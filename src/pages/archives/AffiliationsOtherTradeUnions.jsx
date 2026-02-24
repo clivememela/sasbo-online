@@ -137,6 +137,9 @@ export default function AffiliationsOtherTradeUnions() {
       <h2 className="text-3xl text-center mb-2 text-cyan-700 dark:text-cyan-400">
         Affiliations & Other Trade Unions
       </h2>
+      <p className="text-center text-gray-600 dark:text-gray-400 mb-2">
+        COSATU congress documents, membership figures, trade union constitutions, and international affiliations
+      </p>
       <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
         {totalFiles} documents in {Object.keys(fileStructure).length} categories
       </p>

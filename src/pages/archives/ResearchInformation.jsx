@@ -1,15 +1,8 @@
-import { ChevronDown, ChevronRight, FileText } from "lucide-react";
+import { Download, FileText, ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 export default function ResearchInformation() {
   const [expandedFolders, setExpandedFolders] = useState({});
-
-  const toggleFolder = (path) => {
-    setExpandedFolders(prev => ({
-      ...prev,
-      [path]: !prev[path]
-    }));
-  };
 
   const fileStructure = {
     "Andrew Levy Publications": {
@@ -214,142 +207,111 @@ export default function ResearchInformation() {
     ]
   };
 
-  const renderTree = (data, parentPath = "") => {
-    return Object.entries(data).map(([key, value]) => {
-      const currentPath = parentPath ? `${parentPath}/${key}` : key;
-      const isExpanded = expandedFolders[currentPath];
-
-      if (Array.isArray(value)) {
-        return (
-          <li key={currentPath} className="folder">
-            <div
-              className="folder-header"
-              onClick={() => toggleFolder(currentPath)}
-            >
-              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              <span className="folder-name">{key}</span>
-            </div>
-            {isExpanded && (
-              <ul className="nested">
-                {value.map((file, idx) => (
-                  <li key={`${currentPath}/${file}`} className="file">
-                    <FileText size={14} />
-                    <span>{file}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        );
-      } else {
-        return (
-          <li key={currentPath} className="folder">
-            <div
-              className="folder-header"
-              onClick={() => toggleFolder(currentPath)}
-            >
-              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              <span className="folder-name">{key}</span>
-            </div>
-            {isExpanded && (
-              <ul className="nested">{renderTree(value, currentPath)}</ul>
-            )}
-          </li>
-        );
-      }
-    });
+  const toggleFolder = (folder) => {
+    setExpandedFolders(prev => ({
+      ...prev,
+      [folder]: !prev[folder]
+    }));
   };
+
+  const toggleSubFolder = (key) => {
+    setExpandedFolders(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  const totalFiles = Object.values(fileStructure).reduce((sum, category) => {
+    if (Array.isArray(category)) return sum + category.length;
+    return sum + Object.values(category).reduce((s, files) => s + files.length, 0);
+  }, 0);
 
   return (
     <div className="p-6 text-gray-900 dark:text-gray-100">
       <h2 className="text-3xl text-center mb-2 text-cyan-700 dark:text-cyan-400">
         Information & Research
       </h2>
+
       <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
         Research publications, circulars, legislation, and labour articles
       </p>
+      <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
+        {totalFiles} documents across {Object.keys(fileStructure).length} categories
+      </p>
 
       <div className="max-w-4xl mx-auto">
-        <style>{`
-          .folder-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 1px solid #e5e7eb;
-          }
-          .dark .folder-header {
-            background: #1f2937;
-            border-color: #374151;
-          }
-          .folder-header:hover {
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            background: #f9fafb;
-          }
-          .dark .folder-header:hover {
-            background: #374151;
-          }
-          .folder-name {
-            font-weight: 600;
-          }
-          .nested {
-            margin-left: 16px;
-            margin-top: 4px;
-            padding-left: 16px;
-            border-left: 2px solid #d1d5db;
-          }
-          .dark .nested {
-            border-left-color: #4b5563;
-          }
-          .file {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px;
-            background: #f9fafb;
-            border-radius: 6px;
-            margin: 4px 0;
-            transition: background 0.2s;
-          }
-          .dark .file {
-            background: #111827;
-          }
-          .file:hover {
-            background: #f3f4f6;
-          }
-          .dark .file:hover {
-            background: #1f2937;
-          }
-          .file svg {
-            color: #0891b2;
-            flex-shrink: 0;
-          }
-          .dark .file svg {
-            color: #22d3ee;
-          }
-          .folder-header svg {
-            color: #0891b2;
-            flex-shrink: 0;
-          }
-          .dark .folder-header svg {
-            color: #22d3ee;
-          }
-          ul {
-            list-style: none;
-            padding: 0;
-          }
-          li {
-            margin: 4px 0;
-          }
-        `}</style>
-        <ul>
-          {renderTree(fileStructure)}
-        </ul>
+        {Object.entries(fileStructure).map(([category, subcategories]) => (
+          <div key={category} className="mb-2">
+            <button
+              onClick={() => toggleFolder(category)}
+              className="w-full flex items-center gap-2 p-3 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-700 text-left"
+            >
+              {expandedFolders[category] ? (
+                <ChevronDown size={18} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+              ) : (
+                <ChevronRight size={18} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+              )}
+              <span className="font-semibold">{category}</span>
+            </button>
+
+            {expandedFolders[category] && (
+              <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-300 dark:border-gray-600 pl-4">
+                {Array.isArray(subcategories) ? (
+                  subcategories.map((file, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-900 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <FileText size={16} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                        <span className="text-sm truncate">{file}</span>
+                      </div>
+                      <button className="ml-2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors flex-shrink-0">
+                        <Download size={16} className="text-cyan-600 dark:text-cyan-400" />
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  Object.entries(subcategories).map(([subcategory, files]) => (
+                    <div key={subcategory} className="mb-2">
+                      <button
+                        onClick={() => toggleSubFolder(`${category}-${subcategory}`)}
+                        className="w-full flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-left"
+                      >
+                        {expandedFolders[`${category}-${subcategory}`] ? (
+                          <ChevronDown size={16} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                        ) : (
+                          <ChevronRight size={16} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                        )}
+                        <span className="text-sm font-medium">{subcategory}</span>
+                        <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">({files.length})</span>
+                      </button>
+
+                      {expandedFolders[`${category}-${subcategory}`] && (
+                        <div className="ml-4 mt-1 space-y-1">
+                          {files.map((file, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-900 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            >
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <FileText size={14} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                                <span className="text-xs truncate">{file}</span>
+                              </div>
+                              <button className="ml-2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors flex-shrink-0">
+                                <Download size={14} className="text-cyan-600 dark:text-cyan-400" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

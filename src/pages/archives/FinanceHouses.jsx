@@ -409,6 +409,9 @@ export default function FinanceHouses() {
       <h2 className="text-3xl text-center mb-2 text-cyan-700 dark:text-cyan-400">
         Finance Houses
       </h2>
+      <p className="text-center text-gray-600 dark:text-gray-400 mb-2">
+        Policies, salary agreements, and collective bargaining documents from major South African banks
+      </p>
       <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
         {totalFiles} documents across {Object.keys(fileStructure).length} financial institutions
       </p>
