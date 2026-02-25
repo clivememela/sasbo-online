@@ -1,8 +1,9 @@
-import { Download, FileText, ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { Download, FileText, ChevronDown, ChevronRight, Search, X } from "lucide-react";
+import { useState, useMemo } from "react";
 
 export default function FinanceHouses() {
   const [expandedFolders, setExpandedFolders] = useState({});
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fileStructure = {
     "ABSA": {
@@ -404,6 +405,38 @@ export default function FinanceHouses() {
     return sum + Object.values(bank).reduce((s, files) => s + files.length, 0);
   }, 0);
 
+  const filteredStructure = useMemo(() => {
+    if (!searchQuery.trim()) return fileStructure;
+
+    const query = searchQuery.toLowerCase();
+    const filtered = {};
+
+    Object.entries(fileStructure).forEach(([bank, categories]) => {
+      const bankMatches = bank.toLowerCase().includes(query);
+      let matchedCategories = {};
+
+      if (Array.isArray(categories)) {
+        const matchedFiles = categories.filter(file => file.toLowerCase().includes(query));
+        if (bankMatches || matchedFiles.length > 0) {
+          filtered[bank] = bankMatches ? categories : matchedFiles;
+        }
+      } else {
+        Object.entries(categories).forEach(([category, files]) => {
+          const categoryMatches = category.toLowerCase().includes(query);
+          const matchedFiles = files.filter(file => file.toLowerCase().includes(query));
+          if (categoryMatches || matchedFiles.length > 0) {
+            matchedCategories[category] = categoryMatches ? files : matchedFiles;
+          }
+        });
+        if (bankMatches || Object.keys(matchedCategories).length > 0) {
+          filtered[bank] = bankMatches ? categories : matchedCategories;
+        }
+      }
+    });
+
+    return filtered;
+  }, [searchQuery]);
+
   return (
     <div className="p-6 text-gray-900 dark:text-gray-100">
       <h2 className="text-3xl text-center mb-2 text-cyan-700 dark:text-cyan-400">
@@ -416,8 +449,34 @@ export default function FinanceHouses() {
         {totalFiles} documents across {Object.keys(fileStructure).length} financial institutions
       </p>
 
+      <div className="max-w-4xl mx-auto mb-6">
+        <div className="relative">
+          <Search size={18} className="absolute left-3 top-3 text-gray-400 dark:text-gray-500" />
+          <input
+            type="text"
+            placeholder="Search documents and folders..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+            Found {Object.keys(filteredStructure).length} institutions with matching documents
+          </p>
+        )}
+      </div>
+
       <div className="max-w-4xl mx-auto">
-        {Object.entries(fileStructure).map(([bank, categories]) => (
+        {Object.entries(filteredStructure).map(([bank, categories]) => (
           <div key={bank} className="mb-2">
             <button
               onClick={() => toggleFolder(bank)}

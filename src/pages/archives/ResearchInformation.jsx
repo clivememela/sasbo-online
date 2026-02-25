@@ -1,8 +1,9 @@
-import { Download, FileText, ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { Download, FileText, ChevronDown, ChevronRight, Search, X } from "lucide-react";
+import { useState, useMemo } from "react";
 
 export default function ResearchInformation() {
   const [expandedFolders, setExpandedFolders] = useState({});
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fileStructure = {
     "Andrew Levy Publications": {
@@ -226,6 +227,38 @@ export default function ResearchInformation() {
     return sum + Object.values(category).reduce((s, files) => s + files.length, 0);
   }, 0);
 
+  const filteredStructure = useMemo(() => {
+    if (!searchQuery.trim()) return fileStructure;
+
+    const query = searchQuery.toLowerCase();
+    const filtered = {};
+
+    Object.entries(fileStructure).forEach(([category, subcategories]) => {
+      const categoryMatches = category.toLowerCase().includes(query);
+      let matchedSubcategories = {};
+
+      if (Array.isArray(subcategories)) {
+        const matchedFiles = subcategories.filter(file => file.toLowerCase().includes(query));
+        if (categoryMatches || matchedFiles.length > 0) {
+          filtered[category] = categoryMatches ? subcategories : matchedFiles;
+        }
+      } else {
+        Object.entries(subcategories).forEach(([subcategory, files]) => {
+          const subcategoryMatches = subcategory.toLowerCase().includes(query);
+          const matchedFiles = files.filter(file => file.toLowerCase().includes(query));
+          if (subcategoryMatches || matchedFiles.length > 0) {
+            matchedSubcategories[subcategory] = subcategoryMatches ? files : matchedFiles;
+          }
+        });
+        if (categoryMatches || Object.keys(matchedSubcategories).length > 0) {
+          filtered[category] = categoryMatches ? subcategories : matchedSubcategories;
+        }
+      }
+    });
+
+    return filtered;
+  }, [searchQuery]);
+
   return (
     <div className="p-6 text-gray-900 dark:text-gray-100">
       <h2 className="text-3xl text-center mb-2 text-cyan-700 dark:text-cyan-400">
@@ -239,8 +272,34 @@ export default function ResearchInformation() {
         {totalFiles} documents across {Object.keys(fileStructure).length} categories
       </p>
 
+      <div className="max-w-4xl mx-auto mb-6">
+        <div className="relative">
+          <Search size={18} className="absolute left-3 top-3 text-gray-400 dark:text-gray-500" />
+          <input
+            type="text"
+            placeholder="Search documents and folders..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+            Found {Object.keys(filteredStructure).length} categories with matching documents
+          </p>
+        )}
+      </div>
+
       <div className="max-w-4xl mx-auto">
-        {Object.entries(fileStructure).map(([category, subcategories]) => (
+        {Object.entries(filteredStructure).map(([category, subcategories]) => (
           <div key={category} className="mb-2">
             <button
               onClick={() => toggleFolder(category)}
