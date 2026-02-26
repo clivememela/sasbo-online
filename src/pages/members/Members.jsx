@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Plus } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 
 // Hoist constants to the module scope so their identity is stable across renders.
@@ -6,7 +8,8 @@ import { memberService } from "../../services/memberService.js";
 const PAGE_SIZE = memberService.getPageSize();
 const SearchMembersData = memberService.getMembers();
 
-export default function MemberSearch() {
+export default function Members() {
+    const navigate = useNavigate();
     const [filters, setFilters] = useState({
         title: "",
         employeeNumber: "",
@@ -95,9 +98,18 @@ export default function MemberSearch() {
 
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
-            <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">
-                Search Members
-            </h2>
+            <div className="flex items-center justify-between mb-8">
+                <h2 className="text-3xl text-cyan-700 dark:text-cyan-400">
+                    Members
+                </h2>
+                <button
+                    onClick={() => navigate("/members/apply")}
+                    className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition"
+                >
+                    <Plus size={20} strokeWidth={2} />
+                    Add Member
+                </button>
+            </div>
 
             <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

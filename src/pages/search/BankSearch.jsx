@@ -5,7 +5,6 @@ const PAGE_SIZE = bankService.getPageSize();
 const SearchBanksData = bankService.getBanks();
 
 export default function BankSearch() {
-
   const [filters, setFilters] = useState({
     bankName: "",
     branch: "",
@@ -302,7 +301,7 @@ export default function BankSearch() {
                     <DetailItem label="Manager Name" value={selectedBank.managerName} />
                     <div className="grid grid-cols-2 gap-4 pt-2">
                        <DetailItem label="Reps" value={selectedBank.repsCount} size="sm" />
-                       <DetailItem label="MemberSearch" value={selectedBank.membersCount} size="sm" />
+                       <DetailItem label="Members" value={selectedBank.membersCount} size="sm" />
                        <DetailItem label="Inserts" value={selectedBank.insertsCount} size="sm" />
                        <DetailItem label="Last Visited" value={selectedBank.lastVisitedDate} size="sm" />
                     </div>

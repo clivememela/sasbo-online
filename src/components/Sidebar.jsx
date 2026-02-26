@@ -1,12 +1,19 @@
 import logo from "../assets/images/logo.png";
-import {HandCoins,Home, Landmark, LucideInfo, LucideHome, Building2, Users, ChartNoAxesCombined, ChartBar, Archive, InfoIcon, X, LogIn, LogOutIcon, NotebookPen, Form, MapPinnedIcon, ChevronDown} from "lucide-react";
+import {HandCoins,Home, Landmark, LucideInfo, LucideHome, Building2, Users, ChartNoAxesCombined, ChartBar, Archive, InfoIcon, X, LogIn, LogOutIcon, NotebookPen, Form, MapPinnedIcon, ChevronDown, Plus} from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
 
 const navItems = [
   { title: "Home", icon: Home, href: "/" },
-  { title: "Search Banks", icon: Landmark, href: "/banks" },
-  { title: "Search Members", icon: Users, href: "/members" },
+  { title: "Banks", icon: Landmark, href: "/banks" },
+  { 
+    title: "Members", 
+    icon: Users, 
+    href: "/members",
+    subItems: [
+      { title: "Add Member", icon: Plus, href: "/members/apply" }
+    ]
+  },
   { 
     title: "Reports", 
     icon: ChartNoAxesCombined, 

@@ -1,7 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from './pages/Home';
 import BanksPage from './pages/search/BankSearch.jsx';
-import MembersPage from './pages/search/MemberSearch.jsx';
+import MembersPage from './pages/members/Members.jsx';
+import MembershipApplication from './pages/members/MembershipApplication.jsx';
 import ReportsPage from './pages/reports/ReportSearch.jsx';
 import { OrganizerReport } from './pages/reports/OrganizerReport.jsx';
 import { Forms } from './pages/reports/Forms.jsx';
@@ -25,6 +26,7 @@ function App() {
         <Route index element={<HomePage />} />
         <Route path="banks" element={<BanksPage />} />
         <Route path="members" element={<MembersPage />} />
+        <Route path="members/apply" element={<MembershipApplication />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="reports/organizer-report" element={<OrganizerReport />} />
         <Route path="reports/forms" element={<Forms />} />

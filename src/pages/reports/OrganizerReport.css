@@ -3,6 +3,11 @@
     margin: 0 auto;
     padding: 20px;
     background-color: #f5f5f5;
+    transition: background-color 0.3s;
+}
+
+.dark .organizer-report-container {
+    background-color: #1a1a1a;
 }
 
 .organizer-report-form {
@@ -10,6 +15,13 @@
     padding: 30px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s, color 0.3s, box-shadow 0.3s;
+}
+
+.dark .organizer-report-form {
+    background-color: #2d2d2d;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    color: #e0e0e0;
 }
 
 .report-header {
@@ -25,6 +37,11 @@
     font-size: 18px;
     font-weight: 600;
     letter-spacing: 0.5px;
+    transition: color 0.3s;
+}
+
+.dark .report-header h1 {
+    color: #4a9eff;
 }
 
 .section {
@@ -39,6 +56,11 @@
     font-size: 14px;
     font-weight: 600;
     border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+.dark .section h2 {
+    background-color: #1a4d7a;
 }
 
 .form-row {
@@ -64,6 +86,11 @@
     margin-bottom: 6px;
     text-transform: uppercase;
     letter-spacing: 0.3px;
+    transition: color 0.3s;
+}
+
+.dark .form-group label {
+    color: #e0e0e0;
 }
 
 .form-group input,
@@ -73,7 +100,16 @@
     border-radius: 4px;
     font-size: 13px;
     font-family: inherit;
-    transition: border-color 0.3s;
+    transition: border-color 0.3s, background-color 0.3s, color 0.3s;
+    background-color: white;
+    color: #333;
+}
+
+.dark .form-group input,
+.dark .form-group textarea {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border-color: #555;
 }
 
 .form-group input:focus,
@@ -81,6 +117,12 @@
     outline: none;
     border-color: #003366;
     box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.1);
+}
+
+.dark .form-group input:focus,
+.dark .form-group textarea:focus {
+    border-color: #4a9eff;
+    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
 }
 
 .form-group textarea {
@@ -95,6 +137,11 @@
     margin-top: 30px;
     padding-top: 20px;
     border-top: 1px solid #ddd;
+    transition: border-color 0.3s;
+}
+
+.dark .form-actions {
+    border-top-color: #555;
 }
 
 .btn-submit,
@@ -120,6 +167,14 @@
     box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3);
 }
 
+.dark .btn-submit {
+    background-color: #1a4d7a;
+}
+
+.dark .btn-submit:hover {
+    background-color: #2a6fa8;
+}
+
 .btn-reset {
     background-color: #f0f0f0;
     color: #333;
@@ -128,6 +183,16 @@
 
 .btn-reset:hover {
     background-color: #e0e0e0;
+}
+
+.dark .btn-reset {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border-color: #555;
+}
+
+.dark .btn-reset:hover {
+    background-color: #4a4a4a;
 }
 
 @media (max-width: 768px) {
