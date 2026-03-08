@@ -12,7 +12,7 @@ const navItems = [
     icon: Users, 
     href: "/members",
     subItems: [
-      { title: "Add Member", icon: Plus, href: "/members/apply" }
+      { title: "Member Application", icon: Plus, href: "/members/apply" }
     ]
   },
   { 

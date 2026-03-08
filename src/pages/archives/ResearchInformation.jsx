@@ -264,8 +264,7 @@ export default function ResearchInformation() {
       <h2 className="text-3xl text-center mb-2 text-cyan-700 dark:text-cyan-400">
         Information & Research
       </h2>
-
-      <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
+      <p className="text-center text-gray-600 dark:text-gray-400 mb-2">
         Research publications, circulars, legislation, and labour articles
       </p>
       <p className="text-center text-gray-600 dark:text-gray-400 mb-8">

@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { bankService } from "../../services/bankService.js";
+import { memberService } from "../../services/memberService.js";
+import { TextInput, Button } from "../../components/form";
 
 const PAGE_SIZE = bankService.getPageSize();
 const SearchBanksData = bankService.getBanks();
@@ -16,6 +18,13 @@ export default function BankSearch() {
   const [addressType, setAddressType] = useState("physical");
   const [showAbbrev, setShowAbbrev] = useState(false);
   const [showTableCode, setShowTableCode] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
+
+  const branchMembers = useMemo(() => {
+    if (!selectedBank || !showMembers) return [];
+    return memberService.getMembers().filter(m => m.branch === selectedBank.branch);
+  }, [selectedBank, showMembers]);
 
   const filteredBanks = useMemo(() => {
     const bankNameQuery = filters.bankName.trim().toLowerCase();
@@ -83,46 +92,30 @@ export default function BankSearch() {
 
       <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <label className="flex flex-col gap-2 text-sm">
-            Bank Name
-            <input
-              type="text"
-              value={filters.bankName}
-              onChange={handleInputChange("bankName")}
-              placeholder="Search bank name"
-              className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm">
-            Branch
-            <input
-              type="text"
-              value={filters.branch}
-              onChange={handleInputChange("branch")}
-              placeholder="Search branch"
-              className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm">
-            Area
-            <input
-              type="text"
-              value={filters.area}
-              onChange={handleInputChange("area")}
-              placeholder="Search area"
-              className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm">
-            Random Access Number
-            <input
-              type="text"
-              value={filters.randomAccessNumber}
-              onChange={handleInputChange("randomAccessNumber")}
-              placeholder="Search RAN"
-              className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-            />
-          </label>
+          <TextInput
+            label="Bank Name"
+            value={filters.bankName}
+            onChange={handleInputChange("bankName")}
+            placeholder="Search bank name"
+          />
+          <TextInput
+            label="Branch"
+            value={filters.branch}
+            onChange={handleInputChange("branch")}
+            placeholder="Search branch"
+          />
+          <TextInput
+            label="Area"
+            value={filters.area}
+            onChange={handleInputChange("area")}
+            placeholder="Search area"
+          />
+          <TextInput
+            label="Random Access Number"
+            value={filters.randomAccessNumber}
+            onChange={handleInputChange("randomAccessNumber")}
+            placeholder="Search RAN"
+          />
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">
@@ -130,33 +123,27 @@ export default function BankSearch() {
             Showing {filteredBanks.length === 0 ? 0 : startIndex + 1}-{endIndex} of {filteredBanks.length} banks
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <Button
               type="button"
               onClick={() => setPage((prev) => Math.max(1, prev - 1))}
               disabled={page === 1}
-              className={`px-3 py-1.5 rounded-full text-xs border transition ${
-                page === 1
-                  ? "cursor-not-allowed opacity-50"
-                  : "border-gray-200 bg-white hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700"
-              }`}
+              variant="pagination"
+              className="rounded-full"
             >
               Prev
-            </button>
+            </Button>
             <span className="text-gray-600 dark:text-gray-300">
               Page {page} of {totalPages}
             </span>
-            <button
+            <Button
               type="button"
               onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
               disabled={page === totalPages}
-              className={`px-3 py-1.5 rounded-full text-xs border transition ${
-                page === totalPages
-                  ? "cursor-not-allowed opacity-50"
-                  : "border-gray-200 bg-white hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700"
-              }`}
+              variant="pagination"
+              className="rounded-full"
             >
               Next
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -219,18 +206,29 @@ export default function BankSearch() {
                   </span>
                 )}
               </h3>
-              <button
-                onClick={() => { setSelectedBank(null); setShowAbbrev(false); setShowTableCode(false); }}
-                className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition text-gray-500 dark:text-gray-400"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-2">
+                {!showAbbrev && !showTableCode && (
+                  <a
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); setShowMembers(true); }}
+                    className="text-xs font-bold text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors bg-cyan-50 dark:bg-cyan-900/30 px-3 py-1.5 rounded-md"
+                  >
+                    View All Members
+                  </a>
+                )}
+                <button
+                  onClick={() => { setSelectedBank(null); setShowAbbrev(false); setShowTableCode(false); }}
+                  className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition text-gray-500 dark:text-gray-400"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-              {!showAbbrev && !showTableCode ? (
+              {!showAbbrev && !showTableCode && !showMembers ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {/* General Information */}
                 <section className="space-y-6">
@@ -341,7 +339,64 @@ export default function BankSearch() {
                   </div>
                 </section>
               </div>
-              ) : showAbbrev ? (
+              ) : showMembers ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">Branch</p>
+                    <p className="text-xl font-bold text-cyan-700 dark:text-cyan-400">{selectedBank.branch}</p>
+                  </div>
+                  <button
+                    onClick={() => { setShowMembers(false); setSelectedMember(null); }}
+                    className="px-4 py-2 text-xs font-bold uppercase rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    Back to Bank
+                  </button>
+                </div>
+                <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="grid grid-cols-6 gap-4 px-4 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300 sticky top-0">
+                    <div>Membership Number</div>
+                    <div>Member Name</div>
+                    <div>Email</div>
+                    <div>Phone</div>
+                    <div>Employee Number</div>
+                    <div>Status</div>
+                  </div>
+                  <div className="divide-y divide-gray-200 dark:divide-gray-700 max-h-96 overflow-y-auto">
+                    {branchMembers.length === 0 ? (
+                      <div className="px-4 py-6 text-sm text-gray-600 dark:text-gray-300">
+                        No members found for this branch.
+                      </div>
+                    ) : (
+                      branchMembers.map((m) => (
+                        <div
+                          key={m.id}
+                          onClick={() => setSelectedMember(m)}
+                          className="grid grid-cols-6 gap-4 px-4 py-3 text-sm bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                        >
+                          <div className="font-medium">{m.membershipNumber}</div>
+                          <div className="truncate">{m.title ? `${m.title} ` : ""}{m.initials} {m.surname}</div>
+                          <div className="truncate text-cyan-600 dark:text-cyan-400">{m.email}</div>
+                          <div className="truncate">{m.phone}</div>
+                          <div className="truncate">{m.employeeNumber}</div>
+                          <div>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              m.status === "Active"
+                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                                : m.status === "Pending"
+                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                                : m.status === "Suspended"
+                                ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                                : "bg-gray-100 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300"
+                            }`}>{m.status}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : showAbbrev ? (
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -418,7 +473,49 @@ export default function BankSearch() {
 
             <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end bg-gray-50/50 dark:bg-gray-900/50">
               <button
-                onClick={() => { setSelectedBank(null); setShowAbbrev(false); setShowTableCode(false); }}
+                onClick={() => { setSelectedBank(null); setShowAbbrev(false); setShowTableCode(false); setShowMembers(false); setSelectedMember(null); }}
+                className="px-8 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl transition-all font-bold shadow-lg shadow-cyan-600/20 active:scale-95"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedMember && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 animate-in fade-in duration-300 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-gray-100 dark:border-gray-700">
+            <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50">
+              <h3 className="text-2xl font-bold text-cyan-700 dark:text-cyan-400">
+                {selectedMember.title ? `${selectedMember.title} ` : ""}{selectedMember.initials} {selectedMember.surname}
+              </h3>
+              <button
+                onClick={() => setSelectedMember(null)}
+                className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition text-gray-500 dark:text-gray-400"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <DetailItem label="Membership Number" value={selectedMember.membershipNumber} />
+                <DetailItem label="Employee Number" value={selectedMember.employeeNumber} />
+                <DetailItem label="Email" value={selectedMember.email} className="text-cyan-600 dark:text-cyan-400 break-all" />
+                <DetailItem label="Phone" value={selectedMember.phone} />
+                <DetailItem label="ID Number" value={selectedMember.idNumber} />
+                <DetailItem label="Status" value={selectedMember.status} />
+                <DetailItem label="Bank" value={selectedMember.bankName} />
+                <DetailItem label="Branch" value={selectedMember.branch} />
+                <DetailItem label="Date Joined" value={selectedMember.joinDate} />
+                <DetailItem label="Monthly Subscription" value={selectedMember.monthlySubscription} />
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end bg-gray-50/50 dark:bg-gray-900/50">
+              <button
+                onClick={() => setSelectedMember(null)}
                 className="px-8 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl transition-all font-bold shadow-lg shadow-cyan-600/20 active:scale-95"
               >
                 Close

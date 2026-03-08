@@ -1,5 +1,6 @@
 import {useState} from "react";
 import {OrganizerReport} from "../reports/OrganizerReport.jsx";
+import { TextInput, SelectInput, Button, FilterForm } from "../../components/form";
 
 export function Forms(){
     const [filters, setFilters] = useState({
@@ -10,11 +11,23 @@ export function Forms(){
         formType: "",
     });
 
-    const optionFormType = ["Select Form Type","Membership Application Form", "Branch Form (online)", "Branch Form (offline)", "Location Listing", "Bulk Listing"];
+    const formTypeOptions = [
+        { label: "Select Form Type", value: "" },
+        { label: "Membership Application Form", value: "Membership Application Form" },
+        { label: "Branch Form (online)", value: "Branch Form (online)" },
+        { label: "Branch Form (offline)", value: "Branch Form (offline)" },
+        { label: "Location Listing", value: "Location Listing" },
+        { label: "Bulk Listing", value: "Bulk Listing" }
+    ];
 
     const handleInputChange = (field) => (event) => {
         setFilters((prev) => ({ ...prev, [field]: event.target.value }));
     };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+    };
+
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
             <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">
@@ -23,71 +36,42 @@ export function Forms(){
             <p className="text-center text-gray-600 dark:text-gray-400 mb-2">
                 Complete Forms
             </p>
-            <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <label className="flex flex-col gap-2 text-sm">
-                        Bank Name
-                        <input
-                            type="text"
-                            value={filters.bankName}
-                            onChange={handleInputChange("bankName")}
-                            placeholder="Search bank name"
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Branch
-                        <input
-                            type="text"
-                            value={filters.branch}
-                            onChange={handleInputChange("branch")}
-                            placeholder="Search branch"
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Area
-                        <input
-                            type="text"
-                            value={filters.area}
-                            onChange={handleInputChange("area")}
-                            placeholder="Search area"
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Random Access Number
-                        <input
-                            type="text"
-                            value={filters.randomAccessNumber}
-                            onChange={handleInputChange("randomAccessNumber")}
-                            placeholder="Search RAN"
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Form Type
-                        <select
-                            value={filters.formType}
-                            onChange={handleInputChange("formType")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        >
-                            {optionFormType.map((option) => (
-                                <option key={option} value={option === "Select Form Type" ? "" : option}>
-                                    {option}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                </div>
-                <div className="flex justify-end mt-4">
-                    <button
-                        type="submit"
-                        className="px-2 py-1 rounded-md text-xs border border-gray-200 bg-white hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700"
-                    >
-                        Search
-                    </button>
-                </div>
+            <FilterForm onSubmit={handleSubmit}>
+                <TextInput
+                    label="Bank Name"
+                    value={filters.bankName}
+                    onChange={handleInputChange("bankName")}
+                    placeholder="Search bank name"
+                />
+                <TextInput
+                    label="Branch"
+                    value={filters.branch}
+                    onChange={handleInputChange("branch")}
+                    placeholder="Search branch"
+                />
+                <TextInput
+                    label="Area"
+                    value={filters.area}
+                    onChange={handleInputChange("area")}
+                    placeholder="Search area"
+                />
+                <TextInput
+                    label="Random Access Number"
+                    value={filters.randomAccessNumber}
+                    onChange={handleInputChange("randomAccessNumber")}
+                    placeholder="Search RAN"
+                />
+                <SelectInput
+                    label="Form Type"
+                    value={filters.formType}
+                    onChange={handleInputChange("formType")}
+                    options={formTypeOptions}
+                />
+            </FilterForm>
+            <div className="max-w-6xl mx-auto mt-4 flex justify-end">
+                <Button type="submit" variant="default">Search</Button>
+            </div>
+            <div className="max-w-6xl mx-auto mt-6">
                 <OrganizerReport/>
             </div>
         </div>

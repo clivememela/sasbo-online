@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
-import { memberService } from "../../services/memberService.js";
+import {useEffect, useMemo, useState} from "react";
+import {useNavigate} from "react-router-dom";
+import {Plus} from "lucide-react";
+import {memberService} from "../../services/memberService.js";
 
 // Hoist constants to the module scope so their identity is stable across renders.
 // This preserves memoization semantics for `useMemo` below.
@@ -30,7 +30,7 @@ export default function Members() {
     // Modal state: which member is currently shown in the modal
     const [selectedMember, setSelectedMember] = useState(null);
 
-    // Close modal on Escape key
+    // Close modal on an Escape key
     useEffect(() => {
         const onKeyDown = (e) => {
             if (e.key === "Escape") setSelectedMember(null);
@@ -40,7 +40,7 @@ export default function Members() {
     }, []);
 
     const handleInputChange = (field) => (event) => {
-        setFilters((prev) => ({ ...prev, [field]: event.target.value }));
+        setFilters((prev) => ({...prev, [field]: event.target.value}));
         setPage(1);
     };
 
@@ -68,8 +68,8 @@ export default function Members() {
             if (bankAccQ && !(m.bankAccountNumber ?? "").toLowerCase().includes(bankAccQ)) return false;
             if (phoneQ && !(m.phone ?? "").toLowerCase().includes(phoneQ)) return false;
             if (emailQ && !(m.email ?? "").toLowerCase().includes(emailQ)) return false;
-            if (statusQ && !(m.status ?? "").toLowerCase().includes(statusQ)) return false;
-            return true;
+            return !(statusQ && !(m.status ?? "").toLowerCase().includes(statusQ));
+
         });
     }, [filters]);
 
@@ -98,18 +98,12 @@ export default function Members() {
 
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
-            <div className="flex items-center justify-between mb-8">
-                <h2 className="text-3xl text-cyan-700 dark:text-cyan-400">
-                    Members
-                </h2>
-                <button
-                    onClick={() => navigate("/members/apply")}
-                    className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition"
-                >
-                    <Plus size={20} strokeWidth={2} />
-                    Add Member
-                </button>
-            </div>
+            <h2 className="text-3xl text-center mb-2 text-cyan-700 dark:text-cyan-400">
+                Search Members
+            </h2>
+            <p className="text-center text-gray-600 dark:text-gray-400 mb-2">
+                Policies, salary agreements, and collective bargaining documents from major South African banks
+            </p>
 
             <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -135,7 +129,7 @@ export default function Members() {
                     <label className="flex flex-col gap-2 text-sm">
                         Employee number
                         <input
-                            type="text" 
+                            type="text"
                             placeholder="Search by employee Number"
                             value={filters.employeeNumber}
                             onChange={handleInputChange("employeeNumber")}
@@ -145,7 +139,7 @@ export default function Members() {
                     <label className="flex flex-col gap-2 text-sm">
                         Membership number
                         <input
-                            type="text" 
+                            type="text"
                             placeholder="Search by membership number"
                             value={filters.membershipNumber}
                             onChange={handleInputChange("membershipNumber")}
@@ -155,7 +149,7 @@ export default function Members() {
                     <label className="flex flex-col gap-2 text-sm">
                         Initials
                         <input
-                            type="text" 
+                            type="text"
                             placeholder="Search by initials"
                             value={filters.initials}
                             onChange={handleInputChange("initials")}
@@ -165,7 +159,7 @@ export default function Members() {
                     <label className="flex flex-col gap-2 text-sm">
                         Surname
                         <input
-                            type="text" 
+                            type="text"
                             placeholder="Search by surname"
                             value={filters.surname}
                             onChange={handleInputChange("surname")}
@@ -175,7 +169,7 @@ export default function Members() {
                     <label className="flex flex-col gap-2 text-sm">
                         Identity Number
                         <input
-                            type="text" 
+                            type="text"
                             placeholder="Search by identity number"
                             value={filters.idNumber}
                             onChange={handleInputChange("idNumber")}
@@ -185,7 +179,7 @@ export default function Members() {
                     <label className="flex flex-col gap-2 text-sm">
                         Bank Name
                         <input
-                            type="text" 
+                            type="text"
                             placeholder="Search by bank name"
                             value={filters.bankName}
                             onChange={handleInputChange("bankName")}
@@ -195,7 +189,7 @@ export default function Members() {
                     <label className="flex flex-col gap-2 text-sm">
                         Bank Account Number
                         <input
-                            type="text" 
+                            type="text"
                             placeholder="Search by bank account number"
                             value={filters.bankAccountNumber}
                             onChange={handleInputChange("bankAccountNumber")}
@@ -205,7 +199,7 @@ export default function Members() {
                     <label className="flex flex-col gap-2 text-sm">
                         Cellphone Number
                         <input
-                            type="text" 
+                            type="text"
                             placeholder="Search by cellphone number"
                             value={filters.phone}
                             onChange={handleInputChange("phone")}
@@ -215,7 +209,7 @@ export default function Members() {
                     <label className="flex flex-col gap-2 text-sm">
                         Email Address
                         <input
-                            type="text" 
+                            type="text"
                             placeholder="Search by email address"
                             value={filters.email}
                             onChange={handleInputChange("email")}
@@ -239,6 +233,15 @@ export default function Members() {
 
                 </div>
 
+                <div className="flex justify-end mb-4">
+                    <button
+                        onClick={() => navigate("/members/apply")}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition text-sm shadow-sm"
+                    >
+                        <Plus size={16} strokeWidth={2}/>
+                         Member Application
+                    </button>
+                </div>
                 <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">
                     <div className="text-gray-600 dark:text-gray-300">
                         Showing {filteredMembers.length === 0 ? 0 : startIndex + 1}-{endIndex} of {filteredMembers.length} members
@@ -283,7 +286,8 @@ export default function Members() {
 
                 <div className="mt-4 overflow-hidden rounded-xl border border-transparent max-h-[60vh] overflow-y-auto">
                     {/* Results header aligned to requested order */}
-                    <div className="grid grid-cols-8 gap-4 px-4 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300 sticky top-0 z-10">
+                    <div
+                        className="grid grid-cols-8 gap-4 px-4 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300 sticky top-0 z-10">
                         <div>Membership Number</div>
                         <div>Member (Title, Initials, Surname)</div>
                         <div>Member Email</div>
@@ -306,7 +310,8 @@ export default function Members() {
                                         className="grid grid-cols-8 gap-4 px-4 py-3 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition"
                                     >
                                         <div className="font-medium">{m.membershipNumber}</div>
-                                        <div className="truncate" title={`${m.title ? m.title + " " : ""}${m.initials} ${m.surname}`}>
+                                        <div className="truncate"
+                                             title={`${m.title ? m.title + " " : ""}${m.initials} ${m.surname}`}>
                                             {m.title ? `${m.title} ` : ""}{m.initials} {m.surname}
                                         </div>
                                         <div className="truncate" title={m.email}>{m.email}</div>
@@ -319,10 +324,10 @@ export default function Members() {
                                                 m.status === "Active"
                                                     ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
                                                     : m.status === "Pending"
-                                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                                                    : m.status === "Suspended"
-                                                    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-                                                    : "bg-gray-100 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300"
+                                                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                                                        : m.status === "Suspended"
+                                                            ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                                                            : "bg-gray-100 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300"
                                             }`}>{m.status}</span>
                                         </div>
                                     </div>
@@ -349,12 +354,16 @@ export default function Members() {
                     />
 
                     {/* Dialog */}
-                    <div className="relative max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                    <div
+                        className="relative max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                         {/* Header */}
-                        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                        <div
+                            className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                             <div>
-                                <p className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold">Member Details</p>
-                                <div className="mt-1 flex flex-wrap items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
+                                <p className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold">Member
+                                    Details</p>
+                                <div
+                                    className="mt-1 flex flex-wrap items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
                                     <span>{`${selectedMember.title ? selectedMember.title + " " : ""}${[selectedMember.initials, selectedMember.surname].filter(Boolean).join(" ") || "-"}`}</span>
                                     <span className="text-gray-400">•</span>
                                     <span className="text-gray-600 dark:text-gray-300">
@@ -381,154 +390,196 @@ export default function Members() {
                                 className="shrink-0 rounded-md p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700"
                                 aria-label="Close"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-                                    <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 11-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clipRule="evenodd" />
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+                                     className="h-5 w-5">
+                                    <path fillRule="evenodd"
+                                          d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 11-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z"
+                                          clipRule="evenodd"/>
                                 </svg>
                             </button>
                         </div>
 
                         {/* Breadcrumbs */}
-                        <div className="px-6 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                        <div
+                            className="px-6 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
                             <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                                 <span>Search Members</span>
                                 <span className="text-gray-400">›</span>
-                                <span className="font-medium text-gray-900 dark:text-gray-100">{selectedMember.membershipNumber}</span>
+                                <span
+                                    className="font-medium text-gray-900 dark:text-gray-100">{selectedMember.membershipNumber}</span>
                             </div>
                         </div>
 
                         {/* Body */}
-                        <div className="px-6 py-5 overflow-y-auto max-h-[70vh] text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900/40">
+                        <div
+                            className="px-6 py-5 overflow-y-auto max-h-[70vh] text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900/40">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                                <Detail label="First Names" value={selectedMember.firstNames || selectedMember.firstName || "-"} />
-                                <Detail label="Surname" value={selectedMember.surname || "-"} />
+                                <Detail label="First Names"
+                                        value={selectedMember.firstNames || selectedMember.firstName || "-"}/>
+                                <Detail label="Surname" value={selectedMember.surname || "-"}/>
 
-                                <Detail label="Date Joined" value={selectedMember.joinDate || "-"} />
-                                <Detail label="Monthly Sasbo Subscription" value={selectedMember.monthlySubscription ?? "-"} />
+                                <Detail label="Date Joined" value={selectedMember.joinDate || "-"}/>
+                                <Detail label="Monthly Sasbo Subscription"
+                                        value={selectedMember.monthlySubscription ?? "-"}/>
 
-                                <Detail label="Frequency of Sasbo Subscription" value={selectedMember.subscriptionFrequency ?? "-"} />
-                                <Detail label="Death Benefit Fund Subs" value={selectedMember.deathBenefitSubs ?? "-"} />
+                                <Detail label="Frequency of Sasbo Subscription"
+                                        value={selectedMember.subscriptionFrequency ?? "-"}/>
+                                <Detail label="Death Benefit Fund Subs" value={selectedMember.deathBenefitSubs ?? "-"}/>
 
-                                <Detail label="Frequency of death benefit fund" value={selectedMember.deathBenefitFrequency ?? "-"} />
-                                <Detail label="Death Benefit Fund Policy Number" value={selectedMember.deathBenefitPolicyNo || "-"} />
+                                <Detail label="Frequency of death benefit fund"
+                                        value={selectedMember.deathBenefitFrequency ?? "-"}/>
+                                <Detail label="Death Benefit Fund Policy Number"
+                                        value={selectedMember.deathBenefitPolicyNo || "-"}/>
 
-                                <Detail label="Bank Where Member Is Employed" value={selectedMember.bankName || "-"} />
-                                <Detail label="IBT No." value={selectedMember.ibtNo || "-"} />
+                                <Detail label="Bank Where Member Is Employed" value={selectedMember.bankName || "-"}/>
+                                <Detail label="IBT No." value={selectedMember.ibtNo || "-"}/>
 
-                                <Detail label="Bank Branch Where Member Works" value={selectedMember.branch || "-"} />
-                                <Detail label="Work IBT No." value={selectedMember.workIbtNo || "-"} />
+                                <Detail label="Bank Branch Where Member Works" value={selectedMember.branch || "-"}/>
+                                <Detail label="Work IBT No." value={selectedMember.workIbtNo || "-"}/>
 
-                                <Detail label="Bank Address" value={selectedMember.bankAddress || "-"} className="md:col-span-2" />
-                                <Detail label="Work Bank Address" value={selectedMember.workBankAddress || selectedMember.address || "-"} className="md:col-span-2" />
+                                <Detail label="Bank Address" value={selectedMember.bankAddress || "-"}
+                                        className="md:col-span-2"/>
+                                <Detail label="Work Bank Address"
+                                        value={selectedMember.workBankAddress || selectedMember.address || "-"}
+                                        className="md:col-span-2"/>
 
-                                <Detail label="I.D. Number" value={selectedMember.idNumber || "-"} />
-                                <Detail label="Race" value={selectedMember.race || "-"} />
+                                <Detail label="I.D. Number" value={selectedMember.idNumber || "-"}/>
+                                <Detail label="Race" value={selectedMember.race || "-"}/>
 
-                                <Detail label="Email Address" value={selectedMember.email || "-"} className="break-all text-cyan-600 dark:text-cyan-400" />
-                                <Detail label="Sasbo Rep Election Day" value={selectedMember.repElectionDay ?? "-"} />
+                                <Detail label="Email Address" value={selectedMember.email || "-"}
+                                        className="break-all text-cyan-600 dark:text-cyan-400"/>
+                                <Detail label="Sasbo Rep Election Day" value={selectedMember.repElectionDay ?? "-"}/>
 
-                                <Detail label="Sasbo Rep Election Month" value={selectedMember.repElectionMonth ?? "-"} />
-                                <Detail label="Sasbo Rep Election Year" value={selectedMember.repElectionYear ?? "-"} />
+                                <Detail label="Sasbo Rep Election Month"
+                                        value={selectedMember.repElectionMonth ?? "-"}/>
+                                <Detail label="Sasbo Rep Election Year" value={selectedMember.repElectionYear ?? "-"}/>
 
-                                <Detail label="2nd Remarks Field" value={selectedMember.remarks2 || "-"} className="md:col-span-2" />
-                                <Detail label="Managers Code" value={selectedMember.managersCode ?? "-"} />
+                                <Detail label="2nd Remarks Field" value={selectedMember.remarks2 || "-"}
+                                        className="md:col-span-2"/>
+                                <Detail label="Managers Code" value={selectedMember.managersCode ?? "-"}/>
 
-                                <Detail label="Home Tel" value={selectedMember.homeTel || "-"} />
-                                <Detail label="Work Tel" value={selectedMember.workTel || "-"} />
+                                <Detail label="Home Tel" value={selectedMember.homeTel || "-"}/>
+                                <Detail label="Work Tel" value={selectedMember.workTel || "-"}/>
 
-                                <Detail label="Cell Tel" value={selectedMember.phone || selectedMember.cellTel || "-"} />
-                                <Detail label="Fax Number" value={selectedMember.faxNumber || "-"} />
+                                <Detail label="Cell Tel" value={selectedMember.phone || selectedMember.cellTel || "-"}/>
+                                <Detail label="Fax Number" value={selectedMember.faxNumber || "-"}/>
 
-                                <Detail label="MEMNET Member" value={selectedMember.memnetMember ?? "-"} />
-                                <Detail label="Employee Number" value={selectedMember.employeeNumber || "-"} />
+                                <Detail label="MEMNET Member" value={selectedMember.memnetMember ?? "-"}/>
+                                <Detail label="Employee Number" value={selectedMember.employeeNumber || "-"}/>
 
-                                <Detail label="Endowment Fund Subs" value={selectedMember.endowmentSubs ?? "-"} />
-                                <Detail label="Frequency of Endowment Fund" value={selectedMember.endowmentFrequency ?? "-"} />
+                                <Detail label="Endowment Fund Subs" value={selectedMember.endowmentSubs ?? "-"}/>
+                                <Detail label="Frequency of Endowment Fund"
+                                        value={selectedMember.endowmentFrequency ?? "-"}/>
 
-                                <Detail label="Endowment Fund Policy Number" value={selectedMember.endowmentPolicyNo || "-"} />
-                                <Detail label="Benevolent Fund Subs" value={selectedMember.benevolentSubs ?? "-"} />
+                                <Detail label="Endowment Fund Policy Number"
+                                        value={selectedMember.endowmentPolicyNo || "-"}/>
+                                <Detail label="Benevolent Fund Subs" value={selectedMember.benevolentSubs ?? "-"}/>
 
-                                <Detail label="Frequency of Benevolent Fund" value={selectedMember.benevolentFrequency ?? "-"} />
-                                <Detail label="Benevolent Fund Policy Number" value={selectedMember.benevolentPolicyNo || "-"} />
+                                <Detail label="Frequency of Benevolent Fund"
+                                        value={selectedMember.benevolentFrequency ?? "-"}/>
+                                <Detail label="Benevolent Fund Policy Number"
+                                        value={selectedMember.benevolentPolicyNo || "-"}/>
 
-                                <Detail label="Recruitment Rep" value={selectedMember.recruitmentRep || "-"} className="md:col-span-2" />
-                                <Detail label="Area's Rep" value={selectedMember.areasRep || "-"} className="md:col-span-2" />
+                                <Detail label="Recruitment Rep" value={selectedMember.recruitmentRep || "-"}
+                                        className="md:col-span-2"/>
+                                <Detail label="Area's Rep" value={selectedMember.areasRep || "-"}
+                                        className="md:col-span-2"/>
 
-                                <Detail label="Payment Type" value={selectedMember.paymentType || "-"} />
-                                <Detail label="Last Months Balance" value={selectedMember.lastMonthBalance ?? "-"} />
+                                <Detail label="Payment Type" value={selectedMember.paymentType || "-"}/>
+                                <Detail label="Last Months Balance" value={selectedMember.lastMonthBalance ?? "-"}/>
 
-                                <Detail label="Current Balance" value={selectedMember.currentBalance ?? "-"} />
-                                <Detail label="Arrears Balance" value={selectedMember.arrearsBalance ?? "-"} />
+                                <Detail label="Current Balance" value={selectedMember.currentBalance ?? "-"}/>
+                                <Detail label="Arrears Balance" value={selectedMember.arrearsBalance ?? "-"}/>
 
-                                <Detail label="Day to be debited" value={selectedMember.debitDay ?? "-"} />
-                                <Detail label="Print Label for Postage" value={selectedMember.printLabelForPostage ?? "-"} />
+                                <Detail label="Day to be debited" value={selectedMember.debitDay ?? "-"}/>
+                                <Detail label="Print Label for Postage"
+                                        value={selectedMember.printLabelForPostage ?? "-"}/>
 
-                                <Detail label="Remarks / Comments" value={selectedMember.remarks || "-"} className="md:col-span-2" />
-                                <Detail label="Date Last Changed" value={selectedMember.dateLastChanged || "-"} />
+                                <Detail label="Remarks / Comments" value={selectedMember.remarks || "-"}
+                                        className="md:col-span-2"/>
+                                <Detail label="Date Last Changed" value={selectedMember.dateLastChanged || "-"}/>
 
-                                <Detail label="Alternate Address 1" value={selectedMember.altAddress1 || "-"} />
-                                <Detail label="Previous Address Line 1" value={selectedMember.prevAddress1 || "-"} />
+                                <Detail label="Alternate Address 1" value={selectedMember.altAddress1 || "-"}/>
+                                <Detail label="Previous Address Line 1" value={selectedMember.prevAddress1 || "-"}/>
 
-                                <Detail label="Suspension Code" value={selectedMember.suspensionCode ?? "-"} />
-                                <Detail label="Alt Line 2" value={selectedMember.altAddress2 || "-"} />
+                                <Detail label="Suspension Code" value={selectedMember.suspensionCode ?? "-"}/>
+                                <Detail label="Alt Line 2" value={selectedMember.altAddress2 || "-"}/>
 
-                                <Detail label="Prev Line 2" value={selectedMember.prevAddress2 || "-"} />
-                                <Detail label="Suspended From" value={selectedMember.suspendedFrom || "-"} />
+                                <Detail label="Prev Line 2" value={selectedMember.prevAddress2 || "-"}/>
+                                <Detail label="Suspended From" value={selectedMember.suspendedFrom || "-"}/>
 
-                                <Detail label="Alt Line 3" value={selectedMember.altAddress3 || "-"} />
-                                <Detail label="Prev Line 3" value={selectedMember.prevAddress3 || "-"} />
+                                <Detail label="Alt Line 3" value={selectedMember.altAddress3 || "-"}/>
+                                <Detail label="Prev Line 3" value={selectedMember.prevAddress3 || "-"}/>
 
-                                <Detail label="Suspended To" value={selectedMember.suspendedTo || "-"} />
-                                <Detail label="Postal Code (Alt)" value={selectedMember.altPostalCode || "-"} />
+                                <Detail label="Suspended To" value={selectedMember.suspendedTo || "-"}/>
+                                <Detail label="Postal Code (Alt)" value={selectedMember.altPostalCode || "-"}/>
 
-                                <Detail label="Postal Code (Prev)" value={selectedMember.prevPostalCode || "-"} />
-                                <Detail label="Suspension Reason" value={selectedMember.suspensionReason || "-"} className="md:col-span-2" />
+                                <Detail label="Postal Code (Prev)" value={selectedMember.prevPostalCode || "-"}/>
+                                <Detail label="Suspension Reason" value={selectedMember.suspensionReason || "-"}
+                                        className="md:col-span-2"/>
 
-                                <Detail label="Month Debit Returned" value={selectedMember.monthDebitReturned ?? "-"} />
-                                <Detail label="Use Alternate Address (Y/N)" value={selectedMember.useAltAddress ?? "-"} />
+                                <Detail label="Month Debit Returned" value={selectedMember.monthDebitReturned ?? "-"}/>
+                                <Detail label="Use Alternate Address (Y/N)"
+                                        value={selectedMember.useAltAddress ?? "-"}/>
 
-                                <Detail label="Year Debit Returned" value={selectedMember.yearDebitReturned ?? "-"} />
-                                <Detail label="Deduct Subs through ACB (Y/N)" value={selectedMember.deductACB ?? "-"} />
+                                <Detail label="Year Debit Returned" value={selectedMember.yearDebitReturned ?? "-"}/>
+                                <Detail label="Deduct Subs through ACB (Y/N)" value={selectedMember.deductACB ?? "-"}/>
 
-                                <Detail label="Elected Sasbo Representative (Y/N)" value={selectedMember.electedRep ?? "-"} />
-                                <Detail label="Job Grade" value={selectedMember.jobGrade ?? "-"} />
+                                <Detail label="Elected Sasbo Representative (Y/N)"
+                                        value={selectedMember.electedRep ?? "-"}/>
+                                <Detail label="Job Grade" value={selectedMember.jobGrade ?? "-"}/>
 
-                                <Detail label="National Councillor (Y/N)" value={selectedMember.nationalCouncillor ?? "-"} />
-                                <Detail label="Branch Committee Member" value={selectedMember.branchCommitteeMember ?? "-"} />
+                                <Detail label="National Councillor (Y/N)"
+                                        value={selectedMember.nationalCouncillor ?? "-"}/>
+                                <Detail label="Branch Committee Member"
+                                        value={selectedMember.branchCommitteeMember ?? "-"}/>
 
-                                <Detail label="Print Membership Cards (Y/N)" value={selectedMember.printMembershipCards ?? "-"} />
-                                <Detail label="Home Loan Reduced Interest Rate Option" value={selectedMember.homeLoanReducedRateOption ?? "-"} />
+                                <Detail label="Print Membership Cards (Y/N)"
+                                        value={selectedMember.printMembershipCards ?? "-"}/>
+                                <Detail label="Home Loan Reduced Interest Rate Option"
+                                        value={selectedMember.homeLoanReducedRateOption ?? "-"}/>
 
-                                <Detail label="Previous Account Number" value={selectedMember.previousAccountNumber ?? "-"} />
-                                <Detail label="Previous Clearing Code" value={selectedMember.previousClearingCode ?? "-"} />
+                                <Detail label="Previous Account Number"
+                                        value={selectedMember.previousAccountNumber ?? "-"}/>
+                                <Detail label="Previous Clearing Code"
+                                        value={selectedMember.previousClearingCode ?? "-"}/>
 
-                                <Detail label="Date Address Changed" value={selectedMember.dateAddressChanged || "-"} />
-                                <Detail label="Debit Returned Reason Codes 1" value={selectedMember.debitReturnReason1 ?? "-"} />
+                                <Detail label="Date Address Changed" value={selectedMember.dateAddressChanged || "-"}/>
+                                <Detail label="Debit Returned Reason Codes 1"
+                                        value={selectedMember.debitReturnReason1 ?? "-"}/>
 
-                                <Detail label="Date 1 Debit Returned" value={selectedMember.date1DebitReturned || "-"} />
-                                <Detail label="Date Account Changed" value={selectedMember.dateAccountChanged || "-"} />
+                                <Detail label="Date 1 Debit Returned" value={selectedMember.date1DebitReturned || "-"}/>
+                                <Detail label="Date Account Changed" value={selectedMember.dateAccountChanged || "-"}/>
 
-                                <Detail label="Debit Returned Reason Codes 2" value={selectedMember.debitReturnReason2 ?? "-"} />
-                                <Detail label="Date 2 Debit Returned" value={selectedMember.date2DebitReturned || "-"} />
+                                <Detail label="Debit Returned Reason Codes 2"
+                                        value={selectedMember.debitReturnReason2 ?? "-"}/>
+                                <Detail label="Date 2 Debit Returned" value={selectedMember.date2DebitReturned || "-"}/>
 
-                                <Detail label="PORT No. that Captured Member" value={selectedMember.portCaptured ?? "-"} />
-                                <Detail label="Debit Returned Reason Codes 3" value={selectedMember.debitReturnReason3 ?? "-"} />
+                                <Detail label="PORT No. that Captured Member"
+                                        value={selectedMember.portCaptured ?? "-"}/>
+                                <Detail label="Debit Returned Reason Codes 3"
+                                        value={selectedMember.debitReturnReason3 ?? "-"}/>
 
-                                <Detail label="Date 3 Debit Returned" value={selectedMember.date3DebitReturned || "-"} />
-                                <Detail label="PORT No. that Changed Member" value={selectedMember.portChanged ?? "-"} />
+                                <Detail label="Date 3 Debit Returned" value={selectedMember.date3DebitReturned || "-"}/>
+                                <Detail label="PORT No. that Changed Member" value={selectedMember.portChanged ?? "-"}/>
 
-                                <Detail label="Frequency of Criticare Subs" value={selectedMember.criticareFrequency ?? "-"} />
-                                <Detail label="Criticare Date Joined" value={selectedMember.criticareJoinDate || "-"} />
+                                <Detail label="Frequency of Criticare Subs"
+                                        value={selectedMember.criticareFrequency ?? "-"}/>
+                                <Detail label="Criticare Date Joined" value={selectedMember.criticareJoinDate || "-"}/>
 
-                                <Detail label="Criticare Subs" value={selectedMember.criticareSubs ?? "-"} />
-                                <Detail label="3rd Remarks Field" value={selectedMember.remarks3 || "-"} className="md:col-span-2" />
+                                <Detail label="Criticare Subs" value={selectedMember.criticareSubs ?? "-"}/>
+                                <Detail label="3rd Remarks Field" value={selectedMember.remarks3 || "-"}
+                                        className="md:col-span-2"/>
 
-                                <Detail label="4th Remarks Field" value={selectedMember.remarks4 || "-"} className="md:col-span-2" />
+                                <Detail label="4th Remarks Field" value={selectedMember.remarks4 || "-"}
+                                        className="md:col-span-2"/>
                             </div>
                         </div>
 
                         {/* Footer */}
-                        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                        <div
+                            className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                             <button
                                 type="button"
                                 onClick={() => setSelectedMember(null)}
@@ -544,7 +595,7 @@ export default function Members() {
     );
 }
 
-function Detail({ label, value, className = "" }) {
+function Detail({label, value, className = ""}) {
     return (
         <div className={className}>
             <label className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">
