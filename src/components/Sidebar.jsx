@@ -1,7 +1,8 @@
-import logo from "../assets/images/logo.png";
-import {HandCoins,Home, Landmark, LucideInfo, LucideHome, Building2, Users, ChartNoAxesCombined, ChartBar, Archive, InfoIcon, X, LogIn, LogOutIcon, NotebookPen, Form, MapPinnedIcon, ChevronDown, Plus} from "lucide-react";
+import {HandCoins,Home, Landmark, LucideInfo, Building2, Users, ChartNoAxesCombined, Archive, X, LogOutIcon, NotebookPen, Form, MapPinnedIcon, Plus} from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
+import Logo from "./common/Logo";
+import SidebarItem from "./common/SidebarItem";
 
 const navItems = [
   { title: "Home", icon: Home, href: "/" },
@@ -21,7 +22,7 @@ const navItems = [
     subItems: [
       { title: "Organizer Report", icon: NotebookPen, href: "/reports/organizer-report" },
       { title: "Forms", icon: Form, href: "/reports/forms" },
-      { title: "Locations", icon: MapPinnedIcon, href: "/reports/locations" }
+      { title: "Location Listing", icon: MapPinnedIcon, href: "/reports/locations" }
     ]
   },
   {
@@ -71,7 +72,7 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen}) {
       >
         <div className="p-4 flex justify-between items-center border-b dark:border-gray-700">
           <div className="flex items-center gap-2 text-xl text-cyan-700 dark:text-cyan-400">
-            <img src={logo} alt="Logo" className="h-12 w-auto" />
+            <Logo className="h-12 w-auto" />
             <span>Enquiry Navigation Menu</span>
           </div>
           <button className="lg:hidden dark:text-white" onClick={() => setSideBarOpen(false)}>
@@ -79,74 +80,17 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen}) {
           </button>
         </div>
         <div className="p-4 space-y-2 flex-1 overflow-y-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const hasSubItems = item.subItems && item.subItems.length > 0;
-            const isExpanded = expandedItems[item.href];
-            const isActive = location.pathname === item.href;
-            const hasActiveSubItem = isSubItemActive(item.subItems);
-
-            return (
-              <div key={item.href}>
-                <div
-                  className={`flex items-center p-4 hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-white cursor-pointer transition-colors rounded-lg ${
-                    isActive || hasActiveSubItem ? 'bg-gray-200 dark:bg-gray-700' : ''
-                  }`}
-                  onClick={() => {
-                    if (hasSubItems) {
-                      toggleExpand(item.href);
-                    } else {
-                      setSideBarOpen(false);
-                    }
-                  }}
-                >
-                  <Link
-                    to={item.href}
-                    className="flex items-center flex-1"
-                    onClick={(e) => {
-                      if (hasSubItems) {
-                        e.preventDefault();
-                      } else {
-                        setSideBarOpen(false);
-                      }
-                    }}
-                  >
-                    <Icon size={24} strokeWidth={1} className="mr-6" />
-                    <div className="font-medium">{item.title}</div>
-                  </Link>
-                  {hasSubItems && (
-                    <ChevronDown 
-                      size={20} 
-                      strokeWidth={1} 
-                      className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                    />
-                  )}
-                </div>
-                
-                {hasSubItems && isExpanded && (
-                  <div className="ml-4 space-y-1">
-                    {item.subItems.map((subItem) => {
-                      const SubIcon = subItem.icon;
-                      const isSubActive = location.pathname === subItem.href;
-                      return (
-                        <Link
-                          key={subItem.href}
-                          to={subItem.href}
-                          className={`flex items-center p-3 hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-white cursor-pointer transition-colors rounded-lg text-sm ${
-                            isSubActive ? 'bg-gray-200 dark:bg-gray-700' : ''
-                          }`}
-                          onClick={() => setSideBarOpen(false)}
-                        >
-                          <SubIcon size={20} strokeWidth={1} className="mr-4" />
-                          <div className="font-medium">{subItem.title}</div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {navItems.map((item) => (
+            <SidebarItem 
+              key={item.href}
+              item={item}
+              isActive={location.pathname === item.href}
+              hasActiveSubItem={isSubItemActive(item.subItems)}
+              isExpanded={expandedItems[item.href]}
+              onToggle={toggleExpand}
+              onClick={() => setSideBarOpen(false)}
+            />
+          ))}
           
           <div className="my-4 border-t border-gray-200 dark:border-gray-700"></div>
           

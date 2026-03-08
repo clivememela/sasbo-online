@@ -1,11 +1,11 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from './pages/Home';
-import BanksPage from './pages/search/BankSearch.jsx';
+import BanksPage from './pages/bank/BankSearch.jsx';
 import MembersPage from './pages/members/Members.jsx';
 import MembershipApplication from './pages/members/MembershipApplication.jsx';
-import ReportsPage from './pages/reports/ReportSearch.jsx';
+import ReportsPage from './components/common/ReportSearch.jsx';
 import { OrganizerReport } from './pages/reports/OrganizerReport.jsx';
-import { Forms } from './pages/reports/Forms.jsx';
+import { Forms } from './pages/forms/Forms.jsx';
 import { Locations } from './pages/reports/Locations.jsx';
 import ArchivesPage from './pages/archives/ArchiveSearch.jsx';
 import AffiliationsOtherTradeUnions from './pages/archives/AffiliationsOtherTradeUnions.jsx';

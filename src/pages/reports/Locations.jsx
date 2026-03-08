@@ -1,4 +1,5 @@
 import {useState} from "react";
+import {OrganizerReport} from "./OrganizerReport.jsx";
 
 export function Locations() {
     const [filters, setFilters] = useState({
@@ -15,7 +16,7 @@ export function Locations() {
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
             <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">
-                Locations
+                Location Listings
             </h2>
             <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -61,6 +62,7 @@ export function Locations() {
                     </label>
                 </div>
             </div>
+            <OrganizerReport/>
         </div>
     )
 }
