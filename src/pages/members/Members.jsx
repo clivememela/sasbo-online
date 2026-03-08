@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useState} from "react";
-import {useNavigate} from "react-router-dom";
+import {useNavigate, useLocation} from "react-router-dom";
 import {Plus} from "lucide-react";
 import {memberService} from "../../services/memberService.js";
 
@@ -10,6 +10,7 @@ const SearchMembersData = memberService.getMembers();
 
 export default function Members() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [filters, setFilters] = useState({
         title: "",
         employeeNumber: "",
@@ -17,7 +18,7 @@ export default function Members() {
         initials: "",
         surname: "",
         idNumber: "",
-        bankName: "",
+        bankName: location.state?.filters?.bankName || "",
         bankAccountNumber: "",
         phone: "",
         email: "",
@@ -29,6 +30,8 @@ export default function Members() {
     const [expandedId, setExpandedId] = useState(null);
     // Modal state: which member is currently shown in the modal
     const [selectedMember, setSelectedMember] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [lastSearchTime, setLastSearchTime] = useState(0);
 
     // Close modal on an Escape key
     useEffect(() => {
@@ -57,6 +60,12 @@ export default function Members() {
         const emailQ = filters.email.trim().toLowerCase();
         const statusQ = filters.status.trim().toLowerCase();
 
+        // Trigger loading simulation if filters changed
+        const hasFilters = Object.values(filters).some(v => v.trim() !== "");
+        if (hasFilters) {
+            setLastSearchTime(Date.now());
+        }
+
         return SearchMembersData.filter((m) => {
             if (titleQ && !(m.title ?? "").toLowerCase().includes(titleQ)) return false;
             if (empNoQ && !m.employeeNumber.toLowerCase().includes(empNoQ)) return false;
@@ -72,6 +81,16 @@ export default function Members() {
 
         });
     }, [filters]);
+
+    useEffect(() => {
+        if (lastSearchTime > 0) {
+            setIsLoading(true);
+            const timer = setTimeout(() => {
+                setIsLoading(false);
+            }, 600);
+            return () => clearTimeout(timer);
+        }
+    }, [lastSearchTime]);
 
     const totalPages = Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE));
     const startIndex = (page - 1) * PAGE_SIZE;
@@ -106,7 +125,7 @@ export default function Members() {
             </p>
 
             <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                     <label className="flex flex-col gap-2 text-sm">
                         Title
                         <select
@@ -233,7 +252,7 @@ export default function Members() {
 
                 </div>
 
-                <div className="flex justify-end mb-4">
+                <div className="flex items-end justify-end mt-4">
                     <button
                         onClick={() => navigate("/members/apply")}
                         className="flex items-center gap-2 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition text-sm shadow-sm"
@@ -284,8 +303,16 @@ export default function Members() {
                     </div>
                 </div>
 
-                <div className="mt-4 overflow-hidden rounded-xl border border-transparent max-h-[60vh] overflow-y-auto">
-                    {/* Results header aligned to requested order */}
+                <div className="mt-4 overflow-hidden rounded-xl border border-transparent max-h-[60vh] overflow-y-auto relative">
+                    {isLoading && (
+                        <div className="absolute inset-0 bg-white/60 dark:bg-gray-800/60 z-20 flex items-center justify-center backdrop-blur-[1px]">
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="w-8 h-8 border-4 border-cyan-600 border-t-transparent rounded-full animate-spin"></div>
+                                <p className="text-sm font-medium text-cyan-700 dark:text-cyan-400">Retrieving members...</p>
+                            </div>
+                        </div>
+                    )}
+                    {/* Results header aligned to the requested order */}
                     <div
                         className="grid grid-cols-8 gap-4 px-4 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300 sticky top-0 z-10">
                         <div>Membership Number</div>
