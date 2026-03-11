@@ -23,13 +23,7 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, isExpand
         <Link
           to={item.href}
           className="flex items-center flex-1"
-          onClick={(e) => {
-            if (hasSubItems) {
-              e.preventDefault();
-            } else {
-              onClick();
-            }
-          }}
+          onClick={onClick}
         >
           <Icon size={24} strokeWidth={1} className="mr-6" />
           <div className="font-medium">{item.title}</div>

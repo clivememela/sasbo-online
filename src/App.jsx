@@ -3,7 +3,7 @@ import HomePage from './pages/Home';
 import BanksPage from './pages/bank/BankSearch.jsx';
 import MembersPage from './pages/members/Members.jsx';
 import MembershipApplication from './pages/members/MembershipApplication.jsx';
-import ReportsPage from './components/common/ReportSearch.jsx';
+import ReportsPage from './pages/ReportOptions.jsx';
 import { OrganizerReport } from './pages/reports/OrganizerReport.jsx';
 import { Forms } from './pages/forms/Forms.jsx';
 import { Locations } from './pages/reports/Locations.jsx';

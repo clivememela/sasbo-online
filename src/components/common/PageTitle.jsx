@@ -5,9 +5,9 @@ export default function PageTitle({ title, subtitle }) {
         {title}
       </h2>
       {subtitle && (
-        <h5 className="text-xl text-center mt-2 text-cyan-600 dark:text-cyan-500">
+        <p className="text-xl text-center mt-2 text-cyan-600 dark:text-cyan-500">
           {subtitle}
-        </h5>
+        </p>
       )}
     </div>
   );

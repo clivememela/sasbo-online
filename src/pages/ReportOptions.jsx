@@ -2,7 +2,7 @@ import { useState } from "react";
 import {Form, LucideGitBranch, NotebookPen, MapPinnedIcon, IdCard, Building2, ChartBar, InfoIcon, LucideMap} from "lucide-react";
 import {Link} from "react-router-dom";
 
-export default function ReportSearch() {
+export default function ReportOptions() {
 
     const cards = [
         { title: 'Organizer Report', icon: NotebookPen, href: '/reports/organizer-report', desc: 'Complete visit report' },
@@ -15,9 +15,9 @@ export default function ReportSearch() {
           <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">
               Reports
           </h2>
-          <h5 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">
+          <p className="text-2xl text-center mb-8 text-cyan-700 dark:text-cyan-400">
               Select options below
-          </h5>
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto text-center">
               {cards.map((card) => {
                   const Icon = card.icon;

@@ -443,7 +443,7 @@ export default function FinanceHouses() {
         Finance Houses
       </h2>
       <p className="text-center text-gray-600 dark:text-gray-400 mb-2">
-        Policies, salary agreements, and collective bargaining documents from major South African banks
+        Access official policies, salary agreements, and collective bargaining documents from South African financial institutions
       </p>
       <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
         {totalFiles} documents across {Object.keys(fileStructure).length} financial institutions

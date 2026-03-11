@@ -50,6 +50,13 @@ export const OrganizerReport = () => {
     };
 
     return (
+        <div className="p-6 text-gray-900 dark:text-gray-100">
+            <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">
+                Organizer Report
+            </h2>
+            <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+                Streamline and record organizer site visits, branch engagements, and membership recruitment across all financial institutions.
+            </p>
         <div className="organizer-report-container">
             <form onSubmit={handleSubmit} className="organizer-report-form">
                 <div className="report-header">
@@ -406,6 +413,7 @@ export const OrganizerReport = () => {
                     <button type="reset" className="btn-reset">Clear Form</button>
                 </div>
             </form>
+        </div>
         </div>
     );
 };

@@ -1,5 +1,6 @@
 import {useState} from "react";
 import {OrganizerReport} from "../reports/OrganizerReport.jsx";
+import GeneralForm from "./GeneralForm.jsx";
 import { TextInput, SelectInput, Button, FilterForm } from "../../components/form";
 import {FileSearch, Plus} from "lucide-react";
 
@@ -18,7 +19,8 @@ export function Forms(){
         { label: "Branch Form (online)", value: "Branch Form (online)" },
         { label: "Branch Form (offline)", value: "Branch Form (offline)" },
         { label: "Location Listing", value: "Location Listing" },
-        { label: "Bulk Listing", value: "Bulk Listing" }
+        { label: "Bulk Listing", value: "Bulk Listing" },
+        { label: "General Form", value: "General Form" }
     ];
 
     const handleInputChange = (field) => (event) => {
@@ -31,11 +33,13 @@ export function Forms(){
 
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
-            <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">
+            <h2 className="text-3xl text-center mb-4 text-cyan-700 dark:text-cyan-400">
                 Forms
             </h2>
-            <p className="text-center text-gray-600 dark:text-gray-400 mb-2">
-                Complete Forms
+            <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+                <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+                    Search and complete Forms
+                </p>
             </p>
             <FilterForm onSubmit={handleSubmit}>
                 <TextInput
@@ -79,7 +83,11 @@ export function Forms(){
                 </div>
             </FilterForm>
             <div className="max-w-6xl mx-auto mt-6">
-                <OrganizerReport/>
+                {filters.formType === "General Form" ? (
+                    <GeneralForm />
+                ) : (
+                    <OrganizerReport />
+                )}
             </div>
         </div>
     )

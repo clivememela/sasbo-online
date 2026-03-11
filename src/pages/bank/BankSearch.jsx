@@ -85,6 +85,9 @@ export default function BankSearch() {
       <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">
         Search Banks
       </h2>
+      <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+        Access, manage, and track Sasbo member records across South Africa's leading financial institutions and branch networks.
+      </p>
 
       <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">

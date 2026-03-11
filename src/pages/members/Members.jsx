@@ -121,7 +121,7 @@ export default function Members() {
                 Search Members
             </h2>
             <p className="text-center text-gray-600 dark:text-gray-400 mb-2">
-                Policies, salary agreements, and collective bargaining documents from major South African banks
+                Search and manage Sasbo member records across all major financial institutions
             </p>
 
             <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
