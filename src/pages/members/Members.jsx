@@ -1,6 +1,6 @@
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useState, useRef} from "react";
 import {useNavigate, useLocation} from "react-router-dom";
-import {Plus} from "lucide-react";
+import {LucideUserRoundPlus, Plus, CheckCircle2} from "lucide-react";
 import {memberService} from "../../services/memberService.js";
 
 // Hoist constants to the module scope so their identity is stable across renders.
@@ -23,6 +23,7 @@ export default function Members() {
         phone: "",
         email: "",
         status: "",
+        race: "",
     });
 
     const [page, setPage] = useState(1);
@@ -30,22 +31,87 @@ export default function Members() {
     const [expandedId, setExpandedId] = useState(null);
     // Modal state: which member is currently shown in the modal
     const [selectedMember, setSelectedMember] = useState(null);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editForm, setEditForm] = useState({});
     const [isLoading, setIsLoading] = useState(false);
     const [lastSearchTime, setLastSearchTime] = useState(0);
+    const [activeTab, setActiveTab] = useState("personal");
+    const [showSavedNotification, setShowSavedNotification] = useState(false);
+    const prevMemberIdRef = useRef(null);
+
+    const tabs = [
+        {id: "personal", label: "Personal Information"},
+        {id: "membership", label: "Membership & Subs"},
+        {id: "employment", label: "Employment & Bank"},
+        {id: "representatives", label: "Representatives"},
+        {id: "history", label: "History & Remarks"},
+    ];
+
+    const frequencyOptions = ["Monthly", "Quarterly", "Bi-annually", "Annually"];
+    const titleOptions = ["Mr", "Ms", "Mrs", "Dr", "Prof"];
+    const raceOptions = ["African", "White", "Coloured", "Indian", "Other"];
+    const paymentTypeOptions = ["Debit Order", "Payroll Deduction", "Cash"];
+    const statusOptions = ["Active", "Pending", "Suspended", "Resigned", "Retired"];
+    const yesNoOptions = ["Y", "N"];
+    const suspensionCodeOptions = ["", "NON-PAY", "RESIGN"];
+    const dayOptions = Array.from({length: 31}, (_, i) => (i + 1).toString().padStart(2, '0'));
+    const monthOptions = Array.from({length: 12}, (_, i) => (i + 1).toString().padStart(2, '0'));
+    const yearOptions = Array.from({length: 21}, (_, i) => (new Date().getFullYear() - 10 + i).toString());
 
     // Close modal on an Escape key
     useEffect(() => {
         const onKeyDown = (e) => {
-            if (e.key === "Escape") setSelectedMember(null);
+            if (e.key === "Escape") {
+                setSelectedMember(null);
+                setIsEditing(false);
+            }
         };
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);
     }, []);
 
+    useEffect(() => {
+        if (selectedMember) {
+            setEditForm({...selectedMember});
+            // Only reset to personal tab if we've switched to a DIFFERENT member
+            if (prevMemberIdRef.current !== selectedMember.membershipNumber) {
+                setActiveTab("personal");
+            }
+            prevMemberIdRef.current = selectedMember.membershipNumber;
+        } else {
+            setIsEditing(false);
+            setEditForm({});
+            prevMemberIdRef.current = null;
+        }
+    }, [selectedMember]);
+
+    const handleEditToggle = () => {
+        setIsEditing(!isEditing);
+        if (!isEditing) {
+            setEditForm({...selectedMember});
+        }
+    };
+
+    const handleEditChange = (field) => (event) => {
+        setEditForm((prev) => ({...prev, [field]: event.target.value}));
+    };
+
+    const handleSaveChanges = () => {
+        memberService.updateMember(editForm);
+        setMembersList([...memberService.getMembers()]);
+        setSelectedMember({...editForm});
+        setIsEditing(false);
+        
+        setShowSavedNotification(true);
+        setTimeout(() => setShowSavedNotification(false), 3000);
+    };
+
     const handleInputChange = (field) => (event) => {
         setFilters((prev) => ({...prev, [field]: event.target.value}));
         setPage(1);
     };
+
+    const [membersList, setMembersList] = useState(memberService.getMembers());
 
     const filteredMembers = useMemo(() => {
         const titleQ = filters.title.trim().toLowerCase();
@@ -59,6 +125,7 @@ export default function Members() {
         const phoneQ = filters.phone.trim().toLowerCase();
         const emailQ = filters.email.trim().toLowerCase();
         const statusQ = filters.status.trim().toLowerCase();
+        const raceQ = filters.race.trim().toLowerCase();
 
         // Trigger loading simulation if filters changed
         const hasFilters = Object.values(filters).some(v => v.trim() !== "");
@@ -66,7 +133,7 @@ export default function Members() {
             setLastSearchTime(Date.now());
         }
 
-        return SearchMembersData.filter((m) => {
+        return membersList.filter((m) => {
             if (titleQ && !(m.title ?? "").toLowerCase().includes(titleQ)) return false;
             if (empNoQ && !m.employeeNumber.toLowerCase().includes(empNoQ)) return false;
             if (memNoQ && !m.membershipNumber.toLowerCase().includes(memNoQ)) return false;
@@ -77,10 +144,10 @@ export default function Members() {
             if (bankAccQ && !(m.bankAccountNumber ?? "").toLowerCase().includes(bankAccQ)) return false;
             if (phoneQ && !(m.phone ?? "").toLowerCase().includes(phoneQ)) return false;
             if (emailQ && !(m.email ?? "").toLowerCase().includes(emailQ)) return false;
+            if (raceQ && !(m.race ?? "").toLowerCase().includes(raceQ)) return false;
             return !(statusQ && !(m.status ?? "").toLowerCase().includes(statusQ));
-
         });
-    }, [filters]);
+    }, [filters, membersList]);
 
     useEffect(() => {
         if (lastSearchTime > 0) {
@@ -110,6 +177,7 @@ export default function Members() {
             phone: "",
             email: "",
             status: "",
+            race: "",
         });
         setPage(1);
         setExpandedId(null);
@@ -118,7 +186,7 @@ export default function Members() {
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
             <h2 className="text-3xl text-center mb-2 text-cyan-700 dark:text-cyan-400">
-                Search Members
+                Members
             </h2>
             <p className="text-center text-gray-600 dark:text-gray-400 mb-2">
                 Search and manage Sasbo member records across all major financial institutions
@@ -134,15 +202,9 @@ export default function Members() {
                             className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                         >
                             <option value="">Select Title</option>
-                            <option value="Mr">Mr</option>
-                            <option value="Ms">Ms</option>
-                            <option value="Mrs">Mrs</option>
-                            <option value="Dr">Dr</option>
-                            <option value="Miss">Miss</option>
-                            <option value="Prof">Prof</option>
-                            <option value="Rev">Rev</option>
-                            <option value="Mx">Mx</option>
-                            <option value="Sir">Sir</option>
+                            {titleOptions.map(opt => (
+                                <option key={opt} value={opt}>{opt}</option>
+                            ))}
                         </select>
                     </label>
                     <label className="flex flex-col gap-2 text-sm">
@@ -243,10 +305,37 @@ export default function Members() {
                             className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                         >
                             <option value="">Select Status</option>
-                            <option value="Active">Active</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Suspended">Suspended</option>
-                            <option value="Resigned">Resigned</option>
+                            {statusOptions.map(opt => (
+                                <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <label className="flex flex-col gap-2 text-sm">
+                        Race
+                        <select
+                            value={filters.race || ""}
+                            onChange={(e) => setFilters(prev => ({...prev, race: e.target.value}))}
+                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                        >
+                            <option value="">Select Race</option>
+                            {raceOptions.map(opt => (
+                                <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <label className="flex flex-col gap-2 text-sm">
+                        Title
+                        <select
+                            value={filters.title}
+                            onChange={handleInputChange("title")}
+                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                        >
+                            <option value="">Select Title</option>
+                            {titleOptions.map(opt => (
+                                <option key={opt} value={opt}>{opt}</option>
+                            ))}
                         </select>
                     </label>
 
@@ -257,7 +346,7 @@ export default function Members() {
                         onClick={() => navigate("/members/apply")}
                         className="flex items-center gap-2 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition text-sm shadow-sm"
                     >
-                        <Plus size={16} strokeWidth={2}/>
+                        <LucideUserRoundPlus size={16} strokeWidth={2}/>
                          Member Application
                     </button>
                 </div>
@@ -383,6 +472,15 @@ export default function Members() {
                     {/* Dialog */}
                     <div
                         className="relative max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                        
+                        {/* Saved Notification Toast */}
+                        {showSavedNotification && (
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
+                                <CheckCircle2 size={18} />
+                                <span className="text-sm font-medium">Changes saved successfully!</span>
+                            </div>
+                        )}
+
                         {/* Header */}
                         <div
                             className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -437,183 +535,391 @@ export default function Members() {
                             </div>
                         </div>
 
+                        {/* Tab Navigation */}
+                        <div className="px-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                            <div className="flex flex-wrap -mb-px">
+                                {tabs.map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`mr-4 inline-block p-4 border-b-2 font-medium text-sm transition-colors ${
+                                            activeTab === tab.id
+                                                ? "border-cyan-600 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400"
+                                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                                        }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
                         {/* Body */}
                         <div
                             className="px-6 py-5 overflow-y-auto max-h-[70vh] text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900/40">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {activeTab === "personal" && (
+                                    <>
+                                        <Detail label="Title" value={isEditing ? editForm.title : (selectedMember.title || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("title")}
+                                                options={titleOptions}
+                                        />
+                                        <Detail label="Initials" value={isEditing ? editForm.initials : (selectedMember.initials || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("initials")}
+                                        />
+                                        <Detail label="First Names"
+                                                value={isEditing ? editForm.firstNames || editForm.firstName : (selectedMember.firstNames || selectedMember.firstName || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange(selectedMember.firstNames ? "firstNames" : "firstName")}
+                                        />
+                                        <Detail label="Surname" value={isEditing ? editForm.surname : (selectedMember.surname || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("surname")}
+                                        />
+                                        <Detail label="I.D. Number" value={isEditing ? editForm.idNumber : (selectedMember.idNumber || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("idNumber")}
+                                        />
+                                        <Detail label="Race" value={isEditing ? editForm.race : (selectedMember.race || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("race")}
+                                                options={raceOptions}
+                                        />
+                                        <Detail label="Email Address" value={isEditing ? editForm.email : (selectedMember.email || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("email")}
+                                                className="break-all text-cyan-600 dark:text-cyan-400"/>
+                                        <Detail label="Cell Tel" value={isEditing ? (editForm.phone || editForm.cellTel) : (selectedMember.phone || selectedMember.cellTel || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange(selectedMember.phone ? "phone" : "cellTel")}
+                                        />
+                                        <Detail label="Work Tel" value={isEditing ? editForm.workTel : (selectedMember.workTel || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("workTel")}
+                                        />
+                                        <Detail label="Home Tel" value={isEditing ? editForm.homeTel : (selectedMember.homeTel || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("homeTel")}
+                                        />
+                                        <Detail label="Fax Number" value={isEditing ? editForm.faxNumber : (selectedMember.faxNumber || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("faxNumber")}
+                                        />
+                                        <Detail label="Address" value={isEditing ? editForm.address : (selectedMember.address || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("address")}
+                                                className="md:col-span-2"
+                                        />
+                                    </>
+                                )}
 
-                                <Detail label="First Names"
-                                        value={selectedMember.firstNames || selectedMember.firstName || "-"}/>
-                                <Detail label="Surname" value={selectedMember.surname || "-"}/>
+                                {activeTab === "membership" && (
+                                    <>
+                                        <Detail label="Membership Number" value={selectedMember.membershipNumber} isEditing={false} />
+                                        <Detail label="Member ID" value={selectedMember.id} isEditing={false} />
+                                        <Detail label="Date Joined" value={isEditing ? editForm.joinDate : (selectedMember.joinDate || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("joinDate")}
+                                        />
+                                        <Detail label="Status" value={isEditing ? editForm.status : (selectedMember.status || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("status")}
+                                                options={statusOptions}
+                                        />
 
-                                <Detail label="Date Joined" value={selectedMember.joinDate || "-"}/>
-                                <Detail label="Monthly Sasbo Subscription"
-                                        value={selectedMember.monthlySubscription ?? "-"}/>
+                                        <div className="md:col-span-2 mt-4 border-b pb-1 font-semibold text-cyan-700 dark:text-cyan-400">Sasbo Subscription</div>
+                                        <Detail label="Monthly Sasbo Subscription"
+                                                value={isEditing ? editForm.monthlySubscription : (selectedMember.monthlySubscription ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("monthlySubscription")}
+                                        />
+                                        <Detail label="Frequency of Sasbo Subscription"
+                                                value={isEditing ? editForm.subscriptionFrequency : (selectedMember.subscriptionFrequency ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("subscriptionFrequency")}
+                                                options={frequencyOptions}
+                                        />
 
-                                <Detail label="Frequency of Sasbo Subscription"
-                                        value={selectedMember.subscriptionFrequency ?? "-"}/>
-                                <Detail label="Death Benefit Fund Subs" value={selectedMember.deathBenefitSubs ?? "-"}/>
+                                        <div className="md:col-span-2 mt-4 border-b pb-1 font-semibold text-cyan-700 dark:text-cyan-400">Death Benefit Fund</div>
+                                        <Detail label="Death Benefit Fund Subs" value={isEditing ? editForm.deathBenefitSubs : (selectedMember.deathBenefitSubs ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("deathBenefitSubs")}
+                                        />
+                                        <Detail label="Frequency of death benefit fund"
+                                                value={isEditing ? editForm.deathBenefitFrequency : (selectedMember.deathBenefitFrequency ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("deathBenefitFrequency")}
+                                                options={frequencyOptions}
+                                        />
+                                        <Detail label="Death Benefit Fund Policy Number"
+                                                value={isEditing ? editForm.deathBenefitPolicyNo : (selectedMember.deathBenefitPolicyNo || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("deathBenefitPolicyNo")}
+                                                className="md:col-span-2"
+                                        />
 
-                                <Detail label="Frequency of death benefit fund"
-                                        value={selectedMember.deathBenefitFrequency ?? "-"}/>
-                                <Detail label="Death Benefit Fund Policy Number"
-                                        value={selectedMember.deathBenefitPolicyNo || "-"}/>
+                                        <div className="md:col-span-2 mt-4 border-b pb-1 font-semibold text-cyan-700 dark:text-cyan-400">Endowment Fund</div>
+                                        <Detail label="Endowment Fund Subs" value={isEditing ? editForm.endowmentSubs : (selectedMember.endowmentSubs ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("endowmentSubs")}
+                                        />
+                                        <Detail label="Frequency of Endowment Fund"
+                                                value={isEditing ? editForm.endowmentFrequency : (selectedMember.endowmentFrequency ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("endowmentFrequency")}
+                                                options={frequencyOptions}
+                                        />
+                                        <Detail label="Endowment Fund Policy Number"
+                                                value={isEditing ? editForm.endowmentPolicyNo : (selectedMember.endowmentPolicyNo || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("endowmentPolicyNo")}
+                                                className="md:col-span-2"
+                                        />
 
-                                <Detail label="Bank Where Member Is Employed" value={selectedMember.bankName || "-"}/>
-                                <Detail label="IBT No." value={selectedMember.ibtNo || "-"}/>
+                                        <div className="md:col-span-2 mt-4 border-b pb-1 font-semibold text-cyan-700 dark:text-cyan-400">Benevolent Fund</div>
+                                        <Detail label="Benevolent Fund Subs" value={isEditing ? editForm.benevolentSubs : (selectedMember.benevolentSubs ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("benevolentSubs")}
+                                        />
+                                        <Detail label="Frequency of Benevolent Fund"
+                                                value={isEditing ? editForm.benevolentFrequency : (selectedMember.benevolentFrequency ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("benevolentFrequency")}
+                                                options={frequencyOptions}
+                                        />
+                                        <Detail label="Benevolent Fund Policy Number"
+                                                value={isEditing ? editForm.benevolentPolicyNo : (selectedMember.benevolentPolicyNo || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("benevolentPolicyNo")}
+                                                className="md:col-span-2"
+                                        />
 
-                                <Detail label="Bank Branch Where Member Works" value={selectedMember.branch || "-"}/>
-                                <Detail label="Work IBT No." value={selectedMember.workIbtNo || "-"}/>
+                                        <div className="md:col-span-2 mt-4 border-b pb-1 font-semibold text-cyan-700 dark:text-cyan-400">Balances</div>
+                                        <Detail label="Last Months Balance" value={isEditing ? editForm.lastMonthBalance : (selectedMember.lastMonthBalance ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("lastMonthBalance")}
+                                        />
+                                        <Detail label="Current Balance" value={isEditing ? editForm.currentBalance : (selectedMember.currentBalance ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("currentBalance")}
+                                        />
+                                        <Detail label="Arrears Balance" value={isEditing ? editForm.arrearsBalance : (selectedMember.arrearsBalance ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("arrearsBalance")}
+                                        />
+                                        <Detail label="Date Last Changed" value={isEditing ? editForm.dateLastChanged : (selectedMember.dateLastChanged || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("dateLastChanged")}
+                                        />
+                                    </>
+                                )}
 
-                                <Detail label="Bank Address" value={selectedMember.bankAddress || "-"}
-                                        className="md:col-span-2"/>
-                                <Detail label="Work Bank Address"
-                                        value={selectedMember.workBankAddress || selectedMember.address || "-"}
-                                        className="md:col-span-2"/>
+                                {activeTab === "employment" && (
+                                    <>
+                                        <Detail label="Employee Number" value={isEditing ? editForm.employeeNumber : (selectedMember.employeeNumber || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("employeeNumber")}
+                                        />
+                                        <Detail label="Job Grade" value={isEditing ? editForm.jobGrade : (selectedMember.jobGrade ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("jobGrade")}
+                                        />
+                                        <Detail label="Bank Where Member Is Employed" value={isEditing ? editForm.bankName : (selectedMember.bankName || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("bankName")}
+                                        />
+                                        <Detail label="Bank Account Number" value={isEditing ? editForm.bankAccountNumber : (selectedMember.bankAccountNumber || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("bankAccountNumber")}
+                                        />
+                                        <Detail label="Bank Branch Where Member Works" value={isEditing ? editForm.branch : (selectedMember.branch || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("branch")}
+                                        />
+                                        <Detail label="IBT No." value={isEditing ? editForm.ibtNo : (selectedMember.ibtNo || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("ibtNo")}
+                                        />
+                                        <Detail label="Work IBT No." value={isEditing ? editForm.workIbtNo : (selectedMember.workIbtNo || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("workIbtNo")}
+                                        />
+                                        <Detail label="Payment Type" value={isEditing ? editForm.paymentType : (selectedMember.paymentType || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("paymentType")}
+                                                options={paymentTypeOptions}
+                                        />
+                                        <Detail label="Day to be debited" value={isEditing ? editForm.debitDay : (selectedMember.debitDay ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("debitDay")}
+                                        />
+                                        <Detail label="Bank Address" value={isEditing ? editForm.bankAddress : (selectedMember.bankAddress || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("bankAddress")}
+                                                className="md:col-span-2"/>
+                                        <Detail label="Work Bank Address"
+                                                value={isEditing ? editForm.workBankAddress : (selectedMember.workBankAddress || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("workBankAddress")}
+                                                className="md:col-span-2"/>
+                                    </>
+                                )}
 
-                                <Detail label="I.D. Number" value={selectedMember.idNumber || "-"}/>
-                                <Detail label="Race" value={selectedMember.race || "-"}/>
+                                {activeTab === "representatives" && (
+                                    <>
+                                        <Detail label="Recruitment Rep" value={isEditing ? editForm.recruitmentRep : (selectedMember.recruitmentRep || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("recruitmentRep")}
+                                                className="md:col-span-2"/>
+                                        <Detail label="Area's Rep" value={isEditing ? editForm.areasRep : (selectedMember.areasRep || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("areasRep")}
+                                                className="md:col-span-2"/>
+                                        <Detail label="Sasbo Rep Election Day" value={isEditing ? editForm.repElectionDay : (selectedMember.repElectionDay ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("repElectionDay")}
+                                                options={dayOptions}
+                                        />
+                                        <Detail label="Sasbo Rep Election Month"
+                                                value={isEditing ? editForm.repElectionMonth : (selectedMember.repElectionMonth ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("repElectionMonth")}
+                                                options={monthOptions}
+                                        />
+                                        <Detail label="Sasbo Rep Election Year" value={isEditing ? editForm.repElectionYear : (selectedMember.repElectionYear ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("repElectionYear")}
+                                                options={yearOptions}
+                                        />
+                                        <Detail label="Elected Sasbo Representative (Y/N)"
+                                                value={isEditing ? editForm.electedRep : (selectedMember.electedRep ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("electedRep")}
+                                                options={yesNoOptions}
+                                        />
+                                        <Detail label="National Councillor (Y/N)"
+                                                value={isEditing ? editForm.nationalCouncillor : (selectedMember.nationalCouncillor ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("nationalCouncillor")}
+                                                options={yesNoOptions}
+                                        />
+                                        <Detail label="Branch Committee Member (Y/N)"
+                                                value={isEditing ? editForm.branchCommitteeMember : (selectedMember.branchCommitteeMember ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("branchCommitteeMember")}
+                                                options={yesNoOptions}
+                                        />
+                                    </>
+                                )}
 
-                                <Detail label="Email Address" value={selectedMember.email || "-"}
-                                        className="break-all text-cyan-600 dark:text-cyan-400"/>
-                                <Detail label="Sasbo Rep Election Day" value={selectedMember.repElectionDay ?? "-"}/>
+                                {activeTab === "history" && (
+                                    <>
+                                        <Detail label="Remarks / Comments" value={isEditing ? editForm.remarks : (selectedMember.remarks || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("remarks")}
+                                                className="md:col-span-2"/>
+                                        <Detail label="2nd Remarks Field" value={isEditing ? editForm.remarks2 : (selectedMember.remarks2 || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("remarks2")}
+                                                className="md:col-span-2"/>
+                                        <Detail label="3rd Remarks Field" value={isEditing ? editForm.remarks3 : (selectedMember.remarks3 || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("remarks3")}
+                                                className="md:col-span-2"/>
+                                        <Detail label="4th Remarks Field" value={isEditing ? editForm.remarks4 : (selectedMember.remarks4 || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("remarks4")}
+                                                className="md:col-span-2"/>
 
-                                <Detail label="Sasbo Rep Election Month"
-                                        value={selectedMember.repElectionMonth ?? "-"}/>
-                                <Detail label="Sasbo Rep Election Year" value={selectedMember.repElectionYear ?? "-"}/>
-
-                                <Detail label="2nd Remarks Field" value={selectedMember.remarks2 || "-"}
-                                        className="md:col-span-2"/>
-                                <Detail label="Managers Code" value={selectedMember.managersCode ?? "-"}/>
-
-                                <Detail label="Home Tel" value={selectedMember.homeTel || "-"}/>
-                                <Detail label="Work Tel" value={selectedMember.workTel || "-"}/>
-
-                                <Detail label="Cell Tel" value={selectedMember.phone || selectedMember.cellTel || "-"}/>
-                                <Detail label="Fax Number" value={selectedMember.faxNumber || "-"}/>
-
-                                <Detail label="MEMNET Member" value={selectedMember.memnetMember ?? "-"}/>
-                                <Detail label="Employee Number" value={selectedMember.employeeNumber || "-"}/>
-
-                                <Detail label="Endowment Fund Subs" value={selectedMember.endowmentSubs ?? "-"}/>
-                                <Detail label="Frequency of Endowment Fund"
-                                        value={selectedMember.endowmentFrequency ?? "-"}/>
-
-                                <Detail label="Endowment Fund Policy Number"
-                                        value={selectedMember.endowmentPolicyNo || "-"}/>
-                                <Detail label="Benevolent Fund Subs" value={selectedMember.benevolentSubs ?? "-"}/>
-
-                                <Detail label="Frequency of Benevolent Fund"
-                                        value={selectedMember.benevolentFrequency ?? "-"}/>
-                                <Detail label="Benevolent Fund Policy Number"
-                                        value={selectedMember.benevolentPolicyNo || "-"}/>
-
-                                <Detail label="Recruitment Rep" value={selectedMember.recruitmentRep || "-"}
-                                        className="md:col-span-2"/>
-                                <Detail label="Area's Rep" value={selectedMember.areasRep || "-"}
-                                        className="md:col-span-2"/>
-
-                                <Detail label="Payment Type" value={selectedMember.paymentType || "-"}/>
-                                <Detail label="Last Months Balance" value={selectedMember.lastMonthBalance ?? "-"}/>
-
-                                <Detail label="Current Balance" value={selectedMember.currentBalance ?? "-"}/>
-                                <Detail label="Arrears Balance" value={selectedMember.arrearsBalance ?? "-"}/>
-
-                                <Detail label="Day to be debited" value={selectedMember.debitDay ?? "-"}/>
-                                <Detail label="Print Label for Postage"
-                                        value={selectedMember.printLabelForPostage ?? "-"}/>
-
-                                <Detail label="Remarks / Comments" value={selectedMember.remarks || "-"}
-                                        className="md:col-span-2"/>
-                                <Detail label="Date Last Changed" value={selectedMember.dateLastChanged || "-"}/>
-
-                                <Detail label="Alternate Address 1" value={selectedMember.altAddress1 || "-"}/>
-                                <Detail label="Previous Address Line 1" value={selectedMember.prevAddress1 || "-"}/>
-
-                                <Detail label="Suspension Code" value={selectedMember.suspensionCode ?? "-"}/>
-                                <Detail label="Alt Line 2" value={selectedMember.altAddress2 || "-"}/>
-
-                                <Detail label="Prev Line 2" value={selectedMember.prevAddress2 || "-"}/>
-                                <Detail label="Suspended From" value={selectedMember.suspendedFrom || "-"}/>
-
-                                <Detail label="Alt Line 3" value={selectedMember.altAddress3 || "-"}/>
-                                <Detail label="Prev Line 3" value={selectedMember.prevAddress3 || "-"}/>
-
-                                <Detail label="Suspended To" value={selectedMember.suspendedTo || "-"}/>
-                                <Detail label="Postal Code (Alt)" value={selectedMember.altPostalCode || "-"}/>
-
-                                <Detail label="Postal Code (Prev)" value={selectedMember.prevPostalCode || "-"}/>
-                                <Detail label="Suspension Reason" value={selectedMember.suspensionReason || "-"}
-                                        className="md:col-span-2"/>
-
-                                <Detail label="Month Debit Returned" value={selectedMember.monthDebitReturned ?? "-"}/>
-                                <Detail label="Use Alternate Address (Y/N)"
-                                        value={selectedMember.useAltAddress ?? "-"}/>
-
-                                <Detail label="Year Debit Returned" value={selectedMember.yearDebitReturned ?? "-"}/>
-                                <Detail label="Deduct Subs through ACB (Y/N)" value={selectedMember.deductACB ?? "-"}/>
-
-                                <Detail label="Elected Sasbo Representative (Y/N)"
-                                        value={selectedMember.electedRep ?? "-"}/>
-                                <Detail label="Job Grade" value={selectedMember.jobGrade ?? "-"}/>
-
-                                <Detail label="National Councillor (Y/N)"
-                                        value={selectedMember.nationalCouncillor ?? "-"}/>
-                                <Detail label="Branch Committee Member"
-                                        value={selectedMember.branchCommitteeMember ?? "-"}/>
-
-                                <Detail label="Print Membership Cards (Y/N)"
-                                        value={selectedMember.printMembershipCards ?? "-"}/>
-                                <Detail label="Home Loan Reduced Interest Rate Option"
-                                        value={selectedMember.homeLoanReducedRateOption ?? "-"}/>
-
-                                <Detail label="Previous Account Number"
-                                        value={selectedMember.previousAccountNumber ?? "-"}/>
-                                <Detail label="Previous Clearing Code"
-                                        value={selectedMember.previousClearingCode ?? "-"}/>
-
-                                <Detail label="Date Address Changed" value={selectedMember.dateAddressChanged || "-"}/>
-                                <Detail label="Debit Returned Reason Codes 1"
-                                        value={selectedMember.debitReturnReason1 ?? "-"}/>
-
-                                <Detail label="Date 1 Debit Returned" value={selectedMember.date1DebitReturned || "-"}/>
-                                <Detail label="Date Account Changed" value={selectedMember.dateAccountChanged || "-"}/>
-
-                                <Detail label="Debit Returned Reason Codes 2"
-                                        value={selectedMember.debitReturnReason2 ?? "-"}/>
-                                <Detail label="Date 2 Debit Returned" value={selectedMember.date2DebitReturned || "-"}/>
-
-                                <Detail label="PORT No. that Captured Member"
-                                        value={selectedMember.portCaptured ?? "-"}/>
-                                <Detail label="Debit Returned Reason Codes 3"
-                                        value={selectedMember.debitReturnReason3 ?? "-"}/>
-
-                                <Detail label="Date 3 Debit Returned" value={selectedMember.date3DebitReturned || "-"}/>
-                                <Detail label="PORT No. that Changed Member" value={selectedMember.portChanged ?? "-"}/>
-
-                                <Detail label="Frequency of Criticare Subs"
-                                        value={selectedMember.criticareFrequency ?? "-"}/>
-                                <Detail label="Criticare Date Joined" value={selectedMember.criticareJoinDate || "-"}/>
-
-                                <Detail label="Criticare Subs" value={selectedMember.criticareSubs ?? "-"}/>
-                                <Detail label="3rd Remarks Field" value={selectedMember.remarks3 || "-"}
-                                        className="md:col-span-2"/>
-
-                                <Detail label="4th Remarks Field" value={selectedMember.remarks4 || "-"}
-                                        className="md:col-span-2"/>
+                                        <div className="md:col-span-2 mt-4 border-b pb-1 font-semibold text-cyan-700 dark:text-cyan-400">Other Information</div>
+                                        <Detail label="Managers Code" value={isEditing ? editForm.managersCode : (selectedMember.managersCode ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("managersCode")}
+                                        />
+                                        <Detail label="MEMNET Member (Y/N)" value={isEditing ? editForm.memnetMember : (selectedMember.memnetMember ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("memnetMember")}
+                                                options={yesNoOptions}
+                                        />
+                                        <Detail label="Print Label for Postage (Y/N)"
+                                                value={isEditing ? editForm.printLabelForPostage : (selectedMember.printLabelForPostage ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("printLabelForPostage")}
+                                                options={yesNoOptions}
+                                        />
+                                        <Detail label="Suspension Code" value={isEditing ? editForm.suspensionCode : (selectedMember.suspensionCode ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("suspensionCode")}
+                                                options={suspensionCodeOptions}
+                                        />
+                                        <Detail label="Use Alternate Address (Y/N)"
+                                                value={isEditing ? editForm.useAltAddress : (selectedMember.useAltAddress ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("useAltAddress")}
+                                                options={yesNoOptions}
+                                        />
+                                        <Detail label="Deduct Subs through ACB (Y/N)" value={isEditing ? editForm.deductACB : (selectedMember.deductACB ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("deductACB")}
+                                                options={yesNoOptions}
+                                        />
+                                        <Detail label="Print Membership Cards (Y/N)"
+                                                value={isEditing ? editForm.printMembershipCards : (selectedMember.printMembershipCards ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("printMembershipCards")}
+                                                options={yesNoOptions}
+                                        />
+                                        <Detail label="Home Loan Reduced Interest Rate Option (Y/N)"
+                                                value={isEditing ? editForm.homeLoanReducedRateOption : (selectedMember.homeLoanReducedRateOption ?? "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("homeLoanReducedRateOption")}
+                                                options={yesNoOptions}
+                                        />
+                                    </>
+                                )}
                             </div>
                         </div>
 
                         {/* Footer */}
                         <div
                             className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                            <button
-                                type="button"
-                                onClick={() => setSelectedMember(null)}
-                                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-sm"
-                            >
-                                Close
-                            </button>
+                            {isEditing ? (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveChanges}
+                                        className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium transition"
+                                    >
+                                        Save Changes
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleEditToggle}
+                                        className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-sm"
+                                    >
+                                        Cancel
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={handleEditToggle}
+                                        className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium transition"
+                                    >
+                                        Edit Member
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedMember(null)}
+                                        className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-sm"
+                                    >
+                                        Close
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -622,13 +928,37 @@ export default function Members() {
     );
 }
 
-function Detail({label, value, className = ""}) {
+function Detail({label, value, isEditing, onChange, className = "", options = null}) {
     return (
         <div className={className}>
             <label className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">
                 {label}
             </label>
-            <p className="font-semibold text-gray-800 dark:text-gray-200">{value}</p>
+            {isEditing ? (
+                options ? (
+                    <select
+                        value={value || ""}
+                        onChange={onChange}
+                        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm px-3 py-1.5 border"
+                    >
+                        <option value="">Select...</option>
+                        {options.map((opt) => (
+                            <option key={opt} value={opt}>
+                                {opt}
+                            </option>
+                        ))}
+                    </select>
+                ) : (
+                    <input
+                        type="text"
+                        value={value || ""}
+                        onChange={onChange}
+                        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm px-3 py-1.5 border"
+                    />
+                )
+            ) : (
+                <p className="font-semibold text-gray-800 dark:text-gray-200">{value}</p>
+            )}
         </div>
     );
 }

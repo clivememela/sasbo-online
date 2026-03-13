@@ -1,4 +1,23 @@
-import {HandCoins,Home, Landmark, LucideInfo, Building2, Users, ChartNoAxesCombined, Archive, X, LogOutIcon, NotebookPen, Form, MapPinnedIcon, Plus} from "lucide-react";
+import {
+  TextSelect,
+  ArrowRightLeft,
+  HandCoins,
+  Home,
+  Landmark,
+  LucideInfo,
+  Building2,
+  Users,
+  ChartNoAxesCombined,
+  Archive,
+  X,
+  LogOutIcon,
+  NotebookPen,
+  Form,
+  MapPinnedIcon,
+  Plus,
+  LucideDatabase, Mailbox, LucideToolbox, LucideMenu, LucideCassetteTape, LucideGitBranch, LucideChartNoAxesGantt,
+  LucideUserRoundPlus, LucideCalendar, LucideFile, LucideTag
+} from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
 import Logo from "./common/Logo";
@@ -7,12 +26,32 @@ import SidebarItem from "./common/SidebarItem";
 const navItems = [
   { title: "Home", icon: Home, href: "/" },
   { title: "Banks", icon: Landmark, href: "/banks" },
+  {
+    title: "Admin Menu",
+    icon: LucideDatabase,
+    href: "/admin",
+    subItems: [
+      { title: "Daily Menu", icon: LucideMenu, href: "/miscellaneous/daily-menu" },
+      { title: "Monthly Menu", icon: LucideCalendar, href: "/reports/forms" },
+      { title: "Banks", icon: Landmark, href: "/banks" },
+      { title: "Utilities", icon: LucideToolbox, href: "/reports/forms" },
+      { title: "A.C.B", icon: LucideFile, href: "/reports/forms" },
+      { title: "Regional Branches", icon: LucideGitBranch, href: "/reports/forms" },
+      { title: "Tape", icon: LucideCassetteTape, href: "/reports/forms" },
+      { title: "D.B.F", icon: LucideFile, href: "/banks/new" },
+      { title: "Selective Print", icon: TextSelect, href: "/members/apply" },
+      { title: "Committee", icon: LucideChartNoAxesGantt, href: "/members/apply"},
+      { title: "Ad-Hoc Label", icon: LucideTag, href: "/members/apply"},
+      { title: "Bank Transfer", icon: ArrowRightLeft, href: "/banks/new"},
+      { title: "Letters for Return Debits", icon: Mailbox, href: "/members/apply"}
+    ]
+  },
   { 
     title: "Members", 
     icon: Users, 
     href: "/members",
     subItems: [
-      { title: "Member Application", icon: Plus, href: "/members/apply" }
+      { title: "Member Application", icon: LucideUserRoundPlus, href: "/members/apply" }
     ]
   },
   { 
