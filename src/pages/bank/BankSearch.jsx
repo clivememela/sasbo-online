@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { bankService } from "../../services/bankService.js";
-import { memberService } from "../../services/memberService.js";
 import { TextInput, Button } from "../../components/form";
 
 const PAGE_SIZE = bankService.getPageSize();
@@ -207,12 +206,9 @@ export default function BankSearch() {
               </h3>
               <div className="flex items-center gap-2">
                 {!showAbbrev && !showTableCode && (
-                  <button
-                    onClick={() => navigate("/members", { state: { filters: { bankName: selectedBank.bankName, branch: selectedBank.branch } } })}
-                    className="text-xs font-bold text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors bg-cyan-50 dark:bg-cyan-900/30 px-3 py-1.5 rounded-md"
-                  >
+                  <Button onClick={() => navigate("/members", { state: { filters: { bankName: selectedBank.bankName, branch: selectedBank.branch } } })}>
                     View All Members
-                  </button>
+                  </Button>
                 )}
                 <button
                   onClick={() => { setSelectedBank(null); setShowAbbrev(false); setShowTableCode(false); }}
@@ -344,12 +340,7 @@ export default function BankSearch() {
                       <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">Abbreviation</p>
                       <p className="text-xl font-bold text-cyan-700 dark:text-cyan-400">{abbrevStats?.abbreviation}</p>
                     </div>
-                    <button
-                      onClick={() => setShowAbbrev(false)}
-                      className="px-4 py-2 text-xs font-bold uppercase rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-                    >
-                      Back to Bank
-                    </button>
+                    <Button onClick={() => setShowAbbrev(false)}>Back to Bank</Button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <DetailItem label="Bank Compliment" value={abbrevStats?.staffComplement} />
@@ -379,12 +370,7 @@ export default function BankSearch() {
                       <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">Table Code</p>
                       <p className="text-xl font-bold text-cyan-700 dark:text-cyan-400">{selectedBank.tableCode}</p>
                     </div>
-                    <button
-                      onClick={() => setShowTableCode(false)}
-                      className="px-4 py-2 text-xs font-bold uppercase rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-                    >
-                      Back to Bank
-                    </button>
+                    <Button onClick={() => setShowTableCode(false)}>Back to Bank</Button>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -409,12 +395,9 @@ export default function BankSearch() {
             </div>
 
             <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end bg-gray-50/50 dark:bg-gray-900/50">
-              <button
-                onClick={() => { setSelectedBank(null); setShowAbbrev(false); setShowTableCode(false); setShowMembers(false); setSelectedMember(null); }}
-                className="px-8 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl transition-all font-bold shadow-lg shadow-cyan-600/20 active:scale-95"
-              >
+              <Button variant="primary" onClick={() => { setSelectedBank(null); setShowAbbrev(false); setShowTableCode(false); setSelectedMember(null); }}>
                 Close
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -451,12 +434,7 @@ export default function BankSearch() {
               </div>
             </div>
             <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end bg-gray-50/50 dark:bg-gray-900/50">
-              <button
-                onClick={() => setSelectedMember(null)}
-                className="px-8 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl transition-all font-bold shadow-lg shadow-cyan-600/20 active:scale-95"
-              >
-                Close
-              </button>
+              <Button variant="primary" onClick={() => setSelectedMember(null)}>Close</Button>
             </div>
           </div>
         </div>

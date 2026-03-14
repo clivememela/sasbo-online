@@ -1,7 +1,8 @@
 import {useEffect, useMemo, useState, useRef} from "react";
 import {useNavigate, useLocation} from "react-router-dom";
-import {LucideUserRoundPlus, Plus, CheckCircle2} from "lucide-react";
+import {LucideUserRoundPlus, CheckCircle2} from "lucide-react";
 import {memberService} from "../../services/memberService.js";
+import { TextInput, SelectInput, Button } from "../../components/form";
 
 // Hoist constants to the module scope so their identity is stable across renders.
 // This preserves memoization semantics for `useMemo` below.
@@ -383,206 +384,42 @@ export default function Members() {
 
             <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                    <label className="flex flex-col gap-2 text-sm">
-                        Title
-                        <select
-                            value={filters.title}
-                            onChange={handleInputChange("title")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        >
-                            <option value="">Select Title</option>
-                            {titleOptions.map(opt => (
-                                <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                        </select>
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Employee number
-                        <input
-                            type="text"
-                            placeholder="Search by employee Number"
-                            value={filters.employeeNumber}
-                            onChange={handleInputChange("employeeNumber")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Membership number
-                        <input
-                            type="text"
-                            placeholder="Search by membership number"
-                            value={filters.membershipNumber}
-                            onChange={handleInputChange("membershipNumber")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Initials
-                        <input
-                            type="text"
-                            placeholder="Search by initials"
-                            value={filters.initials}
-                            onChange={handleInputChange("initials")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Surname
-                        <input
-                            type="text"
-                            placeholder="Search by surname"
-                            value={filters.surname}
-                            onChange={handleInputChange("surname")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Identity Number
-                        <input
-                            type="text"
-                            placeholder="Search by identity number"
-                            value={filters.idNumber}
-                            onChange={handleInputChange("idNumber")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Bank Name
-                        <input
-                            type="text"
-                            placeholder="Search by bank name"
-                            value={filters.bankName}
-                            onChange={handleInputChange("bankName")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Branch
-                        <input
-                            type="text"
-                            placeholder="Search by branch"
-                            value={filters.branch}
-                            onChange={handleInputChange("branch")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Bank Account Number
-                        <input
-                            type="text"
-                            placeholder="Search by bank account number"
-                            value={filters.bankAccountNumber}
-                            onChange={handleInputChange("bankAccountNumber")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Cellphone Number
-                        <input
-                            type="text"
-                            placeholder="Search by cellphone number"
-                            value={filters.phone}
-                            onChange={handleInputChange("phone")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Email Address
-                        <input
-                            type="text"
-                            placeholder="Search by email address"
-                            value={filters.email}
-                            onChange={handleInputChange("email")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-2 text-sm">
-                        Status
-                        <select
-                            value={filters.status}
-                            onChange={handleInputChange("status")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        >
-                            <option value="">Select Status</option>
-                            {statusOptions.map(opt => (
-                                <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                        </select>
-                    </label>
-
-                    <label className="flex flex-col gap-2 text-sm">
-                        Race
-                        <select
-                            value={filters.race || ""}
-                            onChange={handleInputChange("race")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        >
-                            <option value="">Select Race</option>
-                            {raceOptions.map(opt => (
-                                <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                        </select>
-                    </label>
-
-                    <div className="flex items-end mb-1">
-                        <button
-                            onClick={handleClear}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800 transition shadow-sm"
-                        >
-                            Clear Filters
-                        </button>
+                    <SelectInput label="Title" value={filters.title} onChange={handleInputChange("title")}
+                        options={[{value:"",label:"Select Title"}, ...titleOptions.map(o=>({value:o,label:o}))]} />
+                    <TextInput label="Employee Number" value={filters.employeeNumber} onChange={handleInputChange("employeeNumber")} placeholder="Search by employee number" />
+                    <TextInput label="Membership Number" value={filters.membershipNumber} onChange={handleInputChange("membershipNumber")} placeholder="Search by membership number" />
+                    <TextInput label="Initials" value={filters.initials} onChange={handleInputChange("initials")} placeholder="Search by initials" />
+                    <TextInput label="Surname" value={filters.surname} onChange={handleInputChange("surname")} placeholder="Search by surname" />
+                    <TextInput label="Identity Number" value={filters.idNumber} onChange={handleInputChange("idNumber")} placeholder="Search by identity number" />
+                    <TextInput label="Bank Name" value={filters.bankName} onChange={handleInputChange("bankName")} placeholder="Search by bank name" />
+                    <TextInput label="Branch" value={filters.branch} onChange={handleInputChange("branch")} placeholder="Search by branch" />
+                    <TextInput label="Bank Account Number" value={filters.bankAccountNumber} onChange={handleInputChange("bankAccountNumber")} placeholder="Search by bank account number" />
+                    <TextInput label="Cellphone Number" value={filters.phone} onChange={handleInputChange("phone")} placeholder="Search by cellphone number" />
+                    <TextInput label="Email Address" value={filters.email} onChange={handleInputChange("email")} placeholder="Search by email address" />
+                    <SelectInput label="Status" value={filters.status} onChange={handleInputChange("status")}
+                        options={[{value:"",label:"Select Status"}, ...statusOptions.map(o=>({value:o,label:o}))]} />
+                    <SelectInput label="Race" value={filters.race || ""} onChange={handleInputChange("race")}
+                        options={[{value:"",label:"Select Race"}, ...raceOptions.map(o=>({value:o,label:o}))]} />
+                    <div className="flex items-end">
+                        <Button onClick={handleClear}>Clear Filters</Button>
                     </div>
-
                 </div>
 
                 <div className="flex items-end justify-end mt-4">
-                    <button
-                        onClick={() => navigate("/members/apply")}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition text-sm shadow-sm"
-                    >
-                        <LucideUserRoundPlus size={16} strokeWidth={2}/>
-                         Member Application
-                    </button>
+                    <Button variant="primary" onClick={() => navigate("/members/apply")}>
+                        <LucideUserRoundPlus size={16} strokeWidth={2} />
+                        Member Application
+                    </Button>
                 </div>
                 <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">
                     <div className="text-gray-600 dark:text-gray-300">
                         Showing {filteredMembers.length === 0 ? 0 : startIndex + 1}-{endIndex} of {filteredMembers.length} members
                     </div>
                     <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                            disabled={page === 1}
-                            className={`px-3 py-1.5 rounded-full text-xs border transition ${
-                                page === 1
-                                    ? "cursor-not-allowed opacity-50"
-                                    : "border-gray-200 bg-white hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700"
-                            }`}
-                        >
-                            Prev
-                        </button>
-                        <span className="text-gray-600 dark:text-gray-300">
-                            Page {page} of {totalPages}
-                        </span>
-                        <button
-                            type="button"
-                            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                            disabled={page === totalPages}
-                            className={`px-3 py-1.5 rounded-full text-xs border transition ${
-                                page === totalPages
-                                    ? "cursor-not-allowed opacity-50"
-                                    : "border-gray-200 bg-white hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700"
-                            }`}
-                        >
-                            Next
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleClear}
-                            className="ml-2 px-3 py-1.5 rounded-full text-xs border border-gray-200 bg-white hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700"
-                        >
-                            Clear
-                        </button>
+                        <Button variant="pagination" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
+                        <span className="text-gray-600 dark:text-gray-300 text-sm">Page {page} of {totalPages}</span>
+                        <Button variant="pagination" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
+                        <Button onClick={handleClear}>Clear</Button>
                     </div>
                 </div>
 
@@ -1087,41 +924,16 @@ export default function Members() {
                         </div>
 
                         {/* Footer */}
-                        <div
-                            className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                             {isEditing ? (
                                 <>
-                                    <button
-                                        type="button"
-                                        onClick={handleSaveChanges}
-                                        className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium transition"
-                                    >
-                                        Save Changes
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleEditToggle}
-                                        className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-sm"
-                                    >
-                                        Cancel
-                                    </button>
+                                    <Button variant="primary" onClick={handleSaveChanges}>Save Changes</Button>
+                                    <Button onClick={handleEditToggle}>Cancel</Button>
                                 </>
                             ) : (
                                 <>
-                                    <button
-                                        type="button"
-                                        onClick={handleEditToggle}
-                                        className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium transition"
-                                    >
-                                        Edit Member
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setSelectedMember(null)}
-                                        className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-sm"
-                                    >
-                                        Close
-                                    </button>
+                                    <Button variant="primary" onClick={handleEditToggle}>Edit Member</Button>
+                                    <Button onClick={() => setSelectedMember(null)}>Close</Button>
                                 </>
                             )}
                         </div>
@@ -1132,46 +944,31 @@ export default function Members() {
     );
 }
 
+const fieldCls = (error) =>
+    `w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 ${
+        error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"
+    }`;
+
 function Detail({label, value, isEditing, onChange, className = "", options = null, type = "text", error = null}) {
     return (
         <div className={className}>
-            <label className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">
+            <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 {label}
             </label>
             {isEditing ? (
-                options ? (
-                    <div className="mt-1">
-                        <select
-                            value={value || ""}
-                            onChange={onChange}
-                            className={`block w-full rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm px-3 py-1.5 border ${
-                                error ? "border-red-500 dark:border-red-400" : "border-gray-300 dark:border-gray-600"
-                            }`}
-                        >
+                <div className="mt-1">
+                    {options ? (
+                        <select value={value || ""} onChange={onChange} className={fieldCls(error)}>
                             <option value="">Select...</option>
-                            {options.map((opt) => (
-                                <option key={opt} value={opt}>
-                                    {opt}
-                                </option>
-                            ))}
+                            {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
-                        {error && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{error}</p>}
-                    </div>
-                ) : (
-                    <div className="mt-1">
-                        <input
-                            type={type}
-                            value={value || ""}
-                            onChange={onChange}
-                            className={`block w-full rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm px-3 py-1.5 border ${
-                                error ? "border-red-500 dark:border-red-400" : "border-gray-300 dark:border-gray-600"
-                            }`}
-                        />
-                        {error && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{error}</p>}
-                    </div>
-                )
+                    ) : (
+                        <input type={type} value={value || ""} onChange={onChange} className={fieldCls(error)} />
+                    )}
+                    {error && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{error}</p>}
+                </div>
             ) : (
-                <p className="font-semibold text-gray-800 dark:text-gray-200">{value}</p>
+                <p className="mt-0.5 text-sm font-semibold text-gray-800 dark:text-gray-200">{value}</p>
             )}
         </div>
     );

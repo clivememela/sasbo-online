@@ -1,38 +1,19 @@
 import { useState, useEffect } from 'react';
+import TextInput from '../../components/form/TextInput';
+import Button from '../../components/form/Button';
 
 export const OrganizerReport = ({ filters }) => {
     const [formData, setFormData] = useState({
-        organiserName: '',
-        dateOfVisit: '',
-        timeIn: '',
-        timeOut: '',
-        bank: filters?.bankName || '',
-        branchDepartment: filters?.branch || '',
-        raNumber: filters?.randomAccessNumber || '',
-        area: filters?.area || '',
-        postalAddress: '',
-        physicalAddress: '',
-        branchDepTelNo: '',
-        branchDepFaxNo: '',
-        branchDepManager: '',
-        branchRepName: '',
-        cellPhoneEmail1: '',
-        memnetMemName: '',
-        cellPhoneEmail2: '',
-        becMemberName: '',
-        cellPhoneEmail3: '',
-        compliment: '',
-        noOfNonMembers: '',
-        membership: '',
-        noOfNewMembersRecruited: '',
-        percentagePenetration: '',
-        noOfNonMembersInterviewed: '',
-        organiserSignature: '',
-        organiserSignatureDate: '',
-        snrOrganiserSignature: '',
-        snrOrganiserSignatureDate: '',
-        adminDeptSignature: '',
-        dateCaptured: '',
+        organiserName: '', dateOfVisit: '', timeIn: '', timeOut: '',
+        bank: filters?.bankName || '', branchDepartment: filters?.branch || '',
+        raNumber: filters?.randomAccessNumber || '', area: filters?.area || '',
+        postalAddress: '', physicalAddress: '', branchDepTelNo: '', branchDepFaxNo: '',
+        branchDepManager: '', branchRepName: '', cellPhoneEmail1: '', memnetMemName: '',
+        cellPhoneEmail2: '', becMemberName: '', cellPhoneEmail3: '', compliment: '',
+        noOfNonMembers: '', membership: '', noOfNewMembersRecruited: '',
+        percentagePenetration: '', noOfNonMembersInterviewed: '', organiserSignature: '',
+        organiserSignatureDate: '', snrOrganiserSignature: '', snrOrganiserSignatureDate: '',
+        adminDeptSignature: '', dateCaptured: '',
     });
 
     useEffect(() => {
@@ -57,22 +38,32 @@ export const OrganizerReport = ({ filters }) => {
         console.log('Form submitted:', formData);
     };
 
-    const inputCls = "w-full px-3 py-2 text-sm border rounded-md bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400";
-    const labelCls = "text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1";
-
-    const Field = ({ label, name, type = 'text', fullWidth = false, textarea = false }) => (
-        <div className={fullWidth ? 'col-span-2' : ''}>
-            <label className={labelCls}>{label}</label>
-            {textarea
-                ? <textarea name={name} value={formData[name]} onChange={handleChange} rows={3} className={`${inputCls} resize-y`} />
-                : <input type={type} name={name} value={formData[name]} onChange={handleChange} className={inputCls} />
-            }
-        </div>
+    // Textarea uses same label style as TextInput but renders a textarea element
+    const TextArea = ({ label, name, rows = 3 }) => (
+        <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 col-span-2">
+            {label}
+            <textarea
+                name={name}
+                value={formData[name]}
+                onChange={handleChange}
+                rows={rows}
+                className="rounded-lg px-3 py-2 text-sm font-normal normal-case tracking-normal border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 resize-y"
+            />
+        </label>
     );
+
+    const Field = ({ label, name, type = 'text', fullWidth = false, textarea = false }) =>
+        textarea
+            ? <TextArea label={label} name={name} />
+            : (
+                <div className={fullWidth ? 'col-span-2' : ''}>
+                    <TextInput label={label} name={name} type={type} value={formData[name]} onChange={handleChange} />
+                </div>
+            );
 
     const Section = ({ title, children }) => (
         <div className="mb-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-white bg-cyan-700 dark:bg-cyan-800 px-4 py-2 rounded-md mb-4">{title}</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-white bg-cyan-700 dark:bg-cyan-800 px-4 py-2 rounded-md mb-4">{title}</h2>
             <div className="grid grid-cols-2 gap-4">{children}</div>
         </div>
     );
@@ -85,8 +76,8 @@ export const OrganizerReport = ({ filters }) => {
             </p>
             <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
                 <div className="text-center mb-6 pb-4 border-b-2 border-cyan-700 dark:border-cyan-600">
-                    <h1 className="text-base font-semibold text-cyan-700 dark:text-cyan-400 tracking-wide">
-                        SASBO FINANCE UNION - Organizer's Branch / Department Report Form
+                    <h1 className="text-sm font-semibold text-cyan-700 dark:text-cyan-400 tracking-wide uppercase">
+                        SASBO Finance Union — Organizer's Branch / Department Report Form
                     </h1>
                 </div>
                 <form onSubmit={handleSubmit}>
@@ -131,12 +122,8 @@ export const OrganizerReport = ({ filters }) => {
                     </Section>
 
                     <div className="flex justify-center gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <button type="submit" className="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold rounded-lg transition">
-                            Submit Report
-                        </button>
-                        <button type="reset" className="px-6 py-2 text-sm font-semibold border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition">
-                            Clear Form
-                        </button>
+                        <Button type="submit" variant="primary">Submit Report</Button>
+                        <Button type="reset" variant="default">Clear Form</Button>
                     </div>
                 </form>
             </div>

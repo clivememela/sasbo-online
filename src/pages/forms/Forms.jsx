@@ -4,7 +4,7 @@ import GeneralForm from "./GeneralForm.jsx";
 import LocationListing from "../reports/LocationListing.jsx";
 import MembershipApplication from "../members/MembershipApplication.jsx";
 import { TextInput, SelectInput, Button, FilterForm } from "../../components/form";
-import {FileSearch, Plus} from "lucide-react";
+import { FileSearch } from "lucide-react";
 
 export function Forms(){
     const [filters, setFilters] = useState({
@@ -90,13 +90,11 @@ export function Forms(){
                     options={formTypeOptions}
                 />
                 <div className="lg:col-span-3"></div>
-                <div className="flex items-end justify-end mt-4">
-                    <button
-                        className="flex items-center gap-2 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition text-sm shadow-sm"
-                    >
-                        <FileSearch size={16} strokeWidth={2}/>
+                <div className="flex items-end justify-end">
+                    <Button type="submit" variant="primary">
+                        <FileSearch size={16} strokeWidth={2} />
                         Search Form
-                    </button>
+                    </Button>
                 </div>
             </FilterForm>
                 <div className="max-w-6xl mx-auto mt-6">
