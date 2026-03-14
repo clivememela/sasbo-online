@@ -1,6 +1,8 @@
 import {useState} from "react";
 import {OrganizerReport} from "../reports/OrganizerReport.jsx";
 import GeneralForm from "./GeneralForm.jsx";
+import LocationListing from "../reports/LocationListing.jsx";
+import MembershipApplication from "../members/MembershipApplication.jsx";
 import { TextInput, SelectInput, Button, FilterForm } from "../../components/form";
 import {FileSearch, Plus} from "lucide-react";
 
@@ -31,15 +33,30 @@ export function Forms(){
         e.preventDefault();
     };
 
+    const renderForm = () => {
+        switch (filters.formType) {
+            case "Membership Application Form":
+                return <MembershipApplication />;
+            case "Branch Form (online)":
+            case "Branch Form (offline)":
+                return <OrganizerReport />;
+            case "Location Listing":
+            case "Bulk Listing":
+                return <LocationListing />;
+            case "General Form":
+                return <GeneralForm />;
+            default:
+                return <OrganizerReport />;
+        }
+    };
+
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
             <h2 className="text-3xl text-center mb-4 text-cyan-700 dark:text-cyan-400">
                 Forms
             </h2>
             <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                    Search and complete Forms
-                </p>
+                Search and complete Forms
             </p>
             <FilterForm onSubmit={handleSubmit}>
                 <TextInput
@@ -82,12 +99,8 @@ export function Forms(){
                     </button>
                 </div>
             </FilterForm>
-            <div className="max-w-6xl mx-auto mt-6">
-                {filters.formType === "General Form" ? (
-                    <GeneralForm />
-                ) : (
-                    <OrganizerReport />
-                )}
+                <div className="max-w-6xl mx-auto mt-6">
+                {renderForm()}
             </div>
         </div>
     )

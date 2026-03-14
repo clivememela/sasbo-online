@@ -208,7 +208,7 @@ export default function BankSearch() {
               <div className="flex items-center gap-2">
                 {!showAbbrev && !showTableCode && (
                   <button
-                    onClick={() => navigate("/members", { state: { filters: { bankName: selectedBank.bankName } } })}
+                    onClick={() => navigate("/members", { state: { filters: { bankName: selectedBank.bankName, branch: selectedBank.branch } } })}
                     className="text-xs font-bold text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors bg-cyan-50 dark:bg-cyan-900/30 px-3 py-1.5 rounded-md"
                   >
                     View All Members

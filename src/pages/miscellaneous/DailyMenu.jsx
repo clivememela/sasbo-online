@@ -2,8 +2,8 @@ import {
     Archive,
     ChartNoAxesCombined,
     Landmark, LucideArmchair, LucideBanknoteArrowDown, LucideBookCheck, LucideCaravan, LucideCopyCheck,
-    LucideCross, LucideFile, LucideLocate,
-    LucidePenBox, LucidePiggyBank, LucidePresentation, LucidePrinter,
+    LucideCross, LucideDoorOpen, LucideFile, LucideLocate,
+    LucidePenBox, LucidePickaxe, LucidePiggyBank, LucidePresentation, LucidePrinter,
     LucidePrinterX, LucideTable, LucideTags,
     LucideUserCheck2,
     UsersRoundIcon
@@ -14,9 +14,9 @@ import {Link} from "react-router-dom";
 export default function DailyMenu () {
     const cards = [
         { title: 'Member (Online)', icon: UsersRoundIcon, href: '/members', desc: 'Search/Capture/Amend Member Records and Details' },
-        { title: 'Member Detail Enquiry', icon: LucideUserCheck2, href: '/archives', desc: 'Browse archived documents' },
-        { title: 'Capture/Print Member Audit Trail', icon: LucidePenBox, href: '/reports', desc: 'Generate and view system reports' },
-        { title: 'Capture Death Benefit/Bene. Fund', icon: LucidePiggyBank, href: '/archives', desc: 'Browse archived documents' },
+        { title: 'Member', icon: LucideUserCheck2, href: '/archives', desc: 'Member Detail Enquiry' },
+        { title: 'Member', icon: LucidePenBox, href: '/reports', desc: 'Capture/Print Member Audit Trail' },
+        { title: 'Death Benefit/Bene. Fund', icon: LucidePiggyBank, href: '/archives', desc: 'Capture Death Benefit/Bene. Fund' },
         { title: 'Criti-care', icon: LucideCross, href: '/criticare-details', desc: 'Capture Death Criti-care Details' },
         { title: 'Capture/Print Endowment Fund', icon: LucidePiggyBank, href: '/endowment-fund', desc: 'Capture/Print Endowment Fund' },
         { title: 'Representatives', icon: LucidePresentation, href: '/representatives', desc: 'Capture/Print Representatives' },
@@ -24,17 +24,17 @@ export default function DailyMenu () {
 
         { title: 'Labels', icon: LucideTags, href: '/member/label', desc: 'Print Member Labels - Selection' },
         { title: 'Pensioner', icon: LucideArmchair, href: '/archives', desc: 'Print Pensioner Labels' },
-        { title: 'Create BPS electronic file', icon: Archive, href: '/archives', desc: 'Browse archived documents' },
+        { title: 'BPS Electronic File', icon: LucidePickaxe, href: '/archives', desc: 'Create BPS electronic file' },
 
         { title: 'Recruiter Table Maintenance', icon: LucideTable, href: '/archives', desc: 'Recruiter Table Maintenance' },
         { title: 'Area Table Maintenance', icon: LucideLocate, href: '/area', desc: 'Area Table Maintenance' },
-        { title: 'Print Duplicate Employee Numbers', icon: LucideCopyCheck, href: '/archives', desc: 'Browse archived documents' },
-        { title: 'Print Member banking at ?', icon: LucidePrinter, href: '/archives', desc: 'Browse archived documents' },
-        { title: 'BPS Paid Up Members', icon: LucideFile, href: '/archives', desc: 'Browse archived documents' },
-        { title: 'Extract Members that have resigned Society', icon: Archive, href: '/archives', desc: 'Browse archived documents' },
-        { title: 'Extract by Tb Code/Lab Ind (Bank)', icon: Archive, href: '/archives', desc: 'Browse archived documents' },
-        { title: 'Extract by Tb Code/Lab Ind (Mail)', icon: Archive, href: '/archives', desc: 'Browse archived documents' },
-        { title: 'Member Print by Area & Table code', icon: Archive, href: '/archives', desc: 'Browse archived documents' }
+        { title: 'Duplicate Employee Numbers', icon: LucideCopyCheck, href: '/archives', desc: 'Print Duplicate Employee Numbers' },
+        { title: 'Print Member banking at ?', icon: LucidePrinter, href: '/archives', desc: 'Print Member banking at ?' },
+        { title: 'Members', icon: LucideFile, href: '/archives', desc: 'BPS Paid Up Members' },
+        { title: 'Members', icon: LucideDoorOpen, href: '/archives', desc: 'Extract Members that have resigned Society' },
+        { title: 'Tb Code/Lab Ind (Bank)', icon: Archive, href: '/archives', desc: 'Extract by Tb Code/Lab Ind (Bank)' },
+        { title: 'Tb Code/Lab Ind (Mail)', icon: Archive, href: '/archives', desc: 'Extract by Tb Code/Lab Ind (Mail)' },
+        { title: 'Area & Table code', icon: LucidePrinter, href: '/archives', desc: 'Print Member by Area & Table code' }
     ];
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">

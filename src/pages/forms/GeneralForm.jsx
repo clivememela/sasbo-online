@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function GeneralForm() {
+export default function GeneralForm({ filters }) {
     // Generate 54 fields for non-members
     const [nonMembers, setNonMembers] = useState(
         Array.from({ length: 54 }, (_, i) => ({
@@ -11,12 +11,22 @@ export default function GeneralForm() {
     );
 
     const [bankDetails, setBankDetails] = useState({
-        bank: 'ABSA BANK',
-        ibtNo: '33411143',
-        raNo: '94',
-        costCode: '00012643',
-        telNo: '0227074211'
+        bank: filters?.bankName || 'ABSA BANK',
+        ibtNo: '',
+        raNo: filters?.randomAccessNumber || '94',
+        costCode: '',
+        telNo: ''
     });
+
+    React.useEffect(() => {
+        if (filters) {
+            setBankDetails(prev => ({
+                ...prev,
+                bank: filters.bankName || prev.bank,
+                raNo: filters.randomAccessNumber || prev.raNo,
+            }));
+        }
+    }, [filters]);
 
     const handleNonMemberChange = (index, field, value) => {
         const updated = [...nonMembers];

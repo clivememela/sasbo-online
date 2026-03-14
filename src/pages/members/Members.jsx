@@ -19,6 +19,7 @@ export default function Members() {
         surname: "",
         idNumber: "",
         bankName: location.state?.filters?.bankName || "",
+        branch: location.state?.filters?.branch || "",
         bankAccountNumber: "",
         phone: "",
         email: "",
@@ -37,6 +38,7 @@ export default function Members() {
     const [lastSearchTime, setLastSearchTime] = useState(0);
     const [activeTab, setActiveTab] = useState("personal");
     const [showSavedNotification, setShowSavedNotification] = useState(false);
+    const [fieldErrors, setFieldErrors] = useState({});
     const prevMemberIdRef = useRef(null);
 
     const tabs = [
@@ -54,6 +56,42 @@ export default function Members() {
     const statusOptions = ["Active", "Pending", "Suspended", "Resigned", "Retired"];
     const yesNoOptions = ["Y", "N"];
     const suspensionCodeOptions = ["", "NON-PAY", "RESIGN"];
+    const bankOptions = [
+        "Absa Bank", "Absa Bank Limited", "Access Bank (South Africa) Limited", "AfrAsia Bank Limited", "African Bank Limited",
+        "Albaraka Bank Limited", "Banco Internacional de Credito", "Bank Julius Baer & Co. Ltd", "Bank Lombard Odier & Co Limited",
+        "Bank Of China Limited", "Bank Of Communication Co., Ltd", "Bank Vontobel AG", "Bank Zero Mutual Bank", "Bank of America N.A.",
+        "Bank of Taiwan", "Banque SYZ SA", "Barclays Bank PLC", "Bidvest Bank Limited", "CBZ Bank Limited", "Caixa Geral de Depositos",
+        "CaixaBank", "Capital International Bank Limited", "Capitec Bank", "Capitec Bank Limited", "China Construction Bank Corporation",
+        "Citibank", "Commerzbank AG", "Deutsche Bank (Suisse) SA", "Deutsche Bank AG", "Discovery Bank Limited",
+        "Ditsobotla Primary Savings and Credit Co-operative Bank", "Doha Bank", "Ecobank", "Export Import Bank of India",
+        "First National Bank", "FirstRand Limited", "GBS Mutual Bank", "GIG Co-operative Bank", "GoTyme Bank Limited",
+        "Goldman Sachs International Bank", "HBZ Bank Limited", "HSBC Bank Plc", "Industrial and Commercial Bank of China",
+        "Investec Bank", "Investec Bank Limited", "KSK Kooperatiewe Bank Beperk", "KfW IPEX-Bank GmbH", "Macquarie Bank Limited",
+        "Metbank Limited", "Mitsubishi UFJ Financial Group Bank, Ltd.", "Mizuho Bank Ltd", "Nedbank", "OM Bank Limited",
+        "OSK Kooperatiewe Bank Beperk", "Sasfin Bank Limited", "Societe Generale", "Standard Bank", "Standard Bank South Africa",
+        "State Bank of India", "Sumitomo Mitsui Banking", "The Export & Import Bank of China", "The Mauritius Commercial Bank Limited",
+        "The Standard Bank of South Africa Limited", "Ubank (under curatorship)", "Union Bancaire Privee, UBP SA",
+        "Ziphakamise Savings and Credit Co-operative Bank", "eNL Mutual Bank"
+    ];
+    const branchOptions = [
+        "Cape Town", "Durban", "Head Office", "Johannesburg", "Johannesburg Branch", "Midrand", "Pretoria",
+        "Representative Office", "Rivonia", "Rosebank", "Sandton", "South Africa Branch", "Soweto", "Stellenbosch"
+    ];
+    const jobGradeOptions = Array.from({length: 12}, (_, i) => (i + 1).toString());
+    const managerOptions = ["MGR-001"];
+    const repOptions = [
+        "Self", "System", "Achmat Adams", "Alvaro Legoinha", "Amanda Hlatshwayo", "Amol Prabhu", "Annerie Visser",
+        "Ashley Cameron", "Ashutosh Kumar", "Benjamin Davis", "Bob Jones", "Chaoyang Zhang", "Charles van Staden",
+        "Cheslyn Jacobs", "Cumesh Moodliar", "Dale Wood", "David Hodnett", "David Kasinamunda", "Dean Radbourne",
+        "Graham Lee", "Hannah Sadiki", "Hanri Maritz", "Hylton Kallner", "J Wang", "John Doe", "Jonathan Fincham",
+        "Karen Black", "Kathryn Quayle", "Kennedy Bungane", "Kenny Fihla", "Li Li", "Lungisa Fuzile", "M Luo",
+        "Mark Selcraig", "Mark Sherratt", "Marna Sabrina Pfranger", "Mary Vilakazi", "Mauro Rogerio", "Michael Shirley",
+        "Micheal Sassoon", "Nathalie Villette Py", "Nthabeleng Likotsi", "Paul Sayers", "Peter Liu", "Peter Taylor",
+        "Phibeon Mutibura", "Ramiro Sebastiao", "Raphael Marlio-Marette", "Saloshni Pillay", "Sandile Shabalala",
+        "Shabir Chohan", "Shugo Suzuki", "Shyamasish Acharya", "Sidhambaram Perumal Pillay", "Simon Denny",
+        "Stefano Rausch", "Thorsten Metz", "Tinus Myburgh", "Tsakani Clarence Nethengwe", "Veronica Padi",
+        "Viviana van Agtmaal", "Yatin Narsai", "Yongzhi Ban", "Yvonne Holenstein"
+    ];
     const dayOptions = Array.from({length: 31}, (_, i) => (i + 1).toString().padStart(2, '0'));
     const monthOptions = Array.from({length: 12}, (_, i) => (i + 1).toString().padStart(2, '0'));
     const yearOptions = Array.from({length: 21}, (_, i) => (new Date().getFullYear() - 10 + i).toString());
@@ -92,11 +130,159 @@ export default function Members() {
         }
     };
 
+    const validateSAID = (id) => {
+        if (!id) return null;
+        // Check length and numeric only
+        if (id.length !== 13 || !/^\d+$/.test(id)) {
+            return "ID must be exactly 13 digits";
+        }
+
+        // Extract date parts
+        const year = parseInt(id.substring(0, 2), 10);
+        const month = parseInt(id.substring(2, 4), 10);
+        const day = parseInt(id.substring(4, 6), 10);
+
+        if (month < 1 || month > 12) return "Invalid birth month";
+        if (day < 1 || day > 31) return "Invalid birth day";
+        // Simple leap year and month length check could be added here, but the Luhn check is more critical
+
+        // Luhn Algorithm (Check digit)
+        let sum = 0;
+        for (let i = 0; i < 12; i++) {
+            let digit = parseInt(id[i], 10);
+            if (i % 2 !== 0) {
+                digit *= 2;
+                if (digit > 9) digit -= 9;
+            }
+            sum += digit;
+        }
+        const checkDigit = (10 - (sum % 10)) % 10;
+        if (checkDigit !== parseInt(id[12], 10)) {
+            return "Invalid South African ID (Check digit failure)";
+        }
+
+        return null;
+    };
+
     const handleEditChange = (field) => (event) => {
-        setEditForm((prev) => ({...prev, [field]: event.target.value}));
+        const value = event.target.value;
+        setEditForm((prev) => ({...prev, [field]: value}));
+
+        // Clear existing error for this field
+        setFieldErrors(prev => {
+            const newErrors = {...prev};
+            delete newErrors[field];
+            return newErrors;
+        });
+
+        // Perform validation for specific fields
+        if (field === "idNumber") {
+            const error = validateSAID(value);
+            if (error) {
+                setFieldErrors(prev => ({...prev, [field]: error}));
+            }
+        }
     };
 
     const handleSaveChanges = () => {
+        // Prevent saving if there are validation errors
+        if (Object.keys(fieldErrors).length > 0) {
+            alert("Please fix the errors before saving.");
+            return;
+        }
+
+        // Identify changed fields and their new values
+        const changes = [];
+        const ignoredFields = ["id", "membershipNumber", "memberId"]; // Internal IDs that shouldn't be listed as changes
+        
+        Object.keys(editForm).forEach(key => {
+            if (!ignoredFields.includes(key) && editForm[key] !== selectedMember[key]) {
+                // Convert camelCase key to readable label if needed, 
+                // but let's try to map them to the labels used in the UI
+                const labelMap = {
+                    title: "Title",
+                    initials: "Initials",
+                    firstNames: "First Names",
+                    firstName: "First Names",
+                    surname: "Surname",
+                    idNumber: "I.D. Number",
+                    race: "Race",
+                    email: "Email Address",
+                    phone: "Cell Tel",
+                    cellTel: "Cell Tel",
+                    workTel: "Work Tel",
+                    homeTel: "Home Tel",
+                    faxNumber: "Fax Number",
+                    address: "Address",
+                    joinDate: "Date Joined",
+                    status: "Status",
+                    monthlySubscription: "Monthly Sasbo Subscription",
+                    subscriptionFrequency: "Frequency of Sasbo Subscription",
+                    deathBenefitSubs: "Death Benefit Fund Subs",
+                    deathBenefitFrequency: "Frequency of death benefit fund",
+                    deathBenefitPolicyNo: "Death Benefit Fund Policy Number",
+                    endowmentSubs: "Endowment Fund Subs",
+                    endowmentFrequency: "Frequency of Endowment Fund",
+                    endowmentPolicyNo: "Endowment Fund Policy Number",
+                    benevolentSubs: "Benevolent Fund Subs",
+                    benevolentFrequency: "Frequency of Benevolent Fund",
+                    benevolentPolicyNo: "Benevolent Fund Policy Number",
+                    lastMonthBalance: "Last Months Balance",
+                    currentBalance: "Current Balance",
+                    arrearsBalance: "Arrears Balance",
+                    dateLastChanged: "Date Last Changed",
+                    employeeNumber: "Employee Number",
+                    jobGrade: "Job Grade",
+                    bankName: "Bank Where Member Is Employed",
+                    bankAccountNumber: "Bank Account Number",
+                    branch: "Bank Branch Where Member Works",
+                    ibtNo: "IBT No.",
+                    workIbtNo: "Work IBT No.",
+                    paymentType: "Payment Type",
+                    debitDay: "Day to be debited",
+                    bankAddress: "Bank Address",
+                    workBankAddress: "Work Bank Address",
+                    recruitmentRep: "Recruitment Rep",
+                    areasRep: "Area's Rep",
+                    repElectionDay: "Sasbo Rep Election Day",
+                    repElectionMonth: "Sasbo Rep Election Month",
+                    repElectionYear: "Sasbo Rep Election Year",
+                    electedRep: "Elected Sasbo Representative (Y/N)",
+                    nationalCouncillor: "National Councillor (Y/N)",
+                    branchCommitteeMember: "Branch Committee Member (Y/N)",
+                    remarks: "Remarks / Comments",
+                    remarks2: "2nd Remarks Field",
+                    remarks3: "3rd Remarks Field",
+                    remarks4: "4th Remarks Field",
+                    managersCode: "Managers Code",
+                    memnetMember: "MEMNET Member (Y/N)",
+                    printLabelForPostage: "Print Label for Postage (Y/N)",
+                    suspensionCode: "Suspension Code",
+                    useAltAddress: "Use Alternate Address (Y/N)",
+                    deductACB: "Deduct Subs through ACB (Y/N)",
+                    printMembershipCards: "Print Membership Cards (Y/N)",
+                    homeLoanReducedRateOption: "Home Loan Reduced Interest Rate Option (Y/N)"
+                };
+                
+                const label = labelMap[key] || key;
+                const oldValue = selectedMember[key] || "-";
+                const newValue = editForm[key] || "-";
+                changes.push(`${label}: ${oldValue} → ${newValue}`);
+            }
+        });
+
+        if (changes.length === 0) {
+            alert("No changes detected.");
+            setIsEditing(false);
+            return;
+        }
+
+        const confirmed = window.confirm(
+            "Are you sure you want to save the following changes?\n\n" + 
+            changes.join("\n")
+        );
+        if (!confirmed) return;
+
         memberService.updateMember(editForm);
         setMembersList([...memberService.getMembers()]);
         setSelectedMember({...editForm});
@@ -121,6 +307,7 @@ export default function Members() {
         const surnameQ = filters.surname.trim().toLowerCase();
         const idNoQ = filters.idNumber.trim().toLowerCase();
         const bankQ = filters.bankName.trim().toLowerCase();
+        const branchQ = filters.branch.trim().toLowerCase();
         const bankAccQ = filters.bankAccountNumber.trim().toLowerCase();
         const phoneQ = filters.phone.trim().toLowerCase();
         const emailQ = filters.email.trim().toLowerCase();
@@ -141,6 +328,7 @@ export default function Members() {
             if (surnameQ && !m.surname.toLowerCase().includes(surnameQ)) return false;
             if (idNoQ && !m.idNumber.toLowerCase().includes(idNoQ)) return false;
             if (bankQ && !m.bankName.toLowerCase().includes(bankQ)) return false;
+            if (branchQ && !(m.branch ?? "").toLowerCase().includes(branchQ)) return false;
             if (bankAccQ && !(m.bankAccountNumber ?? "").toLowerCase().includes(bankAccQ)) return false;
             if (phoneQ && !(m.phone ?? "").toLowerCase().includes(phoneQ)) return false;
             if (emailQ && !(m.email ?? "").toLowerCase().includes(emailQ)) return false;
@@ -173,6 +361,7 @@ export default function Members() {
             surname: "",
             idNumber: "",
             bankName: "",
+            branch: "",
             bankAccountNumber: "",
             phone: "",
             email: "",
@@ -268,6 +457,16 @@ export default function Members() {
                         />
                     </label>
                     <label className="flex flex-col gap-2 text-sm">
+                        Branch
+                        <input
+                            type="text"
+                            placeholder="Search by branch"
+                            value={filters.branch}
+                            onChange={handleInputChange("branch")}
+                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                        />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm">
                         Bank Account Number
                         <input
                             type="text"
@@ -315,7 +514,7 @@ export default function Members() {
                         Race
                         <select
                             value={filters.race || ""}
-                            onChange={(e) => setFilters(prev => ({...prev, race: e.target.value}))}
+                            onChange={handleInputChange("race")}
                             className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                         >
                             <option value="">Select Race</option>
@@ -325,19 +524,14 @@ export default function Members() {
                         </select>
                     </label>
 
-                    <label className="flex flex-col gap-2 text-sm">
-                        Title
-                        <select
-                            value={filters.title}
-                            onChange={handleInputChange("title")}
-                            className="rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                    <div className="flex items-end mb-1">
+                        <button
+                            onClick={handleClear}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800 transition shadow-sm"
                         >
-                            <option value="">Select Title</option>
-                            {titleOptions.map(opt => (
-                                <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                        </select>
-                    </label>
+                            Clear Filters
+                        </button>
+                    </div>
 
                 </div>
 
@@ -581,6 +775,7 @@ export default function Members() {
                                         <Detail label="I.D. Number" value={isEditing ? editForm.idNumber : (selectedMember.idNumber || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("idNumber")}
+                                                error={fieldErrors.idNumber}
                                         />
                                         <Detail label="Race" value={isEditing ? editForm.race : (selectedMember.race || "-")}
                                                 isEditing={isEditing}
@@ -619,9 +814,11 @@ export default function Members() {
                                     <>
                                         <Detail label="Membership Number" value={selectedMember.membershipNumber} isEditing={false} />
                                         <Detail label="Member ID" value={selectedMember.id} isEditing={false} />
-                                        <Detail label="Date Joined" value={isEditing ? editForm.joinDate : (selectedMember.joinDate || "-")}
+                                        <Detail label="Date Joined"
+                                                value={isEditing ? editForm.joinDate : (selectedMember.joinDate || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("joinDate")}
+                                                type="date"
                                         />
                                         <Detail label="Status" value={isEditing ? editForm.status : (selectedMember.status || "-")}
                                                 isEditing={isEditing}
@@ -725,10 +922,12 @@ export default function Members() {
                                         <Detail label="Job Grade" value={isEditing ? editForm.jobGrade : (selectedMember.jobGrade ?? "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("jobGrade")}
+                                                options={jobGradeOptions}
                                         />
                                         <Detail label="Bank Where Member Is Employed" value={isEditing ? editForm.bankName : (selectedMember.bankName || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("bankName")}
+                                                options={bankOptions}
                                         />
                                         <Detail label="Bank Account Number" value={isEditing ? editForm.bankAccountNumber : (selectedMember.bankAccountNumber || "-")}
                                                 isEditing={isEditing}
@@ -737,6 +936,7 @@ export default function Members() {
                                         <Detail label="Bank Branch Where Member Works" value={isEditing ? editForm.branch : (selectedMember.branch || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("branch")}
+                                                options={branchOptions}
                                         />
                                         <Detail label="IBT No." value={isEditing ? editForm.ibtNo : (selectedMember.ibtNo || "-")}
                                                 isEditing={isEditing}
@@ -751,9 +951,10 @@ export default function Members() {
                                                 onChange={handleEditChange("paymentType")}
                                                 options={paymentTypeOptions}
                                         />
-                                        <Detail label="Day to be debited" value={isEditing ? editForm.debitDay : (selectedMember.debitDay ?? "-")}
+                                        <Detail label="Day to be debited" value={isEditing ? editForm.debitDay?.toString().padStart(2, '0') : (selectedMember.debitDay?.toString().padStart(2, '0') || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("debitDay")}
+                                                options={dayOptions}
                                         />
                                         <Detail label="Bank Address" value={isEditing ? editForm.bankAddress : (selectedMember.bankAddress || "-")}
                                                 isEditing={isEditing}
@@ -772,10 +973,12 @@ export default function Members() {
                                         <Detail label="Recruitment Rep" value={isEditing ? editForm.recruitmentRep : (selectedMember.recruitmentRep || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("recruitmentRep")}
+                                                options={repOptions}
                                                 className="md:col-span-2"/>
                                         <Detail label="Area's Rep" value={isEditing ? editForm.areasRep : (selectedMember.areasRep || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("areasRep")}
+                                                options={repOptions}
                                                 className="md:col-span-2"/>
                                         <Detail label="Sasbo Rep Election Day" value={isEditing ? editForm.repElectionDay : (selectedMember.repElectionDay ?? "-")}
                                                 isEditing={isEditing}
@@ -837,6 +1040,7 @@ export default function Members() {
                                         <Detail label="Managers Code" value={isEditing ? editForm.managersCode : (selectedMember.managersCode ?? "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("managersCode")}
+                                                options={managerOptions}
                                         />
                                         <Detail label="MEMNET Member (Y/N)" value={isEditing ? editForm.memnetMember : (selectedMember.memnetMember ?? "-")}
                                                 isEditing={isEditing}
@@ -928,7 +1132,7 @@ export default function Members() {
     );
 }
 
-function Detail({label, value, isEditing, onChange, className = "", options = null}) {
+function Detail({label, value, isEditing, onChange, className = "", options = null, type = "text", error = null}) {
     return (
         <div className={className}>
             <label className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">
@@ -936,25 +1140,35 @@ function Detail({label, value, isEditing, onChange, className = "", options = nu
             </label>
             {isEditing ? (
                 options ? (
-                    <select
-                        value={value || ""}
-                        onChange={onChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm px-3 py-1.5 border"
-                    >
-                        <option value="">Select...</option>
-                        {options.map((opt) => (
-                            <option key={opt} value={opt}>
-                                {opt}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="mt-1">
+                        <select
+                            value={value || ""}
+                            onChange={onChange}
+                            className={`block w-full rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm px-3 py-1.5 border ${
+                                error ? "border-red-500 dark:border-red-400" : "border-gray-300 dark:border-gray-600"
+                            }`}
+                        >
+                            <option value="">Select...</option>
+                            {options.map((opt) => (
+                                <option key={opt} value={opt}>
+                                    {opt}
+                                </option>
+                            ))}
+                        </select>
+                        {error && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{error}</p>}
+                    </div>
                 ) : (
-                    <input
-                        type="text"
-                        value={value || ""}
-                        onChange={onChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm px-3 py-1.5 border"
-                    />
+                    <div className="mt-1">
+                        <input
+                            type={type}
+                            value={value || ""}
+                            onChange={onChange}
+                            className={`block w-full rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm px-3 py-1.5 border ${
+                                error ? "border-red-500 dark:border-red-400" : "border-gray-300 dark:border-gray-600"
+                            }`}
+                        />
+                        {error && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{error}</p>}
+                    </div>
                 )
             ) : (
                 <p className="font-semibold text-gray-800 dark:text-gray-200">{value}</p>
