@@ -8,10 +8,7 @@ import {
   Printer,
   Youtube
 } from 'lucide-react';
-import { useTheme } from '../context/useTheme';
-
 export default function About() {
-  const { darkMode } = useTheme();
   return (
     <div className="p-6 text-gray-900 dark:text-gray-100">
       <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">About Us</h2>
@@ -102,7 +99,7 @@ export default function About() {
         </section>
 
         <section className="space-y-3">
-          <h3 className="text-xl text-shadow-cyan-300 dark:text-cyan-300">Financial Institutions</h3>
+          <h3 className="text-xl text-cyan-800 dark:text-cyan-300">Financial Institutions</h3>
           <p className="text-gray-600 dark:text-gray-400">
           Sasbo extends a hearty welcome to all members in all Financial
           Institutions. We currently have Recognition Agreements with the
@@ -130,8 +127,8 @@ export default function About() {
         </section>
 
         <section className="space-y-2">
-          <h3 className={`text-xl ${darkMode ? "text-cyan-300" : "text-shadow-cyan-300"}`}>Partners & Affiliates</h3>
-          <h3 className="text-xl text-shadow-cyan-300 dark:text-cyan-300">Head Office</h3>
+          <h3 className="text-xl text-cyan-800 dark:text-cyan-300">Partners & Affiliates</h3>
+          <h3 className="text-xl text-cyan-800 dark:text-cyan-300">Head Office</h3>
           <div className="space-y-3 text-gray-600 dark:text-gray-400">
             <div className="flex gap-3">
               <MapPin className="mt-1 h-5 w-5 text-cyan-600 dark:text-cyan-400" strokeWidth={1.5} />
