@@ -1,10 +1,11 @@
-import { Landmark, UsersRoundIcon, ChartNoAxesCombined, Archive } from 'lucide-react';
+import {Landmark, UsersRoundIcon, ChartNoAxesCombined, Archive, LucideDatabase} from 'lucide-react';
 import NavigationCard from '../components/common/NavigationCard';
 import PageTitle from '../components/common/PageTitle';
 
 const cards = [
-  { title: 'Search Banks', icon: Landmark, href: '/banks', desc: 'Manage and view bank information' },
-  { title: 'Member Search', icon: UsersRoundIcon, href: '/members', desc: 'Access member records and details' },
+    {title: 'Admin Menu', icon: LucideDatabase, href: '/admin', desc: 'Manage and view admin menu'},
+  { title: 'Banks', icon: Landmark, href: '/banks', desc: 'Manage and view bank information' },
+  { title: 'Members', icon: UsersRoundIcon, href: '/members', desc: 'Access member records and details' },
   { title: 'Reports', icon: ChartNoAxesCombined, href: '/reports', desc: 'Generate and view system reports' },
   { title: 'Document Archives', icon: Archive, href: '/archives', desc: 'Browse archived documents' },
 ];

@@ -4,8 +4,8 @@ import {
     LucideLocate, LucideCopyCheck, LucidePrinter, LucideFile, LucideDoorOpen,
     Archive, LucidePrinterX
 } from 'lucide-react';
-import NavigationCard from '../../components/common/NavigationCard';
-import PageTitle from '../../components/common/PageTitle';
+import NavigationCard from '../../components/common/NavigationCard.jsx';
+import PageTitle from '../../components/common/PageTitle.jsx';
 
 const cards = [
     { title: 'Member (Online)', icon: UsersRoundIcon, href: '/members', desc: 'Search/Capture/Amend Member Records and Details' },

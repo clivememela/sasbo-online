@@ -15,7 +15,7 @@ import AuthPage from './pages/auth/Auth.jsx';
 import AppLayout from './layouts/AppLayout';
 import AuthLayout from './layouts/AuthLayout';
 import Admin from "./pages/admin/Admin.jsx";
-import DailyMenu from "./pages/miscellaneous/DailyMenu.jsx";
+import DailyMenu from "./pages/admin/DailyMenu.jsx";
 import Representatives from "./pages/members/Representatives.jsx";
 
 function App() {
@@ -28,7 +28,7 @@ function App() {
       <Route path="/" element={<AppLayout />}>
         <Route index element={<HomePage />} />
         <Route path="admin" element={<Admin />} />
-        <Route path="miscellaneous/daily-menu" element={<DailyMenu />} />
+        <Route path="admin/daily-menu" element={<DailyMenu />} />
         <Route path="representatives" element={<Representatives />} />
         <Route path="banks" element={<BanksPage />} />
         <Route path="members" element={<MembersPage />} />

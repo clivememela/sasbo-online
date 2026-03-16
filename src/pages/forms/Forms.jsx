@@ -46,7 +46,7 @@ export function Forms(){
             case "General Form":
                 return <GeneralForm />;
             default:
-                return <OrganizerReport />;
+                return null;
         }
     };
 
@@ -83,13 +83,15 @@ export function Forms(){
                     onChange={handleInputChange("randomAccessNumber")}
                     placeholder="Search RAN"
                 />
-                <SelectInput
-                    label="Form Type"
-                    value={filters.formType}
-                    onChange={handleInputChange("formType")}
-                    options={formTypeOptions}
-                />
-                <div className="lg:col-span-3"></div>
+                <div className="lg:col-span-2">
+                    <SelectInput
+                        label="Form Type"
+                        value={filters.formType}
+                        onChange={handleInputChange("formType")}
+                        options={formTypeOptions}
+                    />
+                </div>
+                <div className="lg:col-span-1"></div>
                 <div className="flex items-end justify-end">
                     <Button type="submit" variant="primary">
                         <FileSearch size={16} strokeWidth={2} />
@@ -97,9 +99,11 @@ export function Forms(){
                     </Button>
                 </div>
             </FilterForm>
+            {filters.formType && (
                 <div className="max-w-6xl mx-auto mt-6">
-                {renderForm()}
-            </div>
+                    {renderForm()}
+                </div>
+            )}
         </div>
     )
 }

@@ -7,19 +7,19 @@ import NavigationCard from '../../components/common/NavigationCard';
 import PageTitle from '../../components/common/PageTitle';
 
 const cards = [
-    { title: 'Daily Menu', icon: LucideMenu, href: '/miscellaneous/daily-menu' },
-    { title: 'Monthly Menu', icon: LucideCalendar, href: '/reports/forms' },
+    { title: 'Daily Menu', icon: LucideMenu, href: '/admin/daily-menu' },
+    { title: 'Monthly Menu', icon: LucideCalendar, href: '/' },
     { title: 'Banks', icon: Landmark, href: '/banks' },
-    { title: 'Utilities', icon: LucideToolbox, href: '/reports/forms' },
+    { title: 'Utilities', icon: LucideToolbox, href: '/' },
     { title: 'A.C.B', icon: LucideFile, href: '/reports/forms' },
     { title: 'Regional Branches', icon: LucideGitBranch, href: '/reports/forms' },
     { title: 'Tape', icon: LucideCassetteTape, href: '/reports/forms' },
-    { title: 'D.B.F', icon: LucideFile, href: '/banks/new' },
-    { title: 'Selective Print', icon: TextSelect, href: '/members/apply' },
-    { title: 'Committee', icon: LucideChartNoAxesGantt, href: '/members/apply' },
-    { title: 'Ad-Hoc Label', icon: LucideTag, href: '/members/apply' },
-    { title: 'Bank Transfer', icon: ArrowRightLeft, href: '/banks/new' },
-    { title: 'Letters for Return Debits', icon: Mailbox, href: '/members/apply' },
+    { title: 'D.B.F', icon: LucideFile, href: '/' },
+    { title: 'Selective Print', icon: TextSelect, href: '/' },
+    { title: 'Committee', icon: LucideChartNoAxesGantt, href: '/' },
+    { title: 'Ad-Hoc Label', icon: LucideTag, href: '/' },
+    { title: 'Bank Transfer', icon: ArrowRightLeft, href: '/' },
+    { title: 'Letters for Return Debits', icon: Mailbox, href: '/' },
 ];
 
 export default function Admin() {

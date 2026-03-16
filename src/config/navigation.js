@@ -20,7 +20,6 @@ import {
 
 export const navItems = [
   { title: "Home", icon: Home, href: "/" },
-  { title: "Banks", icon: Landmark, href: "/banks" },
   {
     title: "Admin Menu",
     icon: LucideDatabase,
@@ -41,6 +40,7 @@ export const navItems = [
       { title: "Letters for Return Debits", icon: Mailbox, href: "/members/apply"}
     ]
   },
+  { title: "Banks", icon: Landmark, href: "/banks" },
   { 
     title: "Members", 
     icon: Users, 
