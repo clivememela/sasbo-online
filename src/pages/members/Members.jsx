@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useState, useRef} from "react";
 import {useNavigate, useLocation} from "react-router-dom";
-import {LucideUserRoundPlus, CheckCircle2} from "lucide-react";
+import {LucideUserRoundPlus, CheckCircle2, UsersRoundIcon} from "lucide-react";
 import {memberService} from "../../services/memberService.js";
 import { TextInput, SelectInput, Button } from "../../components/form";
 
@@ -405,10 +405,14 @@ export default function Members() {
                     </div>
                 </div>
 
-                <div className="flex items-end justify-end mt-4">
+                <div className="flex items-end justify-end mt-4 gap-3">
                     <Button variant="primary" onClick={() => navigate("/members/apply")}>
-                        <LucideUserRoundPlus size={16} strokeWidth={2} />
+                        <UsersRoundIcon size={16} strokeWidth={2} />
                         Member Application
+                    </Button>
+                    <Button variant="primary" onClick={() => navigate("/members/capture")}>
+                        <LucideUserRoundPlus size={16} strokeWidth={2} />
+                        Capture Member
                     </Button>
                 </div>
                 <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">

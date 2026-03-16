@@ -15,7 +15,7 @@ import {
   MapPinnedIcon,
   Plus,
   LucideDatabase, Mailbox, LucideToolbox, LucideMenu, LucideCassetteTape, LucideGitBranch, LucideChartNoAxesGantt,
-  LucideUserRoundPlus, LucideCalendar, LucideFile, LucideTag
+  LucideUserRoundPlus, LucideCalendar, LucideFile, LucideTag, UsersRoundIcon
 } from "lucide-react";
 
 export const navItems = [
@@ -25,7 +25,7 @@ export const navItems = [
     icon: LucideDatabase,
     href: "/admin",
     subItems: [
-      { title: "Daily Menu", icon: LucideMenu, href: "/miscellaneous/daily-menu" },
+      { title: "Daily Menu", icon: LucideMenu, href: "/admin/daily-menu" },
       { title: "Monthly Menu", icon: LucideCalendar, href: "/reports/forms" },
       { title: "Banks", icon: Landmark, href: "/banks" },
       { title: "Utilities", icon: LucideToolbox, href: "/reports/forms" },
@@ -46,7 +46,8 @@ export const navItems = [
     icon: Users, 
     href: "/members",
     subItems: [
-      { title: "Member Application", icon: LucideUserRoundPlus, href: "/members/apply" }
+      { title: "Member Application", icon: UsersRoundIcon, href: "/members/apply" },
+      { title: "Capture Member", icon: LucideUserRoundPlus, href: "/members/capture" }
     ]
   },
   { 

@@ -2,7 +2,7 @@ import {useState} from "react";
 import {OrganizerReport} from "../reports/OrganizerReport.jsx";
 import GeneralForm from "./GeneralForm.jsx";
 import LocationListing from "../reports/LocationListing.jsx";
-import MembershipApplication from "../members/MembershipApplication.jsx";
+import MembershipApplication from "./MembershipApplication.jsx";
 import { TextInput, SelectInput, Button, FilterForm } from "../../components/form";
 import { FileSearch } from "lucide-react";
 

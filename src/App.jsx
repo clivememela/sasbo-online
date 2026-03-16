@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from './pages/Home';
 import BanksPage from './pages/bank/BankSearch.jsx';
 import MembersPage from './pages/members/Members.jsx';
-import MembershipApplication from './pages/members/MembershipApplication.jsx';
+import MembershipApplication from './pages/forms/MembershipApplication.jsx';
 import ReportsPage from './pages/ReportOptions.jsx';
 import { OrganizerReport } from './pages/reports/OrganizerReport.jsx';
 import { Forms } from './pages/forms/Forms.jsx';
@@ -17,6 +17,7 @@ import AuthLayout from './layouts/AuthLayout';
 import Admin from "./pages/admin/Admin.jsx";
 import DailyMenu from "./pages/admin/DailyMenu.jsx";
 import Representatives from "./pages/members/Representatives.jsx";
+import CaptureMember from "./pages/members/CaptureMember.jsx";
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
         <Route path="banks" element={<BanksPage />} />
         <Route path="members" element={<MembersPage />} />
         <Route path="members/apply" element={<MembershipApplication />} />
+        <Route path="members/capture" element={<CaptureMember />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="reports/organizer-report" element={<OrganizerReport />} />
         <Route path="reports/forms" element={<Forms />} />

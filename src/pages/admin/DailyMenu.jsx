@@ -9,8 +9,8 @@ import PageTitle from '../../components/common/PageTitle.jsx';
 
 const cards = [
     { title: 'Member (Online)', icon: UsersRoundIcon, href: '/members', desc: 'Search/Capture/Amend Member Records and Details' },
-    { title: 'Member', icon: LucideUserCheck2, href: '/archives', desc: 'Member Detail Enquiry' },
-    { title: 'Member', icon: LucidePenBox, href: '/reports', desc: 'Capture/Print Member Audit Trail' },
+    { title: 'Member', icon: LucideUserCheck2, href: '/members', desc: 'Member Detail Enquiry' },
+    { title: 'Member', icon: LucidePenBox, href: '/members/capture', desc: 'Capture/Print Member Audit Trail' },
     { title: 'Death Benefit/Bene. Fund', icon: LucidePiggyBank, href: '/archives', desc: 'Capture Death Benefit/Bene. Fund' },
     { title: 'Criti-care', icon: LucideCross, href: '/criticare-details', desc: 'Capture Death Criti-care Details' },
     { title: 'Capture/Print Endowment Fund', icon: LucidePiggyBank, href: '/endowment-fund', desc: 'Capture/Print Endowment Fund' },
