@@ -13,9 +13,8 @@ import {
   NotebookPen,
   Form,
   MapPinnedIcon,
-  Plus,
   LucideDatabase, Mailbox, LucideToolbox, LucideMenu, LucideCassetteTape, LucideGitBranch, LucideChartNoAxesGantt,
-  LucideUserRoundPlus, LucideCalendar, LucideFile, LucideTag, UsersRoundIcon
+  LucideUserRoundPlus, LucideCalendar, LucideFile, LucideTag, UsersRoundIcon, LucideDoorOpen, LucideTags
 } from "lucide-react";
 
 export const navItems = [
@@ -27,7 +26,7 @@ export const navItems = [
     subItems: [
       { title: "Daily Menu", icon: LucideMenu, href: "/admin/daily-menu" },
       { title: "Monthly Menu", icon: LucideCalendar, href: "/reports/forms" },
-      { title: "Banks", icon: Landmark, href: "/banks" },
+      //{ title: "Banks", icon: Landmark, href: "/banks" },
       { title: "Utilities", icon: LucideToolbox, href: "/reports/forms" },
       { title: "A.C.B", icon: LucideFile, href: "/reports/forms" },
       { title: "Regional Branches", icon: LucideGitBranch, href: "/reports/forms" },
@@ -40,14 +39,27 @@ export const navItems = [
       { title: "Letters for Return Debits", icon: Mailbox, href: "/members/apply"}
     ]
   },
-  { title: "Banks", icon: Landmark, href: "/banks" },
+  {
+    title: "Banks",
+    icon: Landmark,
+    href: "/banks",
+    subItems: [
+      { title: "New Bank", icon: LucideFile, href: "/banks/new" },
+      { title: "Bank Listing", icon: MapPinnedIcon, href: "/banks/listing" },
+      { title: 'Tb Code/Lab Ind (Bank)', icon: Archive, href: '/archives', desc: 'Extract by Tb Code/Lab Ind (Bank)' },
+      { title: 'Tb Code/Lab Ind (Mail)', icon: Archive, href: '/archives', desc: 'Extract by Tb Code/Lab Ind (Mail)' }
+    ]
+  },
   { 
     title: "Members", 
     icon: Users, 
     href: "/members",
     subItems: [
       { title: "Member Application", icon: UsersRoundIcon, href: "/members/apply" },
-      { title: "Capture Member", icon: LucideUserRoundPlus, href: "/members/capture" }
+      { title: "Capture Member", icon: LucideUserRoundPlus, href: "/members/capture" },
+      // { title: 'Members', icon: LucideDoorOpen, href: '/archives', desc: 'Extract Members that have resigned Society' },
+      // { title: 'Members', icon: LucideFile, href: '/archives', desc: 'BPS Paid Up Members' },
+      { title: 'Labels', icon: LucideTags, href: '/member/label', desc: 'Print Member Labels - Selection' }
     ]
   },
   { 

@@ -9,7 +9,7 @@ import PageTitle from '../../components/common/PageTitle';
 const cards = [
     { title: 'Daily Menu', icon: LucideMenu, href: '/admin/daily-menu' },
     { title: 'Monthly Menu', icon: LucideCalendar, href: '/' },
-    { title: 'Banks', icon: Landmark, href: '/banks' },
+    // { title: 'Banks', icon: Landmark, href: '/banks' },
     { title: 'Utilities', icon: LucideToolbox, href: '/' },
     { title: 'A.C.B', icon: LucideFile, href: '/reports/forms' },
     { title: 'Regional Branches', icon: LucideGitBranch, href: '/reports/forms' },
