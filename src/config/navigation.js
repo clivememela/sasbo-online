@@ -44,7 +44,7 @@ export const navItems = [
     icon: Landmark,
     href: "/banks",
     subItems: [
-      { title: "New Bank", icon: LucideFile, href: "/banks/new" },
+      // { title: "New Bank", icon: LucideFile, href: "/banks/new" },
       { title: "Bank Listing", icon: MapPinnedIcon, href: "/banks/listing" },
       { title: 'Tb Code/Lab Ind (Bank)', icon: Archive, href: '/archives', desc: 'Extract by Tb Code/Lab Ind (Bank)' },
       { title: 'Tb Code/Lab Ind (Mail)', icon: Archive, href: '/archives', desc: 'Extract by Tb Code/Lab Ind (Mail)' }
