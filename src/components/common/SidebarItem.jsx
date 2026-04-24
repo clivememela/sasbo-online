@@ -1,10 +1,15 @@
 import { Link, useLocation } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 
-export default function SidebarItem({ item, isActive, hasActiveSubItem, isExpanded, onToggle, onClick }) {
+export default function SidebarItem({ item, isActive, hasActiveSubItem, expandedItems, onToggle, onClick }) {
   const location = useLocation();
   const Icon = item.icon;
   const hasSubItems = item.subItems && item.subItems.length > 0;
+  const isExpanded = expandedItems?.[item.href];
+  const isSubItemActive = (subItem) => {
+    if (location.pathname === subItem.href) return true;
+    return (subItem.subItems || []).some(isSubItemActive);
+  };
 
   return (
     <div>
@@ -39,12 +44,28 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, isExpand
       
       {hasSubItems && isExpanded && (
         <div className="ml-4 space-y-1">
-          {item.subItems.map((subItem) => {
+          {item.subItems.map((subItem, index) => {
+            const subItemHasChildren = subItem.subItems && subItem.subItems.length > 0;
+
+            if (subItemHasChildren) {
+              return (
+                <SidebarItem
+                  key={`${subItem.href}-${subItem.title}-${index}`}
+                  item={subItem}
+                  isActive={location.pathname === subItem.href}
+                  hasActiveSubItem={isSubItemActive(subItem)}
+                  expandedItems={expandedItems}
+                  onToggle={onToggle}
+                  onClick={onClick}
+                />
+              );
+            }
+
             const SubIcon = subItem.icon;
             const isSubActive = location.pathname === subItem.href;
             return (
               <Link
-                key={subItem.href}
+                key={`${subItem.href}-${subItem.title}-${index}`}
                 to={subItem.href}
                 className={`flex items-center p-3 hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-white cursor-pointer transition-colors rounded-lg text-sm ${
                   isSubActive ? 'bg-gray-200 dark:bg-gray-700' : ''

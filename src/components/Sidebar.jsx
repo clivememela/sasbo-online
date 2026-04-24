@@ -16,8 +16,11 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen}) {
     }));
   };
 
-  const isSubItemActive = (subItems) => {
-    return subItems?.some(item => location.pathname === item.href);
+  const isSubItemActive = (subItems = []) => {
+    return subItems.some((item) => {
+      if (location.pathname === item.href) return true;
+      return isSubItemActive(item.subItems || []);
+    });
   };
 
   return (
@@ -51,7 +54,7 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen}) {
               item={item}
               isActive={location.pathname === item.href}
               hasActiveSubItem={isSubItemActive(item.subItems)}
-              isExpanded={expandedItems[item.href]}
+              expandedItems={expandedItems}
               onToggle={toggleExpand}
               onClick={() => setSideBarOpen(false)}
             />

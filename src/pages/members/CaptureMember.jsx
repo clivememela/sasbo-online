@@ -8,6 +8,7 @@ const titleOptions = ["Mr", "Ms", "Mrs", "Dr", "Prof"];
 const raceOptions = ["African", "White", "Coloured", "Indian", "Other"];
 const paymentTypeOptions = ["Debit Order", "Payroll Deduction", "Cash"];
 const statusOptions = ["Active", "Pending", "Suspended", "Resigned", "Retired"];
+const identityTypeOptions = ["I.D. Number", "Passport Number"];
 const yesNoOptions = ["Y", "N"];
 const suspensionCodeOptions = ["", "NON-PAY", "RESIGN"];
 const bankOptions = [
@@ -62,6 +63,7 @@ export default function CaptureMember() {
         initials: "",
         firstNames: "",
         surname: "",
+        identityType: "",
         idNumber: "",
         race: "",
         email: "",
@@ -145,15 +147,30 @@ export default function CaptureMember() {
     };
 
     const handleChange = (field) => (event) => {
-        const value = event.target.value;
+        const rawValue = event.target.value;
+        const hasNonNumericInput =
+            field === "idNumber" && form.identityType === "I.D. Number" && /\D/.test(rawValue);
+        const value =
+            field === "idNumber" && form.identityType === "I.D. Number"
+                ? rawValue.replace(/\D/g, "")
+                : rawValue;
         setForm((prev) => ({ ...prev, [field]: value }));
         setFieldErrors((prev) => {
             const newErrors = { ...prev };
             delete newErrors[field];
             return newErrors;
         });
-        if (field === "idNumber") {
-            const error = validateSAID(value);
+        if (field === "identityType") {
+            setFieldErrors((prev) => {
+                const newErrors = { ...prev };
+                delete newErrors.idNumber;
+                return newErrors;
+            });
+        }
+        if (field === "idNumber" && form.identityType === "I.D. Number") {
+            const error = hasNonNumericInput
+                ? "Only numbers are allowed for I.D. Number"
+                : validateSAID(value);
             if (error) {
                 setFieldErrors((prev) => ({ ...prev, [field]: error }));
             }
@@ -179,7 +196,7 @@ export default function CaptureMember() {
                 Capture Member
             </h2>
             <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                Securely capture and register new Sasbo member records. Ensure all required personal, employment, and banking information is accurately entered to maintain the integrity of our member database.
+                Securely Capture/Register new Sasbo member. Ensure all required personal, employment, and banking information is accurately entered to maintain the integrity of our member database.
             </p>
 
             <div className="max-w-6xl mx-auto rounded-2xl shadow-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden relative">
@@ -217,7 +234,14 @@ export default function CaptureMember() {
                                 <Field label="Initials" value={form.initials} onChange={handleChange("initials")} />
                                 <Field label="First Names" value={form.firstNames} onChange={handleChange("firstNames")} />
                                 <Field label="Surname" value={form.surname} onChange={handleChange("surname")} />
-                                <Field label="I.D. Number" value={form.idNumber} onChange={handleChange("idNumber")} error={fieldErrors.idNumber} />
+                                <Field label="Identity Type" value={form.identityType} onChange={handleChange("identityType")} options={identityTypeOptions} />
+                                <Field
+                                    label={form.identityType || "Select Identity Type before entering"}
+                                    value={form.idNumber}
+                                    onChange={handleChange("idNumber")}
+                                    error={form.identityType === "I.D. Number" ? fieldErrors.idNumber : null}
+                                    disabled={!form.identityType}
+                                />
                                 <Field label="Race" value={form.race} onChange={handleChange("race")} options={raceOptions} />
                                 <Field label="Email Address" value={form.email} onChange={handleChange("email")} type="email" />
                                 <Field label="Cellphone Number" value={form.phone} onChange={handleChange("phone")} />
@@ -346,7 +370,7 @@ function RepElectionDatePicker({ form, setForm }) {
     );
 }
 
-function Field({ label, value, onChange, className = "", options = null, type = "text", error = null }) {
+function Field({ label, value, onChange, className = "", options = null, type = "text", error = null, disabled = false }) {
     return (
         <div className={className}>
             <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
@@ -354,7 +378,7 @@ function Field({ label, value, onChange, className = "", options = null, type = 
             </label>
             <div className="relative">
                 {options ? (
-                    <select value={value || ""} onChange={onChange} className={fieldCls(error)}>
+                    <select value={value || ""} onChange={onChange} className={fieldCls(error)} disabled={disabled}>
                         <option value="">Select...</option>
                         {options.map((opt) => (
                             <option key={opt} value={opt}>
@@ -363,7 +387,7 @@ function Field({ label, value, onChange, className = "", options = null, type = 
                         ))}
                     </select>
                 ) : (
-                    <input type={type} value={value || ""} onChange={onChange} className={fieldCls(error)} />
+                    <input type={type} value={value || ""} onChange={onChange} className={fieldCls(error)} disabled={disabled} />
                 )}
                 {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
             </div>
