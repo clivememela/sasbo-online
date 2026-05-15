@@ -18,7 +18,7 @@ export default function Members() {
         membershipNumber: "",
         initials: "",
         surname: "",
-        idNumber: "",
+        identityNumber: "",
         bankName: location.state?.filters?.bankName || "",
         branch: location.state?.filters?.branch || "",
         bankAccountNumber: "",
@@ -177,7 +177,7 @@ export default function Members() {
         });
 
         // Perform validation for specific fields
-        if (field === "idNumber") {
+        if (field === "identityNumber") {
             const error = validateSAID(value);
             if (error) {
                 setFieldErrors(prev => ({...prev, [field]: error}));
@@ -206,7 +206,7 @@ export default function Members() {
                     firstNames: "First Names",
                     firstName: "First Names",
                     surname: "Surname",
-                    idNumber: "I.D. Number",
+                    identityNumber: "I.D. Number",
                     race: "Race",
                     email: "Email Address",
                     phone: "Cell Tel",
@@ -306,7 +306,7 @@ export default function Members() {
         const memNoQ = filters.membershipNumber.trim().toLowerCase();
         const initialsQ = filters.initials.trim().toLowerCase();
         const surnameQ = filters.surname.trim().toLowerCase();
-        const idNoQ = filters.idNumber.trim().toLowerCase();
+        const idNoQ = filters.identityNumber.trim().toLowerCase();
         const bankQ = filters.bankName.trim().toLowerCase();
         const branchQ = filters.branch.trim().toLowerCase();
         const bankAccQ = filters.bankAccountNumber.trim().toLowerCase();
@@ -327,7 +327,7 @@ export default function Members() {
             if (memNoQ && !m.membershipNumber.toLowerCase().includes(memNoQ)) return false;
             if (initialsQ && !m.initials.toLowerCase().includes(initialsQ)) return false;
             if (surnameQ && !m.surname.toLowerCase().includes(surnameQ)) return false;
-            if (idNoQ && !m.idNumber.toLowerCase().includes(idNoQ)) return false;
+            if (idNoQ && !m.identityNumber.toLowerCase().includes(idNoQ)) return false;
             if (bankQ && !m.bankName.toLowerCase().includes(bankQ)) return false;
             if (branchQ && !(m.branch ?? "").toLowerCase().includes(branchQ)) return false;
             if (bankAccQ && !(m.bankAccountNumber ?? "").toLowerCase().includes(bankAccQ)) return false;
@@ -360,7 +360,7 @@ export default function Members() {
             membershipNumber: "",
             initials: "",
             surname: "",
-            idNumber: "",
+            identityNumber: "",
             bankName: "",
             branch: "",
             bankAccountNumber: "",
@@ -390,7 +390,7 @@ export default function Members() {
                     <TextInput label="Membership Number" value={filters.membershipNumber} onChange={handleInputChange("membershipNumber")} placeholder="Search by membership number" />
                     <TextInput label="Initials" value={filters.initials} onChange={handleInputChange("initials")} placeholder="Search by initials" />
                     <TextInput label="Surname" value={filters.surname} onChange={handleInputChange("surname")} placeholder="Search by surname" />
-                    <TextInput label="Identity Number" value={filters.idNumber} onChange={handleInputChange("idNumber")} placeholder="Search by identity number" />
+                    <TextInput label="Identity Number" value={filters.identityNumber} onChange={handleInputChange("identityNumber")} placeholder="Search by identity number" />
                     <TextInput label="Bank Name" value={filters.bankName} onChange={handleInputChange("bankName")} placeholder="Search by bank name" />
                     <TextInput label="Branch" value={filters.branch} onChange={handleInputChange("branch")} placeholder="Search by branch" />
                     <TextInput label="Bank Account Number" value={filters.bankAccountNumber} onChange={handleInputChange("bankAccountNumber")} placeholder="Search by bank account number" />
@@ -467,7 +467,7 @@ export default function Members() {
                                         </div>
                                         <div className="truncate" title={m.email}>{m.email}</div>
                                         <div className="truncate" title={m.phone}>{m.phone}</div>
-                                        <div className="truncate" title={m.idNumber}>{m.idNumber}</div>
+                                        <div className="truncate" title={m.identityNumber}>{m.identityNumber}</div>
                                         <div>{m.bankName}</div>
                                         <div className="truncate" title={m.employeeNumber}>{m.employeeNumber}</div>
                                         <div>
@@ -613,10 +613,10 @@ export default function Members() {
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("surname")}
                                         />
-                                        <Detail label="I.D. Number" value={isEditing ? editForm.idNumber : (selectedMember.idNumber || "-")}
+                                        <Detail label="I.D. Number" value={isEditing ? editForm.identityNumber : (selectedMember.identityNumber || "-")}
                                                 isEditing={isEditing}
-                                                onChange={handleEditChange("idNumber")}
-                                                error={fieldErrors.idNumber}
+                                                onChange={handleEditChange("identityNumber")}
+                                                error={fieldErrors.identityNumber}
                                         />
                                         <Detail label="Race" value={isEditing ? editForm.race : (selectedMember.race || "-")}
                                                 isEditing={isEditing}

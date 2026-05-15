@@ -425,7 +425,7 @@ export default function BankSearch() {
                 <DetailItem label="Employee Number" value={selectedMember.employeeNumber} />
                 <DetailItem label="Email" value={selectedMember.email} className="text-cyan-600 dark:text-cyan-400 break-all" />
                 <DetailItem label="Phone" value={selectedMember.phone} />
-                <DetailItem label="ID Number" value={selectedMember.idNumber} />
+                <DetailItem label="ID Number" value={selectedMember.identityNumber} />
                 <DetailItem label="Status" value={selectedMember.status} />
                 <DetailItem label="Bank" value={selectedMember.bankName} />
                 <DetailItem label="Branch" value={selectedMember.branch} />

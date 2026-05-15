@@ -64,7 +64,7 @@ export default function CaptureMember() {
         firstNames: "",
         surname: "",
         identityType: "",
-        idNumber: "",
+        identityNumber: "",
         race: "",
         email: "",
         phone: "",
@@ -149,9 +149,9 @@ export default function CaptureMember() {
     const handleChange = (field) => (event) => {
         const rawValue = event.target.value;
         const hasNonNumericInput =
-            field === "idNumber" && form.identityType === "I.D. Number" && /\D/.test(rawValue);
+            field === "identityNumber" && form.identityType === "I.D. Number" && /\D/.test(rawValue);
         const value =
-            field === "idNumber" && form.identityType === "I.D. Number"
+            field === "identityNumber" && form.identityType === "I.D. Number"
                 ? rawValue.replace(/\D/g, "")
                 : rawValue;
         setForm((prev) => ({ ...prev, [field]: value }));
@@ -163,11 +163,11 @@ export default function CaptureMember() {
         if (field === "identityType") {
             setFieldErrors((prev) => {
                 const newErrors = { ...prev };
-                delete newErrors.idNumber;
+                delete newErrors.identityNumber;
                 return newErrors;
             });
         }
-        if (field === "idNumber" && form.identityType === "I.D. Number") {
+        if (field === "identityNumber" && form.identityType === "I.D. Number") {
             const error = hasNonNumericInput
                 ? "Only numbers are allowed for I.D. Number"
                 : validateSAID(value);
@@ -237,9 +237,9 @@ export default function CaptureMember() {
                                 <Field label="Identity Type" value={form.identityType} onChange={handleChange("identityType")} options={identityTypeOptions} />
                                 <Field
                                     label={form.identityType || "Select Identity Type before entering"}
-                                    value={form.idNumber}
-                                    onChange={handleChange("idNumber")}
-                                    error={form.identityType === "I.D. Number" ? fieldErrors.idNumber : null}
+                                    value={form.identityNumber}
+                                    onChange={handleChange("identityNumber")}
+                                    error={form.identityType === "I.D. Number" ? fieldErrors.identityNumber : null}
                                     disabled={!form.identityType}
                                 />
                                 <Field label="Race" value={form.race} onChange={handleChange("race")} options={raceOptions} />
