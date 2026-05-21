@@ -19,8 +19,10 @@ export function Locations() {
     };
 
     const handleSearch = () => {
-        setResults(locationService.search(filters));
-        setSearched(true);
+        locationService.search(filters).then((data) => {
+            setResults(data);
+            setSearched(true);
+        });
     };
 
     const handleClear = () => {

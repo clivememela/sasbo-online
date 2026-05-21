@@ -1,10 +1,6 @@
-import banks from "../data/banks.json";
-
 const PAGE_SIZE = 100;
 
-const SearchBanksData = banks;
-
 export const bankService = {
-  getBanks: () => SearchBanksData,
-  getPageSize: () => PAGE_SIZE
+  getBanks: () => fetch('/api/banks').then(r => r.json()),
+  getPageSize: () => PAGE_SIZE,
 };

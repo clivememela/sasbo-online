@@ -182,12 +182,14 @@ export default function CaptureMember() {
             alert("Please fix the errors before saving.");
             return;
         }
-        // In a real app, you'd send this to an API. 
-        // For now, we simulate success.
-        console.log("Saving member:", form);
-        setShowSavedNotification(true);
-        setTimeout(() => setShowSavedNotification(false), 3000);
-        // Optional: Reset form or navigate
+        fetch('/api/members', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(form),
+        }).then(() => {
+            setShowSavedNotification(true);
+            setTimeout(() => setShowSavedNotification(false), 3000);
+        });
     };
 
     return (

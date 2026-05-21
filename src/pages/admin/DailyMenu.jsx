@@ -4,6 +4,7 @@ import {
     LucideLocate, LucideCopyCheck, LucidePrinter, LucideFile, LucideDoorOpen,
     Archive, LucidePrinterX
 } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom';
 import NavigationCard from '../../components/common/NavigationCard.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
 
@@ -21,8 +22,8 @@ const cards = [
     //{ title: 'BPS Electronic File', icon: LucidePickaxe, href: '/archives', desc: 'Create BPS electronic file' },
     { title: 'Recruiter Table Maintenance', icon: LucideTable, href: '/archives', desc: 'Recruiter Table Maintenance' },
     { title: 'Area Table Maintenance', icon: LucideLocate, href: '/area', desc: 'Area Table Maintenance' },
-    { title: 'Duplicate Employee Numbers', icon: LucideCopyCheck, href: '/archives', desc: 'Print Duplicate Employee Numbers' },
-    // { title: 'Print Member banking at ?', icon: LucidePrinter, href: '/archives', desc: 'Print Member banking at ?' },
+    { title: 'Duplicate Employee Numbers', icon: LucideCopyCheck, href: '/archives', desc: 'Print Duplicate Employee Numbers', color: 'text-red-600 dark:text-red-400'  },
+    { title: 'Print Member banking at ?', icon: LucidePrinter, href: '/archives', desc: 'Print Member banking at ?', color: 'text-red-600 dark:text-red-400' },
     // { title: 'Members', icon: LucideFile, href: '/archives', desc: 'BPS Paid Up Members' },
     // { title: 'Members', icon: LucideDoorOpen, href: '/archives', desc: 'Extract Members that have resigned Society' },
     //{ title: 'Tb Code/Lab Ind (Bank)', icon: Archive, href: '/archives', desc: 'Extract by Tb Code/Lab Ind (Bank)' },
@@ -31,11 +32,22 @@ const cards = [
 ];
 
 export default function DailyMenu() {
+    const { setSelectedCardHref, setSideBarOpen } = useOutletContext() || {};
+
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
             <PageTitle title="Daily Menu" subtitle="Select options below" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto text-center">
-                {cards.map((card) => <NavigationCard key={`${card.href}-${card.title}`} {...card} />)}
+                {cards.map((card) => (
+                    <NavigationCard
+                        key={`${card.href}-${card.title}`}
+                        {...card}
+                        onSelect={() => {
+                            setSelectedCardHref?.('/admin/daily-menu');
+                            setSideBarOpen?.(true);
+                        }}
+                    />
+                ))}
             </div>
         </div>
     );

@@ -1,13 +1,34 @@
 import { X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Logo from "./common/Logo";
 import SidebarItem from "./common/SidebarItem";
 import { navItems, authItems } from "../config/navigation";
 
-export default function Sidebar({ sideBarOpen, setSideBarOpen}) {
+export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref}) {
   const location = useLocation();
   const [expandedItems, setExpandedItems] = useState({});
+
+  useEffect(() => {
+    if (!selectedCardHref) return;
+    const findAncestors = (items, target, path = []) => {
+      for (const item of items) {
+        const current = [...path, item.href];
+        if (item.href === target) return current;
+        if (item.subItems) {
+          const found = findAncestors(item.subItems, target, current);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    const ancestors = findAncestors(navItems, selectedCardHref) || [selectedCardHref];
+    setExpandedItems(prev => {
+      const next = { ...prev };
+      ancestors.forEach(href => { next[href] = true; });
+      return next;
+    });
+  }, [selectedCardHref]);
 
   const toggleExpand = (href) => {
     setExpandedItems(prev => ({
@@ -57,6 +78,7 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen}) {
               expandedItems={expandedItems}
               onToggle={toggleExpand}
               onClick={() => setSideBarOpen(false)}
+              selectedCardHref={selectedCardHref}
             />
           ))}
           

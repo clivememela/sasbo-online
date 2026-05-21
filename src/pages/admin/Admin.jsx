@@ -1,7 +1,7 @@
 import {
     Landmark, LucideMenu, LucideToolbox, LucideGitBranch, LucideCassetteTape,
     TextSelect, LucideChartNoAxesGantt, ArrowRightLeft, Mailbox, LucideCalendar,
-    LucideFile, LucideTag
+    LucideFile, LucideTag, LucideExternalLink
 } from 'lucide-react';
 import NavigationCard from '../../components/common/NavigationCard';
 import PageTitle from '../../components/common/PageTitle';
@@ -9,17 +9,18 @@ import PageTitle from '../../components/common/PageTitle';
 const cards = [
     { title: 'Daily Menu', icon: LucideMenu, href: '/admin/daily-menu' },
     { title: 'Monthly Menu', icon: LucideCalendar, href: '/' },
-    // { title: 'Banks', icon: Landmark, href: '/banks' },
-    //{ title: 'Utilities', icon: LucideToolbox, href: '/' },
-    //{ title: 'A.C.B', icon: LucideFile, href: '/reports/forms' },
+    { title: 'Bank/Branch Menu', icon: Landmark, color: 'text-red-600 dark:text-red-400' },
+    { title: 'Utilities', icon: LucideToolbox, color: 'text-red-600 dark:text-red-400' },
+    { title: 'A.C.B Menu', icon: LucideFile, color: 'text-red-600 dark:text-red-400'},
     { title: 'Regional Branches', icon: LucideGitBranch, href: '/reports/forms' },
-    //{ title: 'Tape', icon: LucideCassetteTape, href: '/reports/forms' },
-    //{ title: 'D.B.F', icon: LucideFile, href: '/' },
-    //{ title: 'Selective Print', icon: TextSelect, href: '/' },
-    //{ title: 'Committee', icon: LucideChartNoAxesGantt, href: '/' },
-    //{ title: 'Ad-Hoc Label', icon: LucideTag, href: '/' },
+    { title: 'Tape Menu', icon: LucideCassetteTape, color: 'text-red-600 dark:text-red-400' },
+    { title: 'D.B.F Menu', icon: LucideFile,color: 'text-red-600 dark:text-red-400' },
+    { title: 'Selective Print Menu', icon: TextSelect, color: 'text-red-600 dark:text-red-400'},
+    { title: 'Committee Menu', icon: LucideChartNoAxesGantt , color: 'text-red-600 dark:text-red-400'},
+    { title: 'Ad-Hoc Label', icon: LucideTag, color: 'text-red-600 dark:text-red-400'},
     { title: 'Bank Transfer', icon: ArrowRightLeft, href: '/' },
-    //{ title: 'Letters for Return Debits', icon: Mailbox, href: '/' },
+    { title: 'Letters for Return Debits', icon: Mailbox, color: 'text-red-600 dark:text-red-400'},
+    { title: 'Exit this System', icon: LucideExternalLink , color: 'text-red-600 dark:text-red-400'}
 ];
 
 export default function Admin() {

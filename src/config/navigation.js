@@ -32,38 +32,74 @@ export const navItems = [
         href: "/admin/daily-menu",
         subItems: [
           {
-            title: 'Members',
+            title: 'Capture/Ammend Membership (Online)',
             icon: UsersRoundIcon,
-            href: '/members',
-            desc: 'Search/Capture/Amend Member Records and Details' },
-          // {
-          //   title: 'Member',
-          //   icon: LucideUserCheck2,
-          //   href: '/members',
-          //   desc: 'Member Detail Enquiry'
-          // },
-          //{ title: 'Member', icon: LucidePenBox, href: '/members/capture', desc: 'Capture/Print Member Audit Trail' },
-          { title: 'Capture/Print Endowment Fund', icon: LucidePiggyBank, href: '/endowment-fund', desc: 'Capture/Print Endowment Fund' },
-          { title: 'Representatives', icon: LucidePresentation, href: '/representatives', desc: 'Capture/Print Representatives' },
-          { title: 'Table', icon: LucideTable, href: '/table', desc: 'Suspension/Rejection Table' },
-          { title: 'Recruiter Table Maintenance', icon: LucideTable, href: '/archives', desc: 'Recruiter Table Maintenance' },
-          { title: 'Area Table Maintenance', icon: LucideLocate, href: '/area', desc: 'Area Table Maintenance' },
-          { title: 'Duplicate Employee Numbers', icon: LucideCopyCheck, href: '/archives', desc: 'Print Duplicate Employee Numbers' },
-          { title: 'Area & Table code', icon: LucidePrinter, href: '/archives', desc: 'Print Member by Area & Table code' },
+            desc: 'Search/Capture/Amend Member Records and Details' ,
+            color: 'text-red-600 dark:text-red-400'},
+          {
+            title: 'Print Members Audit Trail',
+            icon: LucideUserCheck2,
+            desc: 'Member Detail Enquiry',
+            color: 'text-red-600 dark:text-red-400'
+          },
+          {
+            title: 'Capture Death Benefit/Ben. Fund',
+            icon: LucidePenBox,
+            color: 'text-red-600 dark:text-red-400'
+          },
+          {
+            title: 'Capture/Print Endowment Fund',
+            icon: LucidePiggyBank, href: '/endowment-fund',
+            color: 'text-red-600 dark:text-red-400'
+          },
+          {
+            title: 'Representatives',
+            icon: LucidePresentation,
+            href: '/representatives',
+            desc: 'Capture/Print Representatives' },
+          {
+            title: 'Table',
+            icon: LucideTable,
+            href: '/table',
+            desc: 'Suspension/Rejection Table' },
+          {
+            title: 'Recruiter Table Maintenance',
+            icon: LucideTable, href: '/archives',
+            desc: 'Recruiter Table Maintenance'
+          },
+          {
+            title: 'Area Table Maintenance',
+            icon: LucideLocate,
+            href: '/area',
+            desc: 'Area Table Maintenance',
+            color: 'text-red-600 dark:text-red-400' },
+          {
+            title: 'Duplicate Employee Numbers',
+            icon: LucideCopyCheck,
+            href: '/archives',
+            desc: 'Print Duplicate Employee Numbers',
+            color: 'text-red-600 dark:text-red-400'
+          },
+          {
+            title: 'Area & Table Code',
+            icon: LucidePrinter,
+            href: '/archives',
+            desc: 'Print Member by Area & Table code'
+          },
         ]
       },
-      { title: "Monthly Menu", icon: LucideCalendar, href: "/reports/forms" },
-      //{ title: "Banks", icon: Landmark, href: "/banks" },
-      //{ title: "Utilities", icon: LucideToolbox, href: "/reports/forms" },
-      //{ title: "A.C.B", icon: LucideFile, href: "/reports/forms" },
+      { title: "Monthly Menu", icon: LucideCalendar, color: 'text-red-600 dark:text-red-400' },
+      { title: "Banks", icon: Landmark, href: "/banks" , color: 'text-red-600 dark:text-red-400'},
+      { title: "Utilities", icon: LucideToolbox, color: 'text-red-600 dark:text-red-400'},
+      { title: "A.C.B", icon: LucideFile,  color: 'text-red-600 dark:text-red-400' },
       { title: "Regional Branches", icon: LucideGitBranch, href: "/reports/forms" },
-      //{ title: "Tape", icon: LucideCassetteTape, href: "/reports/forms" },
-      //{ title: "D.B.F", icon: LucideFile, href: "/banks/new" },
-      //{ title: "Selective Print", icon: TextSelect, href: "/members/apply" },
-      //{ title: "Committee", icon: LucideChartNoAxesGantt, href: "/members/apply"},
-      //{ title: "Ad-Hoc Label", icon: LucideTag, href: "/members/apply"},
+      { title: "Tape", icon: LucideCassetteTape, color: 'text-red-600 dark:text-red-400' },
+      { title: "D.B.F", icon: LucideFile, color: 'text-red-600 dark:text-red-400' },
+      { title: "Selective Print", icon: TextSelect, color: 'text-red-600 dark:text-red-400' },
+      { title: "Committee", icon: LucideChartNoAxesGantt, color: 'text-red-600 dark:text-red-400'},
+      { title: "Ad-Hoc Label", icon: LucideTag, color: 'text-red-600 dark:text-red-400'},
       { title: "Bank Transfer", icon: ArrowRightLeft, href: "/banks/new"},
-      //{ title: "Letters for Return Debits", icon: Mailbox, href: "/members/apply"}
+      { title: "Letters for Return Debits", icon: Mailbox, color: 'text-red-600 dark:text-red-400'}
     ]
   },
   {

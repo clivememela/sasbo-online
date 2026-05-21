@@ -1,11 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 
-export default function SidebarItem({ item, isActive, hasActiveSubItem, expandedItems, onToggle, onClick }) {
+export default function SidebarItem({ item, isActive, hasActiveSubItem, expandedItems, onToggle, onClick, selectedCardHref }) {
   const location = useLocation();
   const Icon = item.icon;
   const hasSubItems = item.subItems && item.subItems.length > 0;
   const isExpanded = expandedItems?.[item.href];
+  const isCardSelected = selectedCardHref === item.href;
   const isSubItemActive = (subItem) => {
     if (location.pathname === subItem.href) return true;
     return (subItem.subItems || []).some(isSubItemActive);
@@ -15,7 +16,9 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
     <div>
       <div
         className={`flex items-center p-4 hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-white cursor-pointer transition-colors rounded-lg ${
-          isActive || hasActiveSubItem ? 'bg-gray-200 dark:bg-gray-700' : ''
+          isActive || hasActiveSubItem || isCardSelected
+            ? 'bg-cyan-100 dark:bg-cyan-900 ring-1 ring-cyan-400'
+            : ''
         }`}
         onClick={() => {
           if (hasSubItems) {
@@ -31,7 +34,7 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
           onClick={onClick}
         >
           <Icon size={24} strokeWidth={1} className="mr-6" />
-          <div className="font-medium">{item.title}</div>
+          <div className={`font-medium ${item.color ? item.color : ''}`}>{item.title}</div>
         </Link>
         {hasSubItems && (
           <ChevronDown 
@@ -57,6 +60,7 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
                   expandedItems={expandedItems}
                   onToggle={onToggle}
                   onClick={onClick}
+                  selectedCardHref={selectedCardHref}
                 />
               );
             }
@@ -73,7 +77,7 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
                 onClick={onClick}
               >
                 <SubIcon size={20} strokeWidth={1} className="mr-4" />
-                <div className="font-medium">{subItem.title}</div>
+                <div className={`font-medium ${subItem.color ? subItem.color : ''}`}>{subItem.title}</div>
               </Link>
             );
           })}

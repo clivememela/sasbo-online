@@ -4,10 +4,7 @@ import {LucideUserRoundPlus, CheckCircle2, UsersRoundIcon} from "lucide-react";
 import {memberService} from "../../services/memberService.js";
 import { TextInput, SelectInput, Button } from "../../components/form";
 
-// Hoist constants to the module scope so their identity is stable across renders.
-// This preserves memoization semantics for `useMemo` below.
 const PAGE_SIZE = memberService.getPageSize();
-const SearchMembersData = memberService.getMembers();
 
 export default function Members() {
     const navigate = useNavigate();
@@ -284,8 +281,9 @@ export default function Members() {
         );
         if (!confirmed) return;
 
-        memberService.updateMember(editForm);
-        setMembersList([...memberService.getMembers()]);
+        memberService.updateMember(editForm).then(() =>
+            memberService.getMembers().then(setMembersList)
+        );
         setSelectedMember({...editForm});
         setIsEditing(false);
         
@@ -298,7 +296,11 @@ export default function Members() {
         setPage(1);
     };
 
-    const [membersList, setMembersList] = useState(memberService.getMembers());
+    const [membersList, setMembersList] = useState([]);
+
+    useEffect(() => {
+        memberService.getMembers().then(setMembersList);
+    }, []);
 
     const filteredMembers = useMemo(() => {
         const titleQ = filters.title.trim().toLowerCase();

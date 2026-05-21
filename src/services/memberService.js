@@ -1,16 +1,12 @@
-import members from "../data/members.json";
-
 const PAGE_SIZE = 100;
 
-let SearchMembersData = [...members];
-
 export const memberService = {
-  getMembers: () => SearchMembersData,
+  getMembers: () => fetch('/api/members').then(r => r.json()),
   getPageSize: () => PAGE_SIZE,
-  updateMember: (updatedMember) => {
-    SearchMembersData = SearchMembersData.map((m) =>
-      m.id === updatedMember.id ? { ...m, ...updatedMember } : m
-    );
-    return updatedMember;
-  },
+  updateMember: (updatedMember) =>
+    fetch(`/api/members/${updatedMember.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedMember),
+    }).then(r => r.json()),
 };

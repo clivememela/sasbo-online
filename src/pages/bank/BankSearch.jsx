@@ -1,13 +1,14 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, Button } from "../../components/form";
 
 const PAGE_SIZE = bankService.getPageSize();
-const SearchBanksData = bankService.getBanks();
 
 export default function BankSearch() {
   const navigate = useNavigate();
+  const [banks, setBanks] = useState([]);
+  useEffect(() => { bankService.getBanks().then(setBanks); }, []);
   const [filters, setFilters] = useState({
     bankName: "",
     branch: "",
@@ -27,14 +28,14 @@ export default function BankSearch() {
     const areaQuery = filters.area.trim().toLowerCase();
     const ranQuery = filters.randomAccessNumber.trim().toLowerCase();
 
-    return SearchBanksData.filter((bank) => {
+    return banks.filter((bank) => {
       if (bankNameQuery && !bank.bankName.toLowerCase().includes(bankNameQuery)) return false;
       if (branchQuery && !bank.branch.toLowerCase().includes(branchQuery)) return false;
       if (areaQuery && !bank.area.toLowerCase().includes(areaQuery)) return false;
       return !(ranQuery && !bank.randomAccessNumber.toLowerCase().includes(ranQuery));
 
     });
-  }, [filters]);
+  }, [filters, banks]);
 
   const totalPages = Math.max(1, Math.ceil(filteredBanks.length / PAGE_SIZE));
   const startIndex = (page - 1) * PAGE_SIZE;
@@ -50,7 +51,7 @@ export default function BankSearch() {
   const abbrevStats = useMemo(() => {
     if (!selectedBank) return null;
     const abbrev = selectedBank.bankAbbreviation;
-    const all = SearchBanksData.filter(b => b.bankAbbreviation === abbrev);
+    const all = banks.filter(b => b.bankAbbreviation === abbrev);
     const sum = (arr, getter) => arr.reduce((acc, x) => acc + getter(x), 0);
 
     const staffComplement = sum(all, b => Number(b.branchStaffComplement || 0));
@@ -77,7 +78,7 @@ export default function BankSearch() {
       acbMembers,
       groupNumber,
     };
-  }, [selectedBank]);
+  }, [selectedBank, banks]);
 
   return (
     <div className="p-6 text-gray-900 dark:text-gray-100">
