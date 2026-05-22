@@ -9,14 +9,29 @@ import NavigationCard from '../../components/common/NavigationCard.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
 
 const cards = [
-    { title: 'Members', icon: UsersRoundIcon, href: '/members', desc: 'Search/Capture/Amend Member Records and Details' },
+    {
+        title: 'Members',
+        icon: UsersRoundIcon,
+        href: '/members',
+        desc: 'Search/Capture/Amend Member Records and Details'
+    },
     //{ title: 'Member', icon: LucideUserCheck2, href: '/members', desc: 'Member Detail Enquiry' },
     //{ title: 'Member', icon: LucidePenBox, href: '/members/capture', desc: 'Capture/Print Member Audit Trail' },
     // { title: 'Death Benefit/Bene. Fund', icon: LucidePiggyBank, href: '/archives', desc: 'Capture Death Benefit/Bene. Fund' },
     // { title: 'Criti-care', icon: LucideCross, href: '/criticare-details', desc: 'Capture Death Criti-care Details' },
     //{ title: 'Capture/Print Endowment Fund', icon: LucidePiggyBank, href: '/endowment-fund', desc: 'Capture/Print Endowment Fund' },
-    { title: 'Representatives', icon: LucidePresentation, href: '/representatives', desc: 'Capture/Print Representatives' },
-    { title: 'Table', icon: LucideTable, href: '/table', desc: 'Suspension/Rejection Table' },
+    {
+        title: 'Representatives',
+        icon: LucidePresentation,
+        href: '/representatives',
+        desc: 'Capture/Print Representatives'
+    },
+    {
+        title: 'Suspension/Rejection',
+        icon: LucideTable,
+        href: '/table',
+        desc: 'Suspension/Rejection Table' ,
+        color: 'text-red-600 dark:text-red-400'},
     // { title: 'Labels', icon: LucideTags, href: '/member/label', desc: 'Print Member Labels - Selection' },
     //{ title: 'Pensioner', icon: LucideArmchair, href: '/archives', desc: 'Print Pensioner Labels' },
     //{ title: 'BPS Electronic File', icon: LucidePickaxe, href: '/archives', desc: 'Create BPS electronic file' },

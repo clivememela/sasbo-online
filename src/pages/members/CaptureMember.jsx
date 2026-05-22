@@ -6,7 +6,7 @@ import { Button } from "../../components/form";
 const frequencyOptions = ["Monthly", "Quarterly", "Bi-annually", "Annually"];
 const titleOptions = ["Mr", "Ms", "Mrs", "Dr", "Prof"];
 const raceOptions = ["African", "White", "Coloured", "Indian", "Other"];
-const paymentTypeOptions = ["Debit Order", "Payroll Deduction", "Cash"];
+const paymentTypeOptions = ["Debit Order", "Payroll Deduction", "EFT"];
 const statusOptions = ["Active", "Pending", "Suspended", "Resigned", "Retired"];
 const identityTypeOptions = ["I.D. Number", "Passport Number"];
 const yesNoOptions = ["Y", "N"];

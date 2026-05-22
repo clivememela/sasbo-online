@@ -16,7 +16,7 @@ import {
   LucideDatabase, Mailbox, LucideToolbox, LucideMenu, LucideCassetteTape, LucideGitBranch, LucideChartNoAxesGantt,
   LucideUserRoundPlus, LucideCalendar, LucideFile, LucideTag, UsersRoundIcon, LucideDoorOpen, LucideTags,
   LucideUserCheck2, LucidePenBox, LucidePiggyBank, LucidePresentation, LucideTable, LucideLocate, LucideCopyCheck,
-  LucidePrinter
+  LucidePrinter, LucideSettings, LucideSettings2, LucideConstruction
 } from "lucide-react";
 
 export const navItems = [
@@ -61,7 +61,8 @@ export const navItems = [
             title: 'Table',
             icon: LucideTable,
             href: '/table',
-            desc: 'Suspension/Rejection Table' },
+            desc: 'Suspension/Rejection Table',
+            color: 'text-red-600 dark:text-red-400' },
           {
             title: 'Recruiter Table Maintenance',
             icon: LucideTable, href: '/archives',
@@ -72,7 +73,8 @@ export const navItems = [
             icon: LucideLocate,
             href: '/area',
             desc: 'Area Table Maintenance',
-            color: 'text-red-600 dark:text-red-400' },
+            color: 'text-red-600 dark:text-red-400'
+          },
           {
             title: 'Duplicate Employee Numbers',
             icon: LucideCopyCheck,
@@ -89,17 +91,18 @@ export const navItems = [
         ]
       },
       { title: "Monthly Menu", icon: LucideCalendar, color: 'text-red-600 dark:text-red-400' },
-      { title: "Banks", icon: Landmark, href: "/banks" , color: 'text-red-600 dark:text-red-400'},
+      { title: "Banks", icon: Landmark, color: 'text-red-600 dark:text-red-400'},
       { title: "Utilities", icon: LucideToolbox, color: 'text-red-600 dark:text-red-400'},
-      { title: "A.C.B", icon: LucideFile,  color: 'text-red-600 dark:text-red-400' },
-      { title: "Regional Branches", icon: LucideGitBranch, href: "/reports/forms" },
+      { title: "A.C.B", icon: LucideFile, color: 'text-red-600 dark:text-red-400' },
+      { title: "Regional Branches", icon: LucideGitBranch, color: 'text-red-600 dark:text-red-400'  },
       { title: "Tape", icon: LucideCassetteTape, color: 'text-red-600 dark:text-red-400' },
       { title: "D.B.F", icon: LucideFile, color: 'text-red-600 dark:text-red-400' },
       { title: "Selective Print", icon: TextSelect, color: 'text-red-600 dark:text-red-400' },
       { title: "Committee", icon: LucideChartNoAxesGantt, color: 'text-red-600 dark:text-red-400'},
       { title: "Ad-Hoc Label", icon: LucideTag, color: 'text-red-600 dark:text-red-400'},
-      { title: "Bank Transfer", icon: ArrowRightLeft, href: "/banks/new"},
-      { title: "Letters for Return Debits", icon: Mailbox, color: 'text-red-600 dark:text-red-400'}
+      { title: "Bank Transfer", icon: ArrowRightLeft, color: 'text-red-600 dark:text-red-400'},
+      { title: "Letters for Return Debits", icon: Mailbox, color: 'text-red-600 dark:text-red-400'},
+      { title: "Maintenance", href:'/maintenance', icon: LucideConstruction}
     ]
   },
   {

@@ -18,6 +18,7 @@ import Admin from "./pages/admin/Admin.jsx";
 import DailyMenu from "./pages/admin/DailyMenu.jsx";
 import Representatives from "./pages/members/Representatives.jsx";
 import CaptureMember from "./pages/members/CaptureMember.jsx";
+import Maintenance from "./pages/admin/Maintenance.jsx";
 
 function App() {
   return (
@@ -43,6 +44,7 @@ function App() {
         <Route path="archives/affiliations-other-trade-unions" element={<AffiliationsOtherTradeUnions />} />
         <Route path="archives/finance-houses" element={<FinanceHouses />} />
         <Route path="archives/research-information" element={<ResearchInformation />} />
+        <Route path="maintenance" element={<Maintenance/>} />
       </Route>
     </Routes>
   )

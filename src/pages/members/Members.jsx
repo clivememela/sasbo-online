@@ -50,7 +50,7 @@ export default function Members() {
     const frequencyOptions = ["Monthly", "Quarterly", "Bi-annually", "Annually"];
     const titleOptions = ["Mr", "Ms", "Mrs", "Dr", "Prof"];
     const raceOptions = ["African", "White", "Coloured", "Indian", "Other"];
-    const paymentTypeOptions = ["Debit Order", "Payroll Deduction", "Cash"];
+    const paymentTypeOptions = ["Debit Order", "Payroll Deduction", "EFT"];
     const statusOptions = ["Active", "Pending", "Suspended", "Resigned", "Retired"];
     const yesNoOptions = ["Y", "N"];
     const suspensionCodeOptions = ["", "NON-PAY", "RESIGN"];
