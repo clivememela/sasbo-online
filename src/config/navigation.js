@@ -56,17 +56,19 @@ export const navItems = [
             title: 'Representatives',
             icon: LucidePresentation,
             href: '/representatives',
-            desc: 'Capture/Print Representatives' },
+            desc: 'Capture/Print Representatives'
+          },
           {
-            title: 'Table',
+            title: 'Suspension/Rejection Table',
             icon: LucideTable,
-            href: '/table',
             desc: 'Suspension/Rejection Table',
-            color: 'text-red-600 dark:text-red-400' },
+            color: 'text-red-600 dark:text-red-400'
+          },
           {
             title: 'Recruiter Table Maintenance',
-            icon: LucideTable, href: '/archives',
-            desc: 'Recruiter Table Maintenance'
+            icon: LucideTable,
+            desc: 'Recruiter Table Maintenance',
+            color: 'text-red-600 dark:text-red-400'
           },
           {
             title: 'Area Table Maintenance',

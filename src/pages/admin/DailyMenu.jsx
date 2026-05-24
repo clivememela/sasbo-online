@@ -35,15 +35,39 @@ const cards = [
     // { title: 'Labels', icon: LucideTags, href: '/member/label', desc: 'Print Member Labels - Selection' },
     //{ title: 'Pensioner', icon: LucideArmchair, href: '/archives', desc: 'Print Pensioner Labels' },
     //{ title: 'BPS Electronic File', icon: LucidePickaxe, href: '/archives', desc: 'Create BPS electronic file' },
-    { title: 'Recruiter Table Maintenance', icon: LucideTable, href: '/archives', desc: 'Recruiter Table Maintenance' },
-    { title: 'Area Table Maintenance', icon: LucideLocate, href: '/area', desc: 'Area Table Maintenance' },
-    { title: 'Duplicate Employee Numbers', icon: LucideCopyCheck, href: '/archives', desc: 'Print Duplicate Employee Numbers', color: 'text-red-600 dark:text-red-400'  },
-    { title: 'Print Member banking at ?', icon: LucidePrinter, href: '/archives', desc: 'Print Member banking at ?', color: 'text-red-600 dark:text-red-400' },
+    {
+        title: 'Recruiter Table Maintenance',
+        icon: LucideTable,
+        desc: 'Recruiter Table Maintenance',
+        color: 'text-red-600 dark:text-red-400'
+    },
+    {
+        title: 'Area Table Maintenance',
+        icon: LucideLocate,
+        desc: 'Area Table Maintenance' ,
+        color: 'text-red-600 dark:text-red-400'
+    },
+    {
+        title: 'Duplicate Employee Numbers',
+        icon: LucideCopyCheck,
+        desc: 'Print Duplicate Employee Numbers',
+        color: 'text-red-600 dark:text-red-400'
+    },
+    {
+        title: 'Print Member banking at ?',
+        icon: LucidePrinter,
+        desc: 'Print Member banking at ?',
+        color: 'text-red-600 dark:text-red-400'
+    },
     // { title: 'Members', icon: LucideFile, href: '/archives', desc: 'BPS Paid Up Members' },
     // { title: 'Members', icon: LucideDoorOpen, href: '/archives', desc: 'Extract Members that have resigned Society' },
     //{ title: 'Tb Code/Lab Ind (Bank)', icon: Archive, href: '/archives', desc: 'Extract by Tb Code/Lab Ind (Bank)' },
     //{ title: 'Tb Code/Lab Ind (Mail)', icon: Archive, href: '/archives', desc: 'Extract by Tb Code/Lab Ind (Mail)' },
-    { title: 'Area & Table code', icon: LucidePrinter, href: '/archives', desc: 'Print Member by Area & Table code' },
+    {
+        title: 'Area & Table code',
+        icon: LucidePrinter,
+        desc: 'Print Member by Area & Table code'
+    },
 ];
 
 export default function DailyMenu() {
