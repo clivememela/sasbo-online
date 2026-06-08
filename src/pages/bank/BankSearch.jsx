@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Printer } from "lucide-react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, Button } from "../../components/form";
 
@@ -117,9 +118,18 @@ export default function BankSearch() {
           />
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">
-          <div className="text-gray-600 dark:text-gray-300">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm no-print">
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
             Showing {filteredBanks.length === 0 ? 0 : startIndex + 1}-{endIndex} of {filteredBanks.length} banks
+            {filteredBanks.length > 0 && (
+              <button
+                onClick={() => window.print()}
+                title="Print results"
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition"
+              >
+                <Printer size={16} />
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -146,7 +156,7 @@ export default function BankSearch() {
           </div>
         </div>
 
-        <div className="mt-4 overflow-hidden rounded-xl border border-transparent">
+        <div className="mt-4 overflow-hidden rounded-xl border border-transparent print-area">
           <div className="grid grid-cols-9 gap-4 px-4 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300">
             <div>Bank Name</div>
             <div>Abbreviation</div>

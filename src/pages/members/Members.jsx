@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useState, useRef} from "react";
 import {useNavigate, useLocation} from "react-router-dom";
-import {LucideUserRoundPlus, CheckCircle2, UsersRoundIcon} from "lucide-react";
+import {LucideUserRoundPlus, CheckCircle2, UsersRoundIcon, Printer} from "lucide-react";
 import {memberService} from "../../services/memberService.js";
 import { TextInput, SelectInput, Button } from "../../components/form";
 
@@ -417,9 +417,18 @@ export default function Members() {
                         Capture Member
                     </Button>
                 </div>
-                <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">
-                    <div className="text-gray-600 dark:text-gray-300">
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm no-print">
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                         Showing {filteredMembers.length === 0 ? 0 : startIndex + 1}-{endIndex} of {filteredMembers.length} members
+                        {filteredMembers.length > 0 && (
+                            <button
+                                onClick={() => window.print()}
+                                title="Print results"
+                                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition"
+                            >
+                                <Printer size={16} />
+                            </button>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="pagination" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
@@ -429,7 +438,7 @@ export default function Members() {
                     </div>
                 </div>
 
-                <div className="mt-4 overflow-hidden rounded-xl border border-transparent max-h-[60vh] overflow-y-auto relative">
+                <div className="mt-4 overflow-hidden rounded-xl border border-transparent max-h-[60vh] overflow-y-auto relative print-area">
                     {isLoading && (
                         <div className="absolute inset-0 bg-white/60 dark:bg-gray-800/60 z-20 flex items-center justify-center backdrop-blur-[1px]">
                             <div className="flex flex-col items-center gap-2">

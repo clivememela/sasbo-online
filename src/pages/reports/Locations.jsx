@@ -1,5 +1,5 @@
 import {useState} from "react";
-import {Search, X} from "lucide-react";
+import {Search, X, Printer} from "lucide-react";
 import LocationListing from "./LocationListing.jsx";
 import {locationService} from "../../services/locationService.js";
 import { TextInput, Button } from "../../components/form";
@@ -49,9 +49,18 @@ export function Locations() {
 
                 <div className="flex items-center justify-between mt-4">
                     {searched && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                             {results.length} location{results.length !== 1 ? "s" : ""} found
-                        </p>
+                            {results.length > 0 && (
+                                <button
+                                    onClick={() => window.print()}
+                                    title="Print results"
+                                    className="no-print p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition"
+                                >
+                                    <Printer size={16} />
+                                </button>
+                            )}
+                        </div>
                     )}
                     <div className="flex gap-2 ml-auto">
                         {searched && (

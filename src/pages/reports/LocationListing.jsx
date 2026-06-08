@@ -89,7 +89,7 @@ const LocationListing = ({ data, filters }) => {
     }
 
     return (
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md max-w-6xl mx-auto my-6 font-sans border border-gray-200 dark:border-gray-700">
+        <div className="print-area bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md max-w-6xl mx-auto my-6 font-sans border border-gray-200 dark:border-gray-700">
 
             {/* Title */}
             <div className="text-center font-bold text-base tracking-wide mb-5 pb-3 border-b border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white uppercase">
