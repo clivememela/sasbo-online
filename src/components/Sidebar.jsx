@@ -1,34 +1,38 @@
 import { X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Logo from "./common/Logo";
 import SidebarItem from "./common/SidebarItem";
 import { navItems, authItems } from "../config/navigation";
 
+const findAncestors = (items, target, path = []) => {
+  for (const item of items) {
+    const current = [...path, item.href];
+    if (item.href === target) return current;
+    if (item.subItems) {
+      const found = findAncestors(item.subItems, target, current);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
 export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref}) {
   const location = useLocation();
   const [expandedItems, setExpandedItems] = useState({});
+  const [prevSelectedCardHref, setPrevSelectedCardHref] = useState(null);
 
-  useEffect(() => {
-    if (!selectedCardHref) return;
-    const findAncestors = (items, target, path = []) => {
-      for (const item of items) {
-        const current = [...path, item.href];
-        if (item.href === target) return current;
-        if (item.subItems) {
-          const found = findAncestors(item.subItems, target, current);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-    const ancestors = findAncestors(navItems, selectedCardHref) || [selectedCardHref];
-    setExpandedItems(prev => {
-      const next = { ...prev };
-      ancestors.forEach(href => { next[href] = true; });
-      return next;
-    });
-  }, [selectedCardHref]);
+  if (selectedCardHref !== prevSelectedCardHref) {
+    setPrevSelectedCardHref(selectedCardHref);
+    if (selectedCardHref) {
+      const ancestors = findAncestors(navItems, selectedCardHref) || [selectedCardHref];
+      setExpandedItems(prev => {
+        const next = { ...prev };
+        ancestors.forEach(href => { next[href] = true; });
+        return next;
+      });
+    }
+  }
 
   const toggleExpand = (href) => {
     setExpandedItems(prev => ({
