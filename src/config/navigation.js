@@ -16,7 +16,8 @@ import {
   LucideDatabase, Mailbox, LucideToolbox, LucideMenu, LucideCassetteTape, LucideGitBranch, LucideChartNoAxesGantt,
   LucideUserRoundPlus, LucideCalendar, LucideFile, LucideTag, UsersRoundIcon, LucideDoorOpen, LucideTags,
   LucideUserCheck2, LucidePenBox, LucidePiggyBank, LucidePresentation, LucideTable, LucideLocate, LucideCopyCheck,
-  LucidePrinter, LucideSettings, LucideSettings2, LucideConstruction
+  LucidePrinter, LucideSettings, LucideSettings2, LucideConstruction, LucideHdmiPort, LucideLogs, LucideMail,
+  LucideTrain, LucidePaintRoller, LucideUserRound
 } from "lucide-react";
 
 export const navItems = [
@@ -92,7 +93,58 @@ export const navItems = [
           },
         ]
       },
-      { title: "Monthly Menu", icon: LucideCalendar, color: 'text-red-600 dark:text-red-400' },
+      {
+        title: "Monthly Menu",
+        icon: LucideCalendar,
+        color: 'text-red-600 dark:text-red-400',
+        href: "/admin/monthly-menu",
+        subItems: [
+          {
+            title: 'Key File Setup',
+            icon: LucideFile,
+            color: 'text-red-600 dark:text-red-400'},
+          {
+            title: 'Flag All Ports',
+            icon: LucideHdmiPort,
+            color: 'text-red-600 dark:text-red-400'
+          },
+          {
+            title: 'Print Log File',
+            icon: LucideLogs,
+            color: 'text-red-600 dark:text-red-400'
+          },
+          {
+            title: 'Merge All Audit Trails',
+            icon: LucideTrain, href: '/endowment-fund',
+            color: 'text-red-600 dark:text-red-400'
+          },
+          {
+            title: 'Prepare File for Vari Mail',
+            icon: LucideMail,
+            color: 'text-red-600 dark:text-red-400'
+          },
+          {
+            title: 'Extract New and Deleted',
+            icon: LucideTable,
+            color: 'text-red-600 dark:text-red-400'
+          },
+          {
+            title: 'Print Location Listing',
+            icon: LucideLocate,
+            color: 'text-red-600 dark:text-red-400'
+          },
+          {
+            title: 'Print Member Roll (No Adding)' ,
+            icon: LucidePaintRoller,
+            color: 'text-red-600 dark:text-red-400'
+          },
+          {
+            title: 'Print Membership Summary',
+            icon: LucideUserRound,
+            color: 'text-red-600 dark:text-red-400'
+          },
+        ]
+      },
       { title: "Banks", icon: Landmark, color: 'text-red-600 dark:text-red-400'},
       { title: "Utilities", icon: LucideToolbox, color: 'text-red-600 dark:text-red-400'},
       { title: "A.C.B", icon: LucideFile, color: 'text-red-600 dark:text-red-400' },

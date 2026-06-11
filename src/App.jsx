@@ -16,6 +16,7 @@ import AppLayout from './layouts/AppLayout';
 import AuthLayout from './layouts/AuthLayout';
 import Admin from "./pages/admin/Admin.jsx";
 import DailyMenu from "./pages/admin/DailyMenu.jsx";
+import MonthlyMenu from "./pages/admin/MonthlyMenu.jsx";
 import Representatives from "./pages/members/Representatives.jsx";
 import CaptureMember from "./pages/members/CaptureMember.jsx";
 import Maintenance from "./pages/admin/Maintenance.jsx";
@@ -31,6 +32,7 @@ function App() {
         <Route index element={<HomePage />} />
         <Route path="admin" element={<Admin />} />
         <Route path="admin/daily-menu" element={<DailyMenu />} />
+        <Route path="admin/monthly-menu" element={<MonthlyMenu />} />
         <Route path="representatives" element={<Representatives />} />
         <Route path="banks" element={<BanksPage />} />
         <Route path="members" element={<MembersPage />} />
