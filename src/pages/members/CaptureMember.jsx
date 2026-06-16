@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
+import { apiUrl } from "../../services/api";
 import { Button } from "../../components/form";
 
 const frequencyOptions = ["Monthly", "Quarterly", "Bi-annually", "Annually"];
@@ -182,7 +183,7 @@ export default function CaptureMember() {
             alert("Please fix the errors before saving.");
             return;
         }
-        fetch('/api/members', {
+        fetch(apiUrl('/api/members'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(form),
