@@ -15,7 +15,7 @@ export default function Auth() {
     e.preventDefault();
     if (isLogin) {
       console.log('Login attempt:', { email, password });
-      navigate('/');
+      navigate('/home');
     } else {
       if (password !== confirmPassword) {
         alert("Passwords don't match");
