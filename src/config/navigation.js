@@ -21,7 +21,10 @@ import {
 } from "lucide-react";
 
 export const navItems = [
-  { title: "Home", icon: Home, href: "/" },
+  {
+    title: "Home",
+    icon: Home,
+    href: "/home" },
   {
     title: "Admin Menu",
     icon: LucideDatabase,

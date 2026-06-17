@@ -15,6 +15,23 @@ The React Compiler is not enabled on this template because of its impact on dev 
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
 
+## Local Development with .env files
+
+To simplify local configuration, `.env` files have been added to both projects. These files are ignored by git to keep your local credentials safe.
+
+### Frontend (`sasbo-online`)
+1. A `.env` file has been created in the root directory.
+2. It contains `VITE_API_BASE_URL=http://localhost:8080`.
+3. Vite automatically loads this variable. You can use it in your code via `import.meta.env.VITE_API_BASE_URL`.
+
+### Backend (`sasbo-online-backend`)
+1. A `.env` file has been created in the backend root directory.
+2. It contains database credentials and the server port.
+3. **How to load it:**
+   - **IntelliJ/WebStorm:** Install the **"EnvFile"** plugin. In your Run Configuration, go to the "EnvFile" tab and add the `.env` file.
+   - **Terminal:** Run `export $(cat .env | xargs)` before running `./gradlew bootRun`.
+   - **Manual:** Copy the values into your IDE's "Environment Variables" section in the Run Configuration.
+
 ## Deploy with Render (Database + Backend + Frontend)
 
 1. **Create PostgreSQL database on Render**

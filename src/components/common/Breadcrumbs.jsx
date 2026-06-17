@@ -31,7 +31,7 @@ export default function Breadcrumbs() {
     return lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1).replace(/-/g, ' ');
   };
 
-  if (location.pathname === "/") {
+  if (location.pathname === "/home") {
     return (
       <nav className="flex items-center text-sm font-medium mt-4">
         <span className="text-gray-500 dark:text-gray-400">Home</span>
@@ -41,7 +41,7 @@ export default function Breadcrumbs() {
 
   return (
     <nav className="flex items-center text-sm font-medium mt-4">
-      <Link to="/" className="hover:underline text-cyan-700 dark:text-cyan-400">Home</Link>
+      <Link to="/home" className="hover:underline text-cyan-700 dark:text-cyan-400">Home</Link>
       {pathnames.map((name, index) => {
         const routeTo = `/${pathnames.slice(0, index + 1).join("/")}`;
         const isLast = index === pathnames.length - 1;
