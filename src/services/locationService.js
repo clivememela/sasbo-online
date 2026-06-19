@@ -5,4 +5,5 @@ export const locationService = {
     const params = new URLSearchParams({ bankName, branch, area, randomAccessNumber });
     return fetch(apiUrl(`/api/branches?${params}`)).then(r => r.json());
   },
+  getProvinces: () => fetch(apiUrl('/api/provinces')).then(r => r.json()),
 };

@@ -1,12 +1,8 @@
 import {
-  Facebook,
-  Instagram,
-  Linkedin,
   Mail,
   MapPin,
   Phone,
-  Printer,
-  Youtube
+  Printer
 } from 'lucide-react';
 export default function About() {
   return (

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Printer } from "lucide-react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, Button } from "../../components/form";
+import AddBankModal from "./AddBankModal.jsx";
 
 const PAGE_SIZE = bankService.getPageSize();
 
@@ -22,6 +23,7 @@ export default function BankSearch() {
   const [showAbbrev, setShowAbbrev] = useState(false);
   const [showTableCode, setShowTableCode] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [showAddBank, setShowAddBank] = useState(false);
 
   const filteredBanks = useMemo(() => {
     const bankNameQuery = filters.bankName.trim().toLowerCase();
@@ -83,9 +85,7 @@ export default function BankSearch() {
 
   return (
     <div className="p-6 text-gray-900 dark:text-gray-100">
-      <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">
-        Search Banks
-      </h2>
+      <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">Search Banks</h2>
       <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
         Access, manage, and track Sasbo member records across South Africa's leading financial institutions and branch networks.
       </p>
@@ -132,6 +132,7 @@ export default function BankSearch() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="primary" onClick={() => setShowAddBank(true)}>+ Add Bank</Button>
             <Button
               type="button"
               onClick={() => setPage((prev) => Math.max(1, prev - 1))}
@@ -412,6 +413,13 @@ export default function BankSearch() {
             </div>
           </div>
         </div>
+      )}
+
+      {showAddBank && (
+        <AddBankModal
+          onClose={() => setShowAddBank(false)}
+          onCreated={(newBank) => { setBanks((prev) => [...prev, newBank]); setShowAddBank(false); }}
+        />
       )}
 
       {selectedMember && (

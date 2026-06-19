@@ -1,23 +1,19 @@
 import { useMemo, useState, useEffect } from 'react';
-import { ChevronRight, UserPlus, Trash2, UserMinus } from 'lucide-react';
+import { ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import { TextInput, SelectInput, Button } from '../../components/form';
 import { memberService } from '../../services/memberService.js';
-import banksData from '../../data/banks.json';
+import { representativeService } from '../../services/representativeService.js';
+import { bankService } from '../../services/bankService.js';
+import { locationService } from '../../services/locationService.js';
 
 const PAGE_SIZE = 20;
 
-const PROVINCES  = [...new Set(banksData.map(b => b.provinceCommitteeName).filter(Boolean))].sort();
-const AREAS      = [...new Set(banksData.map(b => b.area).filter(Boolean))].sort();
-const BRANCHES   = [...new Set(banksData.map(b => b.branch).filter(Boolean))].sort();
-const BANK_NAMES = [...new Set(banksData.map(b => b.bankName).filter(Boolean))].sort();
-
-// bankName -> { province, area }
-const BANK_META = {};
-banksData.forEach(b => { BANK_META[b.bankName] = { province: b.provinceCommitteeName, area: b.area }; });
-
 export default function Representatives() {
     const [members, setMembers] = useState([]);
+    const [reps, setReps] = useState([]);   // [{id, name}, ...] from API
+    const [banksData, setBanksData] = useState([]);
+    const [provincesData, setProvincesData] = useState([]);
     const [filters, setFilters] = useState({ repName: '', bankName: '', branch: '', province: '', area: '' });
     const [page, setPage] = useState(1);
     const [selectedRep, setSelectedRep] = useState(null);   // rep name string
@@ -27,32 +23,79 @@ export default function Representatives() {
     const [saving, setSaving] = useState(false);
     const [showAddRep, setShowAddRep] = useState(false);
     const [newRepName, setNewRepName] = useState('');
+    const [newRepFields, setNewRepFields] = useState({ bank: '', branch: '', province: '', area: '' });
+    const [selectedRepDetail, setSelectedRepDetail] = useState(null);
+    const [editingRep, setEditingRep] = useState(false);
+    const [editRepFields, setEditRepFields] = useState({ name: '', email: '', phone: '' });
+    const [repSearch, setRepSearch] = useState({ membershipNumber: '', name: '', bank: '', branch: '', status: '' });
 
-    useEffect(() => { memberService.getMembers().then(setMembers); }, []);
+    const refreshAll = () => Promise.all([
+        memberService.getMembers(),
+        representativeService.getAll(),
+    ]).then(([m, r]) => { setMembers(m); setReps(r); });
 
-    // Build unique rep list: { name, banks, branches, provinces, areas, memberCount }
+    useEffect(() => {
+        refreshAll();
+        bankService.getBanks().then(setBanksData);
+        locationService.getProvinces().then(setProvincesData);
+    }, []);
+
+    const BANK_NAMES = useMemo(() => [...new Set(banksData.map(b => b.bankName).filter(Boolean))].sort(), [banksData]);
+    const PROVINCES  = useMemo(() => provincesData.map(p => p.name).filter(Boolean).sort(), [provincesData]);
+    const AREAS      = useMemo(() => [...new Set(banksData.map(b => b.area).filter(Boolean))].sort(), [banksData]);
+    const BRANCHES   = useMemo(() => [...new Set(banksData.map(b => b.branchName).filter(Boolean))].sort(), [banksData]);
+
+    // Derived dropdowns for Add Rep modal (cascade from selected bank)
+    const modalBranches  = useMemo(() => {
+        const rows = newRepFields.bank ? banksData.filter(b => b.bankName === newRepFields.bank) : banksData;
+        return [...new Set(rows.map(b => b.branchName).filter(Boolean))].sort();
+    }, [banksData, newRepFields.bank]);
+
+    const modalProvinces = useMemo(() => provincesData.map(p => p.name).filter(Boolean).sort(), [provincesData]);
+
+    const modalAreas     = useMemo(() => {
+        const rows = newRepFields.branch
+            ? banksData.filter(b => b.branchName === newRepFields.branch)
+            : newRepFields.bank ? banksData.filter(b => b.bankName === newRepFields.bank) : banksData;
+        return [...new Set(rows.map(b => b.area).filter(Boolean))].sort();
+    }, [banksData, newRepFields.bank, newRepFields.branch]);
+
+    // bankName -> { province, area }
+    const BANK_META = useMemo(() => {
+        const meta = {};
+        banksData.forEach(b => { meta[b.bankName] = { province: b.provinceCommitteeName, area: b.area }; });
+        return meta;
+    }, [banksData]);
+
+    // Build rep list from API reps, enriched with derived member data
     const repList = useMemo(() => {
-        const map = {};
+        const memberMap = {};
         members.forEach(m => {
             const name = m.areasRep?.trim();
             if (!name) return;
-            if (!map[name]) map[name] = { name, bankSet: new Set(), branchSet: new Set(), provinceSet: new Set(), areaSet: new Set(), count: 0 };
-            map[name].bankSet.add(m.bankName ?? '');
-            map[name].branchSet.add(m.branch ?? '');
+            if (!memberMap[name]) memberMap[name] = { bankSet: new Set(), branchSet: new Set(), provinceSet: new Set(), areaSet: new Set(), count: 0 };
+            memberMap[name].bankSet.add(m.bankName ?? '');
+            memberMap[name].branchSet.add(m.branch ?? '');
             const meta = BANK_META[m.bankName] || {};
-            if (meta.province) map[name].provinceSet.add(meta.province);
-            if (meta.area)     map[name].areaSet.add(meta.area);
-            map[name].count++;
+            if (meta.province) memberMap[name].provinceSet.add(meta.province);
+            if (meta.area)     memberMap[name].areaSet.add(meta.area);
+            memberMap[name].count++;
         });
-        return Object.values(map).map(r => ({
-            name: r.name,
-            banks: [...r.bankSet].filter(Boolean).join(', '),
-            branches: [...r.branchSet].filter(Boolean).join(', '),
-            provinces: [...r.provinceSet].join(', '),
-            areas: [...r.areaSet].join(', '),
-            count: r.count,
-        })).sort((a, b) => a.name.localeCompare(b.name));
-    }, [members]);
+        return reps.map(r => {
+            const d = memberMap[r.name] || { bankSet: new Set(), branchSet: new Set(), provinceSet: new Set(), areaSet: new Set(), count: 0 };
+            return {
+                id: r.id,
+                name: r.name,
+                email: r.email || '',
+                phone: r.phone || '',
+                banks: [...d.bankSet].filter(Boolean).join(', '),
+                branches: [...d.branchSet].filter(Boolean).join(', '),
+                provinces: [...d.provinceSet].join(', '),
+                areas: [...d.areaSet].join(', '),
+                count: d.count,
+            };
+        }).sort((a, b) => a.name.localeCompare(b.name));
+    }, [members, reps, BANK_META]);
 
     const filtered = useMemo(() => {
         const q = v => v.trim().toLowerCase();
@@ -82,6 +125,17 @@ export default function Representatives() {
         selectedRep ? members.filter(m => m.areasRep?.trim() === selectedRep) : [],
     [selectedRep, members]);
 
+    const filteredRepMembers = useMemo(() => {
+        const { membershipNumber, name, bank, branch, status } = repSearch;
+        return repMembers.filter(m =>
+            (!membershipNumber || m.membershipNumber.toLowerCase().includes(membershipNumber.toLowerCase())) &&
+            (!name || `${m.initials} ${m.surname}`.toLowerCase().includes(name.toLowerCase())) &&
+            (!bank || (m.bankName ?? '').toLowerCase().includes(bank.toLowerCase())) &&
+            (!branch || (m.branch ?? '').toLowerCase().includes(branch.toLowerCase())) &&
+            (!status || (m.status ?? '').toLowerCase().includes(status.toLowerCase()))
+        );
+    }, [repMembers, repSearch]);
+
     // Members NOT yet assigned to this rep (candidates to add)
     const candidateMembers = useMemo(() => {
         const q = addSearch.trim().toLowerCase();
@@ -99,20 +153,16 @@ export default function Representatives() {
 
     const handleAssign = async (member) => {
         setSaving(true);
-        const updated = { ...member, areasRep: selectedRep };
-        await memberService.updateMember(updated);
-        const fresh = await memberService.getMembers();
-        setMembers(fresh);
+        await memberService.updateMember({ ...member, areasRep: selectedRep });
+        await refreshAll();
         setSaving(false);
     };
 
     const handleRemove = async (member) => {
         if (!window.confirm(`Remove ${member.initials} ${member.surname} from ${selectedRep}'s list?`)) return;
         setSaving(true);
-        const updated = { ...member, areasRep: '' };
-        await memberService.updateMember(updated);
-        const fresh = await memberService.getMembers();
-        setMembers(fresh);
+        await memberService.updateMember({ ...member, areasRep: '' });
+        await refreshAll();
         setSaving(false);
     };
 
@@ -123,26 +173,23 @@ export default function Representatives() {
             alert('A representative with that name already exists.');
             return;
         }
-        // Create a placeholder member record that establishes the rep
-        // Instead, just close and let user assign members — reps are derived from members.
-        // We store the new rep name as a pending rep by assigning it to no members yet;
-        // the rep only appears once a member is assigned. So we open the rep modal directly.
         setShowAddRep(false);
         setNewRepName('');
+        setNewRepFields({ bank: '', branch: '', province: '', area: '' });
         setSelectedRep(name);
         setShowAddMember(true);
         setAddSearch('');
     };
 
-    const handleRemoveRep = async (repName) => {
-        const repMems = members.filter(m => m.areasRep?.trim() === repName);
-        if (!window.confirm(`Remove representative "${repName}"? This will set ${repMems.length} member(s) to Inactive and clear their rep assignment.`)) return;
+    const handleRemoveRep = async (rep) => {
+        const repMems = members.filter(m => m.areasRep?.trim() === rep.name);
+        if (!window.confirm(`Remove representative "${rep.name}"? This will set ${repMems.length} member(s) to Inactive and clear their rep assignment.`)) return;
         setSaving(true);
         await Promise.all(repMems.map(m =>
             memberService.updateMember({ ...m, areasRep: '', status: 'Inactive' })
         ));
-        const fresh = await memberService.getMembers();
-        setMembers(fresh);
+        await representativeService.remove(rep.id);
+        await refreshAll();
         setSaving(false);
     };
 
@@ -177,7 +224,7 @@ export default function Representatives() {
                         <span className="text-gray-600 dark:text-gray-300">Page {page} of {totalPages}</span>
                         <Button variant="pagination" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
                         <Button onClick={handleClear}>Clear</Button>
-                        <Button variant="primary" onClick={() => { setShowAddRep(true); setNewRepName(''); }}>
+                        <Button variant="primary" onClick={() => { setShowAddRep(true); setNewRepName(''); setNewRepFields({ bank: '', branch: '', province: '', area: '' }); }}>
                             <UserPlus size={14} /> Add Rep
                         </Button>
                     </div>
@@ -192,7 +239,7 @@ export default function Representatives() {
                         <div>Province</div>
                         <div>Area</div>
                         <div>Members</div>
-                        <div></div>
+                        <div className="flex justify-end">Remove</div>
                     </div>
                     <div className="divide-y divide-gray-200 dark:divide-gray-700">
                         {visible.length === 0 ? (
@@ -216,7 +263,7 @@ export default function Representatives() {
                                 </div>
                                 <div className="flex justify-end" onClick={e => e.stopPropagation()}>
                                     <button
-                                        onClick={() => handleRemoveRep(r.name)}
+                                        onClick={() => handleRemoveRep(r)}
                                         disabled={saving}
                                         title="Remove representative"
                                         className="p-1.5 rounded-md text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition disabled:opacity-40">
@@ -232,22 +279,49 @@ export default function Representatives() {
             {/* Rep Members Modal */}
             {selectedRep && !selectedMember && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-                    <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedRep(null)} />
+                    <div className="absolute inset-0 bg-black/50" onClick={() => { setSelectedRep(null); setRepSearch({ membershipNumber: '', name: '', bank: '', branch: '', status: '' }); }} />
                     <div className="relative w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                         {/* Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
                             <div>
                                 <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Representative</p>
-                                <h3 className="text-lg font-semibold text-cyan-700 dark:text-cyan-400">{selectedRep}</h3>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-lg font-semibold text-cyan-700 dark:text-cyan-400">{selectedRep}</h3>
+                                    <div className="relative group">
+                                        <button
+                                            onClick={() => {
+                                    const rep = repList.find(r => r.name === selectedRep);
+                                    setSelectedRepDetail(rep);
+                                    setEditingRep(false);
+                                    setEditRepFields({ name: rep?.name || '', email: rep?.email || '', phone: rep?.phone || '' });
+                                }}
+                                            className="p-1 rounded-md text-cyan-500 hover:bg-cyan-50 hover:text-cyan-700 dark:hover:bg-cyan-900/20 transition">
+                                            <Eye size={14} />
+                                        </button>
+                                        <span className="absolute left-1/2 -translate-x-1/2 top-7 z-50 whitespace-nowrap rounded-md bg-gray-800 text-white text-xs px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
+                                            View representative details
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="text-sm text-gray-500 dark:text-gray-400">{repMembers.length} member{repMembers.length !== 1 ? 's' : ''}</span>
-                                <CloseBtn onClick={() => setSelectedRep(null)} />
+                                <CloseBtn onClick={() => { setSelectedRep(null); setRepSearch({ membershipNumber: '', name: '', bank: '', branch: '', status: '' }); }} />
                             </div>
                         </div>
 
                         {/* Members list */}
                         <div className="overflow-y-auto flex-1">
+                            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 text-center">
+                                <h4 className="text-sm font-semibold text-cyan-700 dark:text-cyan-400">Members ({repMembers.length})</h4>
+                            </div>
+                            <div className="grid grid-cols-5 gap-2 px-4 py-2 border-b border-gray-100 dark:border-gray-700">
+                                <input value={repSearch.membershipNumber} onChange={e => setRepSearch(p => ({ ...p, membershipNumber: e.target.value }))} placeholder="Membership No." className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                                <input value={repSearch.name} onChange={e => setRepSearch(p => ({ ...p, name: e.target.value }))} placeholder="Name" className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                                <input value={repSearch.bank} onChange={e => setRepSearch(p => ({ ...p, bank: e.target.value }))} placeholder="Bank" className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                                <input value={repSearch.branch} onChange={e => setRepSearch(p => ({ ...p, branch: e.target.value }))} placeholder="Branch" className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                                <input value={repSearch.status} onChange={e => setRepSearch(p => ({ ...p, status: e.target.value }))} placeholder="Status" className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                            </div>
                             <div className="grid grid-cols-6 gap-3 px-4 py-2 text-xs uppercase tracking-wide bg-gray-50 text-gray-500 dark:bg-gray-900/50 dark:text-gray-400 sticky top-0">
                                 <div>Membership No.</div>
                                 <div>Name</div>
@@ -257,9 +331,9 @@ export default function Representatives() {
                                 <div></div>
                             </div>
                             <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                                {repMembers.length === 0 ? (
-                                    <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">No members assigned yet.</div>
-                                ) : repMembers.map(m => (
+                                {filteredRepMembers.length === 0 ? (
+                                    <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">No members found.</div>
+                                ) : filteredRepMembers.map(m => (
                                     <div key={m.id} className="grid grid-cols-6 gap-3 px-4 py-3 text-sm items-center hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                                         <div
                                             className="font-medium text-cyan-700 dark:text-cyan-400 cursor-pointer hover:underline"
@@ -292,7 +366,7 @@ export default function Representatives() {
                             <Button variant="primary" onClick={() => { setShowAddMember(true); setAddSearch(''); }}>
                                 <UserPlus size={14} /> Add Member
                             </Button>
-                            <Button onClick={() => setSelectedRep(null)}>Close</Button>
+                            <Button onClick={() => { setSelectedRep(null); setRepSearch({ membershipNumber: '', name: '', bank: '', branch: '', status: '' }); }}>Close</Button>
                         </div>
                     </div>
                 </div>
@@ -353,24 +427,119 @@ export default function Representatives() {
                 </div>
             )}
 
+            {/* Rep Detail Modal */}
+            {selectedRepDetail && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+                    <div className="absolute inset-0 bg-black/60" onClick={() => { setSelectedRepDetail(null); setEditingRep(false); }} />
+                    <div className="relative w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                            <div>
+                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Representative Details</p>
+                                <h3 className="text-base font-semibold text-cyan-700 dark:text-cyan-400">{selectedRepDetail.name}</h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {!editingRep && (
+                                    <button
+                                        onClick={() => {
+                                            setEditRepFields({ name: selectedRepDetail.name, email: selectedRepDetail.email || '', phone: selectedRepDetail.phone || '' });
+                                            setEditingRep(true);
+                                        }}
+                                        className="px-3 py-1 rounded-md text-xs font-medium bg-cyan-600 text-white hover:bg-cyan-700 transition">
+                                        Edit
+                                    </button>
+                                )}
+                                <CloseBtn onClick={() => { setSelectedRepDetail(null); setEditingRep(false); }} />
+                            </div>
+                        </div>
+                        {editingRep ? (
+                            <div className="px-6 py-5 space-y-4">
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Full Name *</label>
+                                    <input value={editRepFields.name} onChange={e => setEditRepFields(p => ({ ...p, name: e.target.value }))} className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Email</label>
+                                    <input value={editRepFields.email} onChange={e => setEditRepFields(p => ({ ...p, email: e.target.value }))} type="email" className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Phone</label>
+                                    <input value={editRepFields.phone} onChange={e => setEditRepFields(p => ({ ...p, phone: e.target.value }))} type="tel" className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="px-6 py-5 space-y-4">
+                                <DRow label="Name" value={selectedRepDetail.name} />
+                                <DRow label="Email" value={selectedRepDetail.email || '—'} />
+                                <DRow label="Phone" value={selectedRepDetail.phone || '—'} />
+                                <DRow label="Bank(s)" value={selectedRepDetail.banks || '—'} />
+                                <DRow label="Branch(es)" value={selectedRepDetail.branches || '—'} />
+                                <DRow label="Province" value={selectedRepDetail.provinces || '—'} />
+                                <DRow label="Area" value={selectedRepDetail.areas || '—'} />
+                                <DRow label="Members Represented" value={selectedRepDetail.count} />
+                            </div>
+                        )}
+                        <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+                            {editingRep ? (
+                                <>
+                                    <Button onClick={() => setEditingRep(false)}>Cancel</Button>
+                                    <Button variant="primary" disabled={!editRepFields.name.trim() || saving}
+                                        onClick={async () => {
+                                            setSaving(true);
+                                            try {
+                                                await representativeService.update(selectedRepDetail.id, editRepFields);
+                                                await refreshAll();
+                                                setSelectedRepDetail(d => ({ ...d, ...editRepFields }));
+                                                if (selectedRep === selectedRepDetail.name) setSelectedRep(editRepFields.name);
+                                                setEditingRep(false);
+                                            } catch (err) {
+                                                alert(err);
+                                            } finally {
+                                                setSaving(false);
+                                            }
+                                        }}>
+                                        Save
+                                    </Button>
+                                </>
+                            ) : (
+                                <Button onClick={() => { setSelectedRepDetail(null); setEditingRep(false); }}>Close</Button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Add Representative Modal */}
             {showAddRep && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true">
                     <div className="absolute inset-0 bg-black/60" onClick={() => setShowAddRep(false)} />
-                    <div className="relative w-full max-w-sm rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
+                    <div className="relative w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Add Representative</h3>
                             <CloseBtn onClick={() => setShowAddRep(false)} />
                         </div>
-                        <input
-                            autoFocus
-                            value={newRepName}
-                            onChange={e => setNewRepName(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleAddRep()}
-                            placeholder="Representative full name"
-                            className="w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 mb-4"
-                        />
-                        <div className="flex justify-end gap-2">
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Full Name *</label>
+                                <input autoFocus value={newRepName} onChange={e => setNewRepName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddRep()} placeholder="Representative full name" className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                            </div>
+                            <SelectInput label="Province"
+                                value={newRepFields.province}
+                                onChange={e => setNewRepFields(p => ({ ...p, province: e.target.value }))}
+                                options={[{ value: '', label: 'Select province…' }, ...modalProvinces.map(p => ({ value: p, label: p }))]} />
+                            <SelectInput label="Bank"
+                                value={newRepFields.bank}
+                                onChange={e => setNewRepFields(p => ({ ...p, bank: e.target.value, branch: '', area: '' }))}
+                                options={[{ value: '', label: 'Select bank…' }, ...BANK_NAMES.map(b => ({ value: b, label: b }))]} />
+                            <SelectInput label="Branch"
+                                value={newRepFields.branch}
+                                onChange={e => setNewRepFields(p => ({ ...p, branch: e.target.value, area: '' }))}
+                                options={[{ value: '', label: 'Select branch…' }, ...modalBranches.map(b => ({ value: b, label: b }))]} />
+                            <SelectInput label="Area"
+                                value={newRepFields.area}
+                                onChange={e => setNewRepFields(p => ({ ...p, area: e.target.value }))}
+                                options={[{ value: '', label: 'Select area…' }, ...modalAreas.map(a => ({ value: a, label: a }))]} />
+                        </div>
+                        <div className="flex justify-end gap-2 mt-5">
                             <Button onClick={() => setShowAddRep(false)}>Cancel</Button>
                             <Button variant="primary" onClick={handleAddRep} disabled={!newRepName.trim()}>
                                 <UserPlus size={14} /> Continue
