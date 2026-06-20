@@ -66,7 +66,8 @@ const cards = [
     {
         title: 'Area & Table code',
         icon: LucidePrinter,
-        desc: 'Print Member by Area & Table code'
+        desc: 'Print Member by Area & Table code',
+        color: 'text-red-600 dark:text-red-400'
     },
 ];
 

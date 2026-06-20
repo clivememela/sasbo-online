@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Printer } from "lucide-react";
 import { bankService } from "../../services/bankService.js";
-import { TextInput, Button } from "../../components/form";
+import { TextInput, SearchableSelect, Button } from "../../components/form";
 import AddBankModal from "./AddBankModal.jsx";
 
 const PAGE_SIZE = bankService.getPageSize();
@@ -92,11 +92,12 @@ export default function BankSearch() {
 
       <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-          <TextInput
+          <SearchableSelect
             label="Bank Name"
             value={filters.bankName}
             onChange={handleInputChange("bankName")}
-            placeholder="Search bank name"
+            placeholder="All Banks"
+            options={[{ value: '', label: 'All Banks' }, ...([...new Set(banks.map(b => b.bankName).filter(Boolean))].sort().map(b => ({ value: b, label: b })))]}
           />
           <TextInput
             label="Branch"

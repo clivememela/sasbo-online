@@ -3,7 +3,7 @@ import {OrganizerReport} from "../reports/OrganizerReport.jsx";
 import GeneralForm from "./GeneralForm.jsx";
 import LocationListing from "../reports/LocationListing.jsx";
 import MembershipApplication from "./MembershipApplication.jsx";
-import { TextInput, SelectInput, Button, FilterForm } from "../../components/form";
+import {TextInput, SelectInput, Button, FilterForm, SearchableSelect} from "../../components/form";
 import { FileSearch } from "lucide-react";
 
 export function Forms(){
@@ -84,7 +84,7 @@ export function Forms(){
                     placeholder="Search RAN"
                 />
                 <div className="lg:col-span-2">
-                    <SelectInput
+                    <SearchableSelect
                         label="Form Type"
                         value={filters.formType}
                         onChange={handleInputChange("formType")}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { apiUrl } from "../../services/api";
-import { Button } from "../../components/form";
+import { Button, SearchableSelect } from "../../components/form";
 
 const frequencyOptions = ["Monthly", "Quarterly", "Bi-annually", "Annually"];
 const titleOptions = ["Mr", "Ms", "Mrs", "Dr", "Prof"];
@@ -285,7 +285,7 @@ export default function CaptureMember() {
                             <>
                                 <Field label="Employee Number" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} />
-                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={bankOptions} />
+                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={bankOptions} searchable />
                                 <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={branchOptions} />
                                 <Field label="Bank Account Number" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} />
                                 <Field label="IBT No." value={form.ibtNo} onChange={handleChange("ibtNo")} />
@@ -373,20 +373,25 @@ function RepElectionDatePicker({ form, setForm }) {
     );
 }
 
-function Field({ label, value, onChange, className = "", options = null, type = "text", error = null, disabled = false }) {
+function Field({ label, value, onChange, className = "", options = null, type = "text", error = null, disabled = false, searchable = false }) {
     return (
         <div className={className}>
             <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
                 {label}
             </label>
             <div className="relative">
-                {options ? (
+                {options && searchable ? (
                     <select value={value || ""} onChange={onChange} className={fieldCls(error)} disabled={disabled}>
                         <option value="">Select...</option>
                         {options.map((opt) => (
-                            <option key={opt} value={opt}>
-                                {opt}
-                            </option>
+                            <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                    </select>
+                ) : options ? (
+                    <select value={value || ""} onChange={onChange} className={fieldCls(error)} disabled={disabled}>
+                        <option value="">Select...</option>
+                        {options.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
                         ))}
                     </select>
                 ) : (

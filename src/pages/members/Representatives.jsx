@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
-import { TextInput, SelectInput, Button } from '../../components/form';
+import { TextInput, SelectInput, SearchableSelect, Button } from '../../components/form';
 import { memberService } from '../../services/memberService.js';
 import { representativeService } from '../../services/representativeService.js';
 import { bankService } from '../../services/bankService.js';
@@ -204,13 +204,13 @@ export default function Representatives() {
                 {/* Filters */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
                     <TextInput label="Rep Name" value={filters.repName} onChange={handleFilter('repName')} placeholder="Search rep name" />
-                    <SelectInput label="Bank Name" value={filters.bankName} onChange={handleFilter('bankName')}
+                    <SearchableSelect label="Bank Name" value={filters.bankName} onChange={handleFilter('bankName')} placeholder="All Banks"
                         options={[{ value: '', label: 'All Banks' }, ...BANK_NAMES.map(b => ({ value: b, label: b }))]} />
-                    <SelectInput label="Branch" value={filters.branch} onChange={handleFilter('branch')}
+                    <SearchableSelect label="Branch" value={filters.branch} onChange={handleFilter('branch')}
                         options={[{ value: '', label: 'All Branches' }, ...BRANCHES.map(b => ({ value: b, label: b }))]} />
-                    <SelectInput label="Province" value={filters.province} onChange={handleFilter('province')}
+                    <SearchableSelect label="Province" value={filters.province} onChange={handleFilter('province')}
                         options={[{ value: '', label: 'All Provinces' }, ...PROVINCES.map(p => ({ value: p, label: p }))]} />
-                    <SelectInput label="Area" value={filters.area} onChange={handleFilter('area')}
+                    <SearchableSelect label="Area" value={filters.area} onChange={handleFilter('area')}
                         options={[{ value: '', label: 'All Areas' }, ...AREAS.map(a => ({ value: a, label: a }))]} />
                 </div>
 
@@ -522,19 +522,19 @@ export default function Representatives() {
                                 <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Full Name *</label>
                                 <input autoFocus value={newRepName} onChange={e => setNewRepName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddRep()} placeholder="Representative full name" className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
                             </div>
-                            <SelectInput label="Province"
+                            <SearchableSelect label="Province"
                                 value={newRepFields.province}
                                 onChange={e => setNewRepFields(p => ({ ...p, province: e.target.value }))}
                                 options={[{ value: '', label: 'Select province…' }, ...modalProvinces.map(p => ({ value: p, label: p }))]} />
-                            <SelectInput label="Bank"
+                            <SearchableSelect label="Bank"
                                 value={newRepFields.bank}
                                 onChange={e => setNewRepFields(p => ({ ...p, bank: e.target.value, branch: '', area: '' }))}
                                 options={[{ value: '', label: 'Select bank…' }, ...BANK_NAMES.map(b => ({ value: b, label: b }))]} />
-                            <SelectInput label="Branch"
+                            <SearchableSelect label="Branch"
                                 value={newRepFields.branch}
                                 onChange={e => setNewRepFields(p => ({ ...p, branch: e.target.value, area: '' }))}
                                 options={[{ value: '', label: 'Select branch…' }, ...modalBranches.map(b => ({ value: b, label: b }))]} />
-                            <SelectInput label="Area"
+                            <SearchableSelect label="Area"
                                 value={newRepFields.area}
                                 onChange={e => setNewRepFields(p => ({ ...p, area: e.target.value }))}
                                 options={[{ value: '', label: 'Select area…' }, ...modalAreas.map(a => ({ value: a, label: a }))]} />

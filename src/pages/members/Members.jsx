@@ -2,7 +2,7 @@ import {useEffect, useMemo, useState, useRef} from "react";
 import {useNavigate, useLocation} from "react-router-dom";
 import {LucideUserRoundPlus, CheckCircle2, UsersRoundIcon, Printer} from "lucide-react";
 import {memberService} from "../../services/memberService.js";
-import { TextInput, SelectInput, Button } from "../../components/form";
+import { TextInput, SearchableSelect, Button } from "../../components/form";
 
 const PAGE_SIZE = memberService.getPageSize();
 
@@ -386,22 +386,23 @@ export default function Members() {
 
             <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                    <SelectInput label="Title" value={filters.title} onChange={handleInputChange("title")}
-                        options={[{value:"",label:"Select Title"}, ...titleOptions.map(o=>({value:o,label:o}))]} />
+                    <SearchableSelect label="Title" value={filters.title} onChange={handleInputChange("title")} placeholder="All Titles"
+                        options={[{value:"",label:"All Titles"}, ...titleOptions.map(o=>({value:o,label:o}))]} />
                     <TextInput label="Employee Number" value={filters.employeeNumber} onChange={handleInputChange("employeeNumber")} placeholder="Search by employee number" />
                     <TextInput label="Membership Number" value={filters.membershipNumber} onChange={handleInputChange("membershipNumber")} placeholder="Search by membership number" />
                     <TextInput label="Initials" value={filters.initials} onChange={handleInputChange("initials")} placeholder="Search by initials" />
                     <TextInput label="Surname" value={filters.surname} onChange={handleInputChange("surname")} placeholder="Search by surname" />
                     <TextInput label="Identity Number" value={filters.identityNumber} onChange={handleInputChange("identityNumber")} placeholder="Search by identity number" />
-                    <TextInput label="Bank Name" value={filters.bankName} onChange={handleInputChange("bankName")} placeholder="Search by bank name" />
+                    <SearchableSelect label="Bank Name" value={filters.bankName} onChange={handleInputChange("bankName")} placeholder="All Banks"
+                        options={[{ value: '', label: 'All Banks' }, ...bankOptions.map(b => ({ value: b, label: b }))]} />
                     <TextInput label="Branch" value={filters.branch} onChange={handleInputChange("branch")} placeholder="Search by branch" />
                     <TextInput label="Bank Account Number" value={filters.bankAccountNumber} onChange={handleInputChange("bankAccountNumber")} placeholder="Search by bank account number" />
                     <TextInput label="Cellphone Number" value={filters.phone} onChange={handleInputChange("phone")} placeholder="Search by cellphone number" />
                     <TextInput label="Email Address" value={filters.email} onChange={handleInputChange("email")} placeholder="Search by email address" />
-                    <SelectInput label="Status" value={filters.status} onChange={handleInputChange("status")}
-                        options={[{value:"",label:"Select Status"}, ...statusOptions.map(o=>({value:o,label:o}))]} />
-                    <SelectInput label="Race" value={filters.race || ""} onChange={handleInputChange("race")}
-                        options={[{value:"",label:"Select Race"}, ...raceOptions.map(o=>({value:o,label:o}))]} />
+                    <SearchableSelect label="Status" value={filters.status} onChange={handleInputChange("status")} placeholder="All Statuses"
+                        options={[{value:"",label:"All Statuses"}, ...statusOptions.map(o=>({value:o,label:o}))]} />
+                    <SearchableSelect label="Race" value={filters.race || ""} onChange={handleInputChange("race")} placeholder="All Races"
+                        options={[{value:"",label:"All Races"}, ...raceOptions.map(o=>({value:o,label:o}))]} />
                     <div className="flex items-end">
                         <Button onClick={handleClear}>Clear Filters</Button>
                     </div>
@@ -780,6 +781,7 @@ export default function Members() {
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("bankName")}
                                                 options={bankOptions}
+                                                searchable
                                         />
                                         <Detail label="Bank Account Number" value={isEditing ? editForm.bankAccountNumber : (selectedMember.bankAccountNumber || "-")}
                                                 isEditing={isEditing}
@@ -964,7 +966,7 @@ const fieldCls = (error) =>
         error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"
     }`;
 
-function Detail({label, value, isEditing, onChange, className = "", options = null, type = "text", error = null}) {
+function Detail({label, value, isEditing, onChange, className = "", options = null, type = "text", error = null, searchable = false}) {
     return (
         <div className={className}>
             <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -972,11 +974,18 @@ function Detail({label, value, isEditing, onChange, className = "", options = nu
             </label>
             {isEditing ? (
                 <div className="mt-1">
-                    {options ? (
-                        <select value={value || ""} onChange={onChange} className={fieldCls(error)}>
-                            <option value="">Select...</option>
-                            {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                        </select>
+                    {options && searchable ? (
+                        <SearchableSelect
+                            value={value || ''}
+                            onChange={onChange}
+                            options={[{ value: '', label: 'Select...' }, ...options.map(o => ({ value: o, label: o }))]}
+                        />
+                    ) : options ? (
+                        <SearchableSelect
+                            value={value || ''}
+                            onChange={onChange}
+                            options={[{ value: '', label: 'Select...' }, ...options.map(o => ({ value: o, label: o }))]}
+                        />
                     ) : (
                         <input type={type} value={value || ""} onChange={onChange} className={fieldCls(error)} />
                     )}
