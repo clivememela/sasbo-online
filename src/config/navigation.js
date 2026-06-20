@@ -44,28 +44,24 @@ export const navItems = [
               { title: "Capture Member", icon: LucideUserRoundPlus, href: "/members/capture" },
               // { title: 'Members', icon: LucideDoorOpen, href: '/archives', desc: 'Extract Members that have resigned Society' },
               // { title: 'Members', icon: LucideFile, href: '/archives', desc: 'BPS Paid Up Members' },
-              { title: 'Labels', icon: LucideTags, href: '/member/label', desc: 'Print Member Labels - Selection' }
+              //{ title: 'Labels', icon: LucideTags, href: '/member/label', desc: 'Print Member Labels - Selection' }
             ]
           },
+          // {
+          //   title: 'Print Members Audit Trail',
+          //   icon: LucideUserCheck2,
+          //   desc: 'Member Detail Enquiry',
+          //   color: 'text-red-600 dark:text-red-400'
+          // },
           {
-            title: 'Capture/Ammend Membership (Online)',
-            icon: UsersRoundIcon,
-            desc: 'Search/Capture/Amend Member Records and Details' ,
-            color: 'text-red-600 dark:text-red-400'},
-          {
-            title: 'Print Members Audit Trail',
-            icon: LucideUserCheck2,
-            desc: 'Member Detail Enquiry',
-            color: 'text-red-600 dark:text-red-400'
-          },
-          {
-            title: 'Capture Death Benefit/Ben. Fund',
+            title: 'Death Benefit/Bene. Fund',
             icon: LucidePenBox,
             color: 'text-red-600 dark:text-red-400'
           },
           {
-            title: 'Capture/Print Endowment Fund',
-            icon: LucidePiggyBank, href: '/endowment-fund',
+            title: 'Endowment Fund',
+            icon: LucidePiggyBank,
+            //href: '/endowment-fund',
             color: 'text-red-600 dark:text-red-400'
           },
           {
@@ -104,7 +100,8 @@ export const navItems = [
             title: 'Area & Table Code',
             icon: LucidePrinter,
             href: '/archives',
-            desc: 'Print Member by Area & Table code'
+            desc: 'Print Member by Area & Table code',
+            color: 'text-red-600 dark:text-red-400'
           },
         ]
       },
@@ -191,10 +188,14 @@ export const navItems = [
     href: "/members",
     subItems: [
       // { title: "Member Application", icon: UsersRoundIcon, href: "/members/apply" },
-      { title: "Capture Member", icon: LucideUserRoundPlus, href: "/members/capture" },
+      {
+        title: "Capture Member",
+        icon: LucideUserRoundPlus,
+        href: "/members/capture"
+      },
       // { title: 'Members', icon: LucideDoorOpen, href: '/archives', desc: 'Extract Members that have resigned Society' },
       // { title: 'Members', icon: LucideFile, href: '/archives', desc: 'BPS Paid Up Members' },
-      { title: 'Labels', icon: LucideTags, href: '/member/label', desc: 'Print Member Labels - Selection' }
+      // { title: 'Labels', icon: LucideTags, href: '/member/label', desc: 'Print Member Labels - Selection' }
     ]
   },
   { 

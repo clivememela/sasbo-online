@@ -17,9 +17,19 @@ const cards = [
     },
     //{ title: 'Member', icon: LucideUserCheck2, href: '/members', desc: 'Member Detail Enquiry' },
     //{ title: 'Member', icon: LucidePenBox, href: '/members/capture', desc: 'Capture/Print Member Audit Trail' },
-    // { title: 'Death Benefit/Bene. Fund', icon: LucidePiggyBank, href: '/archives', desc: 'Capture Death Benefit/Bene. Fund' },
+    {
+        title: 'Death Benefit/Bene. Fund',
+        icon: LucidePiggyBank,
+        desc: 'Capture Death Benefit/Bene. Fund',
+        color: 'text-red-600 dark:text-red-400'
+    },
     // { title: 'Criti-care', icon: LucideCross, href: '/criticare-details', desc: 'Capture Death Criti-care Details' },
-    //{ title: 'Capture/Print Endowment Fund', icon: LucidePiggyBank, href: '/endowment-fund', desc: 'Capture/Print Endowment Fund' },
+    { title: 'Endowment Fund',
+        icon: LucidePiggyBank,
+        //href: '/endowment-fund',
+        desc: 'Capture/Print Endowment Fund',
+        color: 'text-red-600 dark:text-red-400'
+    },
     {
         title: 'Representatives',
         icon: LucidePresentation,
@@ -53,12 +63,7 @@ const cards = [
         desc: 'Print Duplicate Employee Numbers',
         color: 'text-red-600 dark:text-red-400'
     },
-    {
-        title: 'Print Member banking at ?',
-        icon: LucidePrinter,
-        desc: 'Print Member banking at ?',
-        color: 'text-red-600 dark:text-red-400'
-    },
+    //{title: 'Print Member banking at ?', icon: LucidePrinter, desc: 'Print Member banking at ?', color: 'text-red-600 dark:text-red-400'},
     // { title: 'Members', icon: LucideFile, href: '/archives', desc: 'BPS Paid Up Members' },
     // { title: 'Members', icon: LucideDoorOpen, href: '/archives', desc: 'Extract Members that have resigned Society' },
     //{ title: 'Tb Code/Lab Ind (Bank)', icon: Archive, href: '/archives', desc: 'Extract by Tb Code/Lab Ind (Bank)' },
