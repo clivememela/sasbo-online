@@ -48,11 +48,6 @@ export const navItems = [
             ]
           },
           {
-            title: 'Capture/Ammend Membership (Online)',
-            icon: UsersRoundIcon,
-            desc: 'Search/Capture/Amend Member Records and Details' ,
-            color: 'text-red-600 dark:text-red-400'},
-          {
             title: 'Print Members Audit Trail',
             icon: LucideUserCheck2,
             desc: 'Member Detail Enquiry',
@@ -191,10 +186,14 @@ export const navItems = [
     href: "/members",
     subItems: [
       // { title: "Member Application", icon: UsersRoundIcon, href: "/members/apply" },
-      { title: "Capture Member", icon: LucideUserRoundPlus, href: "/members/capture" },
+      {
+        title: "Capture Member",
+        icon: LucideUserRoundPlus,
+        href: "/members/capture"
+      },
       // { title: 'Members', icon: LucideDoorOpen, href: '/archives', desc: 'Extract Members that have resigned Society' },
       // { title: 'Members', icon: LucideFile, href: '/archives', desc: 'BPS Paid Up Members' },
-      { title: 'Labels', icon: LucideTags, href: '/member/label', desc: 'Print Member Labels - Selection' }
+      // { title: 'Labels', icon: LucideTags, href: '/member/label', desc: 'Print Member Labels - Selection' }
     ]
   },
   { 
