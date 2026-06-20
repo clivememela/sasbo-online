@@ -409,10 +409,10 @@ export default function Members() {
                 </div>
 
                 <div className="flex items-end justify-end mt-4 gap-3">
-                    <Button variant="primary" onClick={() => navigate("/members/apply")}>
+                    {/*<Button variant="primary" onClick={() => navigate("/members/apply")}>
                         <UsersRoundIcon size={16} strokeWidth={2} />
                         Member Application
-                    </Button>
+                    </Button>*/}
                     <Button variant="primary" onClick={() => navigate("/members/capture")}>
                         <LucideUserRoundPlus size={16} strokeWidth={2} />
                         Capture Member

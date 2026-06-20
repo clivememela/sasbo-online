@@ -17,7 +17,7 @@ import AuthLayout from './layouts/AuthLayout';
 import Admin from "./pages/admin/Admin.jsx";
 import DailyMenu from "./pages/admin/DailyMenu.jsx";
 import MonthlyMenu from "./pages/admin/MonthlyMenu.jsx";
-import Representatives from "./pages/members/Representatives.jsx";
+import {Representatives} from "./pages/members/Representatives.jsx";
 import CaptureMember from "./pages/members/CaptureMember.jsx";
 import Maintenance from "./pages/admin/Maintenance.jsx";
 
