@@ -68,12 +68,7 @@ const cards = [
     // { title: 'Members', icon: LucideDoorOpen, href: '/archives', desc: 'Extract Members that have resigned Society' },
     //{ title: 'Tb Code/Lab Ind (Bank)', icon: Archive, href: '/archives', desc: 'Extract by Tb Code/Lab Ind (Bank)' },
     //{ title: 'Tb Code/Lab Ind (Mail)', icon: Archive, href: '/archives', desc: 'Extract by Tb Code/Lab Ind (Mail)' },
-    {
-        title: 'Area & Table code',
-        icon: LucidePrinter,
-        desc: 'Print Member by Area & Table code',
-        color: 'text-red-600 dark:text-red-400'
-    },
+    //{title: 'Area & Table code', icon: LucidePrinter, desc: 'Print Member by Area & Table code', color: 'text-red-600 dark:text-red-400'},
 ];
 
 export default function DailyMenu() {

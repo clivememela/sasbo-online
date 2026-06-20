@@ -96,13 +96,7 @@ export const navItems = [
             desc: 'Print Duplicate Employee Numbers',
             color: 'text-red-600 dark:text-red-400'
           },
-          {
-            title: 'Area & Table Code',
-            icon: LucidePrinter,
-            href: '/archives',
-            desc: 'Print Member by Area & Table code',
-              color: 'text-red-600 dark:text-red-400'
-          },
+          //{title: 'Area & Table Code', icon: LucidePrinter, href: '/archives', desc: 'Print Members by Area & Table code', color: 'text-red-600 dark:text-red-400'},
         ]
       },
       {
