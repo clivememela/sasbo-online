@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from './pages/Home';
-import BanksPage from './pages/bank/BankSearch.jsx';
+import BanksPage from './pages/bank/Banks.jsx';
 import MembersPage from './pages/members/Members.jsx';
 import MembershipApplication from './pages/forms/MembershipApplication.jsx';
 import ReportsPage from './pages/ReportOptions.jsx';

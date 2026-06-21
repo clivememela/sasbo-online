@@ -66,6 +66,8 @@ Example structure:
     .then(res => res.json())
   ```
 
+- **Domain service pattern**: small service modules live under `src/services/` (for example `bankService.js`, `memberService.js`, `representativeService.js`, `locationService.js`). They typically export concrete helper functions or small objects (e.g. `export const bankService = { getBanks: ..., createBank: ..., getPageSize: ... }`). Prefer using these service primitives in components instead of calling `fetch` directly — they return Promises that handle JSON parsing and basic error handling (see `src/services/bankService.js` usage in `src/pages/bank/Banks.jsx` where `bankService.getBanks()` and `bankService.getPageSize()` are used).
+
 ### Component Patterns
 
 #### Form Components (`components/form/`)
@@ -73,6 +75,8 @@ Example structure:
 - **Button**: Reusable action button
 - **FilterForm**: Compound component for search/filter UI
 - **SearchableSelect**: Dropdown with search capability
+
+- **Barrel export**: `src/components/form/index.js` re-exports form components. Import from the barrel when building pages: `import { TextInput, Button, SearchableSelect } from '../../components/form';` — this is used throughout the codebase (see `src/pages/bank/Banks.jsx`).
 
 #### Common Components (`components/common/`)
 - **Logo**: SASBO branding
@@ -97,6 +101,8 @@ Example structure:
 - **Usage**: Inline Tailwind classes in JSX (e.g., `<div className="flex gap-4 p-8">`)
 
 Note: The project also uses the `@tailwindcss/vite` plugin (configured in `vite.config.js`) to integrate Tailwind with Vite, and includes `shadcn-ui` as an additional component/ui helper in `package.json`. Agents should preserve the plugin when editing `vite.config.js` and can reference `shadcn-ui` for UI patterns where present.
+
+- **Print / modal helpers**: Components use simple print utilities and modal overlays. Look for `no-print` and `print-area` CSS classes (used in pages such as `src/pages/bank/Banks.jsx`) and calls to `globalThis.print()` for printable views. Modals are typically controlled by boolean state (e.g., `showAddBank`) and rendered as fixed overlays with backdrop blur.
 
 ### State Management
 - **Redux Toolkit**: Centralized state (if complex state exists)
@@ -144,7 +150,7 @@ npm run lint
 
 Each page component in `src/pages/`:
 1. **Home**: Dashboard/landing page
-2. **Banks** (`bank/BankSearch.jsx`): Search & list bank branches
+2. **Banks** (`bank/Banks.jsx`): Search & list bank branches
 3. **Members** (`members/Members.jsx`): Search & manage members
    - **CaptureMember**: Form to add new member
    - **Representatives**: Search representatives
@@ -166,6 +172,10 @@ Each page component in `src/pages/`:
    - **MonthlyMenu**: Monthly operations menu
    - **Maintenance**: System maintenance page
 8. **Auth** (`auth/Auth.jsx`): Login/signup page
+
+Notes on page patterns:
+- **Modals & overlays**: Pages commonly open small modal components within the page (for example `src/pages/bank/AddBankModal.jsx` used from `Banks.jsx`). Typical pattern: a boolean state (e.g. `showAddBank`) toggles rendering of the modal; the modal exposes callbacks such as `onCreated(newItem)` which the parent uses to merge data into local state (see how `Banks.jsx` appends a created bank: `setBanks(prev => [...prev, newBank])`).
+- **Service-backed create flows**: Creation UI components call the domain service (e.g. `bankService.createBank(data)`) and rely on the service to handle POST and basic error handling. Follow that pattern when adding new create/update flows.
 
 ## Critical Configuration Files
 
@@ -232,6 +242,8 @@ useEffect(() => {
   ```
  - **Tailwind dark mode**: Add `dark:` prefix for dark mode styles
 
+  - **Persistence**: The `ThemeContext` persists the user's preference in `localStorage` (`localStorage.darkMode`) and toggles the `dark` class on `document.documentElement`. When manipulating theme in automated edits, replicate this behavior to avoid visual inconsistency.
+
 ## Known Patterns to Replicate
 
 ✅ **Nested Routes with Layouts**: Use React Router outlet for nested pages
@@ -249,5 +261,5 @@ useEffect(() => {
 - **Document assets**: `src/assets/documents/` (e.g., Membership Application.pdf)
 
 ---
-*Last updated: June 2026*
+*Last updated: June 21, 2026*
 

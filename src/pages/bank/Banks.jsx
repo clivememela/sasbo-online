@@ -7,7 +7,7 @@ import AddBankModal from "./AddBankModal.jsx";
 
 const PAGE_SIZE = bankService.getPageSize();
 
-export default function BankSearch() {
+export default function Banks() {
   const navigate = useNavigate();
   const [banks, setBanks] = useState([]);
   useEffect(() => { bankService.getBanks().then(setBanks); }, []);
