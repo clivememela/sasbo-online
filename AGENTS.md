@@ -179,14 +179,14 @@ Notes on page patterns:
 
 ## Critical Configuration Files
 
-| File | Purpose |
-|------|---------|
-| `package.json` | Dependencies & npm scripts |
-| `vite.config.js` | Vite build config + API proxy |
-| `.env` | Local development env vars (VITE_API_BASE_URL) |
-| `vite.config.js` | Frontend build & dev server config |
-| `eslint.config.js` | Linting rules |
-| `render.yaml` | Render.com deployment config (static site) |
+| File               | Purpose                                        |
+|--------------------|------------------------------------------------|
+| `package.json`     | Dependencies & npm scripts                     |
+| `vite.config.js`   | Vite build config + API proxy                  |
+| `.env`             | Local development env vars (VITE_API_BASE_URL) |
+| `vite.config.js`   | Frontend build & dev server config             |
+| `eslint.config.js` | Linting rules                                  |
+| `render.yaml`      | Render.com deployment config (static site)     |
 
 ## Deployment Pipeline
 
