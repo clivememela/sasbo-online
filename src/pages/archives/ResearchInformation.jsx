@@ -118,8 +118,8 @@ export default function ResearchInformation() {
         "Big4MinWage.doc",
         "Big4StaffComplement.docx",
         "Long Service Awards.docx",
-        "Maternity Benefits 4 Big Banks.docx",
-        "Severence compared Big 4 Banks.docx",
+        "Maternity Benefits 4 Big BankBranch.docx",
+        "Severence compared Big 4 BankBranch.docx",
         "Shift Allowances.docx",
         "Sunday Work Table.docx"
       ]

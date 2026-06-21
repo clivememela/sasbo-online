@@ -152,7 +152,7 @@ export const navItems = [
           },
         ]
       },
-      // { title: "Banks", icon: Landmark, color: 'text-red-600 dark:text-red-400'},
+      // { title: "BankBranch", icon: Landmark, color: 'text-red-600 dark:text-red-400'},
       { title: "Utilities", icon: LucideToolbox, color: 'text-red-600 dark:text-red-400'},
       { title: "A.C.B", icon: LucideFile, color: 'text-red-600 dark:text-red-400' },
       { title: "Regional Branches", icon: LucideGitBranch, color: 'text-red-600 dark:text-red-400'  },
@@ -167,7 +167,7 @@ export const navItems = [
     ]
   },
   {
-    title: "Banks",
+    title: "BankBranch",
     icon: Landmark,
     href: "/banks",
     subItems: [

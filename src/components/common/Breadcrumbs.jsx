@@ -21,7 +21,7 @@ export default function Breadcrumbs() {
     const lastSegment = path.split('/').pop();
     if (!lastSegment) return "Home";
     
-    if (lastSegment.toLowerCase() === "banks") return "Banks";
+    if (lastSegment.toLowerCase() === "banks") return "BankBranch";
     if (lastSegment.toLowerCase() === "apply") return "Member Application";
     if (lastSegment.toLowerCase() === "organizer-report") return "Organizer's Report";
     if (lastSegment.toLowerCase() === "daily-menu") return "Daily Menu";

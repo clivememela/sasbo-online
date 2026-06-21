@@ -234,7 +234,7 @@ export function Representatives() {
                                placeholder="Search rep name"/>
                     <SearchableSelect label="Bank Name" value={filters.bankName} onChange={handleFilter('bankName')}
                                       placeholder="All Banks"
-                                      options={[{value: '', label: 'All Banks'}, ...BANK_NAMES.map(b => ({
+                                      options={[{value: '', label: 'All BankBranch'}, ...BANK_NAMES.map(b => ({
                                           value: b,
                                           label: b
                                       }))]}/>

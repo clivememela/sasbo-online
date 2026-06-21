@@ -4,7 +4,8 @@ export default function Button({
   type = "button",
   variant = "default",
   disabled = false,
-  className = ""
+  className = "",
+  ...rest
 }) {
   const base = "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -20,6 +21,7 @@ export default function Button({
       type={type}
       onClick={onClick}
       disabled={disabled}
+      {...rest}
       className={`${base} ${variants[variant] ?? variants.default} ${className}`}
     >
       {children}

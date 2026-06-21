@@ -47,7 +47,7 @@ export default function FinanceHouses() {
       ],
       "Salary Negotiations": [
         "FOUR BIG BANKS SALARY SCALES 2013.docx",
-        "Severence compared Big 4 Banks.docx",
+        "Severence compared Big 4 BankBranch.docx",
         "Salary Negotiations 2012.pdf",
         "Salary Negotiations 2013.pdf",
         "Salary Negotiations 2014.pdf",
