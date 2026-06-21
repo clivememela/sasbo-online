@@ -5,7 +5,7 @@ import PageTitle from '../components/common/PageTitle';
 
 const cards = [
     {title: 'Admin Menu', icon: LucideDatabase, href: '/admin', desc: 'Manage and view admin menu'},
-    { title: 'BankBranch', icon: Landmark, href: '/banks', desc: 'Manage and view bank information' },
+    { title: 'Bank/Branch', icon: Landmark, href: '/banks', desc: 'Manage and view bank information' },
     { title: 'Members', icon: UsersRoundIcon, href: '/members', desc: 'Access member records and details' },
     { title: 'Reports', icon: ChartNoAxesCombined, href: '/reports', desc: 'Generate and view system reports' },
     { title: 'Document Archives', icon: Archive, href: '/archives', desc: 'Browse archived documents' },

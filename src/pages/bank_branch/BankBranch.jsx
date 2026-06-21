@@ -58,7 +58,7 @@ export default function BankBranch() {
             value={filters.bankName}
             onChange={handleInputChange("bankName")}
             placeholder="All Banks"
-            options={[{ value: '', label: 'All BankBranch' }, ...([...new Set(banks.map(b => b.bankName).filter(Boolean))].sort().map(b => ({ value: b, label: b })))]}
+            options={[{ value: '', label: 'All Bank Branch' }, ...([...new Set(banks.map(b => b.bankName).filter(Boolean))].sort().map(b => ({ value: b, label: b })))]}
           />
           <TextInput
             label="Branch"

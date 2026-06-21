@@ -167,14 +167,18 @@ export const navItems = [
     ]
   },
   {
-    title: "BankBranch",
+    title: "Bank/Branch",
     icon: Landmark,
     href: "/banks",
     subItems: [
       // { title: "New Bank", icon: LucideFile, href: "/banks/new" },
-      { title: "Bank Listing", icon: MapPinnedIcon, href: "/banks/listing" },
-      { title: 'Tb Code/Lab Ind (Bank)', icon: Archive, href: '/archives', desc: 'Extract by Tb Code/Lab Ind (Bank)' },
-      { title: 'Tb Code/Lab Ind (Mail)', icon: Archive, href: '/archives', desc: 'Extract by Tb Code/Lab Ind (Mail)' }
+      {
+        title: "Bank Listing",
+        icon: MapPinnedIcon,
+        href: "/banks/listing"
+      },
+      { title: 'Tb Code/Lab Ind (Bank)', icon: Archive, desc: 'Extract by Tb Code/Lab Ind (Bank)' , color: 'text-red-600 dark:text-red-400'},
+      { title: 'Tb Code/Lab Ind (Mail)', icon: Archive, desc: 'Extract by Tb Code/Lab Ind (Mail)', color: 'text-red-600 dark:text-red-400' }
     ]
   },
   { 

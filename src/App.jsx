@@ -20,6 +20,7 @@ import MonthlyMenu from "./pages/admin/MonthlyMenu.jsx";
 import {Representatives} from "./pages/members/Representatives.jsx";
 import CaptureMember from "./pages/members/CaptureMember.jsx";
 import Maintenance from "./pages/admin/Maintenance.jsx";
+import BankListing from "./pages/bank_branch/BankListing.jsx";
 
 function App() {
   return (
@@ -36,6 +37,7 @@ function App() {
         <Route path="admin/monthly-menu" element={<MonthlyMenu />} />
         <Route path="representatives" element={<Representatives />} />
         <Route path="banks" element={<BanksPage />} />
+        <Route path="banks/listing" element={<BankListing />} />
         <Route path="members" element={<MembersPage />} />
         <Route path="members/apply" element={<MembershipApplication />} />
         <Route path="members/capture" element={<CaptureMember />} />
