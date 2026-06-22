@@ -102,7 +102,7 @@ export const navItems = [
       {
         title: "Monthly Menu",
         icon: LucideCalendar,
-        color: 'text-red-600 dark:text-red-400',
+        //color: 'text-red-600 dark:text-red-400',
         href: "/admin/monthly-menu",
         subItems: [
           {

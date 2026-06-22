@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { Printer } from "lucide-react";
 import { bankService } from "../../services/bankService.js";
-import { TextInput } from "../../components/form";
+import { TextInput, Button } from "../../components/form";
 
 const PAGE_SIZE = bankService.getPageSize();
 
@@ -50,7 +51,6 @@ export default function BankListing() {
         ?? bank.universal_branch_code
         ?? bank.bank?.universalBranchCode
         ?? bank.bank?.universal_branch_code
-        ?? bank.randomAccessNumber
         ?? "-",
     }));
   }, [banks]);
@@ -82,10 +82,10 @@ export default function BankListing() {
     <div className="p-6 text-gray-900 dark:text-gray-100">
       <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">Bank Listing</h2>
       <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-        List of all banks with abbreviation and universal branch code.
+        Comprehensive listing of all banks with abbreviations and universal branch codes for reference.
       </p>
 
-      <div className="max-w-5xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
+      <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end no-print">
           <TextInput
             label="Bank Name"
@@ -107,30 +107,41 @@ export default function BankListing() {
           />
         </div>
 
-        <div className="flex items-center justify-between gap-3 text-sm text-gray-600 dark:text-gray-300 no-print">
-          <span>
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm no-print">
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
             Showing {filteredRows.length === 0 ? 0 : startIndex + 1}-{endIndex} of {filteredRows.length} banks
-          </span>
+            {filteredRows.length > 0 && (
+              <button
+                onClick={() => globalThis.print()}
+                title="Print results"
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition"
+              >
+                <Printer size={16} />
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-2">
-            <button
+            <Button
               type="button"
               onClick={() => setPage((prev) => Math.max(1, prev - 1))}
               disabled={safePage === 1 || isLoading || filteredRows.length === 0}
-              className="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 disabled:opacity-50"
+              variant="pagination"
+              className="rounded-full"
             >
               Prev
-            </button>
-            <span>
+            </Button>
+            <span className="text-gray-600 dark:text-gray-300">
               Page {safePage} of {totalPages}
             </span>
-            <button
+            <Button
               type="button"
               onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
               disabled={safePage === totalPages || isLoading || filteredRows.length === 0}
-              className="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 disabled:opacity-50"
+              variant="pagination"
+              className="rounded-full"
             >
               Next
-            </button>
+            </Button>
           </div>
         </div>
 

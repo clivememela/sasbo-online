@@ -150,28 +150,34 @@ npm run lint
 
 Each page component in `src/pages/`:
 1. **Home**: Dashboard/landing page
-2. **BankBranch** (`bank/BankBranch.jsx`): Search & list bank branches
-3. **Members** (`members/Members.jsx`): Search & manage members
+2. **BankBranch** (`bank/BankBranch.jsx`): Search & manage bank branches with create/edit capability
+   - Uses `bankService.getBanks()` to fetch branch data with enhanced fields (bankName, branch, area, randomAccessNumber)
+   - Includes modal for creating/editing branches
+   - Print and filter functionality
+3. **BankListing** (`bank/BankListing.jsx`): Read-only bank listing with basic information
+   - Uses `bankService.getBankListing()` for consolidated bank data (bank name, abbreviation, universal branch code)
+   - Simpler UI focused on lookup and display
+4. **Members** (`members/Members.jsx`): Search & manage members
    - **CaptureMember**: Form to add new member
    - **Representatives**: Search representatives
-4. **Forms** (`forms/`): 
+5. **Forms** (`forms/`):
    - **MembershipApplication**: PDF form for new membership
    - **Forms**: Generic forms page
-5. **Reports** (`reports/`):
-   - **ReportOptions**: Report menu
-   - **OrganizerReport**: Generate organizer reports
-   - **Locations**: Geographic reports
-6. **Archives** (`archives/`):
+6. **Reports** (`reports/`):
+    - **ReportOptions**: Report menu
+    - **OrganizerReport**: Generate organizer reports
+    - **Locations**: Geographic reports
+7. **Archives** (`archives/`):
    - **ArchiveSearch**: Historical data search
    - **AffiliationsOtherTradeUnions**: Archive section
    - **FinanceHouses**: Finance data archives
    - **ResearchInformation**: Research archives
-7. **Admin** (`admin/`):
-   - **Admin**: Dashboard
-   - **DailyMenu**: Daily operations menu
-   - **MonthlyMenu**: Monthly operations menu
-   - **Maintenance**: System maintenance page
-8. **Auth** (`auth/Auth.jsx`): Login/signup page
+8. **Admin** (`admin/`):
+    - **Admin**: Dashboard
+    - **DailyMenu**: Daily operations menu
+    - **MonthlyMenu**: Monthly operations menu
+    - **Maintenance**: System maintenance page
+9. **Auth** (`auth/Auth.jsx`): Login/signup page
 
 Notes on page patterns:
 - **Modals & overlays**: Pages commonly open small modal components within the page (for example `src/pages/bank/BankBranchModal.jsx` used from `BankBranch.jsx`). Typical pattern: a boolean state (e.g. `showAddBank`) toggles rendering of the modal; the modal exposes callbacks such as `onCreated(newItem)` which the parent uses to merge data into local state (see how `BankBranch.jsx` appends a created bank: `setBanks(prev => [...prev, newBank])`).
@@ -261,5 +267,5 @@ useEffect(() => {
 - **Document assets**: `src/assets/documents/` (e.g., Membership Application.pdf)
 
 ---
-*Last updated: June 21, 2026*
+*Last updated: June 22, 2026*
 
