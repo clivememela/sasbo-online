@@ -130,7 +130,7 @@ export const bankService = {
       }),
 
   getBanks: () =>
-    fetch(apiUrl('/api/banks/branches'))
+    fetch(apiUrl('/api/banks/branches'), { credentials: 'include' })
       .then(r => {
         if (!r.ok) {
           throw new Error(`HTTP ${r.status}: ${r.statusText}`);

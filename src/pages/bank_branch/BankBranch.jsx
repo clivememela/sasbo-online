@@ -26,11 +26,10 @@ export default function BankBranch() {
     const ranQuery = filters.randomAccessNumber.trim().toLowerCase();
 
     return banks.filter((bank) => {
-      if (bankNameQuery && !bank.bankName.toLowerCase().includes(bankNameQuery)) return false;
-      if (branchQuery && !bank.branch.toLowerCase().includes(branchQuery)) return false;
-      if (areaQuery && !bank.area.toLowerCase().includes(areaQuery)) return false;
-      return !(ranQuery && !bank.randomAccessNumber.toLowerCase().includes(ranQuery));
-
+      if (bankNameQuery && !bank.bankName?.toLowerCase().includes(bankNameQuery)) return false;
+      if (branchQuery && !bank.branchName?.toLowerCase().includes(branchQuery)) return false;
+      if (areaQuery && !bank.area?.toLowerCase().includes(areaQuery)) return false;
+      return !(ranQuery && !bank.randomAccessNumber?.toLowerCase().includes(ranQuery));
     });
   }, [filters, banks]);
 
@@ -145,7 +144,7 @@ export default function BankBranch() {
                 >
                   <div className="">{bank.bankName}</div>
                   <div className="font-semibold text-cyan-600 dark:text-cyan-400">{bank.bankAbbreviation}</div>
-                  <div>{bank.branch}</div>
+                  <div>{bank.branchName}</div>
                   <div>{bank.area}</div>
                   <div>{bank.randomAccessNumber}</div>
                   <div>{bank.phoneNumber}</div>

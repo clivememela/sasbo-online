@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
-import { apiUrl } from "../../services/api";
 import { Button, SearchableSelect } from "../../components/form";
 
 const frequencyOptions = ["Monthly", "Quarterly", "Bi-annually", "Annually"];
@@ -183,14 +182,12 @@ export default function CaptureMember() {
             alert("Please fix the errors before saving.");
             return;
         }
-        fetch(apiUrl('/api/members'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(form),
-        }).then(() => {
-            setShowSavedNotification(true);
-            setTimeout(() => setShowSavedNotification(false), 3000);
-        });
+        memberService.createMember(form)
+            .then(() => {
+                setShowSavedNotification(true);
+                setTimeout(() => setShowSavedNotification(false), 3000);
+            })
+            .catch((err) => alert(`Failed to save member: ${err.message}`));
     };
 
     return (
