@@ -1,5 +1,5 @@
 import {
-    Landmark, LucideMenu, LucideToolbox, LucideGitBranch, LucideCassetteTape,
+    LucideMenu, LucideToolbox, LucideGitBranch, LucideCassetteTape,
     TextSelect, LucideChartNoAxesGantt, ArrowRightLeft, Mailbox, LucideCalendar,
     LucideFile, LucideTag, LucideExternalLink, LucideConstruction
 } from 'lucide-react';
