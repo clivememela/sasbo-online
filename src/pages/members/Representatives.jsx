@@ -130,8 +130,8 @@ export function Representatives() {
             if (bn && !r.banks.toLowerCase().includes(bn)) return false;
             if (br && !r.branches.toLowerCase().includes(br)) return false;
             if (pv && !r.provinces.toLowerCase().includes(pv)) return false;
-            if (ar && !r.areas.toLowerCase().includes(ar)) return false;
-            return true;
+            return !(ar && !r.areas.toLowerCase().includes(ar));
+
         });
     }, [filters, repList]);
 
