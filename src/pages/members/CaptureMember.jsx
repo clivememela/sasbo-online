@@ -2,59 +2,13 @@ import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { Button, SearchableSelect } from "../../components/form";
-
-const frequencyOptions = ["Monthly", "Quarterly", "Bi-annually", "Annually"];
-const titleOptions = ["Mr", "Ms", "Mrs", "Dr", "Prof"];
-const raceOptions = ["African", "White", "Coloured", "Indian", "Other"];
-const paymentTypeOptions = ["Debit Order", "Payroll Deduction", "EFT"];
-const statusOptions = ["Active", "Pending", "Suspended", "Resigned", "Retired"];
-const identityTypeOptions = ["I.D. Number", "Passport Number"];
-const yesNoOptions = ["Y", "N"];
-const suspensionCodeOptions = ["", "NON-PAY", "RESIGN"];
-const bankOptions = [
-    "Absa Bank", "Absa Bank Limited", "Access Bank (South Africa) Limited", "AfrAsia Bank Limited", "African Bank Limited",
-    "Albaraka Bank Limited", "Banco Internacional de Credito", "Bank Julius Baer & Co. Ltd", "Bank Lombard Odier & Co Limited",
-    "Bank Of China Limited", "Bank Of Communication Co., Ltd", "Bank Vontobel AG", "Bank Zero Mutual Bank", "Bank of America N.A.",
-    "Bank of Taiwan", "Banque SYZ SA", "Barclays Bank PLC", "Bidvest Bank Limited", "CBZ Bank Limited", "Caixa Geral de Depositos",
-    "CaixaBank", "Capital International Bank Limited", "Capitec Bank", "Capitec Bank Limited", "China Construction Bank Corporation",
-    "Citibank", "Commerzbank AG", "Deutsche Bank (Suisse) SA", "Deutsche Bank AG", "Discovery Bank Limited",
-    "Ditsobotla Primary Savings and Credit Co-operative Bank", "Doha Bank", "Ecobank", "Export Import Bank of India",
-    "First National Bank", "FirstRand Limited", "GBS Mutual Bank", "GIG Co-operative Bank", "GoTyme Bank Limited",
-    "Goldman Sachs International Bank", "HBZ Bank Limited", "HSBC Bank Plc", "Industrial and Commercial Bank of China",
-    "Investec Bank", "Investec Bank Limited", "KSK Kooperatiewe Bank Beperk", "KfW IPEX-Bank GmbH", "Macquarie Bank Limited",
-    "Metbank Limited", "Mitsubishi UFJ Financial Group Bank, Ltd.", "Mizuho Bank Ltd", "Nedbank", "OM Bank Limited",
-    "OSK Kooperatiewe Bank Beperk", "Sasfin Bank Limited", "Societe Generale", "Standard Bank", "Standard Bank South Africa",
-    "State Bank of India", "Sumitomo Mitsui Banking", "The Export & Import Bank of China", "The Mauritius Commercial Bank Limited",
-    "The Standard Bank of South Africa Limited", "Ubank (under curatorship)", "Union Bancaire Privee, UBP SA",
-    "Ziphakamise Savings and Credit Co-operative Bank", "eNL Mutual Bank"
-];
-const branchOptions = [
-    "Cape Town", "Durban", "Head Office", "Johannesburg", "Johannesburg Branch", "Midrand", "Pretoria",
-    "Representative Office", "Rivonia", "Rosebank", "Sandton", "South Africa Branch", "Soweto", "Stellenbosch"
-];
-const jobGradeOptions = Array.from({ length: 12 }, (_, i) => (i + 1).toString());
-const managerOptions = ["MGR-001"];
-const repOptions = [
-    "Self", "System", "Achmat Adams", "Alvaro Legoinha", "Amanda Hlatshwayo", "Amol Prabhu", "Annerie Visser",
-    "Ashley Cameron", "Ashutosh Kumar", "Benjamin Davis", "Bob Jones", "Chaoyang Zhang", "Charles van Staden",
-    "Cheslyn Jacobs", "Cumesh Moodliar", "Dale Wood", "David Hodnett", "David Kasinamunda", "Dean Radbourne",
-    "Graham Lee", "Hannah Sadiki", "Hanri Maritz", "Hylton Kallner", "J Wang", "John Doe", "Jonathan Fincham",
-    "Karen Black", "Kathryn Quayle", "Kennedy Bungane", "Kenny Fihla", "Li Li", "Lungisa Fuzile", "M Luo",
-    "Mark Selcraig", "Mark Sherratt", "Marna Sabrina Pfranger", "Mary Vilakazi", "Mauro Rogerio", "Michael Shirley",
-    "Micheal Sassoon", "Nathalie Villette Py", "Nthabeleng Likotsi", "Paul Sayers", "Peter Liu", "Peter Taylor",
-    "Phibeon Mutibura", "Ramiro Sebastiao", "Raphael Marlio-Marette", "Saloshni Pillay", "Sandile Shabalala",
-    "Shabir Chohan", "Shugo Suzuki", "Shyamasish Acharya", "Sidhambaram Perumal Pillay", "Simon Denny",
-    "Stefano Rausch", "Thorsten Metz", "Tinus Myburgh", "Tsakani Clarence Nethengwe", "Veronica Padi",
-    "Viviana van Agtmaal", "Yatin Narsai", "Yongzhi Ban", "Yvonne Holenstein"
-];
-
-const tabs = [
-    { id: "personal", label: "Personal Information" },
-    { id: "membership", label: "Membership & Subs" },
-    { id: "employment", label: "Employment & Bank" },
-    { id: "representatives", label: "Representatives" },
-    { id: "history", label: "History & Remarks" },
-];
+import {
+    FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
+    STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, YES_NO_OPTIONS, SUSPENSION_CODE_OPTIONS,
+    JOB_GRADE_OPTIONS, MANAGER_OPTIONS, DAY_OPTIONS, MEMBER_TABS,
+    BANK_OPTIONS, BRANCH_OPTIONS, REP_OPTIONS,
+} from "../../config/memberConstants.js";
+import { validateSAID } from "../../utils/validateSAID.js";
 
 export default function CaptureMember() {
     const [activeTab, setActiveTab] = useState("personal");
@@ -120,32 +74,6 @@ export default function CaptureMember() {
     const [fieldErrors, setFieldErrors] = useState({});
     const [showSavedNotification, setShowSavedNotification] = useState(false);
 
-    const validateSAID = (id) => {
-        if (!id) return null;
-        if (id.length !== 13 || !/^\d+$/.test(id)) {
-            return "ID must be exactly 13 digits";
-        }
-        const year = parseInt(id.substring(0, 2), 10);
-        const month = parseInt(id.substring(2, 4), 10);
-        const day = parseInt(id.substring(4, 6), 10);
-        if (month < 1 || month > 12) return "Invalid birth month";
-        if (day < 1 || day > 31) return "Invalid birth day";
-        let sum = 0;
-        for (let i = 0; i < 12; i++) {
-            let digit = parseInt(id[i], 10);
-            if (i % 2 !== 0) {
-                digit *= 2;
-                if (digit > 9) digit -= 9;
-            }
-            sum += digit;
-        }
-        const checkDigit = (10 - (sum % 10)) % 10;
-        if (checkDigit !== parseInt(id[12], 10)) {
-            return "Invalid South African ID (Check digit failure)";
-        }
-        return null;
-    };
-
     const handleChange = (field) => (event) => {
         const rawValue = event.target.value;
         const hasNonNumericInput =
@@ -189,6 +117,18 @@ export default function CaptureMember() {
             })
             .catch((err) => alert(`Failed to save member: ${err.message}`));
     };
+
+    const tabs = MEMBER_TABS;
+    const titleOptions = TITLE_OPTIONS;
+    const raceOptions = RACE_OPTIONS;
+    const statusOptions = STATUS_OPTIONS;
+    const frequencyOptions = FREQUENCY_OPTIONS;
+    const identityTypeOptions = IDENTITY_TYPE_OPTIONS;
+    const yesNoOptions = YES_NO_OPTIONS;
+    const suspensionCodeOptions = SUSPENSION_CODE_OPTIONS;
+    const jobGradeOptions = JOB_GRADE_OPTIONS;
+    const managerOptions = MANAGER_OPTIONS;
+    const paymentTypeOptions = PAYMENT_TYPE_OPTIONS;
 
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
@@ -282,8 +222,8 @@ export default function CaptureMember() {
                             <>
                                 <Field label="Employee Number" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} />
-                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={bankOptions} searchable />
-                                <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={branchOptions} />
+                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={BANK_OPTIONS} searchable />
+                                <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} />
                                 <Field label="Bank Account Number" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} />
                                 <Field label="IBT No." value={form.ibtNo} onChange={handleChange("ibtNo")} />
                                 <Field label="Work IBT No." value={form.workIbtNo} onChange={handleChange("workIbtNo")} />
@@ -295,8 +235,8 @@ export default function CaptureMember() {
 
                         {activeTab === "representatives" && (
                             <>
-                                <Field label="Recruitment Rep" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} options={repOptions} />
-                                <Field label="Area's Rep" value={form.areasRep} onChange={handleChange("areasRep")} options={repOptions} />
+                                <Field label="Recruitment Rep" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} options={REP_OPTIONS} />
+                                <Field label="Area's Rep" value={form.areasRep} onChange={handleChange("areasRep")} options={REP_OPTIONS} />
                                 <SectionTitle title="Representative Election Date" />
                                 <RepElectionDatePicker form={form} setForm={setForm} />
 

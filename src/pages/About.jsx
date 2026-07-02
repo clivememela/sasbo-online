@@ -3,8 +3,7 @@ import {
   MapPin,
   Phone,
   Printer
-} from 'lucide-react';
-export default function About() {
+} from 'lucide-react'; function About(){
   return (
     <div className="p-6 text-gray-900 dark:text-gray-100">
       <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">About Us</h2>
@@ -203,3 +202,4 @@ export default function About() {
     </div>
   );
 }
+
