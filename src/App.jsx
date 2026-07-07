@@ -15,6 +15,7 @@ import AuthPage from './pages/auth/Auth.jsx';
 import AppLayout from './layouts/AppLayout';
 import AuthLayout from './layouts/AuthLayout';
 import Admin from "./pages/admin/Admin.jsx";
+import ACBMenu from "./pages/admin/ACBMenu.jsx";
 import DailyMenu from "./pages/admin/DailyMenu.jsx";
 import MonthlyMenu from "./pages/admin/MonthlyMenu.jsx";
 import {Representatives} from "./pages/members/Representatives.jsx";
@@ -33,6 +34,7 @@ function App() {
         <Route index element={<Navigate to="/login" replace />} />
         <Route path="home" element={<HomePage />} />
         <Route path="admin" element={<Admin />} />
+        <Route path="acb" element={<ACBMenu />} />
         <Route path="admin/daily-menu" element={<DailyMenu />} />
         <Route path="admin/monthly-menu" element={<MonthlyMenu />} />
         <Route path="representatives" element={<Representatives />} />
