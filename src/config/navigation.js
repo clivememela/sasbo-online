@@ -154,7 +154,7 @@ export const navItems = [
       },
       // { title: "BankBranch", icon: Landmark, color: 'text-red-600 dark:text-red-400'},
       { title: "Utilities", icon: LucideToolbox, color: 'text-red-600 dark:text-red-400'},
-      { title: "A.C.B", icon: LucideFile, color: 'text-red-600 dark:text-red-400' },
+      { title: "A.C.B", href:'/admin/acb', icon: LucideFile },
       { title: "Regional Branches", icon: LucideGitBranch, color: 'text-red-600 dark:text-red-400'  },
       { title: "Tape", icon: LucideCassetteTape, color: 'text-red-600 dark:text-red-400' },
       { title: "D.B.F", icon: LucideFile, color: 'text-red-600 dark:text-red-400' },

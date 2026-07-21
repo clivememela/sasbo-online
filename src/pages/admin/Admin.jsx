@@ -11,7 +11,7 @@ const cards = [
     { title: 'Monthly Menu', icon: LucideCalendar, href: '/admin/monthly-menu' },
     // { title: 'BankBranch', icon: Landmark, href:'/banks' },
     { title: 'Utilities', icon: LucideToolbox, color: 'text-red-600 dark:text-red-400' },
-    { title: 'A.C.B Menu', icon: LucideFile, href:'/acb'},
+    { title: 'A.C.B Menu', icon: LucideFile, href:'/admin/acb'},
     { title: 'Regional Branches', icon: LucideGitBranch, color: 'text-red-600 dark:text-red-400' },
     { title: 'Tape Menu', icon: LucideCassetteTape, color: 'text-red-600 dark:text-red-400' },
     { title: 'D.B.F Menu', icon: LucideFile,color: 'text-red-600 dark:text-red-400' },

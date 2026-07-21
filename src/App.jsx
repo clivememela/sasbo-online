@@ -34,7 +34,7 @@ function App() {
         <Route index element={<Navigate to="/login" replace />} />
         <Route path="home" element={<HomePage />} />
         <Route path="admin" element={<Admin />} />
-        <Route path="acb" element={<ACBMenu />} />
+        <Route path="admin/acb" element={<ACBMenu />} />
         <Route path="admin/daily-menu" element={<DailyMenu />} />
         <Route path="admin/monthly-menu" element={<MonthlyMenu />} />
         <Route path="representatives" element={<Representatives />} />

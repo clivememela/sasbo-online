@@ -21,8 +21,7 @@ const maintenance_cards = [
     {
         title: 'Bank/Branch',
         icon: Landmark,
-        desc: 'Maintain Bank/Branch',
-        color: 'text-red-600 dark:text-red-400'
+        desc: 'Maintain Bank/Branch'
     },
     {
         title: 'Reginal Branch Menu',
