@@ -1,7 +1,7 @@
 import {
     LucideMenu, LucideToolbox, LucideGitBranch, LucideCassetteTape,
     TextSelect, LucideChartNoAxesGantt, ArrowRightLeft, Mailbox, LucideCalendar,
-    LucideFile, LucideTag, LucideExternalLink, LucideConstruction
+    LucideFile, LucideTag, LucideExternalLink, LucideConstruction, ChartNoAxesCombined
 } from 'lucide-react';
 import PageTitle from "../../components/common/PageTitle.jsx";
 import NavigationCard from "../../components/common/NavigationCard.jsx";
@@ -9,49 +9,49 @@ import NavigationCard from "../../components/common/NavigationCard.jsx";
 const cards = [
     {
         title: "Debits",
-        description: "Manage Re-Debits",
+        desc: "Manage Re-Debits",
         href: "/admin/membership/users",
         icon: LucideCalendar,
     },
     {
         title: "Credits",
-        description: "Manage Credits",
+        desc: "Manage Credits",
         href: "/admin/membership/roles",
         icon: LucideCalendar,
     },
     {
         title: "Subscriptions",
-        description: "Manage Subscriptions",
+        desc: "Manage Subscriptions",
         href: "/admin/membership/permissions",
         icon: LucideCalendar,
     },
     {
         title: "Benevolent Funds",
-        description: "Manage Benevolent Funds",
+        desc: "Manage Benevolent Funds",
         href: "/admin/membership/users",
         icon: LucideCalendar,
     },
     {
         title: "Death Benefit Funds",
-        description: "Manage Death Benefit Funds",
+        desc: "Manage Death Benefit Funds",
         href: "/admin/membership/roles",
         icon: LucideCalendar,
     },
     {
         title: "Endowment Funds",
-        description: "Manage Endowment Funds",
+        desc: "Manage Endowment Funds",
         href: "/admin/membership/permissions",
         icon: LucideCalendar,
     },
     {
         title: "Criticare",
-        description: "Manage Criticare",
+        desc: "Manage Criticare",
         href: "/admin/membership/permissions",
         icon: LucideCalendar,
     },
     {
         title: "Accounts",
-        description: "Manage Accounts",
+        desc: "Manage Accounts",
         href: "/admin/membership/permissions",
         icon: LucideCalendar,
     },
