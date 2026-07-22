@@ -32,6 +32,17 @@ export const memberService = {
         throw err;
       }),
 
+  getMemberById: (id) =>
+    fetch(apiUrl(`/api/members/${id}`), { credentials: 'include' })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+        return r.json();
+      })
+      .catch(err => {
+        console.error('Failed to fetch member:', err);
+        throw err;
+      }),
+
   createMember: (member) =>
     fetch(apiUrl('/api/members'), {
       method: 'POST',

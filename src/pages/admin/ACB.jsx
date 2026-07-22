@@ -9,9 +9,9 @@ import NavigationCard from "../../components/common/NavigationCard.jsx";
 
 const cards = [
     {
-        title: "Debits",
-        desc: "Manage Re-Debits",
-        href: "/acb/debits",
+        title: "Manage Re-Debits",
+        desc: "Capture Resubmission Debits",
+        href: "/admin/acb/debits",
         icon: LucidePiggyBank,
     },
     {
@@ -64,8 +64,8 @@ const cards = [
         color: 'text-red-600 dark:text-red-400'
     },
 ];
-console.log("Rendering ACBMenu");
-export default function ACBMenu() {
+console.log("Rendering ACB");
+export default function ACB() {
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
             <PageTitle title="ACB Menu" subtitle="Select options below" />
