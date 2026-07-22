@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import { TextInput, SelectInput, SearchableSelect, Button } from '../../components/form';
@@ -29,13 +29,13 @@ export function Representatives() {
     const [editRepFields, setEditRepFields] = useState({name: '', email: '', phone: ''});
     const [repSearch, setRepSearch] = useState({membershipNumber: '', name: '', bank: '', branch: '', status: ''});
 
-    const refreshAll = () => Promise.all([
+    const refreshAll = useCallback(() => Promise.all([
         memberService.getMembers(),
         representativeService.getAll(),
     ]).then(([m, r]) => {
         setMembers(m);
         setReps(r);
-    });
+    }), []);
 
     useEffect(() => {
         refreshAll();
@@ -138,14 +138,14 @@ export function Representatives() {
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
     const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-    const handleFilter = field => e => {
+    const handleFilter = useCallback((field) => (e) => {
         setFilters(p => ({...p, [field]: e.target.value}));
         setPage(1);
-    };
-    const handleClear = () => {
+    }, []);
+    const handleClear = useCallback(() => {
         setFilters({repName: '', bankName: '', branch: '', province: '', area: ''});
         setPage(1);
-    };
+    }, []);
 
     // Members represented by the selected rep
     const repMembers = useMemo(() =>
@@ -177,6 +177,30 @@ export function Representatives() {
             );
         });
     }, [members, selectedRep, addSearch]);
+
+    const handleCloseRepModal = useCallback(() => {
+        setSelectedRep(null);
+        setRepSearch({membershipNumber: '', name: '', bank: '', branch: '', status: ''});
+    }, []);
+    const handleCloseMemberModal = useCallback(() => setSelectedMember(null), []);
+    const handleCloseAddMember = useCallback(() => setShowAddMember(false), []);
+    const handleCloseAddRep = useCallback(() => setShowAddRep(false), []);
+    const handleCloseRepDetail = useCallback(() => {
+        setSelectedRepDetail(null);
+        setEditingRep(false);
+    }, []);
+    const handleCancelEdit = useCallback(() => setEditingRep(false), []);
+    const handleOpenAddMember = useCallback(() => {
+        setShowAddMember(true);
+        setAddSearch('');
+    }, []);
+    const handleOpenAddRep = useCallback(() => {
+        setShowAddRep(true);
+        setNewRepName('');
+        setNewRepFields({bank: '', branch: '', province: '', area: ''});
+    }, []);
+    const handlePrevPage = useCallback(() => setPage(p => Math.max(1, p - 1)), []);
+    const handleNextPage = useCallback(() => setPage(p => Math.min(totalPages, p + 1)), [totalPages]);
 
     const handleAssign = async (member) => {
         setSaving(true);
@@ -261,17 +285,13 @@ export function Representatives() {
                         {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} representatives
                     </span>
                     <div className="flex items-center gap-2">
-                        <Button variant="pagination" onClick={() => setPage(p => Math.max(1, p - 1))}
+                        <Button variant="pagination" onClick={handlePrevPage}
                                 disabled={page === 1}>Prev</Button>
                         <span className="text-gray-600 dark:text-gray-300">Page {page} of {totalPages}</span>
-                        <Button variant="pagination" onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        <Button variant="pagination" onClick={handleNextPage}
                                 disabled={page === totalPages}>Next</Button>
                         <Button onClick={handleClear}>Clear</Button>
-                        <Button variant="primary" onClick={() => {
-                            setShowAddRep(true);
-                            setNewRepName('');
-                            setNewRepFields({bank: '', branch: '', province: '', area: ''});
-                        }}>
+                        <Button variant="primary" onClick={handleOpenAddRep}>
                             <UserPlus size={14}/> Add Rep
                         </Button>
                     </div>
@@ -334,10 +354,7 @@ export function Representatives() {
             {selectedRep && !selectedMember && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog"
                      aria-modal="true">
-                    <div className="absolute inset-0 bg-black/50" onClick={() => {
-                        setSelectedRep(null);
-                        setRepSearch({membershipNumber: '', name: '', bank: '', branch: '', status: ''});
-                    }}/>
+                    <div className="absolute inset-0 bg-black/50" onClick={handleCloseRepModal}/>
                     <div
                         className="relative w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                         {/* Header */}
@@ -372,10 +389,7 @@ export function Representatives() {
                             <div className="flex items-center gap-3">
                                 <span
                                     className="text-sm text-gray-500 dark:text-gray-400">{repMembers.length} member{repMembers.length !== 1 ? 's' : ''}</span>
-                                <CloseBtn onClick={() => {
-                                    setSelectedRep(null);
-                                    setRepSearch({membershipNumber: '', name: '', bank: '', branch: '', status: ''});
-                                }}/>
+                                <CloseBtn onClick={handleCloseRepModal}/>
                             </div>
                         </div>
 
@@ -390,22 +404,27 @@ export function Representatives() {
                                 <input value={repSearch.membershipNumber}
                                        onChange={e => setRepSearch(p => ({...p, membershipNumber: e.target.value}))}
                                        placeholder="Membership No."
+                                       aria-label="Filter by membership number"
                                        className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"/>
                                 <input value={repSearch.name}
                                        onChange={e => setRepSearch(p => ({...p, name: e.target.value}))}
                                        placeholder="Name"
+                                       aria-label="Filter by name"
                                        className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"/>
                                 <input value={repSearch.bank}
                                        onChange={e => setRepSearch(p => ({...p, bank: e.target.value}))}
                                        placeholder="Bank"
+                                       aria-label="Filter by bank"
                                        className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"/>
                                 <input value={repSearch.branch}
                                        onChange={e => setRepSearch(p => ({...p, branch: e.target.value}))}
                                        placeholder="Branch"
+                                       aria-label="Filter by branch"
                                        className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"/>
                                 <input value={repSearch.status}
                                        onChange={e => setRepSearch(p => ({...p, status: e.target.value}))}
                                        placeholder="Status"
+                                       aria-label="Filter by status"
                                        className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"/>
                             </div>
                             <div
@@ -455,16 +474,10 @@ export function Representatives() {
 
                         <div
                             className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between shrink-0">
-                            <Button variant="primary" onClick={() => {
-                                setShowAddMember(true);
-                                setAddSearch('');
-                            }}>
+                            <Button variant="primary" onClick={handleOpenAddMember}>
                                 <UserPlus size={14}/> Add Member
                             </Button>
-                            <Button onClick={() => {
-                                setSelectedRep(null);
-                                setRepSearch({membershipNumber: '', name: '', bank: '', branch: '', status: ''});
-                            }}>Close</Button>
+                            <Button onClick={handleCloseRepModal}>Close</Button>
                         </div>
                     </div>
                 </div>
@@ -474,7 +487,7 @@ export function Representatives() {
             {showAddMember && selectedRep && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog"
                      aria-modal="true">
-                    <div className="absolute inset-0 bg-black/60" onClick={() => setShowAddMember(false)}/>
+                    <div className="absolute inset-0 bg-black/60" onClick={handleCloseAddMember}/>
                     <div
                         className="relative w-full max-w-2xl max-h-[80vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                         <div
@@ -484,7 +497,7 @@ export function Representatives() {
                                     member to</p>
                                 <h3 className="text-base font-semibold text-cyan-700 dark:text-cyan-400">{selectedRep}</h3>
                             </div>
-                            <CloseBtn onClick={() => setShowAddMember(false)}/>
+                            <CloseBtn onClick={handleCloseAddMember}/>
                         </div>
                         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
                             <input
@@ -492,6 +505,7 @@ export function Representatives() {
                                 value={addSearch}
                                 onChange={e => setAddSearch(e.target.value)}
                                 placeholder="Search by name, membership no. or bank…"
+                                aria-label="Search members to add"
                                 className="w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                             />
                         </div>
@@ -533,7 +547,7 @@ export function Representatives() {
                         </div>
                         <div
                             className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end shrink-0">
-                            <Button onClick={() => setShowAddMember(false)}>Cancel</Button>
+                            <Button onClick={handleCloseAddMember}>Cancel</Button>
                         </div>
                     </div>
                 </div>
@@ -543,10 +557,7 @@ export function Representatives() {
             {selectedRepDetail && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog"
                      aria-modal="true">
-                    <div className="absolute inset-0 bg-black/60" onClick={() => {
-                        setSelectedRepDetail(null);
-                        setEditingRep(false);
-                    }}/>
+                    <div className="absolute inset-0 bg-black/60" onClick={handleCloseRepDetail}/>
                     <div
                         className="relative w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                         <div
@@ -571,10 +582,7 @@ export function Representatives() {
                                         Edit
                                     </button>
                                 )}
-                                <CloseBtn onClick={() => {
-                                    setSelectedRepDetail(null);
-                                    setEditingRep(false);
-                                }}/>
+                                <CloseBtn onClick={handleCloseRepDetail}/>
                             </div>
                         </div>
                         {editingRep ? (
@@ -619,7 +627,7 @@ export function Representatives() {
                         <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
                             {editingRep ? (
                                 <>
-                                    <Button onClick={() => setEditingRep(false)}>Cancel</Button>
+                                    <Button onClick={handleCancelEdit}>Cancel</Button>
                                     <Button variant="primary" disabled={!editRepFields.name.trim() || saving}
                                             onClick={async () => {
                                                 setSaving(true);
@@ -639,10 +647,7 @@ export function Representatives() {
                                     </Button>
                                 </>
                             ) : (
-                                <Button onClick={() => {
-                                    setSelectedRepDetail(null);
-                                    setEditingRep(false);
-                                }}>Close</Button>
+                                <Button onClick={handleCloseRepDetail}>Close</Button>
                             )}
                         </div>
                     </div>
@@ -653,13 +658,13 @@ export function Representatives() {
             {showAddRep && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog"
                      aria-modal="true">
-                    <div className="absolute inset-0 bg-black/60" onClick={() => setShowAddRep(false)}/>
+                    <div className="absolute inset-0 bg-black/60" onClick={handleCloseAddRep}/>
                     <div
                         className="relative w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Add
                                 Representative</h3>
-                            <CloseBtn onClick={() => setShowAddRep(false)}/>
+                            <CloseBtn onClick={handleCloseAddRep}/>
                         </div>
                         <div className="space-y-3">
                             <div>
@@ -710,7 +715,7 @@ export function Representatives() {
                                               }, ...modalAreas.map(a => ({value: a, label: a}))]}/>
                         </div>
                         <div className="flex justify-end gap-2 mt-5">
-                            <Button onClick={() => setShowAddRep(false)}>Cancel</Button>
+                            <Button onClick={handleCloseAddRep}>Cancel</Button>
                             <Button variant="primary" onClick={handleAddRep} disabled={!newRepName.trim()}>
                                 <UserPlus size={14}/> Continue
                             </Button>
@@ -724,7 +729,7 @@ export function Representatives() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog"
                      aria-modal="true">
                     <div className="absolute inset-0 bg-black/60"
-                         onClick={() => setSelectedMember(null)}/>
+                         onClick={handleCloseMemberModal}/>
                     <div
                         className="relative w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                         {/* Header */}
@@ -743,7 +748,7 @@ export function Representatives() {
                                     <StatusBadge status={selectedMember.status}/>
                                 </div>
                             </div>
-                            <CloseBtn onClick={() => setSelectedMember(null)}/>
+                            <CloseBtn onClick={handleCloseMemberModal}/>
                         </div>
 
                         {/* Breadcrumb */}
@@ -810,7 +815,7 @@ export function Representatives() {
 
                         <div
                             className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end shrink-0">
-                            <Button onClick={() => setSelectedMember(null)}>Close</Button>
+                            <Button onClick={handleCloseMemberModal}>Close</Button>
                         </div>
                     </div>
                 </div>

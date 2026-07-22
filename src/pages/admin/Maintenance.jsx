@@ -42,10 +42,10 @@ const maintenance_cards = [
         color: 'text-red-600 dark:text-red-400'
     },
     {
-        title: 'Recruiters',
+        title: 'Recruiter Types',
         icon: LucideCopyCheck,
-        desc: 'Maintain Recruiters',
-        color: 'text-red-600 dark:text-red-400'
+        desc: 'Maintain Recruiter Types',
+        href: '/maintenance/recruiter-type'
     },
     {
         title: 'Representatives',

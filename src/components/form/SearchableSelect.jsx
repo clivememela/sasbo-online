@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 
 export default function SearchableSelect({ label, value, onChange, options, placeholder = 'Select…' }) {
@@ -25,16 +25,20 @@ export default function SearchableSelect({ label, value, onChange, options, plac
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
-    const handleSelect = (opt) => {
+    const handleToggle = useCallback(() => setOpen(o => !o), []);
+
+    const handleSelect = useCallback((opt) => {
         onChange({ target: { value: opt.value } });
         setOpen(false);
-    };
+    }, [onChange]);
 
-    const handleClear = (e) => {
+    const handleClear = useCallback((e) => {
         e.stopPropagation();
         onChange({ target: { value: '' } });
         setSearch('');
-    };
+    }, [onChange]);
+
+    const handleSearchChange = useCallback((e) => setSearch(e.target.value), []);
 
     return (
         <div ref={containerRef} className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -42,14 +46,17 @@ export default function SearchableSelect({ label, value, onChange, options, plac
             <div className="relative">
                 <button
                     type="button"
-                    onClick={() => setOpen(o => !o)}
+                    onClick={handleToggle}
+                    aria-haspopup="listbox"
+                    aria-expanded={open}
+                    aria-label={label || placeholder}
                     className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-sm font-normal normal-case tracking-normal border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400"
                 >
                     <span className={selected && selected.value ? '' : 'text-gray-400 dark:text-gray-500'}>
                         {selected && selected.value ? selected.label : placeholder}
                     </span>
                     <span className="flex items-center gap-1 shrink-0 ml-2">
-                        {value && <X size={12} onClick={handleClear} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />}
+                        {value && <X size={12} onClick={handleClear} aria-label="Clear selection" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />}
                         <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
                     </span>
                 </button>
@@ -60,17 +67,20 @@ export default function SearchableSelect({ label, value, onChange, options, plac
                             <input
                                 ref={inputRef}
                                 value={search}
-                                onChange={e => setSearch(e.target.value)}
+                                onChange={handleSearchChange}
                                 placeholder="Search…"
+                                aria-label={`Search ${label || 'options'}`}
                                 className="w-full rounded-md px-2 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                             />
                         </div>
-                        <ul className="max-h-48 overflow-y-auto py-1">
+                        <ul role="listbox" aria-label={label || placeholder} className="max-h-48 overflow-y-auto py-1">
                             {filtered.length === 0 ? (
                                 <li className="px-3 py-2 text-sm text-gray-400">No results</li>
                             ) : filtered.map(opt => (
                                 <li
                                     key={opt.value}
+                                    role="option"
+                                    aria-selected={opt.value === value}
                                     onClick={() => handleSelect(opt)}
                                     className={`px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 dark:hover:bg-cyan-900/20 hover:text-cyan-700 dark:hover:text-cyan-300 font-normal normal-case tracking-normal
                                         ${opt.value === value ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 font-medium' : 'text-gray-800 dark:text-gray-200'}`}

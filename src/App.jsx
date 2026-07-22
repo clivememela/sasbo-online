@@ -23,6 +23,7 @@ import {Representatives} from "./pages/members/Representatives.jsx";
 import CaptureMember from "./pages/members/CaptureMember.jsx";
 import Maintenance from "./pages/admin/Maintenance.jsx";
 import BankListing from "./pages/bank_branch/BankListing.jsx";
+import RecruiterType from "./pages/maintainance/RecruiterType.jsx";
 
 
 function App() {
@@ -55,6 +56,7 @@ function App() {
         <Route path="archives/finance-houses" element={<FinanceHouses />} />
         <Route path="archives/research-information" element={<ResearchInformation />} />
         <Route path="maintenance" element={<Maintenance/>} />
+        <Route path="maintenance/recruiter-type" element={<RecruiterType />} />
       </Route>
     </Routes>
   )
