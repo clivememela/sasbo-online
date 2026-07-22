@@ -16,12 +16,14 @@ import AppLayout from './layouts/AppLayout';
 import AuthLayout from './layouts/AuthLayout';
 import Admin from "./pages/admin/Admin.jsx";
 import ACBMenu from "./pages/admin/ACBMenu.jsx";
+import ACBDebits from "./pages/acb/ACBDebits.jsx"
 import DailyMenu from "./pages/admin/DailyMenu.jsx";
 import MonthlyMenu from "./pages/admin/MonthlyMenu.jsx";
 import {Representatives} from "./pages/members/Representatives.jsx";
 import CaptureMember from "./pages/members/CaptureMember.jsx";
 import Maintenance from "./pages/admin/Maintenance.jsx";
 import BankListing from "./pages/bank_branch/BankListing.jsx";
+
 
 function App() {
   return (
@@ -35,6 +37,7 @@ function App() {
         <Route path="home" element={<HomePage />} />
         <Route path="admin" element={<Admin />} />
         <Route path="admin/acb" element={<ACBMenu />} />
+        <Route path="acb/debits" element={<ACBDebits />} />
         <Route path="admin/daily-menu" element={<DailyMenu />} />
         <Route path="admin/monthly-menu" element={<MonthlyMenu />} />
         <Route path="representatives" element={<Representatives />} />

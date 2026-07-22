@@ -15,6 +15,12 @@ const cards = [
         href: '/members',
         desc: 'Search/Capture/Amend Member Records and Details'
     },
+    {
+        title: 'Representatives',
+        icon: LucidePresentation,
+        href: '/representatives',
+        desc: 'Capture/Print Representatives'
+    },
     //{ title: 'Member', icon: LucideUserCheck2, href: '/members', desc: 'Member Detail Enquiry' },
     //{ title: 'Member', icon: LucidePenBox, href: '/members/capture', desc: 'Capture/Print Member Audit Trail' },
     {
@@ -29,12 +35,6 @@ const cards = [
         //href: '/endowment-fund',
         desc: 'Capture/Print Endowment Fund',
         color: 'text-red-600 dark:text-red-400'
-    },
-    {
-        title: 'Representatives',
-        icon: LucidePresentation,
-        href: '/representatives',
-        desc: 'Capture/Print Representatives'
     },
     {
         title: 'Suspension/Rejection',

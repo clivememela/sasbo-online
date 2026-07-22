@@ -1,6 +1,7 @@
 import {
     LucideMenu, LucideToolbox, LucideGitBranch, LucideCassetteTape,
-    TextSelect, LucideChartNoAxesGantt, ArrowRightLeft, Mailbox, LucideCalendar,
+   // TextSelect,
+    LucideChartNoAxesGantt, ArrowRightLeft, Mailbox, LucideCalendar,
     LucideFile, LucideTag, LucideExternalLink, LucideConstruction
 } from 'lucide-react';
 import NavigationCard from '../../components/common/NavigationCard';
