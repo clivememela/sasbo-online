@@ -129,10 +129,10 @@ export default function Members() {
 
         // Identify changed fields and their new values
         const changes = [];
-        const ignoredFields = ["id", "membershipNumber", "memberId"];
-        
+        const ignoredFields = new Set(["id", "membershipNumber", "memberId"]);
+
         Object.keys(editForm).forEach(key => {
-            if (!ignoredFields.includes(key) && editForm[key] !== selectedMember[key]) {
+            if (!ignoredFields.has(key) && editForm[key] !== selectedMember[key]) {
                 const label = MEMBER_FIELD_LABEL_MAP[key] || key;
                 const oldValue = selectedMember[key] || "-";
                 const newValue = editForm[key] || "-";
@@ -174,41 +174,45 @@ export default function Members() {
     }, []);
 
     const filteredMembers = useMemo(() => {
-        const titleQ = filters.title.trim().toLowerCase();
-        const empNoQ = filters.employeeNumber.trim().toLowerCase();
-        const memNoQ = filters.membershipNumber.trim().toLowerCase();
-        const initialsQ = filters.initials.trim().toLowerCase();
-        const surnameQ = filters.surname.trim().toLowerCase();
-        const idNoQ = filters.identityNumber.trim().toLowerCase();
-        const bankQ = filters.bankName.trim().toLowerCase();
-        const branchQ = filters.branch.trim().toLowerCase();
-        const bankAccQ = filters.bankAccountNumber.trim().toLowerCase();
-        const phoneQ = filters.phone.trim().toLowerCase();
-        const emailQ = filters.email.trim().toLowerCase();
-        const statusQ = filters.status.trim().toLowerCase();
-        const raceQ = filters.race.trim().toLowerCase();
+        const q = (s) => (s || "").trim().toLowerCase();
+        const titleQ = q(filters.title);
+        const empNoQ = q(filters.employeeNumber);
+        const memNoQ = q(filters.membershipNumber);
+        const initialsQ = q(filters.initials);
+        const surnameQ = q(filters.surname);
+        const idNoQ = q(filters.identityNumber);
+        const bankQ = q(filters.bankName);
+        const branchQ = q(filters.branch);
+        const bankAccQ = q(filters.bankAccountNumber);
+        const phoneQ = q(filters.phone);
+        const emailQ = q(filters.email);
+        const statusQ = q(filters.status);
+        const raceQ = q(filters.race);
 
         // Trigger loading simulation if filters changed
-        const hasFilters = Object.values(filters).some(v => v.trim() !== "");
+        const hasFilters = Object.values(filters).some(v => (v || "").trim() !== "");
         if (hasFilters) {
             setLastSearchTime(Date.now());
         }
 
-        return membersList.filter((m) => {
-            if (titleQ && !(m.title ?? "").toLowerCase().includes(titleQ)) return false;
-            if (empNoQ && !m.employeeNumber.toLowerCase().includes(empNoQ)) return false;
-            if (memNoQ && !m.membershipNumber.toLowerCase().includes(memNoQ)) return false;
-            if (initialsQ && !m.initials.toLowerCase().includes(initialsQ)) return false;
-            if (surnameQ && !m.surname.toLowerCase().includes(surnameQ)) return false;
-            if (idNoQ && !m.identityNumber.toLowerCase().includes(idNoQ)) return false;
-            if (bankQ && !m.bankName.toLowerCase().includes(bankQ)) return false;
-            if (branchQ && !(m.branch ?? "").toLowerCase().includes(branchQ)) return false;
-            if (bankAccQ && !(m.bankAccountNumber ?? "").toLowerCase().includes(bankAccQ)) return false;
-            if (phoneQ && !(m.phone ?? "").toLowerCase().includes(phoneQ)) return false;
-            if (emailQ && !(m.email ?? "").toLowerCase().includes(emailQ)) return false;
-            if (raceQ && !(m.race ?? "").toLowerCase().includes(raceQ)) return false;
-            return !(statusQ && !(m.status ?? "").toLowerCase().includes(statusQ));
-        });
+        const predicates = [];
+        if (titleQ) predicates.push(m => (m.title ?? "").toLowerCase().includes(titleQ));
+        if (empNoQ) predicates.push(m => (m.employeeNumber ?? "").toLowerCase().includes(empNoQ));
+        if (memNoQ) predicates.push(m => (m.membershipNumber ?? "").toLowerCase().includes(memNoQ));
+        if (initialsQ) predicates.push(m => (m.initials ?? "").toLowerCase().includes(initialsQ));
+        if (surnameQ) predicates.push(m => (m.surname ?? "").toLowerCase().includes(surnameQ));
+        if (idNoQ) predicates.push(m => (m.identityNumber ?? "").toLowerCase().includes(idNoQ));
+        if (bankQ) predicates.push(m => (m.bankName ?? "").toLowerCase().includes(bankQ));
+        if (branchQ) predicates.push(m => (m.branch ?? "").toLowerCase().includes(branchQ));
+        if (bankAccQ) predicates.push(m => (m.bankAccountNumber ?? "").toLowerCase().includes(bankAccQ));
+        if (phoneQ) predicates.push(m => (m.phone ?? "").toLowerCase().includes(phoneQ));
+        if (emailQ) predicates.push(m => (m.email ?? "").toLowerCase().includes(emailQ));
+        if (raceQ) predicates.push(m => (m.race ?? "").toLowerCase().includes(raceQ));
+        if (statusQ) predicates.push(m => (m.status ?? "").toLowerCase().includes(statusQ));
+
+        if (predicates.length === 0) return membersList;
+
+        return membersList.filter(m => predicates.every(pred => pred(m)));
     }, [filters, membersList]);
 
     useEffect(() => {
