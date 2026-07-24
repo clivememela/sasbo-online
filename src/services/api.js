@@ -14,7 +14,7 @@ const API_BASE_URL = (() => {
 
 export function apiUrl(path) {
   // Ensure path starts with / and contains no protocol — prevents open redirect / SSRF
-  const safePath = '/' + path.replace(/^[\/]+/, '').replace(/^[a-z][a-z0-9+\-.]*:\/\//i, '');
+  const safePath = '/' + path.replace(/^\/+/, '').replace(/^[a-z][a-z0-9+\-.]*:\/\//i, '');
   if (!API_BASE_URL) return safePath;
   return `${API_BASE_URL}${safePath}`;
 }

@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useState, useRef} from "react";
 import {useNavigate, useLocation} from "react-router-dom";
-import {LucideUserRoundPlus, CheckCircle2, UsersRoundIcon, Printer} from "lucide-react";
+import {LucideUserRoundPlus, CheckCircle2, Printer} from "lucide-react";
 import {memberService} from "../../services/memberService.js";
 import { TextInput, SearchableSelect, Button } from "../../components/form";
 import {
@@ -33,8 +33,6 @@ export default function Members() {
     });
 
     const [page, setPage] = useState(1);
-    // Keep expandedId for backward compatibility (unused for inline view now)
-    const [expandedId, setExpandedId] = useState(null);
     // Modal state: which member is currently shown in the modal
     const [selectedMember, setSelectedMember] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
@@ -245,7 +243,6 @@ export default function Members() {
             race: "",
         });
         setPage(1);
-        setExpandedId(null);
     };
 
     return (

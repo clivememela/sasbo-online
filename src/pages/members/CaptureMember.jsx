@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
-import { Button, SearchableSelect } from "../../components/form";
+import { Button } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, YES_NO_OPTIONS, SUSPENSION_CODE_OPTIONS,
-    JOB_GRADE_OPTIONS, MANAGER_OPTIONS, DAY_OPTIONS, MEMBER_TABS,
+    JOB_GRADE_OPTIONS, MANAGER_OPTIONS, MEMBER_TABS,
     BANK_OPTIONS, BRANCH_OPTIONS, REP_OPTIONS,
 } from "../../config/memberConstants.js";
 import { validateSAID } from "../../utils/validateSAID.js";

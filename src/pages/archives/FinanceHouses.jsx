@@ -5,7 +5,10 @@ export default function FinanceHouses() {
   const [expandedFolders, setExpandedFolders] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
 
-  const fileStructure = {
+  const fileStructure = useMemo(() => ({
+
+
+
     "ABSA": {
       "Policies & Procedures": [
         "Absa Diversity and inclusion Policy 2012.pdf",
@@ -384,7 +387,7 @@ export default function FinanceHouses() {
         "VBS-SalAgreement-2015.pdf"
       ]
     }
-  };
+  }), []);
 
   const toggleFolder = (folder) => {
     setExpandedFolders(prev => ({

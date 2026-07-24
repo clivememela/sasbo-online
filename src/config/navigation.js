@@ -1,6 +1,4 @@
 import {
-  TextSelect,
-  ArrowRightLeft,
   HandCoins,
   Home,
   Landmark,
@@ -13,11 +11,11 @@ import {
   NotebookPen,
   Form,
   MapPinnedIcon,
-  LucideDatabase, Mailbox, LucideToolbox, LucideMenu, LucideCassetteTape, LucideGitBranch, LucideChartNoAxesGantt,
-  LucideUserRoundPlus, LucideCalendar, LucideFile, LucideTag, UsersRoundIcon, LucideDoorOpen, LucideTags,
-  LucideUserCheck2, LucidePenBox, LucidePiggyBank, LucidePresentation, LucideTable, LucideLocate, LucideCopyCheck,
-  LucidePrinter, LucideSettings, LucideSettings2, LucideConstruction, LucideHdmiPort, LucideLogs, LucideMail,
-  LucideTrain, LucidePaintRoller, LucideUserRound, LucideCross, LucideMails, LucideBuilding
+  LucideDatabase, LucideMenu,
+  LucideUserRoundPlus, LucideCalendar, LucideFile, LucideTags,
+  LucidePiggyBank, LucidePresentation, LucideTable, LucideLocate,
+  LucideConstruction, LucideHdmiPort, LucideLogs, LucideMail,
+  LucideTrain, LucidePaintRoller, LucideUserRound
 } from "lucide-react";
 
 export const navItems = [
@@ -47,13 +45,19 @@ export const navItems = [
               //{ title: 'Labels', icon: LucideTags, href: '/member/label', desc: 'Print Member Labels - Selection' }
             ]
           },
+          {
+            title: 'Representatives',
+            icon: LucidePresentation,
+            href: '/representatives',
+            desc: 'Capture/Print Representatives'
+          },
           // {
           //   title: 'Print Members Audit Trail',
           //   icon: LucideUserCheck2,
           //   desc: 'Member Detail Enquiry',
           //   color: 'text-red-600 dark:text-red-400'
           // },
-          {
+          /*{
             title: 'Death Benefit/Bene. Fund',
             icon: LucidePenBox,
             color: 'text-red-600 dark:text-red-400'
@@ -63,12 +67,6 @@ export const navItems = [
             icon: LucidePiggyBank,
             //href: '/endowment-fund',
             color: 'text-red-600 dark:text-red-400'
-          },
-          {
-            title: 'Representatives',
-            icon: LucidePresentation,
-            href: '/representatives',
-            desc: 'Capture/Print Representatives'
           },
           {
             title: 'Suspension/Rejection Table',
@@ -95,7 +93,7 @@ export const navItems = [
             href: '/archives',
             desc: 'Print Duplicate Employee Numbers',
             color: 'text-red-600 dark:text-red-400'
-          },
+          },*/
           //{title: 'Area & Table Code', icon: LucidePrinter, href: '/archives', desc: 'Print Members by Area & Table code', color: 'text-red-600 dark:text-red-400'},
         ]
       },
@@ -163,7 +161,7 @@ export const navItems = [
             href: "/admin/acb/debits",
             icon: LucidePiggyBank,
           },
-          {
+          /*{
             title: "Credits",
             desc: "Manage Credits",
             //href: "/admin/membership/roles",
@@ -211,20 +209,26 @@ export const navItems = [
             //href: "/admin/membership/permissions",
             icon: LucideBuilding,
             color: 'text-red-600 dark:text-red-400'
-          },
+          },*/
         ]
       },
+      {
+        title: "Maintenance",
+        desc: "Manage System",
+        href:'/maintenance',
+        icon: LucideConstruction
+      },
       // { title: "BankBranch", icon: Landmark, color: 'text-red-600 dark:text-red-400'},
-      { title: "Utilities", icon: LucideToolbox, color: 'text-red-600 dark:text-red-400'},
-      { title: "Regional Branches", icon: LucideGitBranch, color: 'text-red-600 dark:text-red-400'  },
-      { title: "Tape", icon: LucideCassetteTape, color: 'text-red-600 dark:text-red-400' },
-      { title: "D.B.F", icon: LucideFile, color: 'text-red-600 dark:text-red-400' },
+      //{ title: "Utilities", icon: LucideToolbox, color: 'text-red-600 dark:text-red-400'},
+      //{ title: "Regional Branches", icon: LucideGitBranch, color: 'text-red-600 dark:text-red-400'  },
+      //{ title: "Tape", icon: LucideCassetteTape, color: 'text-red-600 dark:text-red-400' },
+      //{ title: "D.B.F", icon: LucideFile, color: 'text-red-600 dark:text-red-400' },
       //{ title: "Selective Print", icon: TextSelect, color: 'text-red-600 dark:text-red-400' },
-      { title: "Committee", icon: LucideChartNoAxesGantt, color: 'text-red-600 dark:text-red-400'},
-      { title: "Ad-Hoc Label", icon: LucideTag, color: 'text-red-600 dark:text-red-400'},
-      { title: "Bank Transfer", icon: ArrowRightLeft, color: 'text-red-600 dark:text-red-400'},
-      { title: "Letters for Return Debits", icon: Mailbox, color: 'text-red-600 dark:text-red-400'},
-      { title: "Maintenance", href:'/maintenance', icon: LucideConstruction}
+      //{ title: "Committee", icon: LucideChartNoAxesGantt, color: 'text-red-600 dark:text-red-400'},
+      //{ title: "Ad-Hoc Label", icon: LucideTag, color: 'text-red-600 dark:text-red-400'},
+      //{ title: "Bank Transfer", icon: ArrowRightLeft, color: 'text-red-600 dark:text-red-400'},
+      //{ title: "Letters for Return Debits", icon: Mailbox, color: 'text-red-600 dark:text-red-400'},
+
     ]
   },
   {
@@ -238,8 +242,8 @@ export const navItems = [
         icon: MapPinnedIcon,
         href: "/banks/listing"
       },
-      { title: 'Tb Code/Lab Ind (Bank)', icon: Archive, desc: 'Extract by Tb Code/Lab Ind (Bank)' , color: 'text-red-600 dark:text-red-400'},
-      { title: 'Tb Code/Lab Ind (Mail)', icon: Archive, desc: 'Extract by Tb Code/Lab Ind (Mail)', color: 'text-red-600 dark:text-red-400' }
+      //{ title: 'Tb Code/Lab Ind (Bank)', icon: Archive, desc: 'Extract by Tb Code/Lab Ind (Bank)' , color: 'text-red-600 dark:text-red-400'},
+      //{ title: 'Tb Code/Lab Ind (Mail)', icon: Archive, desc: 'Extract by Tb Code/Lab Ind (Mail)', color: 'text-red-600 dark:text-red-400' }
     ]
   },
   { 

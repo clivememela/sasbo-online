@@ -5,7 +5,7 @@ export default function AffiliationsOtherTradeUnions() {
   const [expandedFolders, setExpandedFolders] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
 
-  const fileStructure = {
+  const fileStructure = useMemo(() => ({
     "COSATU Congress": [
       "BEC-CosatuCongress-Details-2009.xls",
       "Speech WFTU General Secretary at the 10 COSATU Congress engl.doc",
@@ -122,7 +122,7 @@ export default function AffiliationsOtherTradeUnions() {
       "004.17.7_Signed_Transnet_WageSettlementAgreement-2011.pdf",
       "2011-RegisteredTradeUnions-DoL.doc"
     ]
-  };
+  }), []);
 
   const toggleFolder = (folder) => {
     setExpandedFolders(prev => ({
@@ -149,7 +149,7 @@ export default function AffiliationsOtherTradeUnions() {
     });
 
     return filtered;
-  }, [searchQuery]);
+  }, [fileStructure, searchQuery]);
 
   return (
     <div className="p-6 text-gray-900 dark:text-gray-100">

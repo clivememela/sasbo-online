@@ -48,7 +48,7 @@ export default function ACBDebits() {
             setEditing(false);
         } catch (err) {
             console.error(err);
-            alert('Failed to save banking details');
+            alert('Failed to update banking details');
         } finally {
             setSaving(false);
         }
@@ -179,7 +179,7 @@ export default function ACBDebits() {
                                 </p>
                             </div>
                             <div className="flex items-center gap-3">
-                                <Button onClick={openEdit}>Edit Details</Button>
+                                <Button onClick={openEdit}>Update Details</Button>
                                 {statusBadge(selectedMember.status)}
                             </div>
                         </div>
@@ -226,7 +226,7 @@ export default function ACBDebits() {
                         {editing && (
                             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                                 <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl p-6">
-                                    <h3 className="text-lg font-semibold mb-4">Edit Banking Details</h3>
+                                    <h3 className="text-lg font-semibold mb-4">Update Banking Details</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <TextInput label="Bank" value={bankForm.bankName} onChange={handleBankChange('bankName')} />
                                         <TextInput label="Branch" value={bankForm.branch} onChange={handleBankChange('branch')} />
@@ -240,7 +240,7 @@ export default function ACBDebits() {
                                     </div>
                                     <div className="flex justify-end gap-2 mt-6">
                                         <Button onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
-                                        <Button variant="primary" onClick={saveBanking} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+                                        <Button variant="primary" onClick={saveBanking} disabled={saving}>{saving ? 'Updating...' : 'Update'}</Button>
                                     </div>
                                 </div>
                             </div>

@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Logo from "./common/Logo";
 import SidebarItem from "./common/SidebarItem";
 import { navItems, authItems } from "../config/navigation";

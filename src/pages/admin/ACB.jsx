@@ -1,20 +1,17 @@
 import {
-    LucideMenu, LucideToolbox, LucideGitBranch, LucideCassetteTape,
-    TextSelect, LucideChartNoAxesGantt, ArrowRightLeft, Mailbox, LucideCalendar,
-    LucideFile, LucideTag, LucideExternalLink, LucideConstruction, ChartNoAxesCombined, LucideCross, LucidePiggyBank,
-    LucideMails, LucideBuilding
+    LucidePiggyBank
 } from 'lucide-react';
 import PageTitle from "../../components/common/PageTitle.jsx";
 import NavigationCard from "../../components/common/NavigationCard.jsx";
 
 const cards = [
     {
-        title: "Manage Re-Debits",
-        desc: "Capture Resubmission Debits",
+        title: "Debits",
+        desc: "Manage Debits",
         href: "/admin/acb/debits",
         icon: LucidePiggyBank,
     },
-    {
+    /*{
         title: "Credits",
         desc: "Manage Credits",
         //href: "/admin/membership/roles",
@@ -62,13 +59,13 @@ const cards = [
         //href: "/admin/membership/permissions",
         icon: LucideBuilding,
         color: 'text-red-600 dark:text-red-400'
-    },
+    },*/
 ];
 console.log("Rendering ACB");
 export default function ACB() {
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
-            <PageTitle title="ACB Menu" subtitle="Select options below" />
+            <PageTitle title="A.C.B Menu" subtitle="Select options below" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto text-center">
                 {cards.map((card) => <NavigationCard key={card.href} {...card} />)}
             </div>

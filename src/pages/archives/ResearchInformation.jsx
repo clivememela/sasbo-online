@@ -5,7 +5,8 @@ export default function ResearchInformation() {
   const [expandedFolders, setExpandedFolders] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
 
-  const fileStructure = {
+  const fileStructure = useMemo(() => ({
+
     "Andrew Levy Publications": {
       "2014": [
         "1. March 2014 WSS Q Report.pdf",
@@ -206,7 +207,7 @@ export default function ResearchInformation() {
       "PerformanceManagement-2004.doc",
       "RefusaltoObeyInstructions-Gregory Beck.doc"
     ]
-  };
+  }), []);
 
   const toggleFolder = (folder) => {
     setExpandedFolders(prev => ({
@@ -257,7 +258,7 @@ export default function ResearchInformation() {
     });
 
     return filtered;
-  }, [searchQuery]);
+  }, [fileStructure, searchQuery]);
 
   return (
     <div className="p-6 text-gray-900 dark:text-gray-100">

@@ -1,8 +1,7 @@
 import {
-    UsersRoundIcon, LucideUserCheck2, LucidePenBox, LucidePiggyBank, LucideCross,
-    LucidePresentation, LucideTable, LucideTags, LucideArmchair, LucidePickaxe,
-    LucideLocate, LucideCopyCheck, LucidePrinter, LucideFile, LucideDoorOpen,
-    Archive, LucidePrinterX, LucideEthernetPort, LucideHdmiPort, LucideLogs, LucideTrain, LucideMail, LucidePaintRoller,
+    LucideTable,
+    LucideLocate, LucideFile,
+    LucideHdmiPort, LucideLogs, LucideTrain, LucideMail, LucidePaintRoller,
     LucideUserRound
 } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';

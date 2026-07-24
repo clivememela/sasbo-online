@@ -3,7 +3,7 @@ import {OrganizerReport} from "../reports/OrganizerReport.jsx";
 import GeneralForm from "./GeneralForm.jsx";
 import LocationListing from "../reports/LocationListing.jsx";
 import MembershipApplication from "./MembershipApplication.jsx";
-import {TextInput, SelectInput, Button, FilterForm, SearchableSelect} from "../../components/form";
+import {TextInput, Button, FilterForm, SearchableSelect} from "../../components/form";
 import { FileSearch } from "lucide-react";
 
 export function Forms(){

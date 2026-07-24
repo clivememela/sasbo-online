@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
-import { TextInput, SelectInput, SearchableSelect, Button } from '../../components/form';
+import { TextInput, SearchableSelect, Button } from '../../components/form';
 import { memberService } from '../../services/memberService.js';
 import { representativeService } from '../../services/representativeService.js';
 import { bankService } from '../../services/bankService.js';
@@ -41,7 +41,7 @@ export function Representatives() {
         refreshAll();
         bankService.getBanks().then(setBanksData);
         locationService.getProvinces().then(setProvincesData);
-    }, []);
+    }, [refreshAll]);
 
     const BANK_NAMES = useMemo(() => [...new Set(banksData.map(b => b.bankName).filter(Boolean))].sort(), [banksData]);
     const PROVINCES = useMemo(() => provincesData.map(p => p.name).filter(Boolean).sort(), [provincesData]);
