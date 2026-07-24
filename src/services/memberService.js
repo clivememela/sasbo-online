@@ -32,6 +32,23 @@ export const memberService = {
         throw err;
       }),
 
+  // New: update only banking fields (PATCH)
+  updateBanking: (id, banking) =>
+    fetch(apiUrl(`/api/members/${id}/banking`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(banking),
+    })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+        return r.json();
+      })
+      .catch(err => {
+        console.error('Failed to update member banking:', err);
+        throw err;
+      }),
+
   getMemberById: (id) =>
     fetch(apiUrl(`/api/members/${id}`), { credentials: 'include' })
       .then(r => {

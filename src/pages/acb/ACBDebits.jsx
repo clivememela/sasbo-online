@@ -14,7 +14,45 @@ export default function ACBDebits() {
     const [loadingId, setLoadingId] = useState(null);
     const [confirmed, setConfirmed] = useState(false);
 
+    // Edit modal state
+    const [editing, setEditing] = useState(false);
+    const [bankForm, setBankForm] = useState({});
+    const [saving, setSaving] = useState(false);
+
     useEffect(() => { memberService.getMembers().then(setMembersList); }, []);
+
+    const openEdit = () => {
+        if (!selectedMember) return;
+        setBankForm({
+            bankName: selectedMember.bankName || "",
+            branch: selectedMember.branch || "",
+            bankAccountNumber: selectedMember.bankAccountNumber || "",
+            ibtNo: selectedMember.ibtNo || "",
+            workIbtNo: selectedMember.workIbtNo || "",
+            bankAddress: selectedMember.bankAddress || "",
+            workBankAddress: selectedMember.workBankAddress || "",
+            paymentType: selectedMember.paymentType || "",
+            debitDay: selectedMember.debitDay || "",
+        });
+        setEditing(true);
+    };
+
+    const handleBankChange = (field) => (e) => setBankForm(f => ({ ...f, [field]: e.target.value }));
+
+    const saveBanking = async () => {
+        if (!selectedMember) return;
+        setSaving(true);
+        try {
+            const updated = await memberService.updateBanking(selectedMember.id, bankForm);
+            setSelectedMember(updated);
+            setEditing(false);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to save banking details');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const results = useMemo(() => {
         if (!searched) return [];
@@ -62,7 +100,7 @@ export default function ACBDebits() {
 
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
-            <PageTitle title="Manage Re-Debits" subtitle="Capture Resubmission Debits" />
+            <PageTitle title="Manage Debits" subtitle="Capture Resubmission Debits" />
 
             <div className="max-w-4xl mx-auto">
                 {/* Search */}
@@ -140,7 +178,10 @@ export default function ACBDebits() {
                                     <span className="ml-2 text-gray-400 font-normal text-sm">· {selectedMember.membershipNumber}</span>
                                 </p>
                             </div>
-                            {statusBadge(selectedMember.status)}
+                            <div className="flex items-center gap-3">
+                                <Button onClick={openEdit}>Edit Details</Button>
+                                {statusBadge(selectedMember.status)}
+                            </div>
                         </div>
 
                         {/* Details grid */}
@@ -180,6 +221,30 @@ export default function ACBDebits() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Edit Modal */}
+                        {editing && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                                <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl p-6">
+                                    <h3 className="text-lg font-semibold mb-4">Edit Banking Details</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <TextInput label="Bank" value={bankForm.bankName} onChange={handleBankChange('bankName')} />
+                                        <TextInput label="Branch" value={bankForm.branch} onChange={handleBankChange('branch')} />
+                                        <TextInput label="Account Number" value={bankForm.bankAccountNumber} onChange={handleBankChange('bankAccountNumber')} />
+                                        <TextInput label="IBT No." value={bankForm.ibtNo} onChange={handleBankChange('ibtNo')} />
+                                        <TextInput label="Work IBT No." value={bankForm.workIbtNo} onChange={handleBankChange('workIbtNo')} />
+                                        <TextInput label="Payment Type" value={bankForm.paymentType} onChange={handleBankChange('paymentType')} />
+                                        <TextInput label="Debit Day" value={bankForm.debitDay} onChange={handleBankChange('debitDay')} />
+                                        <TextInput label="Bank Address" value={bankForm.bankAddress} onChange={handleBankChange('bankAddress')} />
+                                        <TextInput label="Work Bank Address" value={bankForm.workBankAddress} onChange={handleBankChange('workBankAddress')} />
+                                    </div>
+                                    <div className="flex justify-end gap-2 mt-6">
+                                        <Button onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
+                                        <Button variant="primary" onClick={saveBanking} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
