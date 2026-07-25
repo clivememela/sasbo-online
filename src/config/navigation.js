@@ -97,7 +97,7 @@ export const navItems = [
           //{title: 'Area & Table Code', icon: LucidePrinter, href: '/archives', desc: 'Print Members by Area & Table code', color: 'text-red-600 dark:text-red-400'},
         ]
       },
-      {
+      /*{
         title: "Monthly Menu",
         icon: LucideCalendar,
         //color: 'text-red-600 dark:text-red-400',
@@ -149,7 +149,7 @@ export const navItems = [
             color: 'text-red-600 dark:text-red-400'
           },
         ]
-      },
+      },*/
       {
         title: "A.C.B",
         href:'/admin/acb',
@@ -215,8 +215,15 @@ export const navItems = [
       {
         title: "Maintenance",
         desc: "Manage System",
-        href:'/maintenance',
-        icon: LucideConstruction
+        href:'/admin/maintenance',
+        icon: LucideConstruction,
+        subItems: [
+          {
+            title: 'Bank/Branch',
+            icon: Landmark,
+            desc: 'Maintain Bank/Branch'
+          },
+        ],
       },
       // { title: "BankBranch", icon: Landmark, color: 'text-red-600 dark:text-red-400'},
       //{ title: "Utilities", icon: LucideToolbox, color: 'text-red-600 dark:text-red-400'},

@@ -55,7 +55,7 @@ function App() {
         <Route path="archives/affiliations-other-trade-unions" element={<AffiliationsOtherTradeUnions />} />
         <Route path="archives/finance-houses" element={<FinanceHouses />} />
         <Route path="archives/research-information" element={<ResearchInformation />} />
-        <Route path="maintenance" element={<Maintenance/>} />
+        <Route path="admin/maintenance" element={<Maintenance/>} />
         <Route path="maintenance/recruiter-type" element={<RecruiterType />} />
       </Route>
     </Routes>

@@ -9,18 +9,18 @@ import PageTitle from '../../components/common/PageTitle.jsx';
 import {useOutletContext} from "react-router-dom";
 
 const maintenance_cards = [
-    {
+    /*{
         title: 'Union Details',
         icon: FileBadge,
         desc: 'Maintain Union Details',
         color: 'text-red-600 dark:text-red-400'
-    },
+    },*/
     {
         title: 'Bank/Branch',
         icon: Landmark,
         desc: 'Maintain Bank/Branch'
     },
-    {
+    /*{
         title: 'Reginal Branch Menu',
         icon: LucideTable,
         desc: 'Maintain Reginal Branch Menu',
@@ -35,16 +35,16 @@ const maintenance_cards = [
     {
         title: 'Committee',
         icon: LucideLocate,
-        desc: 'Maintain Committees ',
+        desc: 'Maintain Committees',
         color: 'text-red-600 dark:text-red-400'
-    },
+    },*/
     {
         title: 'Recruiter Types',
         icon: LucideCopyCheck,
         desc: 'Maintain Recruiter Types',
         href: '/maintenance/recruiter-type'
     },
-    {
+    /*{
         title: 'Representatives',
         icon: LucideUserKey,
         desc: 'Maintain Representatives',
@@ -61,16 +61,16 @@ const maintenance_cards = [
         icon: LucideBrushCleaning,
         desc: 'Clear Figures (Year End)',
         color: 'text-red-600 dark:text-red-400'
-    },
+    }
     {
         title: 'Suspencion/Rejection Table',
         icon: LucideFileX,
         desc: 'Maintain Suspension/Rejection Table',
         color: 'text-red-600 dark:text-red-400'
+        icon: LucideMails,
     },
     {
         title: 'Subscriptions',
-        icon: LucideMails,
         desc: 'Maintain Subscription Table',
         color: 'text-red-600 dark:text-red-400'
     },
@@ -91,7 +91,7 @@ const maintenance_cards = [
         icon: LucideFileText,
         desc: 'Maintain Document Type',
         color: 'text-red-600 dark:text-red-400'
-    },
+    },*/
 ];
 
 export default function Maintenance() {

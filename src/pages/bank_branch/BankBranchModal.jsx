@@ -74,7 +74,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
       <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-gray-100 dark:border-gray-700">
         <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50">
           <h3 className="text-2xl font-bold text-cyan-700 dark:text-cyan-400">
-            {isReadOnlyView ? "Bank Details" : isEditMode ? "Edit Bank/Branch" : "Add Bank/Branch"}
+            {isReadOnlyView ? "Bank Details" : isEditMode ? "Edit Bank/Branch Details" : "Add Bank/Branch Details"}
           </h3>
           <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition text-gray-500">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -180,12 +180,12 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
         )}
 
         <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3 bg-gray-50/50 dark:bg-gray-900/50">
-          <Button type="button" onClick={isReadOnlyView ? onClose : handleCancel} variant="secondary">{isReadOnlyView ? "Close" : "Cancel Editing"}</Button>
+          <Button type="button" onClick={isReadOnlyView ? onClose : handleCancel} variant="secondary">{isReadOnlyView ? "Close" : "Cancel"}</Button>
           {isReadOnlyView ? (
-            <Button type="button" variant="primary" onClick={() => setIsEditing(true)}>Edit Bank/Branch</Button>
+            <Button type="button" variant="primary" onClick={() => setIsEditing(true)}>Edit</Button>
           ) : (
             <Button type="submit" form="add-bank-form" variant="primary" disabled={loading}>
-              {loading ? "Saving..." : isEditMode ? "Save Changes" : "Save Bank"}
+              {loading ? "Saving..." : isEditMode ? "Save Changes" : "Save"}
             </Button>
           )}
         </div>
