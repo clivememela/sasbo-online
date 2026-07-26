@@ -12,10 +12,9 @@ import {
   Form,
   MapPinnedIcon,
   LucideDatabase, LucideMenu,
-  LucideUserRoundPlus, LucideCalendar, LucideFile, LucideTags,
-  LucidePiggyBank, LucidePresentation, LucideTable, LucideLocate,
-  LucideConstruction, LucideHdmiPort, LucideLogs, LucideMail,
-  LucideTrain, LucidePaintRoller, LucideUserRound
+  LucideUserRoundPlus, LucideFile, LucideTags,
+  LucidePiggyBank, LucidePresentation,
+  LucideConstruction
 } from "lucide-react";
 
 export const navItems = [

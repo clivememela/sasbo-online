@@ -5,7 +5,7 @@ import { TextInput, Button } from "../../components/form";
 import { memberService } from "../../services/memberService.js";
 import { validateSAID } from "../../utils/validateSAID.js";
 
-export default function ACBDebits() {
+export default function AcbDebits() {
     const [membersList, setMembersList] = useState([]);
     const [filters, setFilters] = useState({ surname: "", membershipNumber: "", identityNumber: "" });
     const [idError, setIdError] = useState(null);

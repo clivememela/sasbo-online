@@ -15,8 +15,8 @@ import AuthPage from './pages/auth/Auth.jsx';
 import AppLayout from './layouts/AppLayout';
 import AuthLayout from './layouts/AuthLayout';
 import Admin from "./pages/admin/Admin.jsx";
-import ACB from "./pages/admin/ACB.jsx";
-import ACBDebits from "./pages/acb/ACBDebits.jsx"
+import Acb from "./pages/admin/Acb.jsx";
+import AcbDebits from "./pages/acb/AcbDebits.jsx"
 import DailyMenu from "./pages/admin/DailyMenu.jsx";
 import MonthlyMenu from "./pages/admin/MonthlyMenu.jsx";
 import {Representatives} from "./pages/members/Representatives.jsx";
@@ -37,8 +37,8 @@ function App() {
         <Route index element={<Navigate to="/login" replace />} />
         <Route path="home" element={<HomePage />} />
         <Route path="admin" element={<Admin />} />
-        <Route path="admin/acb" element={<ACB />} />
-        <Route path="admin/acb/debits" element={<ACBDebits />} />
+        <Route path="admin/acb" element={<Acb />} />
+        <Route path="admin/acb/debits" element={<AcbDebits />} />
         <Route path="admin/daily-menu" element={<DailyMenu />} />
         <Route path="admin/monthly-menu" element={<MonthlyMenu />} />
         <Route path="representatives" element={<Representatives />} />
