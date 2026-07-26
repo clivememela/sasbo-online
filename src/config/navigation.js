@@ -270,6 +270,12 @@ export const navItems = [
       { title: 'Labels', icon: LucideTags, href: '/member/label', desc: 'Print Member Labels - Selection' }
     ]
   },
+  {
+    title: 'Representatives',
+    icon: LucidePresentation,
+    href: '/representatives',
+    desc: 'Capture/Print Representatives'
+  },
   { 
     title: "Reports", 
     icon: ChartNoAxesCombined, 
