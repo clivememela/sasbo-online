@@ -14,7 +14,7 @@ import {
   LucideDatabase, LucideMenu,
   LucideUserRoundPlus, LucideFile, LucideTags,
   LucidePiggyBank, LucidePresentation,
-  LucideConstruction
+  LucideConstruction, LucideCopyCheck
 } from "lucide-react";
 
 export const navItems = [
@@ -221,6 +221,12 @@ export const navItems = [
             title: 'Bank/Branch',
             icon: Landmark,
             desc: 'Maintain Bank/Branch'
+          },
+          {
+            title: 'Recruiter Types',
+            icon: LucideCopyCheck,
+            desc: 'Maintain Recruiter Types',
+            href: '/maintenance/recruiter-type'
           },
         ],
       },
