@@ -11,7 +11,7 @@ import {
   NotebookPen,
   Form,
   MapPinnedIcon,
-  LucideDatabase, LucideMenu,
+  LucideDatabase, LucideMails, LucideMenu,
   LucideUserRoundPlus, LucideFile, LucideTags,
   LucidePiggyBank, LucidePresentation,
   LucideConstruction, LucideCopyCheck
@@ -228,6 +228,13 @@ export const navItems = [
             desc: 'Maintain Recruiter Types',
             href: '/maintenance/recruiter-type'
           },
+          {
+            title: 'Subscriptions',
+            icon: LucideMails,
+            href: '/maintenance/subscription',
+            desc: 'Maintain Subscription Table',
+            color: 'text-red-600 dark:text-red-400'
+          },
         ],
       },
       // { title: "BankBranch", icon: Landmark, color: 'text-red-600 dark:text-red-400'},
@@ -258,6 +265,35 @@ export const navItems = [
       //{ title: 'Tb Code/Lab Ind (Mail)', icon: Archive, desc: 'Extract by Tb Code/Lab Ind (Mail)', color: 'text-red-600 dark:text-red-400' }
     ]
   },
+  {
+    title:"Document Archives",
+    icon: Archive,
+    href: "/archives",
+    subItems: [
+      { title: "Affiliations/Other Trade Unions", icon: Building2, href: "/archives/affiliations-other-trade-unions" },
+      { title: "Finance Houses", icon: HandCoins, href: "/archives/finance-houses" },
+      { title: "Information & Research", icon: LucideInfo, href: "/archives/research-information" }
+    ]
+  },
+  {
+    title: "Maintenance",
+    desc: "Manage System",
+    href:'/admin/maintenance',
+    icon: LucideConstruction,
+    subItems: [
+      {
+        title: 'Bank/Branch',
+        icon: Landmark,
+        desc: 'Maintain Bank/Branch'
+      },
+      {
+        title: 'Recruiter Types',
+        icon: LucideCopyCheck,
+        desc: 'Maintain Recruiter Types',
+        href: '/maintenance/recruiter-type'
+      },
+    ],
+  },
   { 
     title: "Members", 
     icon: Users, 
@@ -276,6 +312,13 @@ export const navItems = [
     href: '/representatives',
     desc: 'Capture/Print Representatives'
   },
+  {
+    title: 'Subscriptions',
+    icon: LucideMails,
+    href: '/maintenance/subscription',
+    desc: 'Maintain Subscription Table',
+    color: 'text-red-600 dark:text-red-400'
+  },
   { 
     title: "Reports", 
     icon: ChartNoAxesCombined, 
@@ -285,16 +328,7 @@ export const navItems = [
       { title: "Forms", icon: Form, href: "/reports/forms" },
       { title: "Location Listing", icon: MapPinnedIcon, href: "/reports/locations" }
     ]
-  },
-  {
-    title:"Document Archives",
-    icon: Archive,
-    href: "/archives",
-    subItems: [
-      { title: "Affiliations/Other Trade Unions", icon: Building2, href: "/archives/affiliations-other-trade-unions" },
-      { title: "Finance Houses", icon: HandCoins, href: "/archives/finance-houses" },
-      { title: "Information & Research", icon: LucideInfo, href: "/archives/research-information" }
-    ]}
+  }
 ];
 
 export const authItems = [

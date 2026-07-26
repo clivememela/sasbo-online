@@ -44,6 +44,13 @@ const maintenance_cards = [
         desc: 'Maintain Recruiter Types',
         href: '/maintenance/recruiter-type'
     },
+    {
+        title: 'Subscriptions',
+        icon: LucideMails,
+        href: '/maintenance/subscription',
+        desc: 'Maintain Subscription Table',
+        color: 'text-red-600 dark:text-red-400'
+    },
     /*{
         title: 'Representatives',
         icon: LucideUserKey,
@@ -68,11 +75,6 @@ const maintenance_cards = [
         desc: 'Maintain Suspension/Rejection Table',
         color: 'text-red-600 dark:text-red-400'
         icon: LucideMails,
-    },
-    {
-        title: 'Subscriptions',
-        desc: 'Maintain Subscription Table',
-        color: 'text-red-600 dark:text-red-400'
     },
     {
         title: 'Users',
