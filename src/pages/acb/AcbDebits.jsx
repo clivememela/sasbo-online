@@ -179,7 +179,7 @@ export default function AcbDebits() {
                                 </p>
                             </div>
                             <div className="flex items-center gap-3">
-                                <Button onClick={openEdit}>Update Details</Button>
+                                <Button onClick={openEdit}>Edit Details</Button>
                                 {statusBadge(selectedMember.status)}
                             </div>
                         </div>
