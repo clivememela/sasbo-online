@@ -231,9 +231,8 @@ export const navItems = [
           {
             title: 'Subscriptions',
             icon: LucideMails,
-            href: '/maintenance/subscription',
+            href: '/maintenance/subscriptions',
             desc: 'Maintain Subscription Table',
-            color: 'text-red-600 dark:text-red-400'
           },
         ],
       },
@@ -377,9 +376,8 @@ export const navItems = [
   {
     title: 'Subscriptions',
     icon: LucideMails,
-    href: '/maintenance/subscription',
-    desc: 'Maintain Subscription Table',
-    color: 'text-red-600 dark:text-red-400'
+    href: '/maintenance/subscriptions',
+    desc: 'Maintain Subscription Table'
   },
   { 
     title: "Reports", 

@@ -10,6 +10,7 @@ import {
     BANK_OPTIONS, BRANCH_OPTIONS, REP_OPTIONS, MEMBER_FIELD_LABEL_MAP,
 } from "../../config/memberConstants.js";
 import { validateSAID } from "../../utils/validateSAID.js";
+import PageTitle from "../../components/common/PageTitle.jsx";
 
 const PAGE_SIZE = memberService.getPageSize();
 
@@ -251,12 +252,8 @@ export default function Members() {
 
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
-            <h2 className="text-3xl text-center mb-2 text-cyan-700 dark:text-cyan-400">
-                Members
-            </h2>
-            <p className="text-center text-gray-600 dark:text-gray-400 mb-2">
-                Search and manage Sasbo member records across all major financial institutions
-            </p>
+
+            <PageTitle title="Members" subtitle="Search and manage Sasbo member records across all major financial institutions" />
 
             <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
@@ -283,10 +280,6 @@ export default function Members() {
                 </div>
 
                 <div className="flex items-end justify-end mt-4 gap-3">
-                    {/*<Button variant="primary" onClick={() => navigate("/members/apply")}>
-                        <UsersRoundIcon size={16} strokeWidth={2} />
-                        Member Application
-                    </Button>*/}
                     <Button variant="primary" onClick={() => navigate("/members/capture")}>
                         <LucideUserRoundPlus size={16} strokeWidth={2} />
                         Capture Member

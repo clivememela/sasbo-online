@@ -24,6 +24,7 @@ import CaptureMember from "./pages/members/CaptureMember.jsx";
 import Maintenance from "./pages/admin/Maintenance.jsx";
 import BankListing from "./pages/bank_branch/BankListing.jsx";
 import RecruiterType from "./pages/maintainance/RecruiterType.jsx";
+import Subscriptions from "./pages/maintainance/Subscriptions.jsx";
 
 
 function App() {
@@ -47,6 +48,8 @@ function App() {
         <Route path="members" element={<MembersPage />} />
         <Route path="members/apply" element={<MembershipApplication />} />
         <Route path="members/capture" element={<CaptureMember />} />
+        <Route path="members/representatives" element={<Representatives />} />
+        <Route path="maintenance/subscriptions" element={<Subscriptions />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="reports/organizer-report" element={<OrganizerReport />} />
         <Route path="reports/forms" element={<Forms />} />

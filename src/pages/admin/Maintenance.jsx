@@ -47,7 +47,7 @@ const maintenance_cards = [
     {
         title: 'Subscriptions',
         icon: LucideMails,
-        href: '/maintenance/subscription',
+        href: '/maintenance/subscriptions',
         desc: 'Maintain Subscription Table',
         color: 'text-red-600 dark:text-red-400'
     },
