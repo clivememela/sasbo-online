@@ -1,9 +1,8 @@
 import { apiUrl } from './api';
 
-const handleResponse = (data) => {
-    console.log("Inspecting payload:", data);
-    if (!data.ok) return data.text().then(msg => Promise.reject(msg || `HTTP ${data.status}`));
-    return data.json();
+const handleResponse = (res) => {
+    if (!res.ok) return res.text().then(msg => Promise.reject(msg || `HTTP ${res.status}`));
+    return res.json();
 };
 
 export const subscriptionsService = {

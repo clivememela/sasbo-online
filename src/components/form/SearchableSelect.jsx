@@ -28,13 +28,13 @@ export default function SearchableSelect({ label, value, onChange, options, plac
     const handleToggle = useCallback(() => setOpen(o => !o), []);
 
     const handleSelect = useCallback((opt) => {
-        onChange({ target: { value: opt.value } });
+        onChange(opt.value);
         setOpen(false);
     }, [onChange]);
 
     const handleClear = useCallback((e) => {
         e.stopPropagation();
-        onChange({ target: { value: '' } });
+        onChange('');
         setSearch('');
     }, [onChange]);
 
