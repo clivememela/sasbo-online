@@ -1,13 +1,15 @@
 import { apiUrl } from './api';
 
-const handleResponse = (r) => {
-    if (!r.ok) return r.text().then(msg => Promise.reject(msg || `HTTP ${r.status}`));
-    return r.json();
+const handleResponse = (data) => {
+    console.log("Inspecting payload:", data);
+    if (!data.ok) return data.text().then(msg => Promise.reject(msg || `HTTP ${data.status}`));
+    return data.json();
 };
 
 export const subscriptionsService = {
     getAll: () =>
-        fetch(apiUrl('/api/subscriptions'), { credentials: 'include' }).then(handleResponse),
+        fetch(apiUrl('/api/subscriptions'), { credentials: 'include' })
+            .then(handleResponse),
 
     create: (name) =>
         fetch(apiUrl('/api/recruiter-types'), {
