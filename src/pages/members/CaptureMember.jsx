@@ -199,10 +199,10 @@ export default function CaptureMember() {
                                 <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} />
                                 <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={BANK_OPTIONS} searchable />
                                 <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} searchable />
+                                <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={paymentTypeOptions} />
                                 <Field label="Bank Account Number" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} />
                                 <Field label="IBT No." value={form.ibtNo} onChange={handleChange("ibtNo")} />
                                 <Field label="Work IBT No." value={form.workIbtNo} onChange={handleChange("workIbtNo")} />
-                                <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={paymentTypeOptions} />
                                 <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, "0"))} disabled={form.paymentType === "Payroll Deduction"} note={form.paymentType === "Payroll Deduction" ? "*debit day done by payroll*" : null} />
                                 <Field label="Bank Address" value={form.bankAddress} onChange={handleChange("bankAddress")} className="md:col-span-2" />
                             </>
@@ -210,13 +210,13 @@ export default function CaptureMember() {
 
                         {activeTab === "representatives" && (
                             <>
-                                <Field label="Recruitment Rep" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} options={REP_OPTIONS} />
-                                <Field label="Area's Rep" value={form.areasRep} onChange={handleChange("areasRep")} options={REP_OPTIONS} />
+                                <Field label="Recruitment Representative" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} options={REP_OPTIONS} />
+                                <Field label="Area's Representative" value={form.areasRep} onChange={handleChange("areasRep")} options={REP_OPTIONS} />
                                 <SectionTitle title="Representative Election Date" />
                                 <RepElectionDatePicker form={form} setForm={setForm} />
 
                                 <SectionTitle title="Roles" />
-                                <Field label="Elected Rep (Y/N)" value={form.electedRep} onChange={handleChange("electedRep")} options={yesNoOptions} />
+                                <Field label="Elected Representative (Y/N)" value={form.electedRep} onChange={handleChange("electedRep")} options={yesNoOptions} />
                                 <Field label="National Councillor (Y/N)" value={form.nationalCouncillor} onChange={handleChange("nationalCouncillor")} options={yesNoOptions} />
                                 <Field label="Branch Committee Member (Y/N)" value={form.branchCommitteeMember} onChange={handleChange("branchCommitteeMember")} options={yesNoOptions} />
                             </>
