@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { Button } from "../../components/form";
@@ -30,15 +30,6 @@ export default function CaptureMember() {
         status: "Active",
         monthlySubscription: "",
         subscriptionFrequency: "Monthly",
-        deathBenefitSubs: "",
-        deathBenefitFrequency: "Monthly",
-        deathBenefitPolicyNo: "",
-        endowmentSubs: "",
-        endowmentFrequency: "Monthly",
-        endowmentPolicyNo: "",
-        benevolentSubs: "",
-        benevolentFrequency: "Monthly",
-        benevolentPolicyNo: "",
         employeeNumber: "",
         jobGrade: "",
         bankName: "",
@@ -187,7 +178,6 @@ export default function CaptureMember() {
                                 <Field label="Cellphone Number" value={form.phone} onChange={handleChange("phone")} />
                                 <Field label="Work Tel" value={form.workTel} onChange={handleChange("workTel")} />
                                 <Field label="Home Tel" value={form.homeTel} onChange={handleChange("homeTel")} />
-                                <Field label="Fax Number" value={form.faxNumber} onChange={handleChange("faxNumber")} />
                                 <Field label="Residential Address" value={form.address} onChange={handleChange("address")} className="md:col-span-2" />
                             </>
                         )}
@@ -198,23 +188,8 @@ export default function CaptureMember() {
                                 <Field label="Status" value={form.status} onChange={handleChange("status")} options={statusOptions} />
 
                                 <SectionTitle title="Sasbo Subscription" />
-                                <Field label="Monthly Subscription" value={form.monthlySubscription} onChange={handleChange("monthlySubscription")} />
+                                <Field label="Monthly Subscription" value={form.monthlySubscription} onChange={handleChange("monthlySubscription")} disabled note="*reviewed annually through business discussions *" />
                                 <Field label="Frequency" value={form.subscriptionFrequency} onChange={handleChange("subscriptionFrequency")} options={frequencyOptions} />
-
-                                <SectionTitle title="Death Benefit Fund" />
-                                <Field label="Benefit Fund Subs" value={form.deathBenefitSubs} onChange={handleChange("deathBenefitSubs")} />
-                                <Field label="Frequency" value={form.deathBenefitFrequency} onChange={handleChange("deathBenefitFrequency")} options={frequencyOptions} />
-                                <Field label="Policy Number" value={form.deathBenefitPolicyNo} onChange={handleChange("deathBenefitPolicyNo")} className="md:col-span-2" />
-
-                                <SectionTitle title="Endowment Fund" />
-                                <Field label="Endowment Fund Subs" value={form.endowmentSubs} onChange={handleChange("endowmentSubs")} />
-                                <Field label="Frequency" value={form.endowmentFrequency} onChange={handleChange("endowmentFrequency")} options={frequencyOptions} />
-                                <Field label="Policy Number" value={form.endowmentPolicyNo} onChange={handleChange("endowmentPolicyNo")} className="md:col-span-2" />
-
-                                <SectionTitle title="Benevolent Fund" />
-                                <Field label="Benevolent Fund Subs" value={form.benevolentSubs} onChange={handleChange("benevolentSubs")} />
-                                <Field label="Frequency" value={form.benevolentFrequency} onChange={handleChange("benevolentFrequency")} options={frequencyOptions} />
-                                <Field label="Policy Number" value={form.benevolentPolicyNo} onChange={handleChange("benevolentPolicyNo")} className="md:col-span-2" />
                             </>
                         )}
 
@@ -223,12 +198,12 @@ export default function CaptureMember() {
                                 <Field label="Employee Number" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} />
                                 <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={BANK_OPTIONS} searchable />
-                                <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} />
+                                <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} searchable />
                                 <Field label="Bank Account Number" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} />
                                 <Field label="IBT No." value={form.ibtNo} onChange={handleChange("ibtNo")} />
                                 <Field label="Work IBT No." value={form.workIbtNo} onChange={handleChange("workIbtNo")} />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={paymentTypeOptions} />
-                                <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, "0"))} />
+                                <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, "0"))} disabled={form.paymentType === "Payroll Deduction"} note={form.paymentType === "Payroll Deduction" ? "*debit day done by payroll*" : null} />
                                 <Field label="Bank Address" value={form.bankAddress} onChange={handleChange("bankAddress")} className="md:col-span-2" />
                             </>
                         )}
@@ -256,7 +231,7 @@ export default function CaptureMember() {
                                 <Field label="Print Label for Postage (Y/N)" value={form.printLabelForPostage} onChange={handleChange("printLabelForPostage")} options={yesNoOptions} />
                                 <Field label="Suspension Code" value={form.suspensionCode} onChange={handleChange("suspensionCode")} options={suspensionCodeOptions} />
                                 <Field label="Use Alternate Address (Y/N)" value={form.useAltAddress} onChange={handleChange("useAltAddress")} options={yesNoOptions} />
-                                <Field label="Deduct Subs through ACB (Y/N)" value={form.deductACB} onChange={handleChange("deductACB")} options={yesNoOptions} />
+                                <Field label="Deduct Subscriptions through ACB (Y/N)" value={form.deductACB} onChange={handleChange("deductACB")} options={yesNoOptions} />
                                 <Field label="Print Membership Cards (Y/N)" value={form.printMembershipCards} onChange={handleChange("printMembershipCards")} options={yesNoOptions} />
                                 <Field label="Home Loan Reduced Rate (Y/N)" value={form.homeLoanReducedRateOption} onChange={handleChange("homeLoanReducedRateOption")} options={yesNoOptions} />
                             </>
@@ -280,9 +255,10 @@ const SectionTitle = ({ title }) => (
     </div>
 );
 
-const fieldCls = (error) =>
-    `w-full rounded-lg px-4 py-2.5 text-sm border bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 transition-all ${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"
-    }`;
+const fieldCls = (error, disabled = false) =>
+    `w-full rounded-lg px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400
+    ${disabled ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed" : "bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white"}
+    ${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"}`;
 
 function RepElectionDatePicker({ form, setForm }) {
     const dateValue =
@@ -304,35 +280,84 @@ function RepElectionDatePicker({ form, setForm }) {
                 type="date"
                 value={dateValue}
                 onChange={handleDateChange}
-                className={fieldCls(null)}
+                className={fieldCls(null, false)}
             />
         </div>
     );
 }
 
-function Field({ label, value, onChange, className = "", options = null, type = "text", error = null, disabled = false, searchable = false }) {
+function SearchableSelect({ value, onChange, options, error, disabled }) {
+    const [query, setQuery] = useState("");
+    const [open, setOpen] = useState(false);
+    const ref = React.useRef(null);
+
+    const filtered = options.filter((o) => o.toLowerCase().includes(query.toLowerCase()));
+
+    const handleSelect = (opt) => {
+        onChange({ target: { value: opt } });
+        setQuery("");
+        setOpen(false);
+    };
+
+    const handleClear = () => {
+        onChange({ target: { value: "" } });
+        setQuery("");
+    };
+
+    React.useEffect(() => {
+        const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    return (
+        <div ref={ref} className="relative">
+            <input
+                type="text"
+                value={open ? query : value || ""}
+                onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+                onFocus={() => setOpen(true)}
+                placeholder="Search..."
+                disabled={disabled}
+                className={fieldCls(error, disabled)}
+            />
+            {value && !open && (
+                <button type="button" onClick={handleClear} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs">✕</button>
+            )}
+            {open && filtered.length > 0 && (
+                <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg text-sm">
+                    {filtered.map((opt) => (
+                        <li key={opt} onMouseDown={() => handleSelect(opt)}
+                            className="px-4 py-2 cursor-pointer hover:bg-cyan-50 dark:hover:bg-cyan-900/30 text-gray-900 dark:text-white">
+                            {opt}
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
+        </div>
+    );
+}
+
+function Field({ label, value, onChange, className = "", options = null, type = "text", error = null, disabled = false, searchable = false, note = null }) {
     return (
         <div className={className}>
             <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
                 {label}
             </label>
+            {note && <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">{note}</p>}
             <div className="relative">
                 {options && searchable ? (
-                    <select value={value || ""} onChange={onChange} className={fieldCls(error)} disabled={disabled}>
-                        <option value="">Select...</option>
-                        {options.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                    </select>
+                    <SearchableSelect value={value} onChange={onChange} options={options} error={error} disabled={disabled} />
                 ) : options ? (
-                    <select value={value || ""} onChange={onChange} className={fieldCls(error)} disabled={disabled}>
+                    <select value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled}>
                         <option value="">Select...</option>
                         {options.map((opt) => (
                             <option key={opt} value={opt}>{opt}</option>
                         ))}
                     </select>
                 ) : (
-                    <input type={type} value={value || ""} onChange={onChange} className={fieldCls(error)} disabled={disabled} />
+                    <input type={type} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled} />
                 )}
                 {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
             </div>

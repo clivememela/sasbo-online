@@ -1,7 +1,7 @@
 export const FREQUENCY_OPTIONS = ['Monthly', 'Quarterly', 'Bi-annually', 'Annually'];
 export const TITLE_OPTIONS = ['Mr', 'Ms', 'Mrs', 'Dr', 'Prof'];
 export const RACE_OPTIONS = ['African', 'White', 'Coloured', 'Indian', 'Other'];
-export const PAYMENT_TYPE_OPTIONS = ['Debit Order', 'Payroll Deduction', 'EFT'];
+export const PAYMENT_TYPE_OPTIONS = ['Debit Order', 'Payroll Deduction'];
 export const STATUS_OPTIONS = ['Active', 'Pending', 'Suspended', 'Resigned', 'Retired'];
 export const IDENTITY_TYPE_OPTIONS = ['I.D. Number', 'Passport Number'];
 export const YES_NO_OPTIONS = ['Y', 'N'];
@@ -51,7 +51,7 @@ export const REP_OPTIONS = [
 
 export const MEMBER_TABS = [
   { id: 'personal', label: 'Personal Information' },
-  { id: 'membership', label: 'Membership & Subs' },
+  { id: 'membership', label: 'Membership & Subscription' },
   { id: 'employment', label: 'Employment & Bank' },
   { id: 'representatives', label: 'Representatives' },
   { id: 'history', label: 'History & Remarks' },
@@ -69,21 +69,14 @@ export const MEMBER_FIELD_LABEL_MAP = {
   cellTel: 'Cell Tel',
   workTel: 'Work Tel',
   homeTel: 'Home Tel',
-  faxNumber: 'Fax Number',
   address: 'Address',
   joinDate: 'Date Joined',
   status: 'Status',
   monthlySubscription: 'Monthly Sasbo Subscription',
   subscriptionFrequency: 'Frequency of Sasbo Subscription',
-  deathBenefitSubs: 'Death Benefit Fund Subs',
-  deathBenefitFrequency: 'Frequency of death benefit fund',
-  deathBenefitPolicyNo: 'Death Benefit Fund Policy Number',
   endowmentSubs: 'Endowment Fund Subs',
   endowmentFrequency: 'Frequency of Endowment Fund',
   endowmentPolicyNo: 'Endowment Fund Policy Number',
-  benevolentSubs: 'Benevolent Fund Subs',
-  benevolentFrequency: 'Frequency of Benevolent Fund',
-  benevolentPolicyNo: 'Benevolent Fund Policy Number',
   lastMonthBalance: 'Last Months Balance',
   currentBalance: 'Current Balance',
   arrearsBalance: 'Arrears Balance',
