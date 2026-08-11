@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState, useRef} from "react";
+import {useEffect, useMemo, useState, useRef, useCallback} from "react";
 import {useNavigate, useLocation} from "react-router-dom";
 import {LucideUserRoundPlus, CheckCircle2, Printer} from "lucide-react";
 import {memberService} from "../../services/memberService.js";
@@ -9,7 +9,7 @@ import {
     MANAGER_OPTIONS, DAY_OPTIONS, MONTH_OPTIONS, YEAR_OPTIONS,
     BANK_OPTIONS, BRANCH_OPTIONS, REP_OPTIONS, MEMBER_FIELD_LABEL_MAP,
 } from "../../config/memberConstants.js";
-import { validateSAID } from "../../utils/validateSAID.js";
+import { validateSAID, formatDate } from "../../utils/validateSAID.js";
 import PageTitle from "../../components/common/PageTitle.jsx";
 
 const PAGE_SIZE = memberService.getPageSize();
@@ -38,8 +38,6 @@ export default function Members() {
     const [selectedMember, setSelectedMember] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState({});
-    const [isLoading, setIsLoading] = useState(false);
-    const [lastSearchTime, setLastSearchTime] = useState(0);
     const [activeTab, setActiveTab] = useState("personal");
     const [showSavedNotification, setShowSavedNotification] = useState(false);
     const [fieldErrors, setFieldErrors] = useState({});
@@ -47,7 +45,7 @@ export default function Members() {
 
     const tabs = [
         {id: "personal", label: "Personal Information"},
-        {id: "membership", label: "Membership & Subs"},
+        {id: "membership", label: "Membership & Subscriptions"},
         {id: "employment", label: "Employment & Bank"},
         {id: "representatives", label: "Representatives"},
         {id: "history", label: "History & Remarks"},
@@ -103,23 +101,19 @@ export default function Members() {
         }
     };
 
-    const handleEditChange = (field) => (event) => {
-        const value = event.target.value;
+    const handleEditChange = useCallback((field) => (event) => {
+        const value = event && event.target ? event.target.value : event;
         setEditForm((prev) => ({...prev, [field]: value}));
-
         setFieldErrors(prev => {
             const newErrors = {...prev};
             delete newErrors[field];
+            if (field === "identityNumber") {
+                const error = validateSAID(value);
+                if (error) newErrors[field] = error;
+            }
             return newErrors;
         });
-
-        if (field === "identityNumber") {
-            const error = validateSAID(value);
-            if (error) {
-                setFieldErrors(prev => ({...prev, [field]: error}));
-            }
-        }
-    };
+    }, []);
 
     const handleSaveChanges = () => {
         // Prevent saving if there are validation errors
@@ -163,10 +157,11 @@ export default function Members() {
         setTimeout(() => setShowSavedNotification(false), 3000);
     };
 
-    const handleInputChange = (field) => (event) => {
-        setFilters((prev) => ({...prev, [field]: event.target.value}));
+    const handleInputChange = useCallback((field) => (event) => {
+        const value = event && event.target ? event.target.value : event;
+        setFilters((prev) => ({...prev, [field]: value}));
         setPage(1);
-    };
+    }, []);
 
     const [membersList, setMembersList] = useState([]);
 
@@ -176,60 +171,28 @@ export default function Members() {
 
     const filteredMembers = useMemo(() => {
         const q = (s) => (s || "").trim().toLowerCase();
-        const titleQ = q(filters.title);
-        const empNoQ = q(filters.employeeNumber);
-        const memNoQ = q(filters.membershipNumber);
-        const initialsQ = q(filters.initials);
-        const surnameQ = q(filters.surname);
-        const idNoQ = q(filters.identityNumber);
-        const bankQ = q(filters.bankName);
-        const branchQ = q(filters.branch);
-        const bankAccQ = q(filters.bankAccountNumber);
-        const phoneQ = q(filters.phone);
-        const emailQ = q(filters.email);
-        const statusQ = q(filters.status);
-        const raceQ = q(filters.race);
-
-        // Trigger loading simulation if filters changed
-        const hasFilters = Object.values(filters).some(v => (v || "").trim() !== "");
-        if (hasFilters) {
-            setLastSearchTime(Date.now());
-        }
-
         const predicates = [];
-        if (titleQ) predicates.push(m => (m.title ?? "").toLowerCase().includes(titleQ));
-        if (empNoQ) predicates.push(m => (m.employeeNumber ?? "").toLowerCase().includes(empNoQ));
-        if (memNoQ) predicates.push(m => (m.membershipNumber ?? "").toLowerCase().includes(memNoQ));
-        if (initialsQ) predicates.push(m => (m.initials ?? "").toLowerCase().includes(initialsQ));
-        if (surnameQ) predicates.push(m => (m.surname ?? "").toLowerCase().includes(surnameQ));
-        if (idNoQ) predicates.push(m => (m.identityNumber ?? "").toLowerCase().includes(idNoQ));
-        if (bankQ) predicates.push(m => (m.bankName ?? "").toLowerCase().includes(bankQ));
-        if (branchQ) predicates.push(m => (m.branch ?? "").toLowerCase().includes(branchQ));
-        if (bankAccQ) predicates.push(m => (m.bankAccountNumber ?? "").toLowerCase().includes(bankAccQ));
-        if (phoneQ) predicates.push(m => (m.phone ?? "").toLowerCase().includes(phoneQ));
-        if (emailQ) predicates.push(m => (m.email ?? "").toLowerCase().includes(emailQ));
-        if (raceQ) predicates.push(m => (m.race ?? "").toLowerCase().includes(raceQ));
-        if (statusQ) predicates.push(m => (m.status ?? "").toLowerCase().includes(statusQ));
-
+        const titleQ = q(filters.title); if (titleQ) predicates.push(m => (m.title ?? "").toLowerCase().includes(titleQ));
+        const empNoQ = q(filters.employeeNumber); if (empNoQ) predicates.push(m => (m.employeeNumber ?? "").toLowerCase().includes(empNoQ));
+        const memNoQ = q(filters.membershipNumber); if (memNoQ) predicates.push(m => (m.membershipNumber ?? "").toLowerCase().includes(memNoQ));
+        const initialsQ = q(filters.initials); if (initialsQ) predicates.push(m => (m.initials ?? "").toLowerCase().includes(initialsQ));
+        const surnameQ = q(filters.surname); if (surnameQ) predicates.push(m => (m.surname ?? "").toLowerCase().includes(surnameQ));
+        const idNoQ = q(filters.identityNumber); if (idNoQ) predicates.push(m => (m.identityNumber ?? "").toLowerCase().includes(idNoQ));
+        const bankQ = q(filters.bankName); if (bankQ) predicates.push(m => (m.bankName ?? "").toLowerCase().includes(bankQ));
+        const branchQ = q(filters.branch); if (branchQ) predicates.push(m => (m.branch ?? "").toLowerCase().includes(branchQ));
+        const bankAccQ = q(filters.bankAccountNumber); if (bankAccQ) predicates.push(m => (m.bankAccountNumber ?? "").toLowerCase().includes(bankAccQ));
+        const phoneQ = q(filters.phone); if (phoneQ) predicates.push(m => (m.phone ?? "").toLowerCase().includes(phoneQ));
+        const emailQ = q(filters.email); if (emailQ) predicates.push(m => (m.email ?? "").toLowerCase().includes(emailQ));
+        const raceQ = q(filters.race); if (raceQ) predicates.push(m => (m.race ?? "").toLowerCase().includes(raceQ));
+        const statusQ = q(filters.status); if (statusQ) predicates.push(m => (m.status ?? "").toLowerCase().includes(statusQ));
         if (predicates.length === 0) return membersList;
-
         return membersList.filter(m => predicates.every(pred => pred(m)));
     }, [filters, membersList]);
 
-    useEffect(() => {
-        if (lastSearchTime > 0) {
-            setIsLoading(true);
-            const timer = setTimeout(() => {
-                setIsLoading(false);
-            }, 600);
-            return () => clearTimeout(timer);
-        }
-    }, [lastSearchTime]);
-
-    const totalPages = Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE));
+    const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE)), [filteredMembers]);
     const startIndex = (page - 1) * PAGE_SIZE;
     const endIndex = Math.min(startIndex + PAGE_SIZE, filteredMembers.length);
-    const visibleMembers = filteredMembers.slice(startIndex, endIndex);
+    const visibleMembers = useMemo(() => filteredMembers.slice(startIndex, endIndex), [filteredMembers, startIndex, endIndex]);
 
     const handleClear = () => {
         setFilters({
@@ -307,14 +270,6 @@ export default function Members() {
                 </div>
 
                 <div className="mt-4 overflow-hidden rounded-xl border border-transparent max-h-[60vh] overflow-y-auto relative print-area">
-                    {isLoading && (
-                        <div className="absolute inset-0 bg-white/60 dark:bg-gray-800/60 z-20 flex items-center justify-center backdrop-blur-[1px]">
-                            <div className="flex flex-col items-center gap-2">
-                                <div className="w-8 h-8 border-4 border-cyan-600 border-t-transparent rounded-full animate-spin"></div>
-                                <p className="text-sm font-medium text-cyan-700 dark:text-cyan-400">Retrieving members...</p>
-                            </div>
-                        </div>
-                    )}
                     {/* Results header aligned to the requested order */}
                     <div
                         className="grid grid-cols-8 gap-4 px-4 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300 sticky top-0 z-10">
@@ -518,10 +473,6 @@ export default function Members() {
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("homeTel")}
                                         />
-                                        <Detail label="Fax Number" value={isEditing ? editForm.faxNumber : (selectedMember.faxNumber || "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("faxNumber")}
-                                        />
                                         <Detail label="Address" value={isEditing ? editForm.address : (selectedMember.address || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("address")}
@@ -534,12 +485,7 @@ export default function Members() {
                                     <>
                                         <Detail label="Membership Number" value={selectedMember.membershipNumber} isEditing={false} />
                                         <Detail label="Member ID" value={selectedMember.id} isEditing={false} />
-                                        <Detail label="Date Joined"
-                                                value={isEditing ? editForm.joinDate : (selectedMember.joinDate || "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("joinDate")}
-                                                type="date"
-                                        />
+                                        <Detail label="Date Joined" value={formatDate(selectedMember.joinDate)} isEditing={false} />
                                         <Detail label="Status" value={isEditing ? editForm.status : (selectedMember.status || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("status")}
@@ -552,65 +498,11 @@ export default function Members() {
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("monthlySubscription")}
                                         />
-                                        <Detail label="Frequency of Sasbo Subscription"
+                                        <Detail label="Sasbo Subscription"
                                                 value={isEditing ? editForm.subscriptionFrequency : (selectedMember.subscriptionFrequency ?? "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("subscriptionFrequency")}
                                                 options={frequencyOptions}
-                                        />
-
-                                        <div className="md:col-span-2 mt-4 border-b pb-1 font-semibold text-cyan-700 dark:text-cyan-400">Death Benefit Fund</div>
-                                        <Detail label="Death Benefit Fund Subs" value={isEditing ? editForm.deathBenefitSubs : (selectedMember.deathBenefitSubs ?? "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("deathBenefitSubs")}
-                                        />
-                                        <Detail label="Frequency of death benefit fund"
-                                                value={isEditing ? editForm.deathBenefitFrequency : (selectedMember.deathBenefitFrequency ?? "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("deathBenefitFrequency")}
-                                                options={frequencyOptions}
-                                        />
-                                        <Detail label="Death Benefit Fund Policy Number"
-                                                value={isEditing ? editForm.deathBenefitPolicyNo : (selectedMember.deathBenefitPolicyNo || "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("deathBenefitPolicyNo")}
-                                                className="md:col-span-2"
-                                        />
-
-                                        <div className="md:col-span-2 mt-4 border-b pb-1 font-semibold text-cyan-700 dark:text-cyan-400">Endowment Fund</div>
-                                        <Detail label="Endowment Fund Subs" value={isEditing ? editForm.endowmentSubs : (selectedMember.endowmentSubs ?? "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("endowmentSubs")}
-                                        />
-                                        <Detail label="Frequency of Endowment Fund"
-                                                value={isEditing ? editForm.endowmentFrequency : (selectedMember.endowmentFrequency ?? "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("endowmentFrequency")}
-                                                options={frequencyOptions}
-                                        />
-                                        <Detail label="Endowment Fund Policy Number"
-                                                value={isEditing ? editForm.endowmentPolicyNo : (selectedMember.endowmentPolicyNo || "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("endowmentPolicyNo")}
-                                                className="md:col-span-2"
-                                        />
-
-                                        <div className="md:col-span-2 mt-4 border-b pb-1 font-semibold text-cyan-700 dark:text-cyan-400">Benevolent Fund</div>
-                                        <Detail label="Benevolent Fund Subs" value={isEditing ? editForm.benevolentSubs : (selectedMember.benevolentSubs ?? "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("benevolentSubs")}
-                                        />
-                                        <Detail label="Frequency of Benevolent Fund"
-                                                value={isEditing ? editForm.benevolentFrequency : (selectedMember.benevolentFrequency ?? "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("benevolentFrequency")}
-                                                options={frequencyOptions}
-                                        />
-                                        <Detail label="Benevolent Fund Policy Number"
-                                                value={isEditing ? editForm.benevolentPolicyNo : (selectedMember.benevolentPolicyNo || "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("benevolentPolicyNo")}
-                                                className="md:col-span-2"
                                         />
 
                                         <div className="md:col-span-2 mt-4 border-b pb-1 font-semibold text-cyan-700 dark:text-cyan-400">Balances</div>
@@ -626,10 +518,7 @@ export default function Members() {
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("arrearsBalance")}
                                         />
-                                        <Detail label="Date Last Changed" value={isEditing ? editForm.dateLastChanged : (selectedMember.dateLastChanged || "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("dateLastChanged")}
-                                        />
+                                        <Detail label="Date Last Changed" value={formatDate(selectedMember.dateLastChanged)} isEditing={false} />
                                     </>
                                 )}
 
@@ -827,6 +716,11 @@ export default function Members() {
         </div>
     );
 }
+
+const normalizeDate = (val) => {
+    if (!val || val === "-") return "";
+    return val.toString().replace(/,/g, "-").split("-").map(p => p.padStart(2, "0")).join("-");
+};
 
 const fieldCls = (error) =>
     `w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 ${

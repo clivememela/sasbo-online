@@ -24,7 +24,6 @@ export default function CaptureMember() {
         phone: "",
         workTel: "",
         homeTel: "",
-        faxNumber: "",
         address: "",
         joinDate: new Date().toISOString().split("T")[0],
         status: "Active",

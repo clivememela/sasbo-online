@@ -26,3 +26,18 @@ export function validateSAID(id) {
 
   return null;
 }
+
+/**
+ * Formats a date value (ISO string "yyyy-mm-dd" or array [yyyy, mm, dd]) to "dd-mm-yyyy".
+ * @param {string|number[]} date
+ * @returns {string}
+ */
+export function formatDate(date) {
+  if (!date) return "-";
+  if (Array.isArray(date)) {
+    const [y, m, d] = date;
+    return `${String(d).padStart(2, "0")}-${String(m).padStart(2, "0")}-${y}`;
+  }
+  const [y, m, d] = String(date).split("-");
+  return `${d}-${m}-${y}`;
+}
