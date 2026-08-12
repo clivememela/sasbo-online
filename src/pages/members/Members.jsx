@@ -5,7 +5,7 @@ import {memberService} from "../../services/memberService.js";
 import { TextInput, SearchableSelect, Button } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
-    STATUS_OPTIONS, YES_NO_OPTIONS, SUSPENSION_CODE_OPTIONS, JOB_GRADE_OPTIONS,
+    STATUS_OPTIONS, YES_NO_OPTIONS, IDENTITY_TYPE_OPTIONS, SUSPENSION_CODE_OPTIONS, JOB_GRADE_OPTIONS,
     MANAGER_OPTIONS, DAY_OPTIONS, MONTH_OPTIONS, YEAR_OPTIONS,
     BANK_OPTIONS, BRANCH_OPTIONS, REP_OPTIONS, MEMBER_FIELD_LABEL_MAP,
 } from "../../config/memberConstants.js";
@@ -23,6 +23,7 @@ export default function Members() {
         membershipNumber: "",
         initials: "",
         surname: "",
+        identityType: "",
         identityNumber: "",
         bankName: location.state?.filters?.bankName || "",
         branch: location.state?.filters?.branch || "",
@@ -53,6 +54,7 @@ export default function Members() {
 
     const frequencyOptions = FREQUENCY_OPTIONS;
     const titleOptions = TITLE_OPTIONS;
+    const idTypeOptions = IDENTITY_TYPE_OPTIONS;
     const raceOptions = RACE_OPTIONS;
     const paymentTypeOptions = PAYMENT_TYPE_OPTIONS;
     const statusOptions = STATUS_OPTIONS;
@@ -62,6 +64,7 @@ export default function Members() {
     const branchOptions = BRANCH_OPTIONS;
     const jobGradeOptions = JOB_GRADE_OPTIONS;
     const managerOptions = MANAGER_OPTIONS;
+    const identityTypeOptions = IDENTITY_TYPE_OPTIONS;
     const repOptions = REP_OPTIONS;
     const dayOptions = DAY_OPTIONS;
     const monthOptions = MONTH_OPTIONS;
@@ -177,6 +180,7 @@ export default function Members() {
         const memNoQ = q(filters.membershipNumber); if (memNoQ) predicates.push(m => (m.membershipNumber ?? "").toLowerCase().includes(memNoQ));
         const initialsQ = q(filters.initials); if (initialsQ) predicates.push(m => (m.initials ?? "").toLowerCase().includes(initialsQ));
         const surnameQ = q(filters.surname); if (surnameQ) predicates.push(m => (m.surname ?? "").toLowerCase().includes(surnameQ));
+        const idTypeQ = q(filters.identityType); if (idTypeQ) predicates.push(m => (m.identityType ?? "").toLowerCase().includes(idTypeQ));
         const idNoQ = q(filters.identityNumber); if (idNoQ) predicates.push(m => (m.identityNumber ?? "").toLowerCase().includes(idNoQ));
         const bankQ = q(filters.bankName); if (bankQ) predicates.push(m => (m.bankName ?? "").toLowerCase().includes(bankQ));
         const branchQ = q(filters.branch); if (branchQ) predicates.push(m => (m.branch ?? "").toLowerCase().includes(branchQ));
@@ -201,6 +205,7 @@ export default function Members() {
             membershipNumber: "",
             initials: "",
             surname: "",
+            identityType: "",
             identityNumber: "",
             bankName: "",
             branch: "",
@@ -226,6 +231,14 @@ export default function Members() {
                     <TextInput label="Membership Number" value={filters.membershipNumber} onChange={handleInputChange("membershipNumber")} placeholder="Search by membership number" />
                     <TextInput label="Initials" value={filters.initials} onChange={handleInputChange("initials")} placeholder="Search by initials" />
                     <TextInput label="Surname" value={filters.surname} onChange={handleInputChange("surname")} placeholder="Search by surname" />
+                    <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <span>Identity Type</span>
+                        <select value={filters.identityType} onChange={handleInputChange("identityType")}
+                            className="rounded-lg px-3 py-2 text-sm font-normal normal-case tracking-normal border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                            <option value="">All Types</option>
+                            {identityTypeOptions.map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                    </div>
                     <TextInput label="Identity Number" value={filters.identityNumber} onChange={handleInputChange("identityNumber")} placeholder="Search by identity number" />
                     <SearchableSelect label="Bank Name" value={filters.bankName} onChange={handleInputChange("bankName")} placeholder="All Banks"
                         options={[{ value: '', label: 'All BankBranch' }, ...bankOptions.map(b => ({ value: b, label: b }))]} />
@@ -447,10 +460,16 @@ export default function Members() {
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("surname")}
                                         />
-                                        <Detail label="I.D. Number" value={isEditing ? editForm.identityNumber : (selectedMember.identityNumber || "-")}
+                                        <Detail label="Identity Type" value={isEditing ? editForm.identityType : (selectedMember.identityType || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("identityType")}
+                                                options={idTypeOptions}
+                                        />
+                                        <Detail label={isEditing && !editForm.identityType ? "Select Identity Type before entering" : (editForm.identityType || "Identity Number")} value={isEditing ? editForm.identityNumber : (selectedMember.identityNumber || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("identityNumber")}
                                                 error={fieldErrors.identityNumber}
+                                                disabled={isEditing && !editForm.identityType}
                                         />
                                         <Detail label="Race" value={isEditing ? editForm.race : (selectedMember.race || "-")}
                                                 isEditing={isEditing}
@@ -722,35 +741,85 @@ const normalizeDate = (val) => {
     return val.toString().replace(/,/g, "-").split("-").map(p => p.padStart(2, "0")).join("-");
 };
 
-const fieldCls = (error) =>
-    `w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 ${
-        error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"
-    }`;
+const fieldCls = (error, disabled = false) =>
+    `w-full rounded-lg px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400
+    ${disabled ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed" : "bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white"}
+    ${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"}`;
 
-function Detail({label, value, isEditing, onChange, className = "", options = null, type = "text", error = null, searchable = false}) {
+function DetailSearchableSelect({ value, onChange, options, error, disabled }) {
+    const [query, setQuery] = useState("");
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+    const filtered = options.filter(o => o.toLowerCase().includes(query.toLowerCase()));
+
+    const handleSelect = (opt) => {
+        onChange({ target: { value: opt } });
+        setQuery("");
+        setOpen(false);
+    };
+
+    const handleClear = () => {
+        onChange({ target: { value: "" } });
+        setQuery("");
+    };
+
+    useEffect(() => {
+        const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    return (
+        <div ref={ref} className="relative">
+            <input
+                type="text"
+                value={open ? query : value || ""}
+                onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+                onFocus={() => setOpen(true)}
+                placeholder="Search..."
+                disabled={disabled}
+                className={fieldCls(error, disabled)}
+            />
+            {value && !open && (
+                <button type="button" onClick={handleClear} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs">✕</button>
+            )}
+            {open && filtered.length > 0 && (
+                <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg text-sm">
+                    {filtered.map(opt => (
+                        <li key={opt} onMouseDown={() => handleSelect(opt)}
+                            className="px-4 py-2 cursor-pointer hover:bg-cyan-50 dark:hover:bg-cyan-900/30 text-gray-900 dark:text-white">
+                            {opt}
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
+        </div>
+    );
+}
+
+function Detail({label, value, isEditing, onChange, className = "", options = null, type = "text", error = null, searchable = false, disabled = false, note = null}) {
     return (
         <div className={className}>
-            <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
                 {label}
             </label>
+            {note && <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">{note}</p>}
             {isEditing ? (
-                <div className="mt-1">
+                <div className="relative">
                     {options && searchable ? (
-                        <SearchableSelect
-                            value={value || ''}
-                            onChange={onChange}
-                            options={[{ value: '', label: 'Select...' }, ...options.map(o => ({ value: o, label: o }))]}
-                        />
+                        <DetailSearchableSelect value={value} onChange={onChange} options={options} error={error} disabled={disabled} />
                     ) : options ? (
-                        <SearchableSelect
-                            value={value || ''}
-                            onChange={onChange}
-                            options={[{ value: '', label: 'Select...' }, ...options.map(o => ({ value: o, label: o }))]}
-                        />
+                        <select value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled}>
+                            <option value="">Select...</option>
+                            {options.map(opt => (
+                                <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                        </select>
                     ) : (
-                        <input type={type} value={value || ""} onChange={onChange} className={fieldCls(error)} />
+                        <input type={type} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled} />
                     )}
-                    {error && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{error}</p>}
+                    {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
                 </div>
             ) : (
                 <p className="mt-0.5 text-sm font-semibold text-gray-800 dark:text-gray-200">{value}</p>
