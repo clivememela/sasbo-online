@@ -28,6 +28,16 @@ export function validateSAID(id) {
 }
 
 /**
+ * Validates an email address.
+ * @param {string} email
+ * @returns {string|null} error message or null if valid
+ */
+export function validateEmail(email) {
+  if (!email) return null;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? null : 'Invalid email specified';
+}
+
+/**
  * Formats a date value (ISO string "yyyy-mm-dd" or array [yyyy, mm, dd]) to "dd-mm-yyyy".
  * @param {string|number[]} date
  * @returns {string}

@@ -9,7 +9,7 @@ import {
     MANAGER_OPTIONS, DAY_OPTIONS, MONTH_OPTIONS, YEAR_OPTIONS,
     BANK_OPTIONS, BRANCH_OPTIONS, REP_OPTIONS, MEMBER_FIELD_LABEL_MAP,
 } from "../../config/memberConstants.js";
-import { validateSAID, formatDate } from "../../utils/validateSAID.js";
+import { validateSAID, validateEmail, formatDate } from "../../utils/validateSAID.js";
 import PageTitle from "../../components/common/PageTitle.jsx";
 
 const PAGE_SIZE = memberService.getPageSize();
@@ -112,6 +112,10 @@ export default function Members() {
             delete newErrors[field];
             if (field === "identityNumber") {
                 const error = validateSAID(value);
+                if (error) newErrors[field] = error;
+            }
+            if (field === "email") {
+                const error = validateEmail(value);
                 if (error) newErrors[field] = error;
             }
             return newErrors;
@@ -479,6 +483,7 @@ export default function Members() {
                                         <Detail label="Email Address" value={isEditing ? editForm.email : (selectedMember.email || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("email")}
+                                                error={fieldErrors.email}
                                                 className="break-all text-cyan-600 dark:text-cyan-400"/>
                                         <Detail label="Cell Tel" value={isEditing ? (editForm.phone || editForm.cellTel) : (selectedMember.phone || selectedMember.cellTel || "-")}
                                                 isEditing={isEditing}

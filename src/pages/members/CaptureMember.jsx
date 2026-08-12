@@ -8,7 +8,7 @@ import {
     JOB_GRADE_OPTIONS, MANAGER_OPTIONS, MEMBER_TABS,
     BANK_OPTIONS, BRANCH_OPTIONS, REP_OPTIONS,
 } from "../../config/memberConstants.js";
-import { validateSAID } from "../../utils/validateSAID.js";
+import { validateSAID, validateEmail } from "../../utils/validateSAID.js";
 
 export default function CaptureMember() {
     const [activeTab, setActiveTab] = useState("personal");
@@ -93,6 +93,10 @@ export default function CaptureMember() {
                 setFieldErrors((prev) => ({ ...prev, [field]: error }));
             }
         }
+        if (field === "email") {
+            const error = validateEmail(value);
+            if (error) setFieldErrors((prev) => ({ ...prev, [field]: error }));
+        }
     };
 
     const handleSave = () => {
@@ -173,7 +177,7 @@ export default function CaptureMember() {
                                     disabled={!form.identityType}
                                 />
                                 <Field label="Race" value={form.race} onChange={handleChange("race")} options={raceOptions} />
-                                <Field label="Email Address" value={form.email} onChange={handleChange("email")} type="email" />
+                                <Field label="Email Address" value={form.email} onChange={handleChange("email")} type="email" error={fieldErrors.email} />
                                 <Field label="Cellphone Number" value={form.phone} onChange={handleChange("phone")} />
                                 <Field label="Work Tel" value={form.workTel} onChange={handleChange("workTel")} />
                                 <Field label="Home Tel" value={form.homeTel} onChange={handleChange("homeTel")} />

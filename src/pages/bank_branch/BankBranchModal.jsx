@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, Button } from "../../components/form";
+import { validateEmail } from "../../utils/validateSAID.js";
 
 const EMPTY = {
   bankName: "", bankAbbreviation: "", branch: "", branchCode: "", area: "",
@@ -18,14 +19,22 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
   const isEditMode = Boolean(selectedBank) && isEditing;
   const [form, setForm] = useState(selectedBank || EMPTY);
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setForm(selectedBank || EMPTY);
     setIsEditing(false);
+    setFieldErrors({});
   }, [selectedBank]);
 
-  const set = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  const set = (field) => (e) => {
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    if (field === "email") {
+      const err = validateEmail(e.target.value);
+      setFieldErrors((prev) => ({ ...prev, email: err || undefined }));
+    }
+  };
 
   const handleCancel = () => {
     setError(null);
@@ -45,6 +54,10 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
 
     if (!bankName || !branch) {
       setError("Bank Name and Branch are required.");
+      return;
+    }
+    if (fieldErrors.email) {
+      setError("Please fix the errors before saving.");
       return;
     }
     setLoading(true);
@@ -148,7 +161,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <TextInput label="Phone Number" value={form.phoneNumber} onChange={set("phoneNumber")} placeholder="Phone" />
               <TextInput label="Fax" value={form.fax} onChange={set("fax")} placeholder="Fax" />
-              <TextInput label="Email" value={form.email} onChange={set("email")} placeholder="Email" type="email" />
+              <TextInput label="Email" value={form.email} onChange={set("email")} placeholder="Email" type="email" error={fieldErrors.email} />
               <TextInput label="Manager Name" value={form.managerName} onChange={set("managerName")} placeholder="Manager" />
             </div>
           </section>

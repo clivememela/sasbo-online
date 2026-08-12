@@ -6,6 +6,7 @@ import { memberService } from '../../services/memberService.js';
 import { representativeService } from '../../services/representativeService.js';
 import { bankService } from '../../services/bankService.js';
 import { locationService } from '../../services/locationService.js';
+import { validateEmail } from '../../utils/validateSAID.js';
 
 const PAGE_SIZE = 20;
 
@@ -27,6 +28,7 @@ export function Representatives() {
     const [selectedRepDetail, setSelectedRepDetail] = useState(null);
     const [editingRep, setEditingRep] = useState(false);
     const [editRepFields, setEditRepFields] = useState({name: '', email: '', phone: ''});
+    const [editRepErrors, setEditRepErrors] = useState({});
     const [repSearch, setRepSearch] = useState({membershipNumber: '', name: '', bank: '', branch: '', status: ''});
 
     const refreshAll = useCallback(() => Promise.all([
@@ -375,6 +377,7 @@ export function Representatives() {
                                                     email: rep?.email || '',
                                                     phone: rep?.phone || ''
                                                 });
+                                                setEditRepErrors({});
                                             }}
                                             className="p-1 rounded-md text-cyan-500 hover:bg-cyan-50 hover:text-cyan-700 dark:hover:bg-cyan-900/20 transition">
                                             <Eye size={14}/>
@@ -576,6 +579,7 @@ export function Representatives() {
                                                 email: selectedRepDetail.email || '',
                                                 phone: selectedRepDetail.phone || ''
                                             });
+                                            setEditRepErrors({});
                                             setEditingRep(true);
                                         }}
                                         >
@@ -599,9 +603,13 @@ export function Representatives() {
                                     <label
                                         className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Email</label>
                                     <input value={editRepFields.email}
-                                           onChange={e => setEditRepFields(p => ({...p, email: e.target.value}))}
+                                           onChange={e => {
+                                               setEditRepFields(p => ({...p, email: e.target.value}));
+                                               setEditRepErrors(p => ({...p, email: validateEmail(e.target.value) || undefined}));
+                                           }}
                                            type="email"
-                                           className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"/>
+                                           className={`mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 ${editRepErrors.email ? 'border-red-500 dark:border-red-400' : 'border-gray-200 dark:border-gray-700'}`}/>
+                                    {editRepErrors.email && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{editRepErrors.email}</p>}
                                 </div>
                                 <div>
                                     <label
@@ -628,7 +636,7 @@ export function Representatives() {
                             {editingRep ? (
                                 <>
                                     <Button onClick={handleCancelEdit}>Cancel</Button>
-                                    <Button variant="primary" disabled={!editRepFields.name.trim() || saving}
+                                    <Button variant="primary" disabled={!editRepFields.name.trim() || saving || !!editRepErrors.email}
                                             onClick={async () => {
                                                 setSaving(true);
                                                 try {
