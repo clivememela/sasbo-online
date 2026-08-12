@@ -98,8 +98,6 @@ export const MEMBER_FIELD_LABEL_MAP = {
   repElectionMonth: 'Sasbo Rep Election Month',
   repElectionYear: 'Sasbo Rep Election Year',
   electedRep: 'Elected Sasbo Representative (Y/N)',
-  nationalCouncillor: 'National Councillor (Y/N)',
-  branchCommitteeMember: 'Branch Committee Member (Y/N)',
   remarks: 'Remarks / Comments',
   remarks2: '2nd Remarks Field',
   remarks3: '3rd Remarks Field',

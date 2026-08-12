@@ -11,12 +11,12 @@ export const representativeService = {
       .then(handleResponse)
       .catch(err => { console.error('Failed to fetch representatives:', err); throw err; }),
 
-  create: (name) =>
+  create: (memberId, name) =>
     fetch(apiUrl('/api/representatives'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ memberId, name }),
     }).then(handleResponse),
 
   update: (id, data) =>

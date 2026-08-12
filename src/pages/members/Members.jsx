@@ -29,7 +29,8 @@ export default function Members() {
         branch: location.state?.filters?.branch || "",
         bankAccountNumber: "",
         phone: "",
-        email: "",
+        personalEmail: "",
+        workEmail: "",
         status: "",
         race: "",
     });
@@ -114,7 +115,7 @@ export default function Members() {
                 const error = validateSAID(value);
                 if (error) newErrors[field] = error;
             }
-            if (field === "email") {
+            if (field === "personalEmail" || field === "workEmail") {
                 const error = validateEmail(value);
                 if (error) newErrors[field] = error;
             }
@@ -190,7 +191,8 @@ export default function Members() {
         const branchQ = q(filters.branch); if (branchQ) predicates.push(m => (m.branch ?? "").toLowerCase().includes(branchQ));
         const bankAccQ = q(filters.bankAccountNumber); if (bankAccQ) predicates.push(m => (m.bankAccountNumber ?? "").toLowerCase().includes(bankAccQ));
         const phoneQ = q(filters.phone); if (phoneQ) predicates.push(m => (m.phone ?? "").toLowerCase().includes(phoneQ));
-        const emailQ = q(filters.email); if (emailQ) predicates.push(m => (m.email ?? "").toLowerCase().includes(emailQ));
+        const personalEmailQ = q(filters.personalEmail); if (personalEmailQ) predicates.push(m => (m.personalEmail ?? "").toLowerCase().includes(personalEmailQ));
+        const workEmailQ = q(filters.workEmail); if (workEmailQ) predicates.push(m => (m.workEmail ?? "").toLowerCase().includes(workEmailQ));
         const raceQ = q(filters.race); if (raceQ) predicates.push(m => (m.race ?? "").toLowerCase().includes(raceQ));
         const statusQ = q(filters.status); if (statusQ) predicates.push(m => (m.status ?? "").toLowerCase().includes(statusQ));
         if (predicates.length === 0) return membersList;
@@ -215,7 +217,8 @@ export default function Members() {
             branch: "",
             bankAccountNumber: "",
             phone: "",
-            email: "",
+            personalEmail: "",
+            workEmail: "",
             status: "",
             race: "",
         });
@@ -249,7 +252,8 @@ export default function Members() {
                     <TextInput label="Branch" value={filters.branch} onChange={handleInputChange("branch")} placeholder="Search by branch" />
                     <TextInput label="Bank Account Number" value={filters.bankAccountNumber} onChange={handleInputChange("bankAccountNumber")} placeholder="Search by bank account number" />
                     <TextInput label="Cellphone Number" value={filters.phone} onChange={handleInputChange("phone")} placeholder="Search by cellphone number" />
-                    <TextInput label="Email Address" value={filters.email} onChange={handleInputChange("email")} placeholder="Search by email address" />
+                    <TextInput label="Personal Email" value={filters.personalEmail} onChange={handleInputChange("personalEmail")} placeholder="Search by personal email" />
+                    <TextInput label="Work Email" value={filters.workEmail} onChange={handleInputChange("workEmail")} placeholder="Search by work email" />
                     <SearchableSelect label="Status" value={filters.status} onChange={handleInputChange("status")} placeholder="All Statuses"
                         options={[{value:"",label:"All Statuses"}, ...statusOptions.map(o=>({value:o,label:o}))]} />
                     <SearchableSelect label="Race" value={filters.race || ""} onChange={handleInputChange("race")} placeholder="All Races"
@@ -292,7 +296,7 @@ export default function Members() {
                         className="grid grid-cols-8 gap-4 px-4 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300 sticky top-0 z-10">
                         <div>Membership Number</div>
                         <div>Member (Title, Initials, Surname)</div>
-                        <div>Member Email</div>
+                        <div>Preferred Email</div>
                         <div>Cellphone Number</div>
                         <div>ID Number</div>
                         <div>Bank</div>
@@ -316,7 +320,9 @@ export default function Members() {
                                              title={`${m.title ? m.title + " " : ""}${m.initials} ${m.surname}`}>
                                             {m.title ? `${m.title} ` : ""}{m.initials} {m.surname}
                                         </div>
-                                        <div className="truncate" title={m.email}>{m.email}</div>
+                                        <div className="truncate" title={m.preferredEmail === "work" ? m.workEmail : m.personalEmail}>
+                                            {m.preferredEmail === "work" ? m.workEmail : m.personalEmail}
+                                        </div>
                                         <div className="truncate" title={m.phone}>{m.phone}</div>
                                         <div className="truncate" title={m.identityNumber}>{m.identityNumber}</div>
                                         <div>{m.bankName}</div>
@@ -480,11 +486,50 @@ export default function Members() {
                                                 onChange={handleEditChange("race")}
                                                 options={raceOptions}
                                         />
-                                        <Detail label="Email Address" value={isEditing ? editForm.email : (selectedMember.email || "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("email")}
-                                                error={fieldErrors.email}
-                                                className="break-all text-cyan-600 dark:text-cyan-400"/>
+                                        <div>
+                                            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Personal Email</label>
+                                            {isEditing ? (
+                                                <>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="email" value={editForm.personalEmail || ""} onChange={handleEditChange("personalEmail")}
+                                                            className={fieldCls(fieldErrors.personalEmail)} />
+                                                        <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
+                                                            <input type="checkbox" checked={editForm.preferredEmail === "personal"}
+                                                                onChange={() => setEditForm(prev => ({...prev, preferredEmail: "personal"}))}
+                                                                className="accent-cyan-600 w-4 h-4" />
+                                                            Preferred
+                                                        </label>
+                                                    </div>
+                                                    {fieldErrors.personalEmail && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{fieldErrors.personalEmail}</p>}
+                                                </>
+                                            ) : (
+                                                <p className={`mt-0.5 text-sm font-semibold break-all ${selectedMember.preferredEmail === "personal" ? "text-cyan-600 dark:text-cyan-400" : "text-gray-800 dark:text-gray-200"}`}>
+                                                    {selectedMember.personalEmail || "-"}{selectedMember.preferredEmail === "personal" && <span className="ml-1 text-xs text-green-600 dark:text-green-400">(preferred)</span>}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Work Email</label>
+                                            {isEditing ? (
+                                                <>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="email" value={editForm.workEmail || ""} onChange={handleEditChange("workEmail")}
+                                                            className={fieldCls(fieldErrors.workEmail)} />
+                                                        <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
+                                                            <input type="checkbox" checked={editForm.preferredEmail === "work"}
+                                                                onChange={() => setEditForm(prev => ({...prev, preferredEmail: "work"}))}
+                                                                className="accent-cyan-600 w-4 h-4" />
+                                                            Preferred
+                                                        </label>
+                                                    </div>
+                                                    {fieldErrors.workEmail && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{fieldErrors.workEmail}</p>}
+                                                </>
+                                            ) : (
+                                                <p className={`mt-0.5 text-sm font-semibold break-all ${selectedMember.preferredEmail === "work" ? "text-cyan-600 dark:text-cyan-400" : "text-gray-800 dark:text-gray-200"}`}>
+                                                    {selectedMember.workEmail || "-"}{selectedMember.preferredEmail === "work" && <span className="ml-1 text-xs text-green-600 dark:text-green-400">(preferred)</span>}
+                                                </p>
+                                            )}
+                                        </div>
                                         <Detail label="Cell Tel" value={isEditing ? (editForm.phone || editForm.cellTel) : (selectedMember.phone || selectedMember.cellTel || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange(selectedMember.phone ? "phone" : "cellTel")}
@@ -634,18 +679,6 @@ export default function Members() {
                                                 value={isEditing ? editForm.electedRep : (selectedMember.electedRep ?? "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("electedRep")}
-                                                options={yesNoOptions}
-                                        />
-                                        <Detail label="National Councillor (Y/N)"
-                                                value={isEditing ? editForm.nationalCouncillor : (selectedMember.nationalCouncillor ?? "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("nationalCouncillor")}
-                                                options={yesNoOptions}
-                                        />
-                                        <Detail label="Branch Committee Member (Y/N)"
-                                                value={isEditing ? editForm.branchCommitteeMember : (selectedMember.branchCommitteeMember ?? "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("branchCommitteeMember")}
                                                 options={yesNoOptions}
                                         />
                                     </>

@@ -20,7 +20,9 @@ export default function CaptureMember() {
         identityType: "",
         identityNumber: "",
         race: "",
-        email: "",
+        personalEmail: "",
+        workEmail: "",
+        preferredEmail: "personal",
         phone: "",
         workTel: "",
         homeTel: "",
@@ -46,8 +48,6 @@ export default function CaptureMember() {
         repElectionMonth: "",
         repElectionYear: "",
         electedRep: "N",
-        nationalCouncillor: "N",
-        branchCommitteeMember: "N",
         remarks: "",
         remarks2: "",
         remarks3: "",
@@ -93,7 +93,7 @@ export default function CaptureMember() {
                 setFieldErrors((prev) => ({ ...prev, [field]: error }));
             }
         }
-        if (field === "email") {
+        if (field === "personalEmail" || field === "workEmail") {
             const error = validateEmail(value);
             if (error) setFieldErrors((prev) => ({ ...prev, [field]: error }));
         }
@@ -177,7 +177,7 @@ export default function CaptureMember() {
                                     disabled={!form.identityType}
                                 />
                                 <Field label="Race" value={form.race} onChange={handleChange("race")} options={raceOptions} />
-                                <Field label="Email Address" value={form.email} onChange={handleChange("email")} type="email" error={fieldErrors.email} />
+                                <EmailFields form={form} setForm={setForm} handleChange={handleChange} fieldErrors={fieldErrors} />
                                 <Field label="Cellphone Number" value={form.phone} onChange={handleChange("phone")} />
                                 <Field label="Work Tel" value={form.workTel} onChange={handleChange("workTel")} />
                                 <Field label="Home Tel" value={form.homeTel} onChange={handleChange("homeTel")} />
@@ -220,8 +220,6 @@ export default function CaptureMember() {
 
                                 <SectionTitle title="Roles" />
                                 <Field label="Elected Representative (Y/N)" value={form.electedRep} onChange={handleChange("electedRep")} options={yesNoOptions} />
-                                <Field label="National Councillor (Y/N)" value={form.nationalCouncillor} onChange={handleChange("nationalCouncillor")} options={yesNoOptions} />
-                                <Field label="Branch Committee Member (Y/N)" value={form.branchCommitteeMember} onChange={handleChange("branchCommitteeMember")} options={yesNoOptions} />
                             </>
                         )}
 
@@ -339,6 +337,59 @@ function SearchableSelect({ value, onChange, options, error, disabled }) {
             )}
             {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
         </div>
+    );
+}
+
+function EmailFields({ form, setForm, handleChange, fieldErrors }) {
+    return (
+        <>
+            <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+                    Personal Email
+                </label>
+                <div className="flex items-center gap-2">
+                    <input
+                        type="email"
+                        value={form.personalEmail || ""}
+                        onChange={handleChange("personalEmail")}
+                        className={fieldCls(fieldErrors.personalEmail)}
+                    />
+                    <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={form.preferredEmail === "personal"}
+                            onChange={() => setForm((prev) => ({ ...prev, preferredEmail: "personal" }))}
+                            className="accent-cyan-600 w-4 h-4"
+                        />
+                        Preferred
+                    </label>
+                </div>
+                {fieldErrors.personalEmail && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{fieldErrors.personalEmail}</p>}
+            </div>
+            <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+                    Work Email
+                </label>
+                <div className="flex items-center gap-2">
+                    <input
+                        type="email"
+                        value={form.workEmail || ""}
+                        onChange={handleChange("workEmail")}
+                        className={fieldCls(fieldErrors.workEmail)}
+                    />
+                    <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={form.preferredEmail === "work"}
+                            onChange={() => setForm((prev) => ({ ...prev, preferredEmail: "work" }))}
+                            className="accent-cyan-600 w-4 h-4"
+                        />
+                        Preferred
+                    </label>
+                </div>
+                {fieldErrors.workEmail && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{fieldErrors.workEmail}</p>}
+            </div>
+        </>
     );
 }
 
