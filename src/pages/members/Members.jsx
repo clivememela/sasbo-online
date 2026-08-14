@@ -608,10 +608,6 @@ export default function Members() {
                                                 options={bankOptions}
                                                 searchable
                                         />
-                                        <Detail label="Bank Account Number" value={isEditing ? editForm.bankAccountNumber : (selectedMember.bankAccountNumber || "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("bankAccountNumber")}
-                                        />
                                         <Detail label="Bank Branch Where Member Works" value={isEditing ? editForm.branch : (selectedMember.branch || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("branch")}
@@ -630,11 +626,34 @@ export default function Members() {
                                                 onChange={handleEditChange("paymentType")}
                                                 options={paymentTypeOptions}
                                         />
-                                        <Detail label="Day to be debited" value={isEditing ? editForm.debitDay?.toString().padStart(2, '0') : (selectedMember.debitDay?.toString().padStart(2, '0') || "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("debitDay")}
-                                                options={dayOptions}
-                                        />
+                                        
+                                        {/* Bank Account Number - Only show for Debit Order */}
+                                        {(!isEditing || editForm.paymentType === "Debit Order") && (
+                                            <Detail label="Bank Account Number" 
+                                                    value={isEditing ? editForm.bankAccountNumber : (selectedMember.bankAccountNumber || "-")}
+                                                    isEditing={isEditing && editForm.paymentType === "Debit Order"}
+                                                    onChange={handleEditChange("bankAccountNumber")}
+                                                    required={isEditing && editForm.paymentType === "Debit Order"}
+                                            />
+                                        )}
+                                        
+                                        {/* Debit Day - Only for Debit Order */}
+                                        {(!isEditing || editForm.paymentType === "Debit Order") && (
+                                            <Detail label="Day to be debited" 
+                                                    value={isEditing ? editForm.debitDay?.toString().padStart(2, '0') : (selectedMember.debitDay?.toString().padStart(2, '0') || "-")}
+                                                    isEditing={isEditing && editForm.paymentType === "Debit Order"}
+                                                    onChange={handleEditChange("debitDay")}
+                                                    options={dayOptions}
+                                            />
+                                        )}
+                                        
+                                        {/* Info message for Payroll Deduction */}
+                                        {isEditing && editForm.paymentType === "Payroll Deduction" && (
+                                            <div className="md:col-span-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-700 dark:text-blue-300">
+                                                ℹ️ Bank account details and debit day are not required for Payroll Deduction
+                                            </div>
+                                        )}
+                                        
                                         <Detail label="Bank Address" value={isEditing ? editForm.bankAddress : (selectedMember.bankAddress || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("bankAddress")}

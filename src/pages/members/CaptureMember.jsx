@@ -203,10 +203,24 @@ export default function CaptureMember() {
                                 <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={BANK_OPTIONS} searchable />
                                 <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} searchable />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={paymentTypeOptions} />
-                                <Field label="Bank Account Number" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} />
+                                
+                                {/* Bank Account Number - Only visible for Debit Order */}
+                                {form.paymentType === "Debit Order" && (
+                                    <>
+                                        <Field label="Bank Account Number" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} required />
+                                        <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, "0"))} />
+                                    </>
+                                )}
+                                
+                                {/* Show info message for Payroll Deduction */}
+                                {form.paymentType === "Payroll Deduction" && (
+                                    <div className="md:col-span-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-700 dark:text-blue-300">
+                                        ℹ️ Bank account details are not required for Payroll Deduction. Debit day is handled by payroll.
+                                    </div>
+                                )}
+                                
                                 <Field label="IBT No." value={form.ibtNo} onChange={handleChange("ibtNo")} />
                                 <Field label="Work IBT No." value={form.workIbtNo} onChange={handleChange("workIbtNo")} />
-                                <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, "0"))} disabled={form.paymentType === "Payroll Deduction"} note={form.paymentType === "Payroll Deduction" ? "*debit day done by payroll*" : null} />
                                 <Field label="Bank Address" value={form.bankAddress} onChange={handleChange("bankAddress")} className="md:col-span-2" />
                             </>
                         )}
