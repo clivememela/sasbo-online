@@ -33,6 +33,8 @@ export default function Members() {
         workEmail: "",
         status: "",
         race: "",
+        recruitmentRepId:"",
+        isRepresentative:"",
     });
 
     const [page, setPage] = useState(1);
