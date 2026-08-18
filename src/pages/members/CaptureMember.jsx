@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { representativeService } from "../../services/representativeService.js";
-import { Button } from "../../components/form";
+import { Button, PositionTreeSelect } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, YES_NO_OPTIONS, SUSPENSION_CODE_OPTIONS,
@@ -66,7 +66,6 @@ export default function CaptureMember() {
     const [showSavedNotification, setShowSavedNotification] = useState(false);
     const [reps, setReps] = useState([]);
     const [structures, setStructures] = useState([]);
-    const [showStructureDropdown, setShowStructureDropdown] = useState(false);
 
     useEffect(() => {
         representativeService.getAll()
@@ -258,37 +257,13 @@ export default function CaptureMember() {
                                         <RepElectionDatePicker form={form} setForm={setForm} />
 
                                         <div className="md:col-span-2">
-                                            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                                                Position / Structure
-                                            </label>
-                                            <div className="relative">
-                                                <button type="button" onClick={() => setShowStructureDropdown(v => !v)}
-                                                        className={fieldCls(null, false) + " text-left cursor-pointer"}>
-                                                    {(form.structureIds || []).length > 0
-                                                        ? (form.structureIds || []).map(sid => structures.find(s => s.id === sid)?.name).filter(Boolean).join(', ')
-                                                        : 'Select structures...'}
-                                                </button>
-                                                {showStructureDropdown && (
-                                                    <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg max-h-48 overflow-y-auto">
-                                                        {structures.map(s => (
-                                                            <label key={s.id} className="flex items-center gap-2 px-4 py-2 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 cursor-pointer text-sm text-gray-900 dark:text-white">
-                                                                <input type="checkbox" checked={(form.structureIds || []).includes(s.id)}
-                                                                       onChange={() => {
-                                                                           const ids = form.structureIds || [];
-                                                                           setForm(prev => ({
-                                                                               ...prev,
-                                                                               structureIds: ids.includes(s.id) ? ids.filter(id => id !== s.id) : [...ids, s.id]
-                                                                           }));
-                                                                       }} className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500" />
-                                                                {s.name}
-                                                            </label>
-                                                        ))}
-                                                        {structures.length === 0 && (
-                                                            <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">No structures available</div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
+                                            <PositionTreeSelect
+                                                label="Position / Structure"
+                                                structures={structures}
+                                                selectedIds={form.structureIds || []}
+                                                onChange={(ids) => setForm(prev => ({ ...prev, structureIds: ids }))}
+                                                placeholder="Select positions..."
+                                            />
                                         </div>
                                     </>
                                 )}

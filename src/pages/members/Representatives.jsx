@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
-import { TextInput, SearchableSelect, Button } from '../../components/form';
+import { TextInput, SearchableSelect, Button, PositionTreeSelect } from '../../components/form';
 import { memberService } from '../../services/memberService.js';
 import { representativeService } from '../../services/representativeService.js';
 import { bankService } from '../../services/bankService.js';
@@ -32,8 +32,6 @@ export function Representatives() {
     const [repSearch, setRepSearch] = useState({ membershipNumber: '', name: '', bank: '', branch: '', status: '' });
     const [structures, setStructures] = useState([]);
     const [roles, setRoles] = useState([]);
-    const [showStructureDropdown, setShowStructureDropdown] = useState(false);
-    const [showAddStructureDropdown, setShowAddStructureDropdown] = useState(false);
 
     const refreshAll = useCallback(() => Promise.all([
         memberService.getMembers(),
@@ -628,33 +626,13 @@ export function Representatives() {
                                     </div>
                                 )}
                                 <div className="md:col-span-2">
-                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Structures / Positions</label>
-                                    <div className="relative mt-1">
-                                        <button type="button" onClick={() => setShowStructureDropdown(v => !v)}
-                                                className="w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-left text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
-                                            {(editRepFields.structureIds || []).length > 0
-                                                ? editRepFields.structureIds.map(sid => STRUCTURES.find(s => s.id === sid)?.name).filter(Boolean).join(', ')
-                                                : 'Select structures...'}
-                                        </button>
-                                        {showStructureDropdown && (
-                                            <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg max-h-48 overflow-y-auto">
-                                                {STRUCTURES.map(s => (
-                                                    <label key={s.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-900 dark:text-gray-100">
-                                                        <input type="checkbox" checked={(editRepFields.structureIds || []).includes(s.id)}
-                                                               onChange={() => {
-                                                                   const ids = editRepFields.structureIds || [];
-                                                                   setEditRepFields(p => ({
-                                                                       ...p,
-                                                                       structureIds: ids.includes(s.id) ? ids.filter(id => id !== s.id) : [...ids, s.id]
-                                                                   }));
-                                                               }} className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500" />
-                                                        {s.name}
-                                                    </label>
-                                                ))}
-                                                {STRUCTURES.length === 0 && <div className="px-3 py-2 text-sm text-gray-500">No structures available</div>}
-                                            </div>
-                                        )}
-                                    </div>
+                                    <PositionTreeSelect
+                                        label="Structures / Positions"
+                                        structures={STRUCTURES}
+                                        selectedIds={editRepFields.structureIds || []}
+                                        onChange={(ids) => setEditRepFields(p => ({ ...p, structureIds: ids }))}
+                                        placeholder="Select positions..."
+                                    />
                                 </div>
                             </div>
                         ) : (
@@ -799,33 +777,13 @@ export function Representatives() {
                                     </div>
                                 )}
                                 <div>
-                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Structures / Positions</label>
-                                    <div className="relative mt-1">
-                                        <button type="button" onClick={() => setShowAddStructureDropdown(v => !v)}
-                                                className="w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-left text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
-                                            {newRepDetails.structureIds.length > 0
-                                                ? newRepDetails.structureIds.map(sid => STRUCTURES.find(s => s.id === sid)?.name).filter(Boolean).join(', ')
-                                                : 'Select structures...'}
-                                        </button>
-                                        {showAddStructureDropdown && (
-                                            <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg max-h-48 overflow-y-auto">
-                                                {STRUCTURES.map(s => (
-                                                    <label key={s.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-900 dark:text-gray-100">
-                                                        <input type="checkbox" checked={newRepDetails.structureIds.includes(s.id)}
-                                                               onChange={() => {
-                                                                   const ids = newRepDetails.structureIds;
-                                                                   setNewRepDetails(p => ({
-                                                                       ...p,
-                                                                       structureIds: ids.includes(s.id) ? ids.filter(id => id !== s.id) : [...ids, s.id]
-                                                                   }));
-                                                               }} className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500" />
-                                                        {s.name}
-                                                    </label>
-                                                ))}
-                                                {STRUCTURES.length === 0 && <div className="px-3 py-2 text-sm text-gray-500">No structures available</div>}
-                                            </div>
-                                        )}
-                                    </div>
+                                    <PositionTreeSelect
+                                        label="Structures / Positions"
+                                        structures={STRUCTURES}
+                                        selectedIds={newRepDetails.structureIds}
+                                        onChange={(ids) => setNewRepDetails(p => ({ ...p, structureIds: ids }))}
+                                        placeholder="Select positions..."
+                                    />
                                 </div>
                             </div>
                         )}
