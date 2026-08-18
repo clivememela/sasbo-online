@@ -11,12 +11,12 @@ export const representativeService = {
       .then(handleResponse)
       .catch(err => { console.error('Failed to fetch representatives:', err); throw err; }),
 
-  create: (memberId, name) =>
+  create: (data) =>
     fetch(apiUrl('/api/representatives'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ memberId, name }),
+      body: JSON.stringify(data),
     }).then(handleResponse),
 
   update: (id, data) =>
@@ -34,4 +34,14 @@ export const representativeService = {
     }).then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
     }),
+
+  getStructures: () =>
+    fetch(apiUrl('/api/members/structures'), { credentials: 'include' })
+      .then(handleResponse)
+      .catch(err => { console.error('Failed to fetch structures:', err); throw err; }),
+
+  getRoles: () =>
+    fetch(apiUrl('/api/members/userRoles'), { credentials: 'include' })
+      .then(handleResponse)
+      .catch(err => { console.error('Failed to fetch roles:', err); throw err; }),
 };

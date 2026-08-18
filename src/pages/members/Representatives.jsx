@@ -30,6 +30,10 @@ export function Representatives() {
     const [editRepFields, setEditRepFields] = useState({ name: '', email: '', phone: '' });
     const [editRepErrors, setEditRepErrors] = useState({});
     const [repSearch, setRepSearch] = useState({ membershipNumber: '', name: '', bank: '', branch: '', status: '' });
+    const [structures, setStructures] = useState([]);
+    const [roles, setRoles] = useState([]);
+    const [showStructureDropdown, setShowStructureDropdown] = useState(false);
+    const [showAddStructureDropdown, setShowAddStructureDropdown] = useState(false);
 
     const refreshAll = useCallback(() => Promise.all([
         memberService.getMembers(),
@@ -43,6 +47,8 @@ export function Representatives() {
         refreshAll();
         bankService.getBanks().then(setBanksData).catch(err => console.error(err));
         locationService.getProvinces().then(setProvincesData).catch(err => console.error(err));
+        representativeService.getStructures().then(setStructures).catch(err => console.error(err));
+        representativeService.getRoles().then(setRoles).catch(err => console.error(err));
     }, [refreshAll]);
 
     const BANK_NAMES = useMemo(() => [...new Set(banksData.map(b => b?.bankName).filter(Boolean))].sort(), [banksData]);
@@ -59,6 +65,9 @@ export function Representatives() {
         });
         return meta;
     }, [banksData]);
+
+    const ROLES = useMemo(() => roles.map(r => ({ ...r })), [roles]);
+    const STRUCTURES = useMemo(() => structures.map(s => ({ ...s })), [structures]);
 
     const repList = useMemo(() => {
         const memberMap = {};
@@ -94,6 +103,10 @@ export function Representatives() {
                 email: r.email || '',
                 phone: r.phone || '',
                 memberId: r.memberId || null,
+                roleId: r.roleId || null,
+                isElectedRep: r.isElectedRep || false,
+                electionDate: r.electionDate || null,
+                structureIds: r.structureIds || [],
                 banks: [...d.bankSet].filter(Boolean).join(', '),
                 branches: [...d.branchSet].filter(Boolean).join(', '),
                 provinces: [...d.provinceSet].join(', '),
@@ -189,7 +202,7 @@ export function Representatives() {
 
     const handleCloseMemberModal = useCallback(() => setSelectedMember(null), []);
     const handleCloseAddMember = useCallback(() => setShowAddMember(false), []);
-    const handleCloseAddRep = useCallback(() => setShowAddRep(false), []);
+    const handleCloseAddRep = useCallback(() => { setShowAddRep(false); setNewRepDetails({ roleId: null, isElectedRep: false, electionDate: '', structureIds: [] }); }, []);
     const handleCloseRepDetail = useCallback(() => {
         setSelectedRepDetail(null);
         setEditingRep(false);
@@ -277,6 +290,8 @@ export function Representatives() {
         }
     };
 
+    const [newRepDetails, setNewRepDetails] = useState({ roleId: null, isElectedRep: false, electionDate: '', structureIds: [] });
+
     const handleAddRep = async () => {
         if (!newRepMember) return;
         if (repList.some(r => r.memberId === newRepMember.id)) {
@@ -286,10 +301,19 @@ export function Representatives() {
         try {
             setSaving(true);
             const repName = [newRepMember.initials, newRepMember.surname].filter(Boolean).join(' ');
-            const createdRep = await representativeService.create(newRepMember.id, repName);
+            const payload = {
+                memberId: newRepMember.id,
+                name: repName,
+                roleId: newRepDetails.roleId,
+                isElectedRep: newRepDetails.isElectedRep,
+                electionDate: newRepDetails.isElectedRep ? newRepDetails.electionDate || null : null,
+                structureIds: newRepDetails.structureIds,
+            };
+            const createdRep = await representativeService.create(payload);
             await refreshAll();
             setShowAddRep(false);
             setNewRepMember(null);
+            setNewRepDetails({ roleId: null, isElectedRep: false, electionDate: '', structureIds: [] });
             setSelectedRep({ id: createdRep?.id, name: repName });
         } catch (err) {
             alert(err);
@@ -540,7 +564,15 @@ export function Representatives() {
                                 {!editingRep && (
                                     <button className="px-3 py-1 rounded-md text-xs font-medium bg-cyan-600 text-white hover:bg-cyan-700 transition"
                                             onClick={() => {
-                                                setEditRepFields({ name: selectedRepDetail.name, email: selectedRepDetail.email || '', phone: selectedRepDetail.phone || '' });
+                                                setEditRepFields({
+                                                    name: selectedRepDetail.name,
+                                                    email: selectedRepDetail.email || '',
+                                                    phone: selectedRepDetail.phone || '',
+                                                    roleId: selectedRepDetail.roleId || null,
+                                                    isElectedRep: selectedRepDetail.isElectedRep || false,
+                                                    electionDate: selectedRepDetail.electionDate || '',
+                                                    structureIds: selectedRepDetail.structureIds || [],
+                                                });
                                                 setEditRepErrors({});
                                                 setEditingRep(true);
                                             }}>
@@ -571,6 +603,59 @@ export function Representatives() {
                                     <input value={editRepFields.phone} type="tel" onChange={e => { const val = e.target.value; setEditRepFields(p => ({ ...p, phone: val })); }}
                                            className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
                                 </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Role</label>
+                                    <select value={editRepFields.roleId || ''} onChange={e => setEditRepFields(p => ({ ...p, roleId: e.target.value ? Number(e.target.value) : null }))}
+                                            className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                                        <option value="">Select role...</option>
+                                        {ROLES.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Elected Representative</label>
+                                    <div className="mt-1 flex items-center gap-3">
+                                        <button type="button" onClick={() => setEditRepFields(p => ({ ...p, isElectedRep: true }))}
+                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${editRepFields.isElectedRep ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>Yes</button>
+                                        <button type="button" onClick={() => setEditRepFields(p => ({ ...p, isElectedRep: false, electionDate: '' }))}
+                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${!editRepFields.isElectedRep ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>No</button>
+                                    </div>
+                                </div>
+                                {editRepFields.isElectedRep && (
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Election Date</label>
+                                        <input type="date" value={editRepFields.electionDate || ''} onChange={e => setEditRepFields(p => ({ ...p, electionDate: e.target.value }))}
+                                               className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                                    </div>
+                                )}
+                                <div className="md:col-span-2">
+                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Structures / Positions</label>
+                                    <div className="relative mt-1">
+                                        <button type="button" onClick={() => setShowStructureDropdown(v => !v)}
+                                                className="w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-left text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                                            {(editRepFields.structureIds || []).length > 0
+                                                ? editRepFields.structureIds.map(sid => STRUCTURES.find(s => s.id === sid)?.name).filter(Boolean).join(', ')
+                                                : 'Select structures...'}
+                                        </button>
+                                        {showStructureDropdown && (
+                                            <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg max-h-48 overflow-y-auto">
+                                                {STRUCTURES.map(s => (
+                                                    <label key={s.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-900 dark:text-gray-100">
+                                                        <input type="checkbox" checked={(editRepFields.structureIds || []).includes(s.id)}
+                                                               onChange={() => {
+                                                                   const ids = editRepFields.structureIds || [];
+                                                                   setEditRepFields(p => ({
+                                                                       ...p,
+                                                                       structureIds: ids.includes(s.id) ? ids.filter(id => id !== s.id) : [...ids, s.id]
+                                                                   }));
+                                                               }} className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500" />
+                                                        {s.name}
+                                                    </label>
+                                                ))}
+                                                {STRUCTURES.length === 0 && <div className="px-3 py-2 text-sm text-gray-500">No structures available</div>}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         ) : (
                             <div className="px-6 py-5 space-y-4">
@@ -581,6 +666,10 @@ export function Representatives() {
                                 <DRow label="Branch(es)" value={selectedRepDetail.branches || '—'} />
                                 <DRow label="Province" value={selectedRepDetail.provinces || '—'} />
                                 <DRow label="Area" value={selectedRepDetail.areas || '—'} />
+                                <DRow label="Role" value={ROLES.find(r => r.id === selectedRepDetail.roleId)?.name || '—'} />
+                                <DRow label="Elected Rep" value={selectedRepDetail.isElectedRep ? 'Yes' : 'No'} />
+                                {selectedRepDetail.isElectedRep && <DRow label="Election Date" value={selectedRepDetail.electionDate || '—'} />}
+                                <DRow label="Structures" value={(selectedRepDetail.structureIds || []).map(sid => STRUCTURES.find(s => s.id === sid)?.name).filter(Boolean).join(', ') || '—'} />
                                 <DRow label="Members Represented" value={selectedRepDetail.count} />
                             </div>
                         )}
@@ -592,7 +681,14 @@ export function Representatives() {
                                             onClick={async () => {
                                                 setSaving(true);
                                                 try {
-                                                    await representativeService.update(selectedRepDetail.id, editRepFields);
+                                                    const payload = {
+                                                        ...editRepFields,
+                                                        roleId: editRepFields.roleId,
+                                                        isElectedRep: editRepFields.isElectedRep,
+                                                        electionDate: editRepFields.isElectedRep ? editRepFields.electionDate || null : null,
+                                                        structureIds: editRepFields.structureIds || [],
+                                                    };
+                                                    await representativeService.update(selectedRepDetail.id, payload);
                                                     await refreshAll();
                                                     setSelectedRepDetail(d => ({ ...d, ...editRepFields }));
                                                     if (selectedRep?.id === selectedRepDetail.id) setSelectedRep(r => ({ ...r, ...editRepFields }));
@@ -675,6 +771,64 @@ export function Representatives() {
                                 }
                             </div>
                         </div>
+                        {newRepMember && (
+                            <div className="px-6 py-4 space-y-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
+                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Representative Details</p>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Role</label>
+                                    <select value={newRepDetails.roleId || ''} onChange={e => setNewRepDetails(p => ({ ...p, roleId: e.target.value ? Number(e.target.value) : null }))}
+                                            className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                                        <option value="">Select role...</option>
+                                        {ROLES.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Elected Representative</label>
+                                    <div className="mt-1 flex items-center gap-3">
+                                        <button type="button" onClick={() => setNewRepDetails(p => ({ ...p, isElectedRep: true }))}
+                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${newRepDetails.isElectedRep ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>Yes</button>
+                                        <button type="button" onClick={() => setNewRepDetails(p => ({ ...p, isElectedRep: false, electionDate: '' }))}
+                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${!newRepDetails.isElectedRep ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>No</button>
+                                    </div>
+                                </div>
+                                {newRepDetails.isElectedRep && (
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Election Date</label>
+                                        <input type="date" value={newRepDetails.electionDate || ''} onChange={e => setNewRepDetails(p => ({ ...p, electionDate: e.target.value }))}
+                                               className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                                    </div>
+                                )}
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Structures / Positions</label>
+                                    <div className="relative mt-1">
+                                        <button type="button" onClick={() => setShowAddStructureDropdown(v => !v)}
+                                                className="w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-left text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                                            {newRepDetails.structureIds.length > 0
+                                                ? newRepDetails.structureIds.map(sid => STRUCTURES.find(s => s.id === sid)?.name).filter(Boolean).join(', ')
+                                                : 'Select structures...'}
+                                        </button>
+                                        {showAddStructureDropdown && (
+                                            <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg max-h-48 overflow-y-auto">
+                                                {STRUCTURES.map(s => (
+                                                    <label key={s.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-900 dark:text-gray-100">
+                                                        <input type="checkbox" checked={newRepDetails.structureIds.includes(s.id)}
+                                                               onChange={() => {
+                                                                   const ids = newRepDetails.structureIds;
+                                                                   setNewRepDetails(p => ({
+                                                                       ...p,
+                                                                       structureIds: ids.includes(s.id) ? ids.filter(id => id !== s.id) : [...ids, s.id]
+                                                                   }));
+                                                               }} className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500" />
+                                                        {s.name}
+                                                    </label>
+                                                ))}
+                                                {STRUCTURES.length === 0 && <div className="px-3 py-2 text-sm text-gray-500">No structures available</div>}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2 shrink-0">
                             <Button onClick={handleCloseAddRep}>Cancel</Button>
                             <Button variant="primary" onClick={handleAddRep} disabled={!newRepMember || saving}>

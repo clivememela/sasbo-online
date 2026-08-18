@@ -1,12 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
+import { representativeService } from "../../services/representativeService.js";
 import { Button } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, YES_NO_OPTIONS, SUSPENSION_CODE_OPTIONS,
     JOB_GRADE_OPTIONS, MANAGER_OPTIONS, MEMBER_TABS,
-    BANK_OPTIONS, BRANCH_OPTIONS, REP_OPTIONS,
+    BANK_OPTIONS, BRANCH_OPTIONS,
 } from "../../config/memberConstants.js";
 import { validateSAID, validateEmail } from "../../utils/validateSAID.js";
 
@@ -63,6 +64,18 @@ export default function CaptureMember() {
     });
     const [fieldErrors, setFieldErrors] = useState({});
     const [showSavedNotification, setShowSavedNotification] = useState(false);
+    const [reps, setReps] = useState([]);
+    const [structures, setStructures] = useState([]);
+    const [showStructureDropdown, setShowStructureDropdown] = useState(false);
+
+    useEffect(() => {
+        representativeService.getAll()
+            .then(data => setReps(data || []))
+            .catch(err => console.error('Failed to fetch representatives:', err));
+        representativeService.getStructures()
+            .then(data => setStructures(data || []))
+            .catch(err => console.error('Failed to fetch structures:', err));
+    }, []);
 
     const handleChange = (field) => (event) => {
         const rawValue = event.target.value;
@@ -227,13 +240,58 @@ export default function CaptureMember() {
 
                         {activeTab === "representatives" && (
                             <>
-                                <Field label="Recruitment Representative" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} options={REP_OPTIONS} />
-                                <Field label="Area's Representative" value={form.areasRep} onChange={handleChange("areasRep")} options={REP_OPTIONS} />
-                                <SectionTitle title="Representative Election Date" />
-                                <RepElectionDatePicker form={form} setForm={setForm} />
+                                <Field label="Recruitment Representative" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} options={reps.map(r => r.name).filter(Boolean)} searchable />
+                                <Field label="Area's Representative" value={form.areasRep} onChange={handleChange("areasRep")} options={reps.map(r => r.name).filter(Boolean)} searchable />
 
-                                <SectionTitle title="Roles" />
-                                <Field label="Elected Representative (Y/N)" value={form.electedRep} onChange={handleChange("electedRep")} options={yesNoOptions} />
+                                <SectionTitle title="Elected Representative" />
+                                <Field label="Elected Representative (Y/N)" value={form.electedRep} onChange={(e) => {
+                                    const val = e.target.value;
+                                    setForm(prev => ({
+                                        ...prev,
+                                        electedRep: val,
+                                        ...(val === 'N' ? { repElectionDay: '', repElectionMonth: '', repElectionYear: '', structureIds: [] } : {})
+                                    }));
+                                }} options={yesNoOptions} />
+
+                                {form.electedRep === 'Y' && (
+                                    <>
+                                        <RepElectionDatePicker form={form} setForm={setForm} />
+
+                                        <div className="md:col-span-2">
+                                            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+                                                Position / Structure
+                                            </label>
+                                            <div className="relative">
+                                                <button type="button" onClick={() => setShowStructureDropdown(v => !v)}
+                                                        className={fieldCls(null, false) + " text-left cursor-pointer"}>
+                                                    {(form.structureIds || []).length > 0
+                                                        ? (form.structureIds || []).map(sid => structures.find(s => s.id === sid)?.name).filter(Boolean).join(', ')
+                                                        : 'Select structures...'}
+                                                </button>
+                                                {showStructureDropdown && (
+                                                    <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg max-h-48 overflow-y-auto">
+                                                        {structures.map(s => (
+                                                            <label key={s.id} className="flex items-center gap-2 px-4 py-2 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 cursor-pointer text-sm text-gray-900 dark:text-white">
+                                                                <input type="checkbox" checked={(form.structureIds || []).includes(s.id)}
+                                                                       onChange={() => {
+                                                                           const ids = form.structureIds || [];
+                                                                           setForm(prev => ({
+                                                                               ...prev,
+                                                                               structureIds: ids.includes(s.id) ? ids.filter(id => id !== s.id) : [...ids, s.id]
+                                                                           }));
+                                                                       }} className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500" />
+                                                                {s.name}
+                                                            </label>
+                                                        ))}
+                                                        {structures.length === 0 && (
+                                                            <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">No structures available</div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </>
                         )}
 
