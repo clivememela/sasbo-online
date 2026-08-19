@@ -128,7 +128,7 @@ export default function Auth() {
             className="w-full py-3 px-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-md transition-colors flex items-center justify-center gap-2 mt-4"
           >
             {isLogin ? <LogIn size={20} /> : <UserPlus size={20} />}
-            {isLogin ? 'Log In' : 'Register'}
+            {isLogin ? 'Log In' : 'Sign up'}
           </button>
         </form>
 
@@ -138,7 +138,7 @@ export default function Auth() {
             onClick={() => setIsLogin(!isLogin)}
             className="text-cyan-600 hover:underline dark:text-cyan-400 font-medium"
           >
-            {isLogin ? 'Register' : 'Log in'}
+            {isLogin ? 'Sign up' : 'Log in'}
           </button>
         </div>
       </div>
