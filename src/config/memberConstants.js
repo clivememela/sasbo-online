@@ -56,6 +56,7 @@ export const MEMBER_TABS = [
   { id: 'employment', label: 'Employment & Bank' },
   { id: 'membership', label: 'Membership & Subscriptions' },
   { id: 'representatives', label: 'Recruitment Channel' },
+  { id: 'structures', label: 'Sasbo Structures' },
   { id: 'history', label: 'History & Remarks' },
 ];
 
@@ -109,7 +110,6 @@ export const MEMBER_FIELD_LABEL_MAP = {
   remarks2: '2nd Remarks Field',
   remarks3: '3rd Remarks Field',
   remarks4: '4th Remarks Field',
-  managersCode: 'Managers Code',
   memnetMember: 'MEMNET Member (Y/N)',
   printLabelForPostage: 'Print Label for Postage (Y/N)',
   suspensionCode: 'Suspension Code',

@@ -6,7 +6,7 @@ import { TextInput, SearchableSelect, Button } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, YES_NO_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, SUSPENSION_CODE_OPTIONS, JOB_GRADE_OPTIONS,
-    MANAGER_OPTIONS, DAY_OPTIONS, MONTH_OPTIONS, YEAR_OPTIONS,
+    DAY_OPTIONS, MONTH_OPTIONS, YEAR_OPTIONS,
     BANK_OPTIONS, BRANCH_OPTIONS, REP_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS,
 } from "../../config/memberConstants.js";
 import { validateSAID, validateEmail, formatDate, extractDateOfBirthFromSAID, extractGenderFromSAID } from "../../utils/validateSAID.js";
@@ -49,11 +49,12 @@ export default function Members() {
     const prevMemberIdRef = useRef(null);
 
     const tabs = [
-        {id: "personal", label: "Personal Information"},
-        {id: "membership", label: "Membership & Subscriptions"},
-        {id: "employment", label: "Employment & Bank"},
-        {id: "representatives", label: "Recruitment Channel"},
-        {id: "history", label: "History & Remarks"},
+        { id: 'personal', label: 'Personal Information' },
+        { id: 'employment', label: 'Employment & Bank' },
+        { id: 'membership', label: 'Membership & Subscriptions' },
+        { id: 'representatives', label: 'Recruitment Channel' },
+        { id: 'structures', label: 'Sasbo Structures' },
+        { id: 'history', label: 'History & Remarks' },
     ];
 
     const normalizePaymentType = useCallback((paymentType) => {
@@ -74,7 +75,6 @@ export default function Members() {
     const bankOptions = BANK_OPTIONS;
     const branchOptions = BRANCH_OPTIONS;
     const jobGradeOptions = JOB_GRADE_OPTIONS;
-    const managerOptions = MANAGER_OPTIONS;
     const identityTypeOptions = IDENTITY_TYPE_OPTIONS;
     const genderOptions = GENDER_OPTIONS;
     const repOptions = REP_OPTIONS;
@@ -775,11 +775,6 @@ export default function Members() {
                                                 className="md:col-span-2"/>
 
                                         <div className="md:col-span-2 mt-4 border-b pb-1 font-semibold text-cyan-700 dark:text-cyan-400">Other Information</div>
-                                        <Detail label="Managers Code" value={isEditing ? editForm.managersCode : (selectedMember.managersCode ?? "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("managersCode")}
-                                                options={managerOptions}
-                                        />
                                         <Detail label="MEMNET Member (Y/N)" value={isEditing ? editForm.memnetMember : (selectedMember.memnetMember ?? "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("memnetMember")}

@@ -6,7 +6,7 @@ import { Button, PositionTreeSelect } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, YES_NO_OPTIONS, SUSPENSION_CODE_OPTIONS,
-    JOB_GRADE_OPTIONS, MANAGER_OPTIONS, MEMBER_TABS,
+    JOB_GRADE_OPTIONS, MEMBER_TABS,
     BANK_OPTIONS, BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS,
 } from "../../config/memberConstants.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID, formatDate } from "../../utils/validateSAID.js";
@@ -57,7 +57,6 @@ export default function CaptureMember() {
         remarks2: "",
         remarks3: "",
         remarks4: "",
-        managersCode: "",
         memnetMember: "N",
         printLabelForPostage: "Y",
         suspensionCode: "",
@@ -146,7 +145,6 @@ export default function CaptureMember() {
     const yesNoOptions = YES_NO_OPTIONS;
     const suspensionCodeOptions = SUSPENSION_CODE_OPTIONS;
     const jobGradeOptions = JOB_GRADE_OPTIONS;
-    const managerOptions = MANAGER_OPTIONS;
 
 
 
@@ -303,7 +301,6 @@ export default function CaptureMember() {
                             <>
                                 <Field label="Remarks / Comments" value={form.remarks} onChange={handleChange("remarks")} className="md:col-span-2" />
                                 <Field label="2nd Remarks Field" value={form.remarks2} onChange={handleChange("remarks2")} className="md:col-span-2" />
-                                <Field label="Managers Code" value={form.managersCode} onChange={handleChange("managersCode")} options={managerOptions} />
                                 <Field label="MEMNET Member (Y/N)" value={form.memnetMember} onChange={handleChange("memnetMember")} options={yesNoOptions} />
                                 <Field label="Print Label for Postage (Y/N)" value={form.printLabelForPostage} onChange={handleChange("printLabelForPostage")} options={yesNoOptions} />
                                 <Field label="Suspension Code" value={form.suspensionCode} onChange={handleChange("suspensionCode")} options={suspensionCodeOptions} />
