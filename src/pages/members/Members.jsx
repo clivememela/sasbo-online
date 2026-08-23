@@ -7,7 +7,7 @@ import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, YES_NO_OPTIONS, IDENTITY_TYPE_OPTIONS, SUSPENSION_CODE_OPTIONS, JOB_GRADE_OPTIONS,
     MANAGER_OPTIONS, DAY_OPTIONS, MONTH_OPTIONS, YEAR_OPTIONS,
-    BANK_OPTIONS, BRANCH_OPTIONS, REP_OPTIONS, MEMBER_FIELD_LABEL_MAP,
+    BANK_OPTIONS, BRANCH_OPTIONS, REP_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS,
 } from "../../config/memberConstants.js";
 import { validateSAID, validateEmail, formatDate } from "../../utils/validateSAID.js";
 import PageTitle from "../../components/common/PageTitle.jsx";
@@ -52,9 +52,16 @@ export default function Members() {
         {id: "personal", label: "Personal Information"},
         {id: "membership", label: "Membership & Subscriptions"},
         {id: "employment", label: "Employment & Bank"},
-        {id: "representatives", label: "Recruiter"},
+        {id: "representatives", label: "Recruitment Channel"},
         {id: "history", label: "History & Remarks"},
     ];
+
+    const normalizePaymentType = useCallback((paymentType) => {
+        if (paymentType === "Payroll Deduction") {
+            return "Payroll";
+        }
+        return paymentType;
+    }, []);
 
     const frequencyOptions = FREQUENCY_OPTIONS;
     const titleOptions = TITLE_OPTIONS;
@@ -88,7 +95,7 @@ export default function Members() {
 
     useEffect(() => {
         if (selectedMember) {
-            setEditForm({...selectedMember});
+            setEditForm({...selectedMember, paymentType: normalizePaymentType(selectedMember.paymentType)});
             // Only reset to personal tab if we've switched to a DIFFERENT member
             if (prevMemberIdRef.current !== selectedMember.membershipNumber) {
                 setActiveTab("personal");
@@ -99,12 +106,12 @@ export default function Members() {
             setEditForm({});
             prevMemberIdRef.current = null;
         }
-    }, [selectedMember]);
+    }, [selectedMember, normalizePaymentType]);
 
     const handleEditToggle = () => {
         setIsEditing(!isEditing);
         if (!isEditing) {
-            setEditForm({...selectedMember});
+            setEditForm({...selectedMember, paymentType: normalizePaymentType(selectedMember?.paymentType)});
         }
     };
 
@@ -603,6 +610,11 @@ export default function Members() {
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("employeeNumber")}
                                         />
+                                        <Detail label="Employment Type" value={isEditing ? editForm.employmentType : (selectedMember.employmentType || "-")}
+                                                isEditing={isEditing}
+                                                onChange={handleEditChange("employmentType")}
+                                                options={EMPLOYMENT_TYPE_OPTIONS}
+                                        />
                                         <Detail label="Job Grade" value={isEditing ? editForm.jobGrade : (selectedMember.jobGrade ?? "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("jobGrade")}
@@ -649,14 +661,14 @@ export default function Members() {
                                                     value={isEditing ? editForm.debitDay?.toString().padStart(2, '0') : (selectedMember.debitDay?.toString().padStart(2, '0') || "-")}
                                                     isEditing={isEditing && editForm.paymentType === "Debit Order"}
                                                     onChange={handleEditChange("debitDay")}
-                                                    options={dayOptions}
+                                                    options={DEBIT_DAY_OPTIONS}
                                             />
                                         )}
                                         
-                                        {/* Info message for Payroll Deduction */}
-                                        {isEditing && editForm.paymentType === "Payroll Deduction" && (
+                                        {/* Info message for Payroll */}
+                                        {isEditing && editForm.paymentType === "Payroll" && (
                                             <div className="md:col-span-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-700 dark:text-blue-300">
-                                                ℹ️ Bank account details and debit day are not required for Payroll Deduction
+                                                ℹ️ Bank account details and debit day are not required for Payroll
                                             </div>
                                         )}
                                         
@@ -681,7 +693,7 @@ export default function Members() {
 
                                 {activeTab === "representatives" && (
                                     <>
-                                        <Detail label="Recruitment Rep" value={isEditing ? editForm.recruitmentRep : (selectedMember.recruitmentRep || "-")}
+                                        <Detail label="Recruitment Channel" value={isEditing ? editForm.recruitmentRep : (selectedMember.recruitmentRep || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("recruitmentRep")}
                                                 options={repOptions}

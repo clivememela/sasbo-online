@@ -1,11 +1,12 @@
 export const FREQUENCY_OPTIONS = ['Monthly', 'Quarterly', 'Bi-annually', 'Annually'];
 export const TITLE_OPTIONS = ['Mr', 'Ms', 'Mrs', 'Dr', 'Prof'];
 export const RACE_OPTIONS = ['African', 'White', 'Coloured', 'Indian', 'Other'];
-export const PAYMENT_TYPE_OPTIONS = ['Debit Order', 'Payroll Deduction'];
+export const PAYMENT_TYPE_OPTIONS = ['Debit Order', 'Payroll'];
 export const STATUS_OPTIONS = ['Active', 'Pending', 'Suspended', 'Resigned', 'Retired'];
 export const IDENTITY_TYPE_OPTIONS = ['I.D. Number', 'Passport Number'];
 export const YES_NO_OPTIONS = ['Y', 'N'];
 export const SUSPENSION_CODE_OPTIONS = ['', 'NON-PAY', 'RESIGN'];
+export const EMPLOYMENT_TYPE_OPTIONS = ['Permanent', 'Contract'];
 export const JOB_GRADE_OPTIONS = Array.from({ length: 12 }, (_, i) => (i + 1).toString());
 export const MANAGER_OPTIONS = ['MGR-001'];
 export const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, '0'));
@@ -56,6 +57,8 @@ export const MEMBER_TABS = [
   { id: 'representatives', label: 'Recruitment Channel' },
   { id: 'history', label: 'History & Remarks' },
 ];
+
+export const DEBIT_DAY_OPTIONS = ['20', '25', '31'];
 
 export const MEMBER_FIELD_LABEL_MAP = {
   title: 'Title',

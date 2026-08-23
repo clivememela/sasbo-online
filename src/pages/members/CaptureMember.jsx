@@ -7,7 +7,7 @@ import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, YES_NO_OPTIONS, SUSPENSION_CODE_OPTIONS,
     JOB_GRADE_OPTIONS, MANAGER_OPTIONS, MEMBER_TABS,
-    BANK_OPTIONS, BRANCH_OPTIONS,
+    BANK_OPTIONS, BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS,
 } from "../../config/memberConstants.js";
 import { validateSAID, validateEmail } from "../../utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
@@ -38,10 +38,11 @@ export default function CaptureMember() {
         bankName: "",
         bankAccountNumber: "",
         branch: "",
+        employmentType: "",
         ibtNo: "",
         workIbtNo: "",
         paymentType: "Debit Order",
-        debitDay: "01",
+        debitDay: "20",
         bankAddress: "",
         workBankAddress: "",
         recruitmentRep: "",
@@ -145,7 +146,7 @@ export default function CaptureMember() {
                 Capture Member
             </h2>
             <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                Securely Capture/Register new Sasbo member. Ensure all required personal, employment, and banking information is accurately entered to maintain the integrity of our member database.
+                Securely capture a new Sasbo member. Ensure all required personal, employment, and banking information is accurately entered to maintain the integrity of our member database.
             </p>
 
             <div className="max-w-6xl mx-auto rounded-2xl shadow-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden relative">
@@ -202,18 +203,19 @@ export default function CaptureMember() {
 
                         {activeTab === "membership" && (
                             <>
-                                <Field label="Date Joined" value={form.joinDate} onChange={handleChange("joinDate")} type="date" />
-                                <Field label="Status" value={form.status} onChange={handleChange("status")} options={statusOptions} />
+                                <Field label="Date Joined" value={form.joinDate} onChange={handleChange("joinDate")} type="date" disabled />
+                                <Field label="Status" value={form.status} onChange={handleChange("status")} options={statusOptions} disabled />
 
                                 <SectionTitle title="Sasbo Subscription" />
                                 <Field label="Monthly Subscription" value={form.monthlySubscription} onChange={handleChange("monthlySubscription")} disabled note="*reviewed annually through business discussions *" />
-                                <Field label="Frequency" value={form.subscriptionFrequency} onChange={handleChange("subscriptionFrequency")} options={frequencyOptions} />
+                                <Field label="Frequency" value={form.subscriptionFrequency} onChange={handleChange("subscriptionFrequency")} options={frequencyOptions} disabled />
                             </>
                         )}
 
                         {activeTab === "employment" && (
                             <>
                                 <Field label="Employee Number" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
+                                <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
                                 <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} />
                                 <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={BANK_OPTIONS} searchable />
                                 <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} searchable />
@@ -223,14 +225,14 @@ export default function CaptureMember() {
                                 {form.paymentType === "Debit Order" && (
                                     <>
                                         <Field label="Bank Account Number" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} required />
-                                        <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, "0"))} />
+                                        <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={DEBIT_DAY_OPTIONS} />
                                     </>
                                 )}
                                 
-                                {/* Show info message for Payroll Deduction */}
-                                {form.paymentType === "Payroll Deduction" && (
+                                {/* Show info message for Payroll */}
+                                {form.paymentType === "Payroll" && (
                                     <div className="md:col-span-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-700 dark:text-blue-300">
-                                        ℹ️ Bank account details are not required for Payroll Deduction. Debit day is handled by payroll.
+                                        ℹ️ Bank account details are not required for Payroll. Debit day is handled by payroll.
                                     </div>
                                 )}
                                 
