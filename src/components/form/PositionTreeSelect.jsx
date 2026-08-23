@@ -1,214 +1,142 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ChevronDown, ChevronRight, X } from 'lucide-react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 
 /**
- * Multi-select tree dropdown for hierarchical positions/structures.
+ * Cascading dropdown selects for hierarchical position/structure selection.
+ *
+ * Renders one <select> per hierarchy level. Selecting a parent at level N
+ * populates the children at level N+1.
  *
  * Props:
- *   label        – field label
- *   structures   – flat array of { id, name, parentId }
- *   selectedIds  – array of currently-selected IDs
+ *   structures   – tree array from /api/members/structures/tree (nodes have { id, name, children })
+ *   selectedIds  – array of currently-selected IDs (all levels combined)
  *   onChange     – callback(selectedIds: number[])
- *   placeholder  – placeholder text when nothing selected
+ *   label        – field label
+ *   placeholder  – placeholder text for empty selects
  */
 export default function PositionTreeSelect({
-    label,
     structures = [],
     selectedIds = [],
     onChange,
-    placeholder = 'Select positions...',
+    label,
+    placeholder = 'Select...',
 }) {
-    const [open, setOpen] = useState(false);
-    const [expanded, setExpanded] = useState(new Set());
-    const containerRef = useRef(null);
-
-    // Build tree from flat list
-    const tree = useMemo(() => {
+    // Build a lookup: id → { node, parentChain } for resolving pre-selections
+    const nodeMap = useMemo(() => {
         const map = new Map();
-        structures.forEach(s => map.set(s.id, { ...s, children: [] }));
-        const roots = [];
-        map.forEach(node => {
-            if (node.parentId && map.has(node.parentId)) {
-                map.get(node.parentId).children.push(node);
-            } else {
-                roots.push(node);
-            }
-        });
-        return roots;
+        const walk = (nodes, ancestors) => {
+            nodes.forEach(node => {
+                map.set(node.id, { node, ancestors });
+                if (node.children?.length) walk(node.children, [...ancestors, node.id]);
+            });
+        };
+        walk(structures, []);
+        return map;
     }, [structures]);
 
-    // Close on outside click
+    // Derive level selections from selectedIds (supports pre-selection / edit mode)
+    const initialSelections = useMemo(() => {
+        if (!selectedIds.length || !structures.length) return {};
+        // Use the deepest (last) selected ID to reconstruct the cascade
+        const deepestId = selectedIds[selectedIds.length - 1];
+        const entry = nodeMap.get(deepestId);
+        if (!entry) return {};
+
+        const sel = {};
+        entry.ancestors.forEach((id, level) => { sel[level] = id; });
+        sel[entry.ancestors.length] = deepestId;
+        return sel;
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Track the selected ID at each depth level: { 0: id, 1: id, 2: id, ... }
+    const [selectionsByLevel, setSelectionsByLevel] = useState(initialSelections);
+
+    // Sync external selectedIds changes (e.g. reset when electedRep toggled to N)
     useEffect(() => {
-        const handler = (e) => {
-            if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false);
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
-
-    const toggleExpand = useCallback((id) => {
-        setExpanded(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    }, []);
-
-    const toggleCheck = useCallback((id) => {
-        onChange(
-            selectedIds.includes(id)
-                ? selectedIds.filter(x => x !== id)
-                : [...selectedIds, id]
-        );
-    }, [selectedIds, onChange]);
-
-    // Collect all descendant IDs (including self)
-    const getDescendantIds = useCallback((node) => {
-        const ids = [node.id];
-        node.children.forEach(child => {
-            ids.push(...getDescendantIds(child));
-        });
-        return ids;
-    }, []);
-
-    // Check if all descendants are selected
-    const areAllDescendantsSelected = useCallback((node) => {
-        const ids = getDescendantIds(node);
-        return ids.every(id => selectedIds.includes(id));
-    }, [selectedIds, getDescendantIds]);
-
-    // Check if some (but not all) descendants are selected
-    const areSomeDescendantsSelected = useCallback((node) => {
-        const ids = getDescendantIds(node);
-        const count = ids.filter(id => selectedIds.includes(id)).length;
-        return count > 0 && count < ids.length;
-    }, [selectedIds, getDescendantIds]);
-
-    const toggleParentCheck = useCallback((node) => {
-        const descendantIds = getDescendantIds(node);
-        const allSelected = descendantIds.every(id => selectedIds.includes(id));
-        if (allSelected) {
-            // Deselect all descendants
-            onChange(selectedIds.filter(id => !descendantIds.includes(id)));
-        } else {
-            // Select all descendants
-            const newIds = [...new Set([...selectedIds, ...descendantIds])];
-            onChange(newIds);
+        if (selectedIds.length === 0) {
+            setSelectionsByLevel({});
         }
-    }, [selectedIds, onChange, getDescendantIds]);
+    }, [selectedIds]);
 
-    const handleClear = useCallback((e) => {
-        e.stopPropagation();
-        onChange([]);
-    }, [onChange]);
+    // Determine the options available at each level based on the tree
+    const levels = useMemo(() => {
+        const result = [];
 
-    // Build display text for selected items
-    const displayText = useMemo(() => {
-        if (selectedIds.length === 0) return null;
-        return selectedIds
-            .map(id => structures.find(s => s.id === id)?.name)
-            .filter(Boolean)
-            .join(', ');
-    }, [selectedIds, structures]);
+        // Level 0: root nodes
+        result.push(structures);
 
-    // Recursive tree node renderer
-    const renderNode = (node, depth = 0) => {
-        const hasChildren = node.children.length > 0;
-        const isExpanded = expanded.has(node.id);
-        const isChecked = selectedIds.includes(node.id);
-        const allChildrenChecked = hasChildren && areAllDescendantsSelected(node);
-        const someChildrenChecked = hasChildren && areSomeDescendantsSelected(node);
-        const indent = depth * 16;
+        // Subsequent levels: children of the selected node at the previous level
+        let currentLevelNodes = structures;
+        let level = 0;
+        while (true) {
+            const selectedId = selectionsByLevel[level];
+            if (selectedId == null) break;
 
-        return (
-            <li key={node.id}>
-                <div
-                    className={`flex items-center gap-1 py-1.5 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 cursor-pointer`}
-                    style={{ paddingLeft: `${8 + indent}px`, paddingRight: '8px' }}
-                >
-                    {/* Expand/collapse toggle */}
-                    {hasChildren ? (
-                        <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); toggleExpand(node.id); }}
-                            className="shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                            aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                        >
-                            {isExpanded
-                                ? <ChevronDown size={14} className="text-gray-500 dark:text-gray-400" />
-                                : <ChevronRight size={14} className="text-gray-500 dark:text-gray-400" />}
-                        </button>
-                    ) : (
-                        <span className="w-5 shrink-0" />
-                    )}
+            const selectedNode = currentLevelNodes.find(n => n.id === selectedId);
+            if (!selectedNode || !selectedNode.children || selectedNode.children.length === 0) break;
 
-                    {/* Checkbox */}
-                    <input
-                        type="checkbox"
-                        checked={allChildrenChecked || isChecked}
-                        ref={el => { if (el) el.indeterminate = someChildrenChecked && !allChildrenChecked; }}
-                        onChange={() => hasChildren ? toggleParentCheck(node) : toggleCheck(node.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500 shrink-0"
-                    />
+            result.push(selectedNode.children);
+            currentLevelNodes = selectedNode.children;
+            level++;
+        }
 
-                    {/* Label */}
-                    <span
-                        className={`text-sm select-none ${
-                            isChecked || allChildrenChecked
-                                ? 'text-cyan-700 dark:text-cyan-300 font-medium'
-                                : 'text-gray-800 dark:text-gray-200'
-                        }`}
-                        onClick={() => hasChildren ? toggleParentCheck(node) : toggleCheck(node.id)}
-                    >
-                        {node.name}
-                    </span>
-                </div>
+        return result;
+    }, [structures, selectionsByLevel]);
 
-                {/* Children */}
-                {hasChildren && isExpanded && (
-                    <ul>{node.children.map(child => renderNode(child, depth + 1))}</ul>
-                )}
-            </li>
-        );
-    };
+    const handleSelect = useCallback((level, id) => {
+        const newSelections = { ...selectionsByLevel };
+
+        if (id === '' || id == null) {
+            // Clear this level and all below
+            delete newSelections[level];
+            Object.keys(newSelections).forEach(key => {
+                if (Number(key) > level) delete newSelections[key];
+            });
+        } else {
+            // Set this level, clear all below
+            newSelections[level] = Number(id);
+            Object.keys(newSelections).forEach(key => {
+                if (Number(key) > level) delete newSelections[key];
+            });
+        }
+
+        setSelectionsByLevel(newSelections);
+
+        // Collect all selected IDs across all levels
+        const allIds = Object.values(newSelections).map(Number);
+        onChange(allIds);
+    }, [selectionsByLevel, onChange]);
+
+    // Don't render if no structures available
+    if (structures.length === 0) return null;
+
+    const selectCls =
+        'w-full rounded-lg px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white border-gray-200 dark:border-gray-700';
 
     return (
-        <div ref={containerRef} className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            {label && <span>{label}</span>}
-            <div className="relative">
-                <button
-                    type="button"
-                    onClick={() => setOpen(o => !o)}
-                    className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-sm font-normal normal-case tracking-normal border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400"
-                >
-                    <span className={`truncate ${!displayText ? 'text-gray-400 dark:text-gray-500' : ''}`}>
-                        {displayText || placeholder}
-                    </span>
-                    <span className="flex items-center gap-1 shrink-0 ml-2">
-                        {selectedIds.length > 0 && (
-                            <X
-                                size={12}
-                                onClick={handleClear}
-                                aria-label="Clear all"
-                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                            />
-                        )}
-                        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
-                    </span>
-                </button>
+        <div className="flex flex-col gap-2">
+            {label && (
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {label}
+                </span>
+            )}
 
-                {open && (
-                    <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg max-h-64 overflow-y-auto">
-                        {tree.length === 0 ? (
-                            <div className="px-3 py-2 text-sm text-gray-400">No positions available</div>
-                        ) : (
-                            <ul className="py-1">{tree.map(node => renderNode(node))}</ul>
-                        )}
-                    </div>
-                )}
-            </div>
+            {levels.map((options, level) => (
+                <div key={level} className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                        {level === 0 ? 'Level 1' : `Level ${level + 1}`}
+                    </label>
+                    <select
+                        value={selectionsByLevel[level] ?? ''}
+                        onChange={(e) => handleSelect(level, e.target.value)}
+                        className={selectCls}
+                    >
+                        <option value="">{placeholder}</option>
+                        {options.map(node => (
+                            <option key={node.id} value={node.id}>{node.name}</option>
+                        ))}
+                    </select>
+                </div>
+            ))}
         </div>
     );
 }
