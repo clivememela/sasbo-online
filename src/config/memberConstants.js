@@ -4,6 +4,7 @@ export const RACE_OPTIONS = ['African', 'White', 'Coloured', 'Indian', 'Other'];
 export const PAYMENT_TYPE_OPTIONS = ['Debit Order', 'Payroll'];
 export const STATUS_OPTIONS = ['Active', 'Pending', 'Suspended', 'Resigned', 'Retired'];
 export const IDENTITY_TYPE_OPTIONS = ['I.D. Number', 'Passport Number'];
+export const GENDER_OPTIONS = ['Male', 'Female'];
 export const YES_NO_OPTIONS = ['Y', 'N'];
 export const SUSPENSION_CODE_OPTIONS = ['', 'NON-PAY', 'RESIGN'];
 export const EMPLOYMENT_TYPE_OPTIONS = ['Permanent', 'Contract'];
@@ -66,6 +67,8 @@ export const MEMBER_FIELD_LABEL_MAP = {
   firstNames: 'First Names',
   surname: 'Surname',
   identityNumber: 'I.D. Number',
+  dateOfBirth: 'Date of Birth',
+  gender: 'Gender',
   race: 'Race',
   email: 'Email Address',
   phone: 'Cell Tel',

@@ -179,10 +179,11 @@ export default function AddressAutocomplete({
 
   return (
     <div className={`${className} relative`} ref={wrapperRef}>
-      <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+      <label htmlFor="address-autocomplete-input" className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
         <span>{label}</span>
         <div className="relative">
           <input
+            id="address-autocomplete-input"
             type="text"
             value={query}
             onChange={handleInputChange}
@@ -190,7 +191,6 @@ export default function AddressAutocomplete({
             onFocus={() => { if (predictions.length > 0) setIsOpen(true); }}
             placeholder={placeholder}
             disabled={disabled}
-            aria-label={label}
             autoComplete="off"
             className={inputCls(error)}
           />

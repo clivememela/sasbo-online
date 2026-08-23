@@ -5,11 +5,11 @@ import { recruiterService } from "../../services/recruiterService.js";
 import { Button, PositionTreeSelect } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
-    STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, YES_NO_OPTIONS, SUSPENSION_CODE_OPTIONS,
+    STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, YES_NO_OPTIONS, SUSPENSION_CODE_OPTIONS,
     JOB_GRADE_OPTIONS, MANAGER_OPTIONS, MEMBER_TABS,
     BANK_OPTIONS, BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS,
 } from "../../config/memberConstants.js";
-import { validateSAID, validateEmail } from "../../utils/validateSAID.js";
+import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID, formatDate } from "../../utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 
 export default function CaptureMember() {
@@ -21,6 +21,8 @@ export default function CaptureMember() {
         surname: "",
         identityType: "",
         identityNumber: "",
+        dateOfBirth: "",
+        gender: "",
         race: "",
         personalEmail: "",
         workEmail: "",
@@ -105,7 +107,15 @@ export default function CaptureMember() {
                 : validateSAID(value);
             if (error) {
                 setFieldErrors((prev) => ({ ...prev, [field]: error }));
+            } else if (value.length === 13) {
+                const dob = extractDateOfBirthFromSAID(value);
+                const gender = extractGenderFromSAID(value);
+                if (dob) setForm((prev) => ({ ...prev, dateOfBirth: dob }));
+                if (gender) setForm((prev) => ({ ...prev, gender }));
             }
+        }
+        if (field === "identityType") {
+            setForm((prev) => ({ ...prev, dateOfBirth: "", gender: "" }));
         }
         if (field === "personalEmail" || field === "workEmail") {
             const error = validateEmail(value);
@@ -132,11 +142,11 @@ export default function CaptureMember() {
     const statusOptions = STATUS_OPTIONS;
     const frequencyOptions = FREQUENCY_OPTIONS;
     const identityTypeOptions = IDENTITY_TYPE_OPTIONS;
+    const genderOptions = GENDER_OPTIONS;
     const yesNoOptions = YES_NO_OPTIONS;
     const suspensionCodeOptions = SUSPENSION_CODE_OPTIONS;
     const jobGradeOptions = JOB_GRADE_OPTIONS;
     const managerOptions = MANAGER_OPTIONS;
-    const paymentTypeOptions = PAYMENT_TYPE_OPTIONS;
 
 
 
@@ -191,6 +201,20 @@ export default function CaptureMember() {
                                     onChange={handleChange("identityNumber")}
                                     error={form.identityType === "I.D. Number" ? fieldErrors.identityNumber : null}
                                     disabled={!form.identityType}
+                                />
+                                <Field
+                                    label="Date of Birth"
+                                    value={form.identityType === "I.D. Number" ? formatDate(form.dateOfBirth) : form.dateOfBirth}
+                                    onChange={handleChange("dateOfBirth")}
+                                    type={form.identityType === "I.D. Number" ? "text" : "date"}
+                                    disabled={form.identityType === "I.D. Number"}
+                                />
+                                <Field
+                                    label="Gender"
+                                    value={form.gender}
+                                    onChange={handleChange("gender")}
+                                    options={form.identityType === "I.D. Number" ? null : genderOptions}
+                                    disabled={form.identityType === "I.D. Number"}
                                 />
                                 <Field label="Race" value={form.race} onChange={handleChange("race")} options={raceOptions} />
                                 <EmailFields form={form} setForm={setForm} handleChange={handleChange} fieldErrors={fieldErrors} />
@@ -380,7 +404,7 @@ function SearchableSelect({ value, onChange, options, error, disabled }) {
             {open && filtered.length > 0 && (
                 <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg text-sm">
                     {filtered.map((opt) => (
-                        <li key={opt} onMouseDown={() => handleSelect(opt)}
+                        <li key={opt} role="option" aria-selected={false} onClick={() => handleSelect(opt)}
                             className="px-4 py-2 cursor-pointer hover:bg-cyan-50 dark:hover:bg-cyan-900/30 text-gray-900 dark:text-white">
                             {opt}
                         </li>
@@ -392,25 +416,49 @@ function SearchableSelect({ value, onChange, options, error, disabled }) {
     );
 }
 
+function togglePersonalPreferred(setForm) {
+    setForm((prev) => {
+        const hasPersonal = prev.preferredEmail === "personal" || prev.preferredEmail === "both";
+        const hasWork = prev.preferredEmail === "work" || prev.preferredEmail === "both";
+        if (hasPersonal && hasWork) return { ...prev, preferredEmail: "work" };
+        if (hasPersonal) return { ...prev, preferredEmail: "" };
+        if (hasWork) return { ...prev, preferredEmail: "both" };
+        return { ...prev, preferredEmail: "personal" };
+    });
+}
+
+function toggleWorkPreferred(setForm) {
+    setForm((prev) => {
+        const hasPersonal = prev.preferredEmail === "personal" || prev.preferredEmail === "both";
+        const hasWork = prev.preferredEmail === "work" || prev.preferredEmail === "both";
+        if (hasWork && hasPersonal) return { ...prev, preferredEmail: "personal" };
+        if (hasWork) return { ...prev, preferredEmail: "" };
+        if (hasPersonal) return { ...prev, preferredEmail: "both" };
+        return { ...prev, preferredEmail: "work" };
+    });
+}
+
 function EmailFields({ form, setForm, handleChange, fieldErrors }) {
     return (
         <>
             <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+                <label htmlFor="personalEmail" className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
                     Personal Email
                 </label>
                 <div className="flex items-center gap-2">
                     <input
+                        id="personalEmail"
                         type="email"
                         value={form.personalEmail || ""}
                         onChange={handleChange("personalEmail")}
                         className={fieldCls(fieldErrors.personalEmail)}
                     />
-                    <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
+                    <label htmlFor="prefPersonal" className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
                         <input
+                            id="prefPersonal"
                             type="checkbox"
                             checked={form.preferredEmail === "personal" || form.preferredEmail === "both"}
-                            onChange={() => setForm((prev) => { const has = prev.preferredEmail === "personal" || prev.preferredEmail === "both"; const hasWork = prev.preferredEmail === "work" || prev.preferredEmail === "both"; return { ...prev, preferredEmail: has ? (hasWork ? "work" : "") : (hasWork ? "both" : "personal") }; })}
+                            onChange={() => togglePersonalPreferred(setForm)}
                             className="accent-cyan-600 w-4 h-4"
                         />
                         Preferred
@@ -419,21 +467,23 @@ function EmailFields({ form, setForm, handleChange, fieldErrors }) {
                 {fieldErrors.personalEmail && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{fieldErrors.personalEmail}</p>}
             </div>
             <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+                <label htmlFor="workEmail" className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
                     Work Email
                 </label>
                 <div className="flex items-center gap-2">
                     <input
+                        id="workEmail"
                         type="email"
                         value={form.workEmail || ""}
                         onChange={handleChange("workEmail")}
                         className={fieldCls(fieldErrors.workEmail)}
                     />
-                    <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
+                    <label htmlFor="prefWork" className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
                         <input
+                            id="prefWork"
                             type="checkbox"
                             checked={form.preferredEmail === "work" || form.preferredEmail === "both"}
-                            onChange={() => setForm((prev) => { const hasPersonal = prev.preferredEmail === "personal" || prev.preferredEmail === "both"; const has = prev.preferredEmail === "work" || prev.preferredEmail === "both"; return { ...prev, preferredEmail: has ? (hasPersonal ? "personal" : "") : (hasPersonal ? "both" : "work") }; })}
+                            onChange={() => toggleWorkPreferred(setForm)}
                             className="accent-cyan-600 w-4 h-4"
                         />
                         Preferred
@@ -445,10 +495,11 @@ function EmailFields({ form, setForm, handleChange, fieldErrors }) {
     );
 }
 
-function Field({ label, value, onChange, className = "", options = null, type = "text", error = null, disabled = false, searchable = false, note = null }) {
+function Field({ label, value, onChange, className = "", options = null, type = "text", error = null, disabled = false, searchable = false, note = null, id }) {
+    const fieldId = id || label.toLowerCase().replace(/\s+/g, "-");
     return (
         <div className={className}>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+            <label htmlFor={fieldId} className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
                 {label}
             </label>
             {note && <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">{note}</p>}
@@ -456,14 +507,14 @@ function Field({ label, value, onChange, className = "", options = null, type = 
                 {options && searchable ? (
                     <SearchableSelect value={value} onChange={onChange} options={options} error={error} disabled={disabled} />
                 ) : options ? (
-                    <select value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled}>
+                    <select id={fieldId} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled}>
                         <option value="">Select...</option>
                         {options.map((opt) => (
                             <option key={opt} value={opt}>{opt}</option>
                         ))}
                     </select>
                 ) : (
-                    <input type={type} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled} />
+                    <input id={fieldId} type={type} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled} />
                 )}
                 {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
             </div>

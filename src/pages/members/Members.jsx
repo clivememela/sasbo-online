@@ -5,11 +5,11 @@ import {memberService} from "../../services/memberService.js";
 import { TextInput, SearchableSelect, Button } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
-    STATUS_OPTIONS, YES_NO_OPTIONS, IDENTITY_TYPE_OPTIONS, SUSPENSION_CODE_OPTIONS, JOB_GRADE_OPTIONS,
+    STATUS_OPTIONS, YES_NO_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, SUSPENSION_CODE_OPTIONS, JOB_GRADE_OPTIONS,
     MANAGER_OPTIONS, DAY_OPTIONS, MONTH_OPTIONS, YEAR_OPTIONS,
     BANK_OPTIONS, BRANCH_OPTIONS, REP_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS,
 } from "../../config/memberConstants.js";
-import { validateSAID, validateEmail, formatDate } from "../../utils/validateSAID.js";
+import { validateSAID, validateEmail, formatDate, extractDateOfBirthFromSAID, extractGenderFromSAID } from "../../utils/validateSAID.js";
 import PageTitle from "../../components/common/PageTitle.jsx";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 
@@ -76,6 +76,7 @@ export default function Members() {
     const jobGradeOptions = JOB_GRADE_OPTIONS;
     const managerOptions = MANAGER_OPTIONS;
     const identityTypeOptions = IDENTITY_TYPE_OPTIONS;
+    const genderOptions = GENDER_OPTIONS;
     const repOptions = REP_OPTIONS;
     const dayOptions = DAY_OPTIONS;
     const monthOptions = MONTH_OPTIONS;
@@ -131,6 +132,16 @@ export default function Members() {
             }
             return newErrors;
         });
+        // Auto-populate DOB and gender from SA ID number
+        if (field === "identityNumber" && value.length === 13) {
+            const dob = extractDateOfBirthFromSAID(value);
+            const gender = extractGenderFromSAID(value);
+            if (dob) setEditForm(prev => ({ ...prev, dateOfBirth: dob }));
+            if (gender) setEditForm(prev => ({ ...prev, gender }));
+        }
+        if (field === "identityType") {
+            setEditForm(prev => ({ ...prev, dateOfBirth: "", gender: "" }));
+        }
     }, []);
 
     const handleSaveChanges = () => {
@@ -491,21 +502,37 @@ export default function Members() {
                                                 error={fieldErrors.identityNumber}
                                                 disabled={isEditing && !editForm.identityType}
                                         />
+                                        <Detail
+                                            label="Date of Birth"
+                                            value={getDobDisplayValue(isEditing, editForm, selectedMember)}
+                                            isEditing={isEditing && editForm.identityType !== "I.D. Number"}
+                                            onChange={handleEditChange("dateOfBirth")}
+                                            type={editForm.identityType === "I.D. Number" ? "text" : "date"}
+                                            disabled={editForm.identityType === "I.D. Number"}
+                                        />
+                                        <Detail
+                                            label="Gender"
+                                            value={isEditing ? editForm.gender : (selectedMember.gender || "-")}
+                                            isEditing={isEditing && editForm.identityType !== "I.D. Number"}
+                                            onChange={handleEditChange("gender")}
+                                            options={editForm.identityType === "I.D. Number" ? null : genderOptions}
+                                            disabled={editForm.identityType === "I.D. Number"}
+                                        />
                                         <Detail label="Race" value={isEditing ? editForm.race : (selectedMember.race || "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("race")}
                                                 options={raceOptions}
                                         />
                                         <div>
-                                            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Personal Email</label>
+                                            <label htmlFor="edit-personal-email" className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Personal Email</label>
                                             {isEditing ? (
                                                 <>
                                                     <div className="flex items-center gap-2">
-                                                        <input type="email" value={editForm.personalEmail || ""} onChange={handleEditChange("personalEmail")}
+                                                        <input id="edit-personal-email" type="email" value={editForm.personalEmail || ""} onChange={handleEditChange("personalEmail")}
                                                             className={fieldCls(fieldErrors.personalEmail)} />
-                                                        <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
-                                                            <input type="checkbox" checked={editForm.preferredEmail === "personal" || editForm.preferredEmail === "both"}
-                                                                onChange={() => setEditForm(prev => { const has = prev.preferredEmail === "personal" || prev.preferredEmail === "both"; const hasWork = prev.preferredEmail === "work" || prev.preferredEmail === "both"; return {...prev, preferredEmail: has ? (hasWork ? "work" : "") : (hasWork ? "both" : "personal")}; })}
+                                                        <label htmlFor="edit-pref-personal" className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
+                                                            <input id="edit-pref-personal" type="checkbox" checked={editForm.preferredEmail === "personal" || editForm.preferredEmail === "both"}
+                                                                onChange={() => toggleEditPersonalPreferred(setEditForm)}
                                                                 className="accent-cyan-600 w-4 h-4" />
                                                             Preferred
                                                         </label>
@@ -519,15 +546,15 @@ export default function Members() {
                                             )}
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Work Email</label>
+                                            <label htmlFor="edit-work-email" className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Work Email</label>
                                             {isEditing ? (
                                                 <>
                                                     <div className="flex items-center gap-2">
-                                                        <input type="email" value={editForm.workEmail || ""} onChange={handleEditChange("workEmail")}
+                                                        <input id="edit-work-email" type="email" value={editForm.workEmail || ""} onChange={handleEditChange("workEmail")}
                                                             className={fieldCls(fieldErrors.workEmail)} />
-                                                        <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
-                                                            <input type="checkbox" checked={editForm.preferredEmail === "work" || editForm.preferredEmail === "both"}
-                                                                onChange={() => setEditForm(prev => { const hasPersonal = prev.preferredEmail === "personal" || prev.preferredEmail === "both"; const has = prev.preferredEmail === "work" || prev.preferredEmail === "both"; return {...prev, preferredEmail: has ? (hasPersonal ? "personal" : "") : (hasPersonal ? "both" : "work")}; })}
+                                                        <label htmlFor="edit-pref-work" className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
+                                                            <input id="edit-pref-work" type="checkbox" checked={editForm.preferredEmail === "work" || editForm.preferredEmail === "both"}
+                                                                onChange={() => toggleEditWorkPreferred(setEditForm)}
                                                                 className="accent-cyan-600 w-4 h-4" />
                                                             Preferred
                                                         </label>
@@ -863,7 +890,7 @@ function DetailSearchableSelect({ value, onChange, options, error, disabled }) {
             {open && filtered.length > 0 && (
                 <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg text-sm">
                     {filtered.map(opt => (
-                        <li key={opt} onMouseDown={() => handleSelect(opt)}
+                        <li key={opt} role="option" aria-selected={false} onClick={() => handleSelect(opt)}
                             className="px-4 py-2 cursor-pointer hover:bg-cyan-50 dark:hover:bg-cyan-900/30 text-gray-900 dark:text-white">
                             {opt}
                         </li>
@@ -875,10 +902,43 @@ function DetailSearchableSelect({ value, onChange, options, error, disabled }) {
     );
 }
 
+function getDobDisplayValue(isEditing, editForm, selectedMember) {
+    if (isEditing) {
+        if (editForm.identityType === "I.D. Number") {
+            return formatDate(editForm.dateOfBirth);
+        }
+        return editForm.dateOfBirth;
+    }
+    return selectedMember.dateOfBirth ? formatDate(selectedMember.dateOfBirth) : "-";
+}
+
+function toggleEditPersonalPreferred(setEditForm) {
+    setEditForm(prev => {
+        const hasPersonal = prev.preferredEmail === "personal" || prev.preferredEmail === "both";
+        const hasWork = prev.preferredEmail === "work" || prev.preferredEmail === "both";
+        if (hasPersonal && hasWork) return { ...prev, preferredEmail: "work" };
+        if (hasPersonal) return { ...prev, preferredEmail: "" };
+        if (hasWork) return { ...prev, preferredEmail: "both" };
+        return { ...prev, preferredEmail: "personal" };
+    });
+}
+
+function toggleEditWorkPreferred(setEditForm) {
+    setEditForm(prev => {
+        const hasPersonal = prev.preferredEmail === "personal" || prev.preferredEmail === "both";
+        const hasWork = prev.preferredEmail === "work" || prev.preferredEmail === "both";
+        if (hasWork && hasPersonal) return { ...prev, preferredEmail: "personal" };
+        if (hasWork) return { ...prev, preferredEmail: "" };
+        if (hasPersonal) return { ...prev, preferredEmail: "both" };
+        return { ...prev, preferredEmail: "work" };
+    });
+}
+
 function Detail({label, value, isEditing, onChange, className = "", options = null, type = "text", error = null, searchable = false, disabled = false, note = null}) {
+    const detailId = `detail-${label.toLowerCase().replace(/\s+/g, "-")}`;
     return (
         <div className={className}>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+            <label htmlFor={detailId} className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
                 {label}
             </label>
             {note && <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">{note}</p>}
@@ -887,14 +947,14 @@ function Detail({label, value, isEditing, onChange, className = "", options = nu
                     {options && searchable ? (
                         <DetailSearchableSelect value={value} onChange={onChange} options={options} error={error} disabled={disabled} />
                     ) : options ? (
-                        <select value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled}>
+                        <select id={detailId} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled}>
                             <option value="">Select...</option>
                             {options.map(opt => (
                                 <option key={opt} value={opt}>{opt}</option>
                             ))}
                         </select>
                     ) : (
-                        <input type={type} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled} />
+                        <input id={detailId} type={type} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled} />
                     )}
                     {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
                 </div>
