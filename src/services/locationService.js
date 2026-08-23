@@ -24,4 +24,27 @@ export const locationService = {
         console.error('Failed to fetch provinces:', err);
         throw err;
       }),
+
+    getDistricts: provinceId =>
+      fetch(apiUrl(`/api/districts?provinceId=${provinceId}`), { credentials: 'include' })
+        .then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+          return r.json();
+        })
+        .catch(err => {
+          console.error('Failed to fetch districts:', err);
+          throw err;
+        }),
+
+    getAreas: districtId =>
+      fetch(apiUrl(`/api/areas?districtId=${districtId}`), { credentials: 'include' })
+        .then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+          return r.json();
+        })
+        .catch(err => {
+          console.error('Failed to fetch areas:', err);
+          throw err;
+        }),
+
 };

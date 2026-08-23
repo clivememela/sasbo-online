@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, Button } from "../../components/form";
+import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import { validateEmail } from "../../utils/validateSAID.js";
 
 const EMPTY = {
@@ -169,8 +170,8 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
           <section className="space-y-4">
             <h4 className="text-sm font-bold uppercase tracking-widest text-cyan-600 dark:text-cyan-500 border-l-4 border-cyan-600 pl-3">Address</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <TextInput label="Physical Address" value={form.physicalAddress} onChange={set("physicalAddress")} placeholder="Street address" />
-              <TextInput label="Postal Address" value={form.postalAddress} onChange={set("postalAddress")} placeholder="Postal address" />
+              <AddressAutocomplete label="Physical Address" value={form.physicalAddress} onChange={set("physicalAddress")} placeholder="Start typing a physical address..." />
+              <AddressAutocomplete label="Postal Address" value={form.postalAddress} onChange={set("postalAddress")} placeholder="Start typing a postal address..." />
             </div>
           </section>
 

@@ -11,6 +11,7 @@ import {
 } from "../../config/memberConstants.js";
 import { validateSAID, validateEmail, formatDate } from "../../utils/validateSAID.js";
 import PageTitle from "../../components/common/PageTitle.jsx";
+import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 
 const PAGE_SIZE = memberService.getPageSize();
 
@@ -322,8 +323,8 @@ export default function Members() {
                                              title={`${m.title ? m.title + " " : ""}${m.initials} ${m.surname}`}>
                                             {m.title ? `${m.title} ` : ""}{m.initials} {m.surname}
                                         </div>
-                                        <div className="truncate" title={m.preferredEmail === "work" ? m.workEmail : m.personalEmail}>
-                                            {m.preferredEmail === "work" ? m.workEmail : m.personalEmail}
+                                        <div className="truncate" title={m.preferredEmail === "both" ? `${m.personalEmail || ''}, ${m.workEmail || ''}` : (m.preferredEmail === "work" ? m.workEmail : m.personalEmail)}>
+                                            {m.preferredEmail === "both" ? (<><span className="text-cyan-600 dark:text-cyan-400">{m.personalEmail || '-'}</span><span className="text-gray-400">, </span><span className="text-cyan-600 dark:text-cyan-400">{m.workEmail || '-'}</span></>) : (m.preferredEmail === "work" ? m.workEmail : m.personalEmail)}
                                         </div>
                                         <div className="truncate" title={m.phone}>{m.phone}</div>
                                         <div className="truncate" title={m.identityNumber}>{m.identityNumber}</div>
@@ -496,8 +497,8 @@ export default function Members() {
                                                         <input type="email" value={editForm.personalEmail || ""} onChange={handleEditChange("personalEmail")}
                                                             className={fieldCls(fieldErrors.personalEmail)} />
                                                         <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
-                                                            <input type="checkbox" checked={editForm.preferredEmail === "personal"}
-                                                                onChange={() => setEditForm(prev => ({...prev, preferredEmail: "personal"}))}
+                                                            <input type="checkbox" checked={editForm.preferredEmail === "personal" || editForm.preferredEmail === "both"}
+                                                                onChange={() => setEditForm(prev => { const has = prev.preferredEmail === "personal" || prev.preferredEmail === "both"; const hasWork = prev.preferredEmail === "work" || prev.preferredEmail === "both"; return {...prev, preferredEmail: has ? (hasWork ? "work" : "") : (hasWork ? "both" : "personal")}; })}
                                                                 className="accent-cyan-600 w-4 h-4" />
                                                             Preferred
                                                         </label>
@@ -505,8 +506,8 @@ export default function Members() {
                                                     {fieldErrors.personalEmail && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{fieldErrors.personalEmail}</p>}
                                                 </>
                                             ) : (
-                                                <p className={`mt-0.5 text-sm font-semibold break-all ${selectedMember.preferredEmail === "personal" ? "text-cyan-600 dark:text-cyan-400" : "text-gray-800 dark:text-gray-200"}`}>
-                                                    {selectedMember.personalEmail || "-"}{selectedMember.preferredEmail === "personal" && <span className="ml-1 text-xs text-green-600 dark:text-green-400">(preferred)</span>}
+                                                <p className={`mt-0.5 text-sm font-semibold break-all ${(selectedMember.preferredEmail === "personal" || selectedMember.preferredEmail === "both") ? "text-cyan-600 dark:text-cyan-400" : "text-gray-800 dark:text-gray-200"}`}>
+                                                    {selectedMember.personalEmail || "-"}{(selectedMember.preferredEmail === "personal" || selectedMember.preferredEmail === "both") && <span className="ml-1 text-xs text-green-600 dark:text-green-400">(preferred)</span>}
                                                 </p>
                                             )}
                                         </div>
@@ -518,8 +519,8 @@ export default function Members() {
                                                         <input type="email" value={editForm.workEmail || ""} onChange={handleEditChange("workEmail")}
                                                             className={fieldCls(fieldErrors.workEmail)} />
                                                         <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
-                                                            <input type="checkbox" checked={editForm.preferredEmail === "work"}
-                                                                onChange={() => setEditForm(prev => ({...prev, preferredEmail: "work"}))}
+                                                            <input type="checkbox" checked={editForm.preferredEmail === "work" || editForm.preferredEmail === "both"}
+                                                                onChange={() => setEditForm(prev => { const hasPersonal = prev.preferredEmail === "personal" || prev.preferredEmail === "both"; const has = prev.preferredEmail === "work" || prev.preferredEmail === "both"; return {...prev, preferredEmail: has ? (hasPersonal ? "personal" : "") : (hasPersonal ? "both" : "work")}; })}
                                                                 className="accent-cyan-600 w-4 h-4" />
                                                             Preferred
                                                         </label>
@@ -527,8 +528,8 @@ export default function Members() {
                                                     {fieldErrors.workEmail && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{fieldErrors.workEmail}</p>}
                                                 </>
                                             ) : (
-                                                <p className={`mt-0.5 text-sm font-semibold break-all ${selectedMember.preferredEmail === "work" ? "text-cyan-600 dark:text-cyan-400" : "text-gray-800 dark:text-gray-200"}`}>
-                                                    {selectedMember.workEmail || "-"}{selectedMember.preferredEmail === "work" && <span className="ml-1 text-xs text-green-600 dark:text-green-400">(preferred)</span>}
+                                                <p className={`mt-0.5 text-sm font-semibold break-all ${(selectedMember.preferredEmail === "work" || selectedMember.preferredEmail === "both") ? "text-cyan-600 dark:text-cyan-400" : "text-gray-800 dark:text-gray-200"}`}>
+                                                    {selectedMember.workEmail || "-"}{(selectedMember.preferredEmail === "work" || selectedMember.preferredEmail === "both") && <span className="ml-1 text-xs text-green-600 dark:text-green-400">(preferred)</span>}
                                                 </p>
                                             )}
                                         </div>
@@ -544,11 +545,14 @@ export default function Members() {
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("homeTel")}
                                         />
-                                        <Detail label="Address" value={isEditing ? editForm.address : (selectedMember.address || "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("address")}
-                                                className="md:col-span-2"
-                                        />
+                                        {isEditing ? (
+                                            <AddressAutocomplete label="Address" value={editForm.address || ""} onChange={handleEditChange("address")} placeholder="Start typing an address..." className="md:col-span-2" />
+                                        ) : (
+                                            <div className="md:col-span-2">
+                                                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Address</label>
+                                                <p className="mt-0.5 text-sm font-semibold text-gray-800 dark:text-gray-200">{selectedMember.address || "-"}</p>
+                                            </div>
+                                        )}
                                     </>
                                 )}
 
@@ -656,15 +660,22 @@ export default function Members() {
                                             </div>
                                         )}
                                         
-                                        <Detail label="Bank Address" value={isEditing ? editForm.bankAddress : (selectedMember.bankAddress || "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("bankAddress")}
-                                                className="md:col-span-2"/>
-                                        <Detail label="Work Bank Address"
-                                                value={isEditing ? editForm.workBankAddress : (selectedMember.workBankAddress || "-")}
-                                                isEditing={isEditing}
-                                                onChange={handleEditChange("workBankAddress")}
-                                                className="md:col-span-2"/>
+                                        {isEditing ? (
+                                            <AddressAutocomplete label="Bank Address" value={editForm.bankAddress || ""} onChange={handleEditChange("bankAddress")} placeholder="Start typing a bank address..." className="md:col-span-2" />
+                                        ) : (
+                                            <div className="md:col-span-2">
+                                                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Bank Address</label>
+                                                <p className="mt-0.5 text-sm font-semibold text-gray-800 dark:text-gray-200">{selectedMember.bankAddress || "-"}</p>
+                                            </div>
+                                        )}
+                                        {isEditing ? (
+                                            <AddressAutocomplete label="Work Bank Address" value={editForm.workBankAddress || ""} onChange={handleEditChange("workBankAddress")} placeholder="Start typing a work bank address..." className="md:col-span-2" />
+                                        ) : (
+                                            <div className="md:col-span-2">
+                                                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Work Bank Address</label>
+                                                <p className="mt-0.5 text-sm font-semibold text-gray-800 dark:text-gray-200">{selectedMember.workBankAddress || "-"}</p>
+                                            </div>
+                                        )}
                                     </>
                                 )}
 
@@ -794,11 +805,6 @@ export default function Members() {
         </div>
     );
 }
-
-const normalizeDate = (val) => {
-    if (!val || val === "-") return "";
-    return val.toString().replace(/,/g, "-").split("-").map(p => p.padStart(2, "0")).join("-");
-};
 
 const fieldCls = (error, disabled = false) =>
     `w-full rounded-lg px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400

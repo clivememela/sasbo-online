@@ -51,9 +51,9 @@ export const REP_OPTIONS = [
 
 export const MEMBER_TABS = [
   { id: 'personal', label: 'Personal Information' },
-  { id: 'membership', label: 'Membership & Subscription' },
   { id: 'employment', label: 'Employment & Bank' },
-  { id: 'representatives', label: 'Representatives' },
+  { id: 'membership', label: 'Membership & Subscriptions' },
+  { id: 'representatives', label: 'Recruitment Channel' },
   { id: 'history', label: 'History & Remarks' },
 ];
 

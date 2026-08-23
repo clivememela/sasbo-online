@@ -322,7 +322,7 @@ export function Representatives() {
 
     const handleRemoveRep = async (rep) => {
         const repMems = members.filter(m => m.recruitmentRepresentativeId === rep.id);
-        if (!window.confirm(`Remove representative "${rep.name}"? This will set \${repMems.length} member(s) to Inactive and clear their rep assignment.`)) return;
+        if (!window.confirm(`Remove representative "${rep.name}"? This will set ${repMems.length} member(s) to Inactive and clear their rep assignment.`)) return;
         try {
             setSaving(true);
             await Promise.all(repMems.map(m => {
@@ -593,7 +593,7 @@ export function Representatives() {
                                         const val = e.target.value;
                                         setEditRepFields(p => ({ ...p, email: val }));
                                         setEditRepErrors(p => ({ ...p, email: validateEmail(val) || undefined }));
-                                    }} className={`mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 \${editRepErrors.email ? 'border-red-500 dark:border-red-400' : 'border-gray-200 dark:border-gray-700'}`} />
+                                    }} className={`mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 ${editRepErrors.email ? 'border-red-500 dark:border-red-400' : 'border-gray-200 dark:border-gray-700'}`} />
                                     {editRepErrors.email && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{editRepErrors.email}</p>}
                                 </div>
                                 <div>
@@ -731,7 +731,7 @@ export function Representatives() {
                                         if (!q) return true;
                                         return (
                                             (m.membershipNumber ?? '').toLowerCase().includes(q) ||
-                                            `\${m.initials || ''} \${m.surname || ''}`.toLowerCase().includes(q) ||
+                                            `${m.initials || ''} ${m.surname || ''}`.toLowerCase().includes(q) ||
                                             (m.firstNames ?? '').toLowerCase().includes(q) ||
                                             (m.bankName ?? '').toLowerCase().includes(q)
                                         );
@@ -739,7 +739,7 @@ export function Representatives() {
                                     .slice(0, 50)
                                     .map(m => (
                                         <div key={m.id} onClick={() => setNewRepMember(m)}
-                                             className={`grid grid-cols-4 gap-3 px-4 py-3 text-sm cursor-pointer transition \${newRepMember?.id === m.id ? 'bg-cyan-50 dark:bg-cyan-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+                                             className={`grid grid-cols-4 gap-3 px-4 py-3 text-sm cursor-pointer transition ${newRepMember?.id === m.id ? 'bg-cyan-50 dark:bg-cyan-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
                                             <div className="font-medium text-cyan-700 dark:text-cyan-400">{m.membershipNumber}</div>
                                             <div className="truncate">{m.title ? `${m.title} ` : ''}{m.initials} {m.surname}</div>
                                             <div className="truncate text-xs text-gray-600 dark:text-gray-400">{m.bankName}</div>
@@ -806,7 +806,7 @@ export function Representatives() {
                             <div>
                                 <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Member Details</p>
                                 <div className="mt-1 flex flex-wrap items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
-                                    <span>{selectedMember.title ? `\${selectedMember.title} ` : ''}{selectedMember.initials} {selectedMember.surname}</span>
+                                    <span>{selectedMember.title ? `${selectedMember.title} ` : ''}{selectedMember.initials} {selectedMember.surname}</span>
                                     <span className="text-gray-400">•</span>
                                     <span className="text-sm font-normal text-gray-600 dark:text-gray-300">{selectedMember.membershipNumber}</span>
                                     <span className="text-gray-400">•</span>
@@ -827,7 +827,7 @@ export function Representatives() {
                                     <DRow label="Surname" value={selectedMember.surname} />
                                     <DRow label="ID Number" value={selectedMember.identityNumber} />
                                     <DRow label="Race" value={selectedMember.race} />
-                                    <DRow label="Email" value={(selectedMember.preferredEmail === "work" ? selectedMember.workEmail : selectedMember.personalEmail) || '—'} className="break-all text-cyan-600 dark:text-cyan-400" />
+                                    <DRow label="Email" value={selectedMember.preferredEmail === "both" ? [selectedMember.personalEmail, selectedMember.workEmail].filter(Boolean).join(', ') || '—' : ((selectedMember.preferredEmail === "work" ? selectedMember.workEmail : selectedMember.personalEmail) || '—')} className="break-all text-cyan-600 dark:text-cyan-400" />
                                     <DRow label="Cell" value={selectedMember.phone || selectedMember.cellTel} />
                                     <DRow label="Work Tel" value={selectedMember.workTel} />
                                     <DRow label="Home Tel" value={selectedMember.homeTel} />
@@ -886,7 +886,7 @@ function StatusBadge({ status }) {
         : status === 'Pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
             : status === 'Suspended' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
                 : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400';
-    return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold \${cls}`}>{status || 'Unknown'}</span>;
+    return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}>{status || 'Unknown'}</span>;
 }
 
 function Section({ title, children }) {
@@ -902,7 +902,7 @@ function DRow({ label, value, className = '' }) {
     return (
         <div>
             <p className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">{label}</p>
-            <p className={`text-sm font-semibold text-gray-800 dark:text-gray-200 \${className}`}>{value || '—'}</p>
+            <p className={`text-sm font-semibold text-gray-800 dark:text-gray-200 ${className}`}>{value || '—'}</p>
         </div>
     );
 }

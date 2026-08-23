@@ -10,6 +10,7 @@ import {
     BANK_OPTIONS, BRANCH_OPTIONS,
 } from "../../config/memberConstants.js";
 import { validateSAID, validateEmail } from "../../utils/validateSAID.js";
+import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 
 export default function CaptureMember() {
     const [activeTab, setActiveTab] = useState("personal");
@@ -136,6 +137,8 @@ export default function CaptureMember() {
     const managerOptions = MANAGER_OPTIONS;
     const paymentTypeOptions = PAYMENT_TYPE_OPTIONS;
 
+
+
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
             <h2 className="text-3xl text-center mb-4 text-cyan-700 dark:text-cyan-400">
@@ -193,7 +196,7 @@ export default function CaptureMember() {
                                 <Field label="Cellphone Number" value={form.phone} onChange={handleChange("phone")} />
                                 <Field label="Work Tel" value={form.workTel} onChange={handleChange("workTel")} />
                                 <Field label="Home Tel" value={form.homeTel} onChange={handleChange("homeTel")} />
-                                <Field label="Residential Address" value={form.address} onChange={handleChange("address")} className="md:col-span-2" />
+                                <AddressAutocomplete label="Residential Address" value={form.address} onChange={handleChange("address")} placeholder="Start typing a residential address..." className="md:col-span-2" />
                             </>
                         )}
 
@@ -214,7 +217,7 @@ export default function CaptureMember() {
                                 <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} />
                                 <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={BANK_OPTIONS} searchable />
                                 <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} searchable />
-                                <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={paymentTypeOptions} />
+                                <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
                                 
                                 {/* Bank Account Number - Only visible for Debit Order */}
                                 {form.paymentType === "Debit Order" && (
@@ -233,7 +236,7 @@ export default function CaptureMember() {
                                 
                                 <Field label="IBT No." value={form.ibtNo} onChange={handleChange("ibtNo")} />
                                 <Field label="Work IBT No." value={form.workIbtNo} onChange={handleChange("workIbtNo")} />
-                                <Field label="Bank Address" value={form.bankAddress} onChange={handleChange("bankAddress")} className="md:col-span-2" />
+                                <AddressAutocomplete label="Bank Address" value={form.bankAddress} onChange={handleChange("bankAddress")} placeholder="Start typing a bank address..." className="md:col-span-2" />
                             </>
                         )}
 
@@ -404,8 +407,8 @@ function EmailFields({ form, setForm, handleChange, fieldErrors }) {
                     <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
                         <input
                             type="checkbox"
-                            checked={form.preferredEmail === "personal"}
-                            onChange={() => setForm((prev) => ({ ...prev, preferredEmail: "personal" }))}
+                            checked={form.preferredEmail === "personal" || form.preferredEmail === "both"}
+                            onChange={() => setForm((prev) => { const has = prev.preferredEmail === "personal" || prev.preferredEmail === "both"; const hasWork = prev.preferredEmail === "work" || prev.preferredEmail === "both"; return { ...prev, preferredEmail: has ? (hasWork ? "work" : "") : (hasWork ? "both" : "personal") }; })}
                             className="accent-cyan-600 w-4 h-4"
                         />
                         Preferred
@@ -427,8 +430,8 @@ function EmailFields({ form, setForm, handleChange, fieldErrors }) {
                     <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
                         <input
                             type="checkbox"
-                            checked={form.preferredEmail === "work"}
-                            onChange={() => setForm((prev) => ({ ...prev, preferredEmail: "work" }))}
+                            checked={form.preferredEmail === "work" || form.preferredEmail === "both"}
+                            onChange={() => setForm((prev) => { const hasPersonal = prev.preferredEmail === "personal" || prev.preferredEmail === "both"; const has = prev.preferredEmail === "work" || prev.preferredEmail === "both"; return { ...prev, preferredEmail: has ? (hasPersonal ? "personal" : "") : (hasPersonal ? "both" : "work") }; })}
                             className="accent-cyan-600 w-4 h-4"
                         />
                         Preferred
