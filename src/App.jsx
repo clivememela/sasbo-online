@@ -19,7 +19,7 @@ import Acb from "./pages/admin/Acb.jsx";
 import AcbDebits from "./pages/acb/AcbDebits.jsx"
 import DailyMenu from "./pages/admin/DailyMenu.jsx";
 import MonthlyMenu from "./pages/admin/MonthlyMenu.jsx";
-import {Representatives} from "./pages/members/Representatives.jsx";
+import {Recruiters} from "./pages/members/Recruiters.jsx";
 import CaptureMember from "./pages/members/CaptureMember.jsx";
 import Maintenance from "./pages/admin/Maintenance.jsx";
 import BankListing from "./pages/bank_branch/BankListing.jsx";
@@ -42,13 +42,13 @@ function App() {
         <Route path="admin/acb/debits" element={<AcbDebits />} />
         <Route path="admin/daily-menu" element={<DailyMenu />} />
         <Route path="admin/monthly-menu" element={<MonthlyMenu />} />
-        <Route path="representatives" element={<Representatives />} />
+        <Route path="recruiters" element={<Recruiters />} />
         <Route path="banks" element={<BanksPage />} />
         <Route path="banks/listing" element={<BankListing />} />
         <Route path="members" element={<MembersPage />} />
         <Route path="members/apply" element={<MembershipApplication />} />
         <Route path="members/capture" element={<CaptureMember />} />
-        <Route path="members/representatives" element={<Representatives />} />
+        <Route path="members/recruiters" element={<Recruiters />} />
         <Route path="maintenance/subscriptions" element={<Subscriptions />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="reports/organizer-report" element={<OrganizerReport />} />

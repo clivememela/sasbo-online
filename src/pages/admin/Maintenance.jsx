@@ -51,9 +51,9 @@ const maintenance_cards = [
         desc: 'Maintain Subscription Table'
     },
     /*{
-        title: 'Representatives',
+        title: 'Recruiters',
         icon: LucideUserKey,
-        desc: 'Maintain Representatives',
+        desc: 'Maintain Recruiters',
         color: 'text-red-600 dark:text-red-400'
     },
     {

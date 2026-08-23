@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
-import { representativeService } from "../../services/representativeService.js";
+import { recruiterService } from "../../services/recruiterService.js";
 import { Button, PositionTreeSelect } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
@@ -69,10 +69,10 @@ export default function CaptureMember() {
     const [structures, setStructures] = useState([]);
 
     useEffect(() => {
-        representativeService.getAll()
+        recruiterService.getAll()
             .then(data => setReps(data || []))
-            .catch(err => console.error('Failed to fetch representatives:', err));
-        representativeService.getStructures()
+            .catch(err => console.error('Failed to fetch recruiters:', err));
+        recruiterService.getStructures()
             .then(data => setStructures(data || []))
             .catch(err => console.error('Failed to fetch structures:', err));
     }, []);
@@ -242,11 +242,11 @@ export default function CaptureMember() {
 
                         {activeTab === "representatives" && (
                             <>
-                                <Field label="Recruitment Representative" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} options={reps.map(r => r.name).filter(Boolean)} searchable />
-                                <Field label="Area's Representative" value={form.areasRep} onChange={handleChange("areasRep")} options={reps.map(r => r.name).filter(Boolean)} searchable />
+                                <Field label="Recruiter" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} options={reps.map(r => r.name).filter(Boolean)} searchable />
+                                <Field label="Area's Recruiter" value={form.areasRep} onChange={handleChange("areasRep")} options={reps.map(r => r.name).filter(Boolean)} searchable />
 
-                                <SectionTitle title="Elected Representative" />
-                                <Field label="Elected Representative (Y/N)" value={form.electedRep} onChange={(e) => {
+                                <SectionTitle title="Elected Recruiter" />
+                                <Field label="Elected Recruiter (Y/N)" value={form.electedRep} onChange={(e) => {
                                     const val = e.target.value;
                                     setForm(prev => ({
                                         ...prev,

@@ -3,14 +3,15 @@ import { ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import { TextInput, SearchableSelect, Button, PositionTreeSelect } from '../../components/form';
 import { memberService } from '../../services/memberService.js';
-import { representativeService } from '../../services/representativeService.js';
+import { recruiterService } from '../../services/recruiterService.js';
+import { recruiterTypeService } from '../../services/recruiterTypeService.js';
 import { bankService } from '../../services/bankService.js';
 import { locationService } from '../../services/locationService.js';
 import { validateEmail } from '../../utils/validateSAID.js';
 
 const PAGE_SIZE = 20;
 
-export function Representatives() {
+export function Recruiters() {
     const [members, setMembers] = useState([]);
     const [reps, setReps] = useState([]);
     const [banksData, setBanksData] = useState([]);
@@ -32,10 +33,11 @@ export function Representatives() {
     const [repSearch, setRepSearch] = useState({ membershipNumber: '', name: '', bank: '', branch: '', status: '' });
     const [structures, setStructures] = useState([]);
     const [roles, setRoles] = useState([]);
+    const [recruiterTypes, setRecruiterTypes] = useState([]);
 
     const refreshAll = useCallback(() => Promise.all([
         memberService.getMembers(),
-        representativeService.getAll(),
+        recruiterService.getAll(),
     ]).then(([m, r]) => {
         setMembers(m);
         setReps(r);
@@ -45,8 +47,9 @@ export function Representatives() {
         refreshAll();
         bankService.getBanks().then(setBanksData).catch(err => console.error(err));
         locationService.getProvinces().then(setProvincesData).catch(err => console.error(err));
-        representativeService.getStructures().then(setStructures).catch(err => console.error(err));
-        representativeService.getRoles().then(setRoles).catch(err => console.error(err));
+        recruiterService.getStructures().then(setStructures).catch(err => console.error(err));
+        recruiterService.getRoles().then(setRoles).catch(err => console.error(err));
+        recruiterTypeService.getAll().then(setRecruiterTypes).catch(err => console.error(err));
     }, [refreshAll]);
 
     const BANK_NAMES = useMemo(() => [...new Set(banksData.map(b => b?.bankName).filter(Boolean))].sort(), [banksData]);
@@ -65,7 +68,19 @@ export function Representatives() {
     }, [banksData]);
 
     const ROLES = useMemo(() => roles.map(r => ({ ...r })), [roles]);
-    const STRUCTURES = useMemo(() => structures.map(s => ({ ...s })), [structures]);
+    const STRUCTURES_TREE = structures;
+    const STRUCTURES = useMemo(() => {
+        const flat = [];
+        const walk = (nodes) => {
+            nodes.forEach(n => {
+                flat.push({ id: n.id, name: n.name, parentId: n.parentId });
+                if (n.children?.length) walk(n.children);
+            });
+        };
+        walk(structures);
+        return flat;
+    }, [structures]);
+    const RECRUITER_TYPES = useMemo(() => recruiterTypes.filter(r => r.enabled).sort((a, b) => a.name.localeCompare(b.name)), [recruiterTypes]);
 
     const repList = useMemo(() => {
         const memberMap = {};
@@ -104,6 +119,7 @@ export function Representatives() {
                 roleId: r.roleId || null,
                 isElectedRep: r.isElectedRep || false,
                 electionDate: r.electionDate || null,
+                recruiterTypeId: r.recruiterTypeId || null,
                 structureIds: r.structureIds || [],
                 banks: [...d.bankSet].filter(Boolean).join(', '),
                 branches: [...d.branchSet].filter(Boolean).join(', '),
@@ -200,7 +216,7 @@ export function Representatives() {
 
     const handleCloseMemberModal = useCallback(() => setSelectedMember(null), []);
     const handleCloseAddMember = useCallback(() => setShowAddMember(false), []);
-    const handleCloseAddRep = useCallback(() => { setShowAddRep(false); setNewRepDetails({ roleId: null, isElectedRep: false, electionDate: '', structureIds: [] }); }, []);
+    const handleCloseAddRep = useCallback(() => { setShowAddRep(false); setNewRepDetails({ roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] }); }, []);
     const handleCloseRepDetail = useCallback(() => {
         setSelectedRepDetail(null);
         setEditingRep(false);
@@ -288,12 +304,16 @@ export function Representatives() {
         }
     };
 
-    const [newRepDetails, setNewRepDetails] = useState({ roleId: null, isElectedRep: false, electionDate: '', structureIds: [] });
+    const [newRepDetails, setNewRepDetails] = useState({ roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] });
 
     const handleAddRep = async () => {
         if (!newRepMember) return;
+        if (!newRepDetails.recruiterTypeId) {
+            alert('Please select a recruiter type.');
+            return;
+        }
         if (repList.some(r => r.memberId === newRepMember.id)) {
-            alert('This member is already a representative.');
+            alert('This member is already a recruiter.');
             return;
         }
         try {
@@ -303,15 +323,16 @@ export function Representatives() {
                 memberId: newRepMember.id,
                 name: repName,
                 roleId: newRepDetails.roleId,
+                recruiterTypeId: newRepDetails.recruiterTypeId,
                 isElectedRep: newRepDetails.isElectedRep,
                 electionDate: newRepDetails.isElectedRep ? newRepDetails.electionDate || null : null,
                 structureIds: newRepDetails.structureIds,
             };
-            const createdRep = await representativeService.create(payload);
+            const createdRep = await recruiterService.create(payload);
             await refreshAll();
             setShowAddRep(false);
             setNewRepMember(null);
-            setNewRepDetails({ roleId: null, isElectedRep: false, electionDate: '', structureIds: [] });
+            setNewRepDetails({ roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] });
             setSelectedRep({ id: createdRep?.id, name: repName });
         } catch (err) {
             alert(err);
@@ -322,17 +343,17 @@ export function Representatives() {
 
     const handleRemoveRep = async (rep) => {
         const repMems = members.filter(m => m.recruitmentRepresentativeId === rep.id);
-        if (!window.confirm(`Remove representative "${rep.name}"? This will set ${repMems.length} member(s) to Inactive and clear their rep assignment.`)) return;
+        if (!window.confirm(`Remove recruiter "${rep.name}"? This will set ${repMems.length} member(s) to Inactive and clear their recruiter assignment.`)) return;
         try {
             setSaving(true);
             await Promise.all(repMems.map(m => {
                 const cleanData = sanitizeMemberPayload(m, { areasRep: '', status: 'Inactive' });
                 return memberService.updateMember(cleanData);
             }));
-            await representativeService.remove(rep.id);
+            await recruiterService.remove(rep.id);
             await refreshAll();
         } catch (err) {
-            alert(`Could not remove representative context completely: ${err.message || err}`);
+            alert(`Could not remove recruiter context completely: ${err.message || err}`);
         } finally {
             setSaving(false);
         }
@@ -340,13 +361,13 @@ export function Representatives() {
 
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
-            <PageTitle title="Representatives" />
+            <PageTitle title="Recruiters" />
             <p className="text-center text-gray-600 dark:text-gray-400 mb-4">
-                Browse Sasbo representatives and the members they represent
+                Browse Sasbo recruiters and the members they recruit
             </p>
             <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-                    <TextInput label="Rep Name" value={filters.repName} onChange={handleFilter('repName')} placeholder="Search rep name" />
+                    <TextInput label="Recruiter Name" value={filters.repName} onChange={handleFilter('repName')} placeholder="Search recruiter name" />
                     <SearchableSelect label="Bank Name" value={filters.bankName} onChange={handleFilter('bankName')} placeholder="All Banks"
                                       options={[{ value: '', label: 'All Banks' }, ...BANK_NAMES.map(b => ({ value: b, label: b }))]} />
                     <SearchableSelect label="Branch" value={filters.branch} onChange={handleFilter('branch')}
@@ -358,7 +379,7 @@ export function Representatives() {
                 </div>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
           <span className="text-gray-600 dark:text-gray-300">
-            {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} representatives
+            {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} recruiters
           </span>
                     <div className="flex items-center gap-2">
                         <Button variant="pagination" onClick={handlePrevPage} disabled={page === 1}>Prev</Button>
@@ -366,13 +387,13 @@ export function Representatives() {
                         <Button variant="pagination" onClick={handleNextPage} disabled={page === totalPages}>Next</Button>
                         <Button onClick={handleClear}>Clear</Button>
                         <Button variant="primary" onClick={handleOpenAddRep}>
-                            <UserPlus size={14} /> Add Rep
+                            <UserPlus size={14} /> Add Recruiter
                         </Button>
                     </div>
                 </div>
                 <div className="mt-4 rounded-xl overflow-hidden border border-transparent max-h-[60vh] overflow-y-auto">
                     <div className="grid grid-cols-7 gap-3 px-4 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300 sticky top-0 z-10">
-                        <div>Representative</div>
+                        <div>Recruiter</div>
                         <div>Bank(s)</div>
                         <div>Branch(es)</div>
                         <div>Province</div>
@@ -382,7 +403,7 @@ export function Representatives() {
                     </div>
                     <div className="divide-y divide-gray-200 dark:divide-gray-700">
                         {visible.length === 0 ? (
-                            <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">No representatives match your search.</div>
+                            <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">No recruiters match your search.</div>
                         ) : visible.map(repMembers => (
                             <div key={repMembers.id} onClick={() => setSelectedRep({ id: repMembers.id, name: repMembers.name })}
                                  className="grid grid-cols-7 gap-3 px-4 py-3 text-sm bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition items-center">
@@ -400,7 +421,7 @@ export function Representatives() {
                   </span>
                                 </div>
                                 <div className="flex justify-end" onClick={e => e.stopPropagation()}>
-                                    <button onClick={() => handleRemoveRep(repMembers)} disabled={saving} title="Remove representative"
+                                    <button onClick={() => handleRemoveRep(repMembers)} disabled={saving} title="Remove recruiter"
                                             className="p-1.5 rounded-md text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition disabled:opacity-40">
                                         <UserMinus size={14} />
                                     </button>
@@ -418,7 +439,7 @@ export function Representatives() {
                     <div className="relative w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
                             <div>
-                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Representative</p>
+                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Recruiter</p>
                                 <div className="flex items-center gap-2">
                                     <h3 className="text-lg font-semibold text-cyan-700 dark:text-cyan-400">{selectedRep.name}</h3>
                                     <div className="relative group">
@@ -432,7 +453,7 @@ export function Representatives() {
                                             <Eye size={14} />
                                         </button>
                                         <span className="absolute left-1/2 -translate-x-1/2 top-7 z-50 whitespace-nowrap rounded-md bg-gray-800 text-white text-xs px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
-                      View representative details
+                      View recruiter details
                     </span>
                                     </div>
                                 </div>
@@ -507,7 +528,7 @@ export function Representatives() {
                     <div className="relative w-full max-w-2xl max-h-[80vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
                             <div>
-                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Add member to representative :</p>
+                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Add member to recruiter :</p>
                                 <h3 className="text-base font-semibold text-cyan-700 dark:text-cyan-400">{selectedRep.name}</h3>
                             </div>
                             <CloseBtn onClick={handleCloseAddMember} />
@@ -555,7 +576,7 @@ export function Representatives() {
                     <div className="relative w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                             <div>
-                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Representative Details</p>
+                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Recruiter Details</p>
                                 <h3 className="text-base font-semibold text-cyan-700 dark:text-cyan-400">{selectedRepDetail.name}</h3>
                             </div>
                             <div className="flex items-center gap-2">
@@ -567,6 +588,7 @@ export function Representatives() {
                                                     email: selectedRepDetail.email || '',
                                                     phone: selectedRepDetail.phone || '',
                                                     roleId: selectedRepDetail.roleId || null,
+                                                    recruiterTypeId: selectedRepDetail.recruiterTypeId || null,
                                                     isElectedRep: selectedRepDetail.isElectedRep || false,
                                                     electionDate: selectedRepDetail.electionDate || '',
                                                     structureIds: selectedRepDetail.structureIds || [],
@@ -602,6 +624,14 @@ export function Representatives() {
                                            className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
                                 </div>
                                 <div>
+                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Recruiter Type</label>
+                                    <select value={editRepFields.recruiterTypeId || ''} onChange={e => setEditRepFields(p => ({ ...p, recruiterTypeId: e.target.value ? Number(e.target.value) : null }))}
+                                            className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                                        <option value="">Select recruiter type...</option>
+                                        {RECRUITER_TYPES.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
+                                    </select>
+                                </div>
+                                <div>
                                     <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Role</label>
                                     <select value={editRepFields.roleId || ''} onChange={e => setEditRepFields(p => ({ ...p, roleId: e.target.value ? Number(e.target.value) : null }))}
                                             className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
@@ -610,7 +640,7 @@ export function Representatives() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Elected Representative</label>
+                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Elected Recruiter</label>
                                     <div className="mt-1 flex items-center gap-3">
                                         <button type="button" onClick={() => setEditRepFields(p => ({ ...p, isElectedRep: true }))}
                                                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${editRepFields.isElectedRep ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>Yes</button>
@@ -628,7 +658,7 @@ export function Representatives() {
                                 <div className="md:col-span-2">
                                     <PositionTreeSelect
                                         label="Structures / Positions"
-                                        structures={STRUCTURES}
+                                        structures={STRUCTURES_TREE}
                                         selectedIds={editRepFields.structureIds || []}
                                         onChange={(ids) => setEditRepFields(p => ({ ...p, structureIds: ids }))}
                                         placeholder="Select positions..."
@@ -644,11 +674,12 @@ export function Representatives() {
                                 <DRow label="Branch(es)" value={selectedRepDetail.branches || '—'} />
                                 <DRow label="Province" value={selectedRepDetail.provinces || '—'} />
                                 <DRow label="Area" value={selectedRepDetail.areas || '—'} />
+                                <DRow label="Recruiter Type" value={RECRUITER_TYPES.find(rt => rt.id === selectedRepDetail.recruiterTypeId)?.name || '—'} />
                                 <DRow label="Role" value={ROLES.find(r => r.id === selectedRepDetail.roleId)?.name || '—'} />
                                 <DRow label="Elected Rep" value={selectedRepDetail.isElectedRep ? 'Yes' : 'No'} />
                                 {selectedRepDetail.isElectedRep && <DRow label="Election Date" value={selectedRepDetail.electionDate || '—'} />}
                                 <DRow label="Structures" value={(selectedRepDetail.structureIds || []).map(sid => STRUCTURES.find(s => s.id === sid)?.name).filter(Boolean).join(', ') || '—'} />
-                                <DRow label="Members Represented" value={selectedRepDetail.count} />
+                                <DRow label="Members Recruited" value={selectedRepDetail.count} />
                             </div>
                         )}
                         <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
@@ -662,11 +693,12 @@ export function Representatives() {
                                                     const payload = {
                                                         ...editRepFields,
                                                         roleId: editRepFields.roleId,
+                                                        recruiterTypeId: editRepFields.recruiterTypeId,
                                                         isElectedRep: editRepFields.isElectedRep,
                                                         electionDate: editRepFields.isElectedRep ? editRepFields.electionDate || null : null,
                                                         structureIds: editRepFields.structureIds || [],
                                                     };
-                                                    await representativeService.update(selectedRepDetail.id, payload);
+                                                    await recruiterService.update(selectedRepDetail.id, payload);
                                                     await refreshAll();
                                                     setSelectedRepDetail(d => ({ ...d, ...editRepFields }));
                                                     if (selectedRep?.id === selectedRepDetail.id) setSelectedRep(r => ({ ...r, ...editRepFields }));
@@ -688,15 +720,15 @@ export function Representatives() {
                 </div>
             )}
 
-            {/* Add Representative Modal */}
+            {/* Add Recruiter Modal */}
             {showAddRep && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
                     <div className="absolute inset-0 bg-black/60" onClick={handleCloseAddRep} />
                     <div className="relative w-full max-w-lg max-h-[80vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
                             <div>
-                                <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Add Representative</h3>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">A representative must be an existing member</p>
+                                <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Add Recruiter</h3>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">A recruiter must be an existing member</p>
                             </div>
                             <CloseBtn onClick={handleCloseAddRep} />
                         </div>
@@ -751,7 +783,15 @@ export function Representatives() {
                         </div>
                         {newRepMember && (
                             <div className="px-6 py-4 space-y-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
-                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Representative Details</p>
+                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Recruiter Details</p>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Recruiter Type *</label>
+                                    <select value={newRepDetails.recruiterTypeId || ''} onChange={e => setNewRepDetails(p => ({ ...p, recruiterTypeId: e.target.value ? Number(e.target.value) : null }))}
+                                            className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                                        <option value="">Select recruiter type...</option>
+                                        {RECRUITER_TYPES.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
+                                    </select>
+                                </div>
                                 <div>
                                     <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Role</label>
                                     <select value={newRepDetails.roleId || ''} onChange={e => setNewRepDetails(p => ({ ...p, roleId: e.target.value ? Number(e.target.value) : null }))}
@@ -761,7 +801,7 @@ export function Representatives() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Elected Representative</label>
+                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Elected Recruiter</label>
                                     <div className="mt-1 flex items-center gap-3">
                                         <button type="button" onClick={() => setNewRepDetails(p => ({ ...p, isElectedRep: true }))}
                                                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${newRepDetails.isElectedRep ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>Yes</button>
@@ -779,7 +819,7 @@ export function Representatives() {
                                 <div>
                                     <PositionTreeSelect
                                         label="Structures / Positions"
-                                        structures={STRUCTURES}
+                                        structures={STRUCTURES_TREE}
                                         selectedIds={newRepDetails.structureIds}
                                         onChange={(ids) => setNewRepDetails(p => ({ ...p, structureIds: ids }))}
                                         placeholder="Select positions..."
@@ -790,7 +830,7 @@ export function Representatives() {
                         <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2 shrink-0">
                             <Button onClick={handleCloseAddRep}>Cancel</Button>
                             <Button variant="primary" onClick={handleAddRep} disabled={!newRepMember || saving}>
-                                <UserPlus size={14} /> Make Representative
+                                <UserPlus size={14} /> Make Recruiter
                             </Button>
                         </div>
                     </div>
@@ -852,7 +892,7 @@ export function Representatives() {
                                     <DRow label="Current Balance" value={selectedMember.currentBalance} />
                                     <DRow label="Arrears Balance" value={selectedMember.arrearsBalance} />
                                 </Section>
-                                <Section title="Representatives">
+                                <Section title="Recruiters">
                                     <DRow label="Area's Rep" value={selectedMember.areasRep} />
                                     <DRow label="Recruitment Rep" value={selectedMember.recruitmentRep} />
                                     <DRow label="Elected Rep" value={selectedMember.electedRep} />

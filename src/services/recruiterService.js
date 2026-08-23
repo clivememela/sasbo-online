@@ -5,11 +5,11 @@ const handleResponse = (r) => {
   return r.json();
 };
 
-export const representativeService = {
+export const recruiterService = {
   getAll: () =>
     fetch(apiUrl('/api/representatives'), { credentials: 'include' })
       .then(handleResponse)
-      .catch(err => { console.error('Failed to fetch representatives:', err); throw err; }),
+      .catch(err => { console.error('Failed to fetch recruiters:', err); throw err; }),
 
   create: (data) =>
     fetch(apiUrl('/api/representatives'), {
@@ -36,7 +36,7 @@ export const representativeService = {
     }),
 
   getStructures: () =>
-    fetch(apiUrl('/api/members/structures'), { credentials: 'include' })
+    fetch(apiUrl('/api/members/structures/tree'), { credentials: 'include' })
       .then(handleResponse)
       .catch(err => { console.error('Failed to fetch structures:', err); throw err; }),
 

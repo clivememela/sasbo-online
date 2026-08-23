@@ -14,10 +14,10 @@ const cards = [
         desc: 'Search/Capture/Amend Member Records and Details'
     },
     {
-        title: 'Representatives',
+        title: 'Recruiters',
         icon: LucidePresentation,
-        href: '/representatives',
-        desc: 'Capture/Print Representatives'
+        href: '/recruiters',
+        desc: 'Capture/Print Recruiters'
     },
     //{ title: 'Member', icon: LucideUserCheck2, href: '/members', desc: 'Member Detail Enquiry' },
     //{ title: 'Member', icon: LucidePenBox, href: '/members/capture', desc: 'Capture/Print Member Audit Trail' },

@@ -52,7 +52,7 @@ export default function Members() {
         {id: "personal", label: "Personal Information"},
         {id: "membership", label: "Membership & Subscriptions"},
         {id: "employment", label: "Employment & Bank"},
-        {id: "representatives", label: "Representatives"},
+        {id: "representatives", label: "Recruiter"},
         {id: "history", label: "History & Remarks"},
     ];
 
@@ -707,7 +707,7 @@ export default function Members() {
                                                 onChange={handleEditChange("repElectionYear")}
                                                 options={yearOptions}
                                         />
-                                        <Detail label="Elected Sasbo Representative (Y/N)"
+                                        <Detail label="Elected Sasbo Recruiter (Y/N)"
                                                 value={isEditing ? editForm.electedRep : (selectedMember.electedRep ?? "-")}
                                                 isEditing={isEditing}
                                                 onChange={handleEditChange("electedRep")}

@@ -45,10 +45,10 @@ export const navItems = [
             ]
           },
           {
-            title: 'Representatives',
+            title: 'Recruiters',
             icon: LucidePresentation,
-            href: '/representatives',
-            desc: 'Capture/Print Representatives'
+            href: '/recruiters',
+            desc: 'Capture/Print Recruiters'
           },
           // {
           //   title: 'Print Members Audit Trail',
@@ -368,10 +368,10 @@ export const navItems = [
     ]
   },
   {
-    title: 'Representatives',
+    title: 'Recruiters',
     icon: LucidePresentation,
-    href: '/representatives',
-    desc: 'Capture/Print Representatives'
+    href: '/recruiters',
+    desc: 'Capture/Print Recruiters'
   },
   {
     title: 'Subscriptions',
