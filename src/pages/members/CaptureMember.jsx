@@ -146,8 +146,6 @@ export default function CaptureMember() {
     const suspensionCodeOptions = SUSPENSION_CODE_OPTIONS;
     const jobGradeOptions = JOB_GRADE_OPTIONS;
 
-
-
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
             <h2 className="text-3xl text-center mb-4 text-cyan-700 dark:text-cyan-400">
