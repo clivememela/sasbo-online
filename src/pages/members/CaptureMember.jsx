@@ -165,7 +165,7 @@ export default function CaptureMember() {
 
                 {/* Tab Navigation */}
                 <div className="px-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
-                    <div className="flex flex-wrap -mb-px">
+                    <div className="flex -mb-px">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
