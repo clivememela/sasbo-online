@@ -14,6 +14,8 @@ export const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => (i + 1).toString
 export const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 export const YEAR_OPTIONS = Array.from({ length: 21 }, (_, i) => (new Date().getFullYear() - 10 + i).toString());
 
+export const BEC_STRUCTURE_OPTIONS = ['Shop Stewart', 'Branch Executive Committee'];
+
 export const BANK_OPTIONS = [
   'Absa Bank', 'Absa Bank Limited', 'Access Bank (South Africa) Limited', 'AfrAsia Bank Limited', 'African Bank Limited',
   'Albaraka Bank Limited', 'Banco Internacional de Credito', 'Bank Julius Baer & Co. Ltd', 'Bank Lombard Odier & Co Limited',
@@ -117,4 +119,8 @@ export const MEMBER_FIELD_LABEL_MAP = {
   deductACB: 'Deduct Subs through ACB (Y/N)',
   printMembershipCards: 'Print Membership Cards (Y/N)',
   homeLoanReducedRateOption: 'Home Loan Reduced Interest Rate Option (Y/N)',
+  isRepresentative: 'Is Representative',
+  roleId: 'Representative Role',
+  structureId: 'Union Structure / Position',
+  electionDate: 'Election Date',
 };

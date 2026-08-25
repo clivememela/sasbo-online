@@ -5,12 +5,37 @@ import { recruiterService } from "../../services/recruiterService.js";
 import { Button, PositionTreeSelect } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
-    STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, YES_NO_OPTIONS, SUSPENSION_CODE_OPTIONS,
-    JOB_GRADE_OPTIONS, MEMBER_TABS,
-    BANK_OPTIONS, BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS,
+    STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, YES_NO_OPTIONS,
+    SUSPENSION_CODE_OPTIONS, JOB_GRADE_OPTIONS, MEMBER_TABS,
+    BANK_OPTIONS, BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS
 } from "../../config/memberConstants.js";
-import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID, formatDate } from "../../utils/validateSAID.js";
+import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
+    formatDate } from "../../utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
+
+// 44 Unique SASBO Branches for Primary Selection Dropdown
+const SASBO_BRANCHES = [
+    "Absa Johannesburg Central", "Absa Pretoria", "Absa Cape Town", "Absa Durban", "Absa Gqeberha",
+    "Standard Bank Gauteng South", "Standard Bank KZN", "Standard Bank Western Cape", "Standard Bank Eastern Cape",
+    "Nedbank Wits & Pretoria", "Nedbank Coastal", "Capitec Western Cape", "Capitec Gauteng", "FNB Corporate HQ",
+    "FNB Regional West", "FNB Eastern Cape", "FNB KZN Area", "Discovery Bank National", "TymeBank Johannesburg",
+    "African Bank Midrand", "Bidvest Bank Regional", "Albaraka Bank National", "Mercantile Bank Central",
+    "HBZ Bank South Africa", "Sasfin Bank Gauteng", "Grindrod Bank Coastal", "Investec Sandton", "Investec Cape Town",
+    "SARB Pretoria HQ", "SARB Johannesburg", "SARB Cape Town Branch", "SARB Durban Branch", "Finbond National",
+    "Ubank Mining Belt North", "Ubank Mining Belt South", "Postbank Free State", "Postbank Limpopo",
+    "Land Bank Head Office", "Development Bank SA", "SNG Grant Thornton", "Santam Johannesburg",
+    "Old Mutual Financial Services", "Hollard Insurance Group", "Regent Insurance National"
+];
+
+// BEC Structure Representative Options (Multiple Selection Allowed)
+const STRUCTURE_REP_OPTIONS = [
+    "INC / IC", "NCF / SJC", "VP", "President", "MANCOM", "Resolutions Committee"
+];
+
+// BEC Executive Positions (Only One Position Allowed)
+const BEC_EXECUTIVE_POSITIONS = [
+    "Chairperson", "Deputy Chairperson", "Secretary", "Deputy Secretary", "Treasurer"
+];
 
 export default function CaptureMember() {
     const [activeTab, setActiveTab] = useState("personal");
@@ -64,7 +89,20 @@ export default function CaptureMember() {
         deductACB: "Y",
         printMembershipCards: "Y",
         homeLoanReducedRateOption: "N",
+        structure1: "",
+
+        // Exact Flow diagram state bindings
+        isShopSteward: "N",
+        shopStewardElectionDate: "",
+        isBecMember: "N",
+        becBranchName: "", // Choice among the 44 unique branches
+        isBecRecruiter: "N",
+        isBecStructureRep: "N",
+        selectedBecStructures: [], // Array for MULTIPLE STRUCTURES ALLOWED
+        isBecExecutive: "N",
+        becExecutivePosition: "" // Single Selection Allowed
     });
+
     const [fieldErrors, setFieldErrors] = useState({});
     const [showSavedNotification, setShowSavedNotification] = useState(false);
     const [reps, setReps] = useState([]);
@@ -82,17 +120,44 @@ export default function CaptureMember() {
     const handleChange = (field) => (event) => {
         const rawValue = event.target.value;
         const hasNonNumericInput =
-            field === "identityNumber" && form.identityType === "I.D. Number" && /\D/.test(rawValue);
+            field === "identityNumber" && form.identityType === "I.D. Number" &&
+            /\D/.test(rawValue);
         const value =
             field === "identityNumber" && form.identityType === "I.D. Number"
                 ? rawValue.replace(/\D/g, "")
                 : rawValue;
-        setForm((prev) => ({ ...prev, [field]: value }));
+
+        setForm((prev) => {
+            let updatedForm = { ...prev, [field]: value };
+
+            // Hierarchical state clear-out hooks following diagram branches
+            if (field === "isShopSteward" && value === "N") {
+                updatedForm.shopStewardElectionDate = "";
+            }
+            if (field === "isBecMember" && value === "N") {
+                updatedForm.becBranchName = "";
+                updatedForm.isBecRecruiter = "N";
+                updatedForm.isBecStructureRep = "N";
+                updatedForm.selectedBecStructures = [];
+                updatedForm.isBecExecutive = "N";
+                updatedForm.becExecutivePosition = "";
+            }
+            if (field === "isBecStructureRep" && value === "N") {
+                updatedForm.selectedBecStructures = [];
+            }
+            if (field === "isBecExecutive" && value === "N") {
+                updatedForm.becExecutivePosition = "";
+            }
+
+            return updatedForm;
+        });
+
         setFieldErrors((prev) => {
             const newErrors = { ...prev };
             delete newErrors[field];
             return newErrors;
         });
+
         if (field === "identityType") {
             setFieldErrors((prev) => {
                 const newErrors = { ...prev };
@@ -100,6 +165,7 @@ export default function CaptureMember() {
                 return newErrors;
             });
         }
+
         if (field === "identityNumber" && form.identityType === "I.D. Number") {
             const error = hasNonNumericInput
                 ? "Only numbers are allowed for I.D. Number"
@@ -113,13 +179,35 @@ export default function CaptureMember() {
                 if (gender) setForm((prev) => ({ ...prev, gender }));
             }
         }
+
         if (field === "identityType") {
             setForm((prev) => ({ ...prev, dateOfBirth: "", gender: "" }));
         }
+
         if (field === "personalEmail" || field === "workEmail") {
             const error = validateEmail(value);
             if (error) setFieldErrors((prev) => ({ ...prev, [field]: error }));
         }
+
+        if(field === "structure1"){
+            setForm((prev) => ({ ...prev, structure1: value }));
+        }
+    };
+
+    // Handler for checkbox multiple selection arrays
+    const handleStructureCheckboxChange = (structureName) => (event) => {
+        const checked = event.target.checked;
+        setForm((prev) => {
+            let currentSelections = [...prev.selectedBecStructures];
+            if (checked) {
+                if (!currentSelections.includes(structureName)) {
+                    currentSelections.push(structureName);
+                }
+            } else {
+                currentSelections = currentSelections.filter(item => item !== structureName);
+            }
+            return { ...prev, selectedBecStructures: currentSelections };
+        });
     };
 
     const handleSave = () => {
@@ -152,9 +240,9 @@ export default function CaptureMember() {
                 Capture Member
             </h2>
             <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                Securely capture a new Sasbo member. Ensure all required personal, employment, and banking information is accurately entered to maintain the integrity of our member database.
+                Securely capture a new Sasbo member. Ensure all required personal,
+                employment, and banking information is accurately entered to maintain the integrity of our member database.
             </p>
-
             <div className="max-w-6xl mx-auto rounded-2xl shadow-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden relative">
                 {showSavedNotification && (
                     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
@@ -162,7 +250,6 @@ export default function CaptureMember() {
                         <span className="text-sm font-medium">Member captured successfully!</span>
                     </div>
                 )}
-
                 {/* Tab Navigation */}
                 <div className="px-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
                     <div className="flex -mb-px">
@@ -171,16 +258,15 @@ export default function CaptureMember() {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`mr-4 inline-block p-4 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
-                                        ? "border-cyan-600 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400"
-                                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                                    }`}
+                                    ? "border-cyan-600 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400"
+                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                                }`}
                             >
                                 {tab.label}
                             </button>
                         ))}
                     </div>
                 </div>
-
                 {/* Body */}
                 <div className="px-6 py-8 overflow-y-auto max-h-[70vh] text-sm bg-white dark:bg-gray-800">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
@@ -220,18 +306,15 @@ export default function CaptureMember() {
                                 <AddressAutocomplete label="Residential Address" value={form.address} onChange={handleChange("address")} placeholder="Start typing a residential address..." className="md:col-span-2" />
                             </>
                         )}
-
                         {activeTab === "membership" && (
                             <>
                                 <Field label="Date Joined" value={form.joinDate} onChange={handleChange("joinDate")} type="date" disabled />
                                 <Field label="Status" value={form.status} onChange={handleChange("status")} options={statusOptions} disabled />
-
                                 <SectionTitle title="Sasbo Subscription" />
                                 <Field label="Monthly Subscription" value={form.monthlySubscription} onChange={handleChange("monthlySubscription")} disabled note="*reviewed annually through business discussions *" />
                                 <Field label="Frequency" value={form.subscriptionFrequency} onChange={handleChange("subscriptionFrequency")} options={frequencyOptions} disabled />
                             </>
                         )}
-
                         {activeTab === "employment" && (
                             <>
                                 <Field label="Employee Number" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
@@ -240,25 +323,124 @@ export default function CaptureMember() {
                                 <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={BANK_OPTIONS} searchable />
                                 <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} searchable />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
-                                
-                                {/* Bank Account Number - Only visible for Debit Order */}
+
                                 {form.paymentType === "Debit Order" && (
                                     <>
                                         <Field label="Bank Account Number" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} required />
                                         <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={DEBIT_DAY_OPTIONS} />
                                     </>
                                 )}
-                                
-                                {/* Show info message for Payroll */}
                                 {form.paymentType === "Payroll" && (
                                     <div className="md:col-span-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-700 dark:text-blue-300">
                                         ℹ️ Bank account details are not required for Payroll. Debit day is handled by payroll.
                                     </div>
                                 )}
-                                
                                 <Field label="IBT No." value={form.ibtNo} onChange={handleChange("ibtNo")} />
                                 <Field label="Work IBT No." value={form.workIbtNo} onChange={handleChange("workIbtNo")} />
                                 <AddressAutocomplete label="Bank Address" value={form.bankAddress} onChange={handleChange("bankAddress")} placeholder="Start typing a bank address..." className="md:col-span-2" />
+                            </>
+                        )}
+
+                        {activeTab === "structures" && (
+                            <>
+                                <SectionTitle title="SASBO Hierarchy Core Alignment Matrix" />
+
+                                {/* Flow node 1: Shop Steward? */}
+                                <Field
+                                    label="Shop Steward?"
+                                    value={form.isShopSteward}
+                                    onChange={handleChange("isShopSteward")}
+                                    options={yesNoOptions}
+                                />
+
+                                {form.isShopSteward === "Y" && (
+                                    <div className="md:col-span-2 p-4 bg-cyan-50/50 dark:bg-cyan-950/10 border border-cyan-100 rounded-lg animate-in fade-in duration-200">
+                                        <Field
+                                            label="Enter Shop Steward Election Date"
+                                            value={form.shopStewardElectionDate}
+                                            onChange={handleChange("shopStewardElectionDate")}
+                                            type="date"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Flow node 2: BEC? */}
+                                <Field
+                                    label="BEC Member?"
+                                    value={form.isBecMember}
+                                    onChange={handleChange("isBecMember")}
+                                    options={yesNoOptions}
+                                />
+
+                                {form.isBecMember === "Y" && (
+                                    <div className="md:col-span-2 space-y-6 border-l-2 border-cyan-500 pl-4 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+
+                                        {/* Flow node 3: 44 BEC Committees (Single Selection branch selector) */}
+                                        <Field
+                                            label="Select primary BEC Committee (44 Unique Branches Available)"
+                                            value={form.becBranchName}
+                                            onChange={handleChange("becBranchName")}
+                                            options={SASBO_BRANCHES}
+                                            searchable
+                                        />
+
+                                        {/* Flow node 4: BEC Recruiter? */}
+                                        <Field
+                                            label="BEC Recruiter?"
+                                            value={form.isBecRecruiter}
+                                            onChange={handleChange("isBecRecruiter")}
+                                            options={yesNoOptions}
+                                        />
+
+                                        {/* Flow node 5: BEC Structure Representative? */}
+                                        <Field
+                                            label="BEC Structure Representative?"
+                                            value={form.isBecStructureRep}
+                                            onChange={handleChange("isBecStructureRep")}
+                                            options={yesNoOptions}
+                                        />
+
+                                        {form.isBecStructureRep === "Y" && (
+                                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 animate-in fade-in duration-200">
+                                                <label className="block text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:text-cyan-400 mb-2">
+                                                    Select BEC Structure(s) - MULTIPLE STRUCTURES ALLOWED
+                                                </label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {STRUCTURE_REP_OPTIONS.map((struct) => (
+                                                        <label key={struct} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={form.selectedBecStructures.includes(struct)}
+                                                                onChange={handleStructureCheckboxChange(struct)}
+                                                                className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500 w-4 h-4"
+                                                            />
+                                                            {struct}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Flow node 6: BEC Executive? */}
+                                        <Field
+                                            label="BEC Executive?"
+                                            value={form.isBecExecutive}
+                                            onChange={handleChange("isBecExecutive")}
+                                            options={yesNoOptions}
+                                        />
+
+                                        {form.isBecExecutive === "Y" && (
+                                            <div className="p-4 bg-purple-50/50 dark:bg-purple-950/10 rounded-lg border border-purple-200 dark:border-purple-800 animate-in slide-in-from-left-2 duration-300">
+                                                <Field
+                                                    label="Select BEC Executive Position - ONLY ONE POSITION ALLOWED"
+                                                    value={form.becExecutivePosition}
+                                                    onChange={handleChange("becExecutivePosition")}
+                                                    options={BEC_EXECUTIVE_POSITIONS}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </>
                         )}
 
@@ -266,7 +448,6 @@ export default function CaptureMember() {
                             <>
                                 <Field label="Recruiter" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} options={reps.map(r => r.name).filter(Boolean)} searchable />
                                 <Field label="Area's Recruiter" value={form.areasRep} onChange={handleChange("areasRep")} options={reps.map(r => r.name).filter(Boolean)} searchable />
-
                                 <SectionTitle title="Elected Recruiter" />
                                 <Field label="Elected Recruiter (Y/N)" value={form.electedRep} onChange={(e) => {
                                     const val = e.target.value;
@@ -276,11 +457,9 @@ export default function CaptureMember() {
                                         ...(val === 'N' ? { repElectionDay: '', repElectionMonth: '', repElectionYear: '', structureIds: [] } : {})
                                     }));
                                 }} options={yesNoOptions} />
-
                                 {form.electedRep === 'Y' && (
                                     <>
                                         <RepElectionDatePicker form={form} setForm={setForm} />
-
                                         <div className="md:col-span-2">
                                             <PositionTreeSelect
                                                 label="Position / Structure"
@@ -294,7 +473,6 @@ export default function CaptureMember() {
                                 )}
                             </>
                         )}
-
                         {activeTab === "history" && (
                             <>
                                 <Field label="Remarks / Comments" value={form.remarks} onChange={handleChange("remarks")} className="md:col-span-2" />
@@ -310,7 +488,6 @@ export default function CaptureMember() {
                         )}
                     </div>
                 </div>
-
                 {/* Footer */}
                 <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
                     <Button variant="primary" onClick={handleSave}>Save Member</Button>
@@ -322,27 +499,26 @@ export default function CaptureMember() {
 }
 
 const SectionTitle = ({ title }) => (
-    <div className="md:col-span-2 mt-4 border-b border-gray-200 dark:border-gray-700 pb-1 font-semibold text-cyan-700 dark:text-cyan-400">
+    <div className="md:col-span-2 mt-4 border-b border-gray-200 dark:border-gray-700 pb-1
+ font-semibold text-cyan-700 dark:text-cyan-400">
         {title}
     </div>
 );
 
 const fieldCls = (error, disabled = false) =>
     `w-full rounded-lg px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400
-    ${disabled ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed" : "bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white"}
-    ${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"}`;
+ ${disabled ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed" : "bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white"}
+ ${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"}`;
 
 function RepElectionDatePicker({ form, setForm }) {
     const dateValue =
         form.repElectionYear && form.repElectionMonth && form.repElectionDay
             ? `${form.repElectionYear}-${form.repElectionMonth}-${form.repElectionDay}`
             : "";
-
     const handleDateChange = (e) => {
         const [year, month, day] = e.target.value.split("-");
         setForm((prev) => ({ ...prev, repElectionYear: year || "", repElectionMonth: month || "", repElectionDay: day || "" }));
     };
-
     return (
         <div className="md:col-span-2">
             <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
@@ -362,26 +538,21 @@ function SearchableSelect({ value, onChange, options, error, disabled }) {
     const [query, setQuery] = useState("");
     const [open, setOpen] = useState(false);
     const ref = React.useRef(null);
-
     const filtered = options.filter((o) => o.toLowerCase().includes(query.toLowerCase()));
-
     const handleSelect = (opt) => {
         onChange({ target: { value: opt } });
         setQuery("");
         setOpen(false);
     };
-
     const handleClear = () => {
         onChange({ target: { value: "" } });
         setQuery("");
     };
-
     React.useEffect(() => {
         const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
         document.addEventListener("mousedown", handler);
         return () => document.removeEventListener("mousedown", handler);
     }, []);
-
     return (
         <div ref={ref} className="relative">
             <input
@@ -490,7 +661,8 @@ function EmailFields({ form, setForm, handleChange, fieldErrors }) {
     );
 }
 
-function Field({ label, value, onChange, className = "", options = null, type = "text", error = null, disabled = false, searchable = false, note = null, id }) {
+function Field({ label, value, onChange, className = "", options = null, type = "text",
+                   error = null, disabled = false, searchable = false, note = null, id }) {
     const fieldId = id || label.toLowerCase().replace(/\s+/g, "-");
     return (
         <div className={className}>
