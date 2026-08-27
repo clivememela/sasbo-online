@@ -53,6 +53,30 @@ const TABS = [
     { id: "history", label: "History & Remarks" },
 ];
 
+const FIELD_TO_TAB_MAP = {
+    title: "personal",
+    initials: "personal",
+    firstNames: "personal",
+    surname: "personal",
+    identityType: "personal",
+    identityNumber: "personal",
+    dateOfBirth: "personal",
+    personalEmail: "personal",
+    workEmail: "personal",
+    phone: "personal",
+    employeeNumber: "employment",
+    employmentType: "employment",
+    jobGrade: "employment",
+    bankName: "employment",
+    branch: "employment",
+    paymentType: "employment",
+    bankAccountNumber: "employment",
+    debitDay: "employment",
+    shopStewardElectionDate: "structures",
+    becCommitteeId: "structures",
+    becExecutivePosition: "structures"
+};
+
 export const SASBO_BEC_BRANCHES = [
     { id: "bec-01", name: "Tshwane CBD Regional Branch", region: "Gauteng North" },
     { id: "bec-02", name: "Centurion Financial Hub Committee", region: "Gauteng North" },
@@ -132,27 +156,25 @@ export default function Members() {
     const prevMemberIdRef = useRef(null);
     const [structuresTree, setStructuresTree] = useState([]);
     const [roles, setRoles] = useState([]);
-
-    const flatStructures = useMemo(() => {
-        const result = [];
-        const traverse = (node, depth = 0) => {
-            result.push({
-                id: node.id,
-                name: " ".repeat(depth) + node.name,
-                requiresElectionDate: node.requiresElectionDate
-            });
-            if (node.children) {
-                node.children.forEach(child => traverse(child, depth + 1));
-            }
-        };
-        structuresTree.forEach(node => traverse(node));
-        return result;
-    }, [structuresTree]);
+    const [membersList, setMembersList] = useState([]);
 
     useEffect(() => {
         recruiterService.getStructures().then(setStructuresTree).catch(err => console.error("Failed to load structures", err));
         recruiterService.getRoles().then(setRoles).catch(err => console.error("Failed to load roles", err));
+        memberService.getMembers().then(res => {
+            const list = Array.isArray(res) ? res : (res.data || res.members || []);
+            setMembersList(list);
+        }).catch(err => console.error("Failed fetching records array", err));
     }, []);
+
+    const tabsWithErrors = useMemo(() => {
+        const errorTabs = new Set();
+        Object.keys(fieldErrors).forEach((field) => {
+            const mappedTab = FIELD_TO_TAB_MAP[field];
+            if (mappedTab) errorTabs.add(mappedTab);
+        });
+        return errorTabs;
+    }, [fieldErrors]);
 
     const titleOptions = TITLE_OPTIONS;
     const idTypeOptions = IDENTITY_TYPE_OPTIONS;
@@ -182,10 +204,12 @@ export default function Members() {
                 setActiveTab("personal");
             }
             prevMemberIdRef.current = selectedMember.membershipNumber;
+            setFieldErrors({});
         } else {
             setIsEditing(false);
             setEditForm({});
             prevMemberIdRef.current = null;
+            setFieldErrors({});
         }
     }, [selectedMember]);
 
@@ -193,16 +217,38 @@ export default function Members() {
         setIsEditing((editing) => {
             if (!editing) {
                 setEditForm({ ...selectedMember, paymentType: normalizePaymentType(selectedMember?.paymentType) });
+                setFieldErrors({});
             }
             return !editing;
         });
     };
 
     const handleEditChange = useCallback((field) => (event) => {
-        const value = event && event.target ? event.target.value : event;
+        let rawValue = event && event.target ? event.target.value : event;
+
+        if (field === "identityNumber" && editForm.identityType === "I.D. Number" && rawValue.length > 13) {
+            rawValue = rawValue.substring(0, 13);
+        }
+
+        const hasNonNumericInput =
+            field === "identityNumber" && editForm.identityType === "I.D. Number" &&
+            /\\D/.test(rawValue);
+        const value =
+            field === "identityNumber" && editForm.identityType === "I.D. Number"
+                ? rawValue.replace(/\\D/g, "")
+                : rawValue;
+
         setEditForm((prev) => {
             const next = { ...prev, [field]: value };
-            if (field === "identityNumber" && value.length === 13) {
+
+            if (field === "firstNames") {
+                next.initials = value
+                    .trim()
+                    .split(/\\s+/)
+                    .map(name => name.charAt(0).toUpperCase())
+                    .join("");
+            }
+            if (field === "identityNumber" && value.length === 13 && prev.identityType === "I.D. Number") {
                 next.dateOfBirth = extractDateOfBirthFromSAID(value) || next.dateOfBirth;
                 next.gender = extractGenderFromSAID(value) || next.gender;
             }
@@ -212,11 +258,22 @@ export default function Members() {
             }
             return next;
         });
+
         setFieldErrors(prev => {
             const newErrors = { ...prev };
             delete newErrors[field];
-            if (field === "identityNumber") {
-                const error = validateSAID(value);
+
+            if (field === "identityType") {
+                delete newErrors.identityNumber;
+                delete newErrors.dateOfBirth;
+            }
+            if (field === "paymentType" && value !== "Debit Order") {
+                delete newErrors.bankAccountNumber;
+                delete newErrors.bankName;
+                delete newErrors.branch;
+            }
+            if (field === "identityNumber" && editForm.identityType === "I.D. Number") {
+                const error = hasNonNumericInput ? "Only numbers are allowed for I.D. Number" : validateSAID(value);
                 if (error) newErrors[field] = error;
             }
             if (field === "personalEmail" || field === "workEmail") {
@@ -225,20 +282,50 @@ export default function Members() {
             }
             return newErrors;
         });
-    }, []);
+    }, [editForm.identityType]);
 
-    const handleSaveChanges = async () => {
-        if (Object.keys(fieldErrors).length > 0) {
-            alert("Please fix the errors before saving.");
-            return;
+    const validateEditForm = () => {
+        const errors = {};
+        if (!editForm.firstNames?.trim()) errors.firstNames = "First Name(s) field is required";
+        if (!editForm.surname?.trim()) errors.surname = "Surname field is required";
+        if (!editForm.identityType) errors.identityType = "Identity Type selection is required";
+
+        if (!editForm.identityNumber?.trim()) {
+            errors.identityNumber = "Identity Number field is required";
+        } else if (editForm.identityType === "I.D. Number" && editForm.identityNumber.trim().length !== 13) {
+            errors.identityNumber = "Identity Number must be exactly 13 digits when I.D. Number is selected";
+        }
+
+        if (editForm.identityType === "Passport" && !editForm.dateOfBirth) {
+            errors.dateOfBirth = "Date of Birth is strictly required when Passport is selected";
+        }
+
+        if (editForm.paymentType === "Debit Order") {
+            if (!editForm.bankAccountNumber?.trim()) errors.bankAccountNumber = "Bank Account Number is required for Debit Orders";
+            if (!editForm.bankName?.trim()) errors.bankName = "Bank Employer alignment name is required for Debit Orders";
+            if (!editForm.branch?.trim()) errors.branch = "Bank Branch selection is required for Debit Orders";
         }
 
         if (editForm.isShopSteward && !editForm.shopStewardElectionDate) {
-            alert("Shop Stewards must have an Election Date specified.");
-            return;
+            errors.shopStewardElectionDate = "Shop Stewards must have an Election Date specified.";
         }
         if (editForm.isBec && !editForm.becCommitteeId) {
-            alert("Please select an active primary BEC Committee before continuing.");
+            errors.becCommitteeId = "Please select an active primary BEC Committee before continuing.";
+        }
+        return errors;
+    };
+
+    const handleSaveChanges = async () => {
+        const clientSideErrors = validateEditForm();
+        const mergedErrors = { ...fieldErrors, ...clientSideErrors };
+
+        if (Object.keys(mergedErrors).length > 0) {
+            setFieldErrors(mergedErrors);
+            const dynamicFields = Object.keys(mergedErrors);
+            setActiveTab(FIELD_TO_TAB_MAP[dynamicFields[0]] || "personal");
+
+            const summary = Object.values(mergedErrors).map(msg => `• ${msg}`).join("\n");
+            alert(`Please fix the following validation errors before saving:\n\n${summary}`);
             return;
         }
 
@@ -254,8 +341,9 @@ export default function Members() {
 
         try {
             await memberService.updateMember(editForm);
-            const refreshedMembers = await memberService.getMembers();
-            setMembersList(refreshedMembers);
+            const refreshed = await memberService.getMembers();
+            const list = Array.isArray(refreshed) ? refreshed : (refreshed.data || refreshed.members || []);
+            setMembersList(list);
             setSelectedMember({ ...editForm });
             setIsEditing(false);
             setShowSavedNotification(true);
@@ -272,17 +360,12 @@ export default function Members() {
         setPage(1);
     }, []);
 
-    const [membersList, setMembersList] = useState([]);
-    useEffect(() => {
-        memberService.getMembers().then(setMembersList);
-    }, []);
-
     const filteredMembers = useMemo(() => {
         const activeFilters = FILTER_FIELDS
-            .map((field) => [field, normalize(filters[field])])
+            .map((field) => [field, filters[field] ? String(filters[field]).trim().toLowerCase() : ""])
             .filter(([, value]) => value);
         return membersList.filter((member) => activeFilters.every(([field, value]) =>
-            normalize(member[field]).includes(value)
+            String(member[field] ?? "").trim().toLowerCase().includes(value)
         ));
     }, [filters, membersList]);
 
@@ -298,6 +381,15 @@ export default function Members() {
     const handleClear = () => {
         setFilters({ ...EMPTY_FILTERS });
         setPage(1);
+    };
+
+    const formatBackendDate = (dateVal) => {
+        if (!dateVal) return "-";
+        if (Array.isArray(dateVal)) {
+            const [year, month, day] = dateVal;
+            return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        }
+        return String(dateVal).split("T")[0];
     };
 
     return (
@@ -336,9 +428,50 @@ export default function Members() {
                     </Button>
                 </div>
 
-                {/* Simplified table container for context truncation */}
+                <div className="mt-6 overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                        <thead>
+                        <tr className="border-b border-gray-200 dark:border-gray-700 text-xs uppercase text-gray-500 font-bold bg-gray-50 dark:bg-gray-900/20">
+                            <th className="p-3">Membership No</th>
+                            <th className="p-3">Employee No</th>
+                            <th className="p-3">Full Names & Surname</th>
+                            <th className="p-3">Bank Institution</th>
+                            <th className="p-3">Branch Location</th>
+                            <th className="p-3">Status</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {visibleMembers.length > 0 ? (
+                            visibleMembers.map((member) => (
+                                <tr
+                                    key={member.id}
+                                    onClick={() => setSelectedMember(member)}
+                                    className="border-b border-gray-100 dark:border-gray-800/60 hover:bg-cyan-50/40 dark:hover:bg-cyan-950/20 cursor-pointer transition-colors"
+                                >
+                                    <td className="p-3 font-semibold text-cyan-600 dark:text-cyan-400">{member.membershipNumber || "-"}</td>
+                                    <td className="p-3 font-medium text-gray-600 dark:text-gray-400">{member.employeeNumber || "-"}</td>
+                                    <td className="p-3 font-medium">{`${member.title || ""} ${member.initials || ""} ${member.surname || ""}`}</td>
+                                    <td className="p-3 text-gray-700 dark:text-gray-300">{member.bankName || "-"}</td>
+                                    <td className="p-3 text-gray-500">{member.branch || "-"}</td>
+                                    <td className="p-3">
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${member.status === "Active" ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300" : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"}`}>
+                                                {member.status || "Unknown"}
+                                            </span>
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan="6" className="text-center py-12 text-gray-400 font-medium">
+                                    No Sasbo members match the specified query definitions.
+                                </td>
+                            </tr>
+                        )}
+                        </tbody>
+                    </table>
+                </div>
                 <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm no-print">
-                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 font-medium">
                         Showing {filteredMembers.length === 0 ? 0 : startIndex + 1}-{endIndex} of {filteredMembers.length} members
                         {filteredMembers.length > 0 && (
                             <button onClick={() => window.print()} title="Print results" className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition">
@@ -348,66 +481,160 @@ export default function Members() {
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="pagination" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
-                        <span className="text-gray-600 dark:text-gray-300 text-sm">Page {page} of {totalPages}</span>
+                        <span className="text-gray-600 dark:text-gray-300 text-sm font-semibold">Page {page} of {totalPages}</span>
                         <Button variant="pagination" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
                         <Button onClick={handleClear}>Clear</Button>
                     </div>
                 </div>
             </div>
 
-            {/* Modal: Member Details */}
             {selectedMember && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Member Details">
-                    <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedMember(null)} />
-                    <div className="relative max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs" role="dialog" aria-modal="true" aria-label="Member Details">
+                    <div className="absolute inset-0" onClick={() => setSelectedMember(null)} />
+                    <div className="relative max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 animate-in fade-in zoom-in-95 duration-200">
                         {showSavedNotification && (
-                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg">
                                 <CheckCircle2 size={18} />
                                 <span className="text-sm font-medium">Changes saved successfully!</span>
                             </div>
                         )}
 
-                        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
                             <div>
-                                <p className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold">Member Details</p>
-                                <div className="mt-1 flex flex-wrap items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
-                                    <span>{`${selectedMember.title ? selectedMember.title + " " : ""}${[selectedMember.initials, selectedMember.surname].filter(Boolean).join(" ") || "-"}`}</span>
-                                    <span className="text-gray-400">•</span>
-                                    <span className="text-gray-600 dark:text-gray-300">{selectedMember.bankName || "-"}</span>
-                                    <span className="text-gray-400">•</span>
-                                    <span className="text-gray-600 dark:text-gray-300">{selectedMember.branch || "-"}</span>
-                                    <span className="text-gray-400">•</span>
-                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${selectedMember.status === "Active" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" : "bg-gray-100 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300"}`}>{selectedMember.status}</span>
+                                <p className="text-xs uppercase tracking-wider text-gray-400 font-bold">Sasbo Member Dashboard Profile</p>
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-base font-bold text-gray-900 dark:text-gray-100">
+                                    <span>{`${editForm.title ? editForm.title + " " : ""}${[editForm.initials, editForm.surname].filter(Boolean).join(" ") || "-"}`}</span>
+                                    <span className="text-gray-300 dark:text-gray-600">•</span>
+                                    <span className="text-gray-600 dark:text-gray-400 text-sm font-semibold">{editForm.membershipNumber || "No Account ID"}</span>
+                                    <span className="text-gray-300 dark:text-gray-600">•</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${editForm.status === "Active" ? "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-300" : "bg-gray-100 text-gray-600 dark:bg-gray-900/40"}`}>{editForm.status}</span>
                                 </div>
                             </div>
-                            <button onClick={() => setSelectedMember(null)} className="shrink-0 rounded-md p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700">
-                                <span className="text-xl">✕</span>
+                            <button onClick={() => setSelectedMember(null)} className="shrink-0 rounded-md p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-gray-700 transition">
+                                <span className="text-lg">✕</span>
                             </button>
                         </div>
 
-                        {/* Tab Navigation */}
                         <div className="px-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                            <div className="flex -mb-px">
+                            <div className="flex -mb-px overflow-x-auto whitespace-nowrap">
                                 {TABS.map((tab) => (
-                                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`mr-4 inline-block p-4 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id ? "border-cyan-600 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"}`}>
-                                        {tab.label}
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`mr-4 inline-flex items-center gap-1 p-4 border-b-2 font-bold text-sm transition-colors ${activeTab === tab.id ? "border-cyan-600 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400" : "border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"}`}
+                                    >
+                                        <span>{tab.label}</span>
+                                        {isEditing && tabsWithErrors.has(tab.id) && (
+                                            <span className="text-red-500 font-extrabold text-sm animate-pulse">*</span>
+                                        )}
                                     </button>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Main Tabs Workspace Panel Container */}
-                        <div className="px-6 py-5 overflow-y-auto max-h-[70vh] text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900/40">
+                        <div className="px-6 py-5 overflow-y-auto max-h-[65vh] text-sm bg-gray-50 dark:bg-gray-900/20">
+                            {activeTab === "personal" && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
+                                    <Detail label="Title" value={editForm.title} isEditing={isEditing} options={titleOptions} onChange={handleEditChange("title")} />
+                                    <Detail label="Initials" value={editForm.initials} isEditing={isEditing} onChange={handleEditChange("initials")} />
+                                    <Detail label="First Name(s)" value={editForm.firstNames} isEditing={isEditing} onChange={handleEditChange("firstNames")} error={fieldErrors.firstNames} required />
+                                    <Detail label="Surname" value={editForm.surname} isEditing={isEditing} onChange={handleEditChange("surname")} error={fieldErrors.surname} required />
+                                    <Detail label="Identity Type" value={editForm.identityType} isEditing={isEditing} options={idTypeOptions} onChange={handleEditChange("identityType")} error={fieldErrors.identityType} required />
+                                    <Detail
+                                        label={editForm.identityType || "Identity Number"}
+                                        value={editForm.identityNumber}
+                                        isEditing={isEditing}
+                                        onChange={handleEditChange("identityNumber")}
+                                        error={fieldErrors.identityNumber}
+                                        disabled={!editForm.identityType}
+                                        required
+                                    />
+                                    <Detail
+                                        label="Date of Birth"
+                                        value={editForm.identityType === "I.D. Number" ? formatDate(editForm.dateOfBirth) : editForm.dateOfBirth}
+                                        isEditing={isEditing}
+                                        type={editForm.identityType === "I.D. Number" ? "text" : "date"}
+                                        onChange={handleEditChange("dateOfBirth")}
+                                        disabled={editForm.identityType === "I.D. Number"}
+                                        error={fieldErrors.dateOfBirth}
+                                        required={editForm.identityType === "Passport"}
+                                    />
+                                    <Detail label="Gender" value={editForm.gender} isEditing={isEditing} options={editForm.identityType === "I.D. Number" ? null : genderOptions} onChange={handleEditChange("gender")} disabled={editForm.identityType === "I.D. Number"} />
+                                    <Detail label="Race" value={editForm.race} isEditing={isEditing} options={raceOptions} onChange={handleEditChange("race")} />
+                                    <Detail label="Cellphone Number" value={editForm.phone} isEditing={isEditing} onChange={handleEditChange("phone")} />
+                                    <Detail label="Work Tel" value={editForm.workTel} isEditing={isEditing} onChange={handleEditChange("workTel")} />
+                                    <Detail label="Home Tel" value={editForm.homeTel} isEditing={isEditing} onChange={handleEditChange("homeTel")} />
+                                    <div className="md:col-span-2">
+                                        {isEditing ? (
+                                            <AddressAutocomplete label="Residential Address" value={editForm.address} onChange={handleEditChange("address")} placeholder="Update residential location address strings..." />
+                                        ) : (
+                                            <Detail label="Residential Address" value={selectedMember.address} isEditing={false} />
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === "employment" && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
+                                    <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} />
+                                    <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
+                                    <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGradeOptions} onChange={handleEditChange("jobGrade")} />
+                                    <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
+                                    <Detail label="Bank Branch" value={editForm.branch} isEditing={isEditing} options={branchOptions} error={fieldErrors.branch} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("branch")} />
+                                    <Detail label="Payment Type" value={editForm.paymentType} isEditing={isEditing} options={paymentTypeOptions} onChange={handleEditChange("paymentType")} />
+
+                                    {editForm.paymentType === "Debit Order" && (
+                                        <>
+                                            <Detail label="Bank Account Number" value={editForm.bankAccountNumber} isEditing={isEditing} error={fieldErrors.bankAccountNumber} required onChange={handleEditChange("bankAccountNumber")} />
+
+                                            {/* 🛠️ Explicitly enforce allowed selections here */}
+                                            <Detail
+                                                label="Debit Day"
+                                                value={editForm.debitDay}
+                                                isEditing={isEditing}
+                                                options={["20", "25", "31"]}
+                                                error={fieldErrors.debitDay}
+                                                onChange={handleEditChange("debitDay")}
+                                            />
+                                        </>
+                                    )}
+                                    <Detail label="IBT No." value={editForm.ibtNo} isEditing={isEditing} onChange={handleEditChange("ibtNo")} />
+                                    <Detail label="Work IBT No." value={editForm.workIbtNo} isEditing={isEditing} onChange={handleEditChange("workIbtNo")} />
+                                    <div className="md:col-span-2">
+                                        {isEditing ? (
+                                            <AddressAutocomplete label="Bank Work Address" value={editForm.bankAddress} onChange={handleEditChange("bankAddress")} placeholder="Search coordinates..." />
+                                        ) : (
+                                            <Detail label="Bank Address" value={selectedMember.bankAddress} isEditing={false} />
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === "membership" && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
+                                    <Detail label="Date Joined Sasbo" value={formatBackendDate(selectedMember.joinDate)} isEditing={false} />
+                                    <Detail label="Account Membership Status" value={editForm.status} isEditing={isEditing} options={statusOptions} onChange={handleEditChange("status")} />
+                                    <div className="md:col-span-2 border-t pt-3 font-semibold text-cyan-700 dark:text-cyan-400">Sasbo Subscription Fee Details</div>
+                                    <Detail label="Monthly Subscription (ZAR)" value={selectedMember.monthlySubscription || "182.77"} isEditing={false} />
+                                    <Detail label="Billing Frequency" value={selectedMember.subscriptionFrequency || "Monthly"} isEditing={false} />
+                                </div>
+                            )}
+
+                            {activeTab === "representatives" && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
+                                    <Detail label="Assigned Lead Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={isEditing} options={reps.map(r=>r.name)} onChange={handleEditChange("recruitmentRepresentativeName")} />
+                                    <Detail label="Regional Area Representative" value={editForm.areasRep} isEditing={isEditing} options={reps.map(r=>r.name)} onChange={handleEditChange("areasRep")} />
+                                </div>
+                            )}
+
                             {activeTab === "structures" && (
                                 <div className="space-y-6 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
                                     <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                                        <h3 className="text-sm font-bold uppercase tracking-wide text-cyan-700 dark:text-cyan-400">SASBO Structural Configuration</h3>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Manage how this member sits across SASBO hierarchical layouts.</p>
+                                        <h3 className="text-sm font-bold uppercase tracking-wide text-cyan-700 dark:text-cyan-400">SASBO Structural Configuration Matrix</h3>
                                     </div>
 
                                     {isEditing ? (
                                         <div className="space-y-6">
-                                            {/* LEVEL 1: Shop Steward Framework */}
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <Detail label="Shop Steward?" value={editForm.isShopSteward ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
                                                     const isYes = e.target.value === "Yes";
@@ -421,7 +648,6 @@ export default function Members() {
                                                 )}
                                             </div>
 
-                                            {/* LEVEL 2: BEC Core Affiliation */}
                                             <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                                                 <Detail label="BEC (Branch Executive Committee) Member?" value={editForm.isBec ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
                                                     const isYes = e.target.value === "Yes";
@@ -433,10 +659,8 @@ export default function Members() {
                                                 }} />
                                             </div>
 
-                                            {/* NESTED DEPENDENCIES */}
                                             {editForm.isBec && (
                                                 <div className="pl-4 border-l-2 border-cyan-500 dark:border-cyan-600 space-y-6 mt-4 animate-slideDown">
-                                                    {/* LEVEL 3A: 44 Single Selection Committees */}
                                                     <div>
                                                         <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Select BEC Committee (Single Selection — 44 Available) *</label>
                                                         <select value={editForm.becCommitteeId || ""} className={fieldCls(fieldErrors.becCommitteeId)} onChange={(e) => {
@@ -458,7 +682,6 @@ export default function Members() {
                                                         </select>
                                                     </div>
 
-                                                    {/* LEVEL 3B: BEC Recruiter Selection */}
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         <Detail label="BEC Recruiter?" value={editForm.isBecRecruiter ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
                                                             const isYes = e.target.value === "Yes";
@@ -469,7 +692,6 @@ export default function Members() {
                                                         )}
                                                     </div>
 
-                                                    {/* LEVEL 3C: BEC Structure Representative - Multiple Selection */}
                                                     <div className="space-y-3">
                                                         <Detail label="BEC Structure Representative?" value={editForm.isBecStructureRep ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
                                                             const isYes = e.target.value === "Yes";
@@ -477,7 +699,6 @@ export default function Members() {
                                                         }} />
                                                         {editForm.isBecStructureRep && (
                                                             <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg space-y-2">
-                                                                <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Select Associated Structure(s) — MULTIPLE ALLOWED</label>
                                                                 {["INC / IC", "NCF / SJC", "Vice President (VP)", "President", "MANCOM", "Resolutions Committee"].map((struct) => {
                                                                     const currentSelected = editForm.becStructures || [];
                                                                     const isChecked = currentSelected.includes(struct);
@@ -495,7 +716,6 @@ export default function Members() {
                                                         )}
                                                     </div>
 
-                                                    {/* LEVEL 3D: BEC Executive Selection - Single Choice */}
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         <Detail label="BEC Executive?" value={editForm.isBecExecutive ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
                                                             const isYes = e.target.value === "Yes";
@@ -509,7 +729,6 @@ export default function Members() {
                                             )}
                                         </div>
                                     ) : (
-                                        /* READ-ONLY WORKSPACE OVERVIEW */
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 divide-y md:divide-y-0 divide-gray-100 dark:divide-gray-800">
                                             <div className="space-y-3">
                                                 <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Core Appointments</h4>
@@ -533,14 +752,18 @@ export default function Members() {
                                 </div>
                             )}
 
-                            {activeTab !== "structures" && (
-                                <div className="text-center py-10 text-gray-400">
-                                    Tab content placeholder mock wrapper.
+                            {activeTab === "history" && (
+                                <div className="grid grid-cols-1 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
+                                    <Detail label="Primary Remarks / Audit Comments" value={editForm.remarks} isEditing={isEditing} onChange={handleEditChange("remarks")} />
+                                    <Detail label="Secondary Comments Logging Sub-Field" value={editForm.remarks2} isEditing={isEditing} onChange={handleEditChange("remarks2")} />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t">
+                                        <Detail label="Record Created Timestamp" value={formatBackendDate(selectedMember.createdAt)} isEditing={false} />
+                                        <Detail label="Last Account Modification" value={formatBackendDate(selectedMember.updatedAt)} isEditing={false} />
+                                    </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* Footer buttons section layout */}
                         <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                             {isEditing ? (
                                 <>
@@ -563,28 +786,33 @@ export default function Members() {
 
 const fieldCls = (error, disabled = false) =>
     `w-full rounded-lg px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 ${
-        disabled ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed" : "bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white"
-    } ${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"}`;
+        disabled ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed" : "bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white"} ${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"}`;
 
-function Detail({ label, value, isEditing, onChange, className = "", options = null, type = "text", error = null, disabled = false }) {
+function Detail({ label, value, isEditing, onChange, className = "", options = null, type = "text", error = null, disabled = false, required = false }) {
     const detailId = `detail-${label.toLowerCase().replace(/\\s+/g, "-")}`;
     return (
         <div className={className}>
-            <label htmlFor={detailId} className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">{label}</label>
+            <label htmlFor={detailId} className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+                {label} {isEditing && required && <span className="text-red-500 font-bold">*</span>}
+            </label>
             {isEditing ? (
                 <div className="relative">
                     {options ? (
                         <select id={detailId} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled}>
                             <option value="">Select...</option>
-                            {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            {options.map(opt => (
+                                <option key={opt.value !== undefined ? opt.value : opt} value={opt.value !== undefined ? opt.value : opt}>
+                                    {opt.label !== undefined ? opt.label : opt}
+                                </option>
+                            ))}
                         </select>
                     ) : (
                         <input id={detailId} type={type} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled} />
                     )}
-                    {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
+                    {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400 font-medium">{error}</p>}
                 </div>
             ) : (
-                <p className="mt-0.5 text-sm font-semibold text-gray-800 dark:text-gray-200">{value}</p>
+                <p className="mt-0.5 text-sm font-semibold text-gray-800 dark:text-gray-200 bg-gray-50/50 dark:bg-gray-800/40 p-2 rounded-lg border border-gray-100/70 dark:border-gray-700/30">{value || "-"}</p>
             )}
         </div>
     );

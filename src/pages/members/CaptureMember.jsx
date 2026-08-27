@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { recruiterService } from "../../services/recruiterService.js";
@@ -13,7 +13,6 @@ import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderF
     formatDate } from "../../utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 
-// 44 Unique SASBO Branches for Primary Selection Dropdown
 const SASBO_BRANCHES = [
     "Absa Johannesburg Central", "Absa Pretoria", "Absa Cape Town", "Absa Durban", "Absa Gqeberha",
     "Standard Bank Gauteng South", "Standard Bank KZN", "Standard Bank Western Cape", "Standard Bank Eastern Cape",
@@ -27,15 +26,37 @@ const SASBO_BRANCHES = [
     "Old Mutual Financial Services", "Hollard Insurance Group", "Regent Insurance National"
 ];
 
-// BEC Structure Representative Options (Multiple Selection Allowed)
 const STRUCTURE_REP_OPTIONS = [
     "INC / IC", "NCF / SJC", "VP", "President", "MANCOM", "Resolutions Committee"
 ];
 
-// BEC Executive Positions (Only One Position Allowed)
 const BEC_EXECUTIVE_POSITIONS = [
     "Chairperson", "Deputy Chairperson", "Secretary", "Deputy Secretary", "Treasurer"
 ];
+
+const FIELD_TO_TAB_MAP = {
+    title: "personal",
+    initials: "personal",
+    firstNames: "personal",
+    surname: "personal",
+    identityType: "personal",
+    identityNumber: "personal",
+    dateOfBirth: "personal",
+    personalEmail: "personal",
+    workEmail: "personal",
+    phone: "personal",
+    employeeNumber: "employment",
+    employmentType: "employment",
+    jobGrade: "employment",
+    bankName: "employment",
+    branch: "employment",
+    paymentType: "employment",
+    bankAccountNumber: "employment",
+    debitDay: "employment",
+    shopStewardElectionDate: "structures",
+    becBranchName: "structures",
+    becExecutivePosition: "structures"
+};
 
 export default function CaptureMember() {
     const [activeTab, setActiveTab] = useState("personal");
@@ -56,7 +77,7 @@ export default function CaptureMember() {
         workTel: "",
         homeTel: "",
         address: "",
-        joinDate: new Date().toISOString().split("T")[0],
+        joinDate: new Date().toISOString().split("T"),
         status: "Active",
         monthlySubscription: "",
         subscriptionFrequency: "Monthly",
@@ -90,17 +111,15 @@ export default function CaptureMember() {
         printMembershipCards: "Y",
         homeLoanReducedRateOption: "N",
         structure1: "",
-
-        // Exact Flow diagram state bindings
         isShopSteward: "N",
         shopStewardElectionDate: "",
         isBecMember: "N",
-        becBranchName: "", // Choice among the 44 unique branches
+        becBranchName: "",
         isBecRecruiter: "N",
         isBecStructureRep: "N",
-        selectedBecStructures: [], // Array for MULTIPLE STRUCTURES ALLOWED
+        selectedBecStructures: [],
         isBecExecutive: "N",
-        becExecutivePosition: "" // Single Selection Allowed
+        becExecutivePosition: ""
     });
 
     const [fieldErrors, setFieldErrors] = useState({});
@@ -117,8 +136,22 @@ export default function CaptureMember() {
             .catch(err => console.error('Failed to fetch structures:', err));
     }, []);
 
+    const tabsWithErrors = useMemo(() => {
+        const errorTabs = new Set();
+        Object.keys(fieldErrors).forEach((field) => {
+            const mappedTab = FIELD_TO_TAB_MAP[field];
+            if (mappedTab) errorTabs.add(mappedTab);
+        });
+        return errorTabs;
+    }, [fieldErrors]);
+
     const handleChange = (field) => (event) => {
-        const rawValue = event.target.value;
+        let rawValue = event.target.value;
+
+        if (field === "identityNumber" && form.identityType === "I.D. Number" && rawValue.length > 13) {
+            rawValue = rawValue.substring(0, 13);
+        }
+
         const hasNonNumericInput =
             field === "identityNumber" && form.identityType === "I.D. Number" &&
             /\D/.test(rawValue);
@@ -130,7 +163,15 @@ export default function CaptureMember() {
         setForm((prev) => {
             let updatedForm = { ...prev, [field]: value };
 
-            // Hierarchical state clear-out hooks following diagram branches
+            if (field === "firstNames") {
+                const autoInitials = value
+                    .trim()
+                    .split(/\s+/)
+                    .map(name => name.charAt(0).toUpperCase())
+                    .join("");
+                updatedForm.initials = autoInitials;
+            }
+
             if (field === "isShopSteward" && value === "N") {
                 updatedForm.shopStewardElectionDate = "";
             }
@@ -155,16 +196,18 @@ export default function CaptureMember() {
         setFieldErrors((prev) => {
             const newErrors = { ...prev };
             delete newErrors[field];
+
+            if (field === "identityType") {
+                delete newErrors.identityNumber;
+                delete newErrors.dateOfBirth;
+            }
+            if (field === "paymentType" && value !== "Debit Order") {
+                delete newErrors.bankAccountNumber;
+                delete newErrors.bankName;
+                delete newErrors.branch;
+            }
             return newErrors;
         });
-
-        if (field === "identityType") {
-            setFieldErrors((prev) => {
-                const newErrors = { ...prev };
-                delete newErrors.identityNumber;
-                return newErrors;
-            });
-        }
 
         if (field === "identityNumber" && form.identityType === "I.D. Number") {
             const error = hasNonNumericInput
@@ -188,13 +231,8 @@ export default function CaptureMember() {
             const error = validateEmail(value);
             if (error) setFieldErrors((prev) => ({ ...prev, [field]: error }));
         }
-
-        if(field === "structure1"){
-            setForm((prev) => ({ ...prev, structure1: value }));
-        }
     };
 
-    // Handler for checkbox multiple selection arrays
     const handleStructureCheckboxChange = (structureName) => (event) => {
         const checked = event.target.checked;
         setForm((prev) => {
@@ -210,11 +248,68 @@ export default function CaptureMember() {
         });
     };
 
+    const validateFormBeforeSave = () => {
+        const errors = {};
+
+        if (!form.firstNames.trim()) errors.firstNames = "First Name(s) field is required";
+        if (!form.surname.trim()) errors.surname = "Surname field is required";
+        if (!form.identityType) errors.identityType = "Identity Type selection is required";
+        if (!form.identityNumber.trim()) {
+            errors.identityNumber = "Identity Number field is required";
+        } else if (form.identityType === "I.D. Number" && form.identityNumber.trim().length !== 13) {
+            errors.identityNumber = "Identity Number must be exactly 13 digits when I.D. Number is selected";
+        }
+
+        if (form.identityType === "Passport" && !form.dateOfBirth) {
+            errors.dateOfBirth = "Date of Birth is strictly required when Passport is selected";
+        }
+
+        if (form.paymentType === "Debit Order") {
+            if (!form.bankAccountNumber.trim()) errors.bankAccountNumber = "Bank Account Number is required for Debit Orders";
+            if (!form.bankName.trim()) errors.bankName = "Bank Employer alignment name is required for Debit Orders";
+            if (!form.branch.trim()) errors.branch = "Bank Branch selection is required for Debit Orders";
+
+            // 🛠️ NEW VALIDATION RULE TO MATCH JAVA BACKEND
+            const validDays = ["20", "25", "31", 20, 25, 31];
+            if (!validDays.includes(form.debitDay)) {
+                errors.debitDay = "Debit day must be one of 20, 25 or 31 when payment type is 'Debit Order'";
+            }
+        }
+
+        if (form.isShopSteward === "Y" && !form.shopStewardElectionDate) {
+            errors.shopStewardElectionDate = "Shop Steward Election Date is required";
+        }
+
+        if (form.isBecMember === "Y") {
+            if (!form.becBranchName) errors.becBranchName = "BEC branch committee selection is required";
+            if (form.isBecExecutive === "Y" && !form.becExecutivePosition) {
+                errors.becExecutivePosition = "An Executive position assignment must be declared";
+            }
+        }
+
+        return errors;
+    };
+
     const handleSave = () => {
-        if (Object.keys(fieldErrors).length > 0) {
-            alert("Please fix the errors before saving.");
+        const clientSideErrors = validateFormBeforeSave();
+        const mergedErrors = { ...fieldErrors, ...clientSideErrors };
+
+        if (Object.keys(mergedErrors).length > 0) {
+            setFieldErrors(mergedErrors);
+
+            const dynamicErrorFields = Object.keys(mergedErrors);
+            const firstFailedField = dynamicErrorFields[0];
+            const fallbackTabContext = FIELD_TO_TAB_MAP[firstFailedField] || "personal";
+            setActiveTab(fallbackTabContext);
+
+            const errorSummaryList = Object.values(mergedErrors)
+                .map((errMsg) => `• ${errMsg}`)
+                .join("\n");
+
+            alert(`Please fix the following validation errors before saving:\n\n${errorSummaryList}`);
             return;
         }
+
         memberService.createMember(form)
             .then(() => {
                 setShowSavedNotification(true);
@@ -245,7 +340,7 @@ export default function CaptureMember() {
             </p>
             <div className="max-w-6xl mx-auto rounded-2xl shadow-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden relative">
                 {showSavedNotification && (
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
                         <CheckCircle2 size={18} />
                         <span className="text-sm font-medium">Member captured successfully!</span>
                     </div>
@@ -257,12 +352,15 @@ export default function CaptureMember() {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`mr-4 inline-block p-4 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
+                                className={`mr-4 inline-flex items-center gap-1 p-4 border-b-2 font-medium text-sm transition-colors \${activeTab === tab.id
                                     ? "border-cyan-600 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400"
                                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
                                 }`}
                             >
-                                {tab.label}
+                                <span>{tab.label}</span>
+                                {tabsWithErrors.has(tab.id) && (
+                                    <span className="text-red-500 font-bold animate-pulse text-sm" title="Contains required validation errors">*</span>
+                                )}
                             </button>
                         ))}
                     </div>
@@ -274,15 +372,16 @@ export default function CaptureMember() {
                             <>
                                 <Field label="Title" value={form.title} onChange={handleChange("title")} options={titleOptions} />
                                 <Field label="Initials" value={form.initials} onChange={handleChange("initials")} />
-                                <Field label="First Names" value={form.firstNames} onChange={handleChange("firstNames")} />
-                                <Field label="Surname" value={form.surname} onChange={handleChange("surname")} />
-                                <Field label="Identity Type" value={form.identityType} onChange={handleChange("identityType")} options={identityTypeOptions} />
+                                <Field label="First Name(s)" value={form.firstNames} onChange={handleChange("firstNames")} error={fieldErrors.firstNames} required />
+                                <Field label="Surname" value={form.surname} onChange={handleChange("surname")} error={fieldErrors.surname} required />
+                                <Field label="Identity Type" value={form.identityType} onChange={handleChange("identityType")} options={identityTypeOptions} error={fieldErrors.identityType} required />
                                 <Field
                                     label={form.identityType || "Select Identity Type before entering"}
                                     value={form.identityNumber}
                                     onChange={handleChange("identityNumber")}
-                                    error={form.identityType === "I.D. Number" ? fieldErrors.identityNumber : null}
+                                    error={fieldErrors.identityNumber}
                                     disabled={!form.identityType}
+                                    required
                                 />
                                 <Field
                                     label="Date of Birth"
@@ -290,6 +389,8 @@ export default function CaptureMember() {
                                     onChange={handleChange("dateOfBirth")}
                                     type={form.identityType === "I.D. Number" ? "text" : "date"}
                                     disabled={form.identityType === "I.D. Number"}
+                                    error={fieldErrors.dateOfBirth}
+                                    required={form.identityType === "Passport"}
                                 />
                                 <Field
                                     label="Gender"
@@ -320,13 +421,13 @@ export default function CaptureMember() {
                                 <Field label="Employee Number" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
                                 <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} />
-                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={BANK_OPTIONS} searchable />
-                                <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} searchable />
+                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={BANK_OPTIONS} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
+                                <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
 
                                 {form.paymentType === "Debit Order" && (
                                     <>
-                                        <Field label="Bank Account Number" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} required />
+                                        <Field label="Bank Account Number" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} error={fieldErrors.bankAccountNumber} required />
                                         <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={DEBIT_DAY_OPTIONS} />
                                     </>
                                 )}
@@ -345,7 +446,6 @@ export default function CaptureMember() {
                             <>
                                 <SectionTitle title="SASBO Hierarchy Core Alignment Matrix" />
 
-                                {/* Flow node 1: Shop Steward? */}
                                 <Field
                                     label="Shop Steward?"
                                     value={form.isShopSteward}
@@ -359,12 +459,13 @@ export default function CaptureMember() {
                                             label="Enter Shop Steward Election Date"
                                             value={form.shopStewardElectionDate}
                                             onChange={handleChange("shopStewardElectionDate")}
+                                            error={fieldErrors.shopStewardElectionDate}
                                             type="date"
+                                            required
                                         />
                                     </div>
                                 )}
 
-                                {/* Flow node 2: BEC? */}
                                 <Field
                                     label="BEC Member?"
                                     value={form.isBecMember}
@@ -375,16 +476,16 @@ export default function CaptureMember() {
                                 {form.isBecMember === "Y" && (
                                     <div className="md:col-span-2 space-y-6 border-l-2 border-cyan-500 pl-4 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
 
-                                        {/* Flow node 3: 44 BEC Committees (Single Selection branch selector) */}
                                         <Field
                                             label="Select primary BEC Committee (44 Unique Branches Available)"
                                             value={form.becBranchName}
                                             onChange={handleChange("becBranchName")}
                                             options={SASBO_BRANCHES}
+                                            error={fieldErrors.becBranchName}
                                             searchable
+                                            required
                                         />
 
-                                        {/* Flow node 4: BEC Recruiter? */}
                                         <Field
                                             label="BEC Recruiter?"
                                             value={form.isBecRecruiter}
@@ -392,7 +493,6 @@ export default function CaptureMember() {
                                             options={yesNoOptions}
                                         />
 
-                                        {/* Flow node 5: BEC Structure Representative? */}
                                         <Field
                                             label="BEC Structure Representative?"
                                             value={form.isBecStructureRep}
@@ -421,7 +521,6 @@ export default function CaptureMember() {
                                             </div>
                                         )}
 
-                                        {/* Flow node 6: BEC Executive? */}
                                         <Field
                                             label="BEC Executive?"
                                             value={form.isBecExecutive}
@@ -436,6 +535,8 @@ export default function CaptureMember() {
                                                     value={form.becExecutivePosition}
                                                     onChange={handleChange("becExecutivePosition")}
                                                     options={BEC_EXECUTIVE_POSITIONS}
+                                                    error={fieldErrors.becExecutivePosition}
+                                                    required
                                                 />
                                             </div>
                                         )}
@@ -499,21 +600,20 @@ export default function CaptureMember() {
 }
 
 const SectionTitle = ({ title }) => (
-    <div className="md:col-span-2 mt-4 border-b border-gray-200 dark:border-gray-700 pb-1
- font-semibold text-cyan-700 dark:text-cyan-400">
+    <div className="md:col-span-2 mt-4 border-b border-gray-200 dark:border-gray-700 pb-1 font-semibold text-cyan-700 dark:text-cyan-400">
         {title}
     </div>
 );
 
 const fieldCls = (error, disabled = false) =>
     `w-full rounded-lg px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400
- ${disabled ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed" : "bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white"}
- ${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"}`;
+ \${disabled ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed" : "bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white"}
+ \${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"}`;
 
 function RepElectionDatePicker({ form, setForm }) {
     const dateValue =
         form.repElectionYear && form.repElectionMonth && form.repElectionDay
-            ? `${form.repElectionYear}-${form.repElectionMonth}-${form.repElectionDay}`
+            ? `\${form.repElectionYear}-\${form.repElectionMonth}-	ext{\${form.repElectionDay}}`
             : "";
     const handleDateChange = (e) => {
         const [year, month, day] = e.target.value.split("-");
@@ -526,7 +626,7 @@ function RepElectionDatePicker({ form, setForm }) {
             </label>
             <input
                 type="date"
-                value={dateValue}
+                value={dateValue.replace('text{', '').replace('}', '')}
                 onChange={handleDateChange}
                 className={fieldCls(null, false)}
             />
@@ -662,12 +762,12 @@ function EmailFields({ form, setForm, handleChange, fieldErrors }) {
 }
 
 function Field({ label, value, onChange, className = "", options = null, type = "text",
-                   error = null, disabled = false, searchable = false, note = null, id }) {
+                   error = null, disabled = false, searchable = false, note = null, id, required = false }) {
     const fieldId = id || label.toLowerCase().replace(/\s+/g, "-");
     return (
         <div className={className}>
             <label htmlFor={fieldId} className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                {label}
+                {label} {required && <span className="text-red-500 font-bold">*</span>}
             </label>
             {note && <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">{note}</p>}
             <div className="relative">
