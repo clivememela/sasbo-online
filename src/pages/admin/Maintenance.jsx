@@ -39,15 +39,15 @@ const maintenance_cards = [
         color: 'text-red-600 dark:text-red-400'
     },*/
     {
-        title: 'Recruiter Types',
+        title: 'Recruitment Channel',
         icon: LucideCopyCheck,
-        desc: 'Maintain Recruiter Types',
-        href: '/maintenance/recruiter-type'
+        desc: 'Maintain Recruitment Channels',
+        href: '/admin/maintenance/recruitment-channel'
     },
     {
         title: 'Subscriptions',
         icon: LucideMails,
-        href: '/maintenance/subscriptions',
+        href: '/admin/maintenance/subscriptions',
         desc: 'Maintain Subscription Table'
     },
     /*{

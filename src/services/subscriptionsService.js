@@ -11,7 +11,7 @@ export const subscriptionsService = {
             .then(handleResponse),
 
     create: (name) =>
-        fetch(apiUrl('/api/recruiter-types'), {
+        fetch(apiUrl('/api/recruitment-channels'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',

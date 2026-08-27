@@ -4,7 +4,7 @@ import PageTitle from '../../components/common/PageTitle';
 import { TextInput, SearchableSelect, Button, PositionTreeSelect } from '../../components/form';
 import { memberService } from '../../services/memberService.js';
 import { recruiterService } from '../../services/recruiterService.js';
-import { recruiterTypeService } from '../../services/recruiterTypeService.js';
+import { recruitmentChannelService } from '../../services/recruitmentChannelService.js';
 import { bankService } from '../../services/bankService.js';
 import { locationService } from '../../services/locationService.js';
 import { validateEmail } from '../../utils/validateSAID.js';
@@ -33,11 +33,11 @@ export function Recruiters() {
     const [repSearch, setRepSearch] = useState({ membershipNumber: '', name: '', bank: '', branch: '', status: '' });
     const [structures, setStructures] = useState([]);
     const [roles, setRoles] = useState([]);
-    const [recruiterTypes, setRecruiterTypes] = useState([]);
+    const [recruitmentChannels, setRecruitmentChannels] = useState([]);
 
     const refreshAll = useCallback(() => Promise.all([
         memberService.getMembers(),
-        recruiterService.getAll(),
+        recruitmentChannelService.getAll(),
     ]).then(([m, r]) => {
         setMembers(m);
         setReps(r);
@@ -49,7 +49,7 @@ export function Recruiters() {
         locationService.getProvinces().then(setProvincesData).catch(err => console.error(err));
         recruiterService.getStructures().then(setStructures).catch(err => console.error(err));
         recruiterService.getRoles().then(setRoles).catch(err => console.error(err));
-        recruiterTypeService.getAll().then(setRecruiterTypes).catch(err => console.error(err));
+        recruitmentChannelService.getAll().then(setRecruitmentChannels).catch(err => console.error(err));
     }, [refreshAll]);
 
     const BANK_NAMES = useMemo(() => [...new Set(banksData.map(b => b?.bankName).filter(Boolean))].sort(), [banksData]);
@@ -80,7 +80,7 @@ export function Recruiters() {
         walk(structures);
         return flat;
     }, [structures]);
-    const RECRUITER_TYPES = useMemo(() => recruiterTypes.filter(r => r.enabled).sort((a, b) => a.name.localeCompare(b.name)), [recruiterTypes]);
+    const RECRUITMENT_CHANNELS = useMemo(() => recruitmentChannels.filter(r => r.enabled).sort((a, b) => a.name.localeCompare(b.name)), [recruitmentChannels]);
 
     const repList = useMemo(() => {
         const memberMap = {};
@@ -393,7 +393,7 @@ export function Recruiters() {
                 </div>
                 <div className="mt-4 rounded-xl overflow-hidden border border-transparent max-h-[60vh] overflow-y-auto">
                     <div className="grid grid-cols-7 gap-3 px-4 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300 sticky top-0 z-10">
-                        <div>Recruiter</div>
+                        <div>Recruitment Channel</div>
                         <div>Bank(s)</div>
                         <div>Branch(es)</div>
                         <div>Province</div>
@@ -439,11 +439,11 @@ export function Recruiters() {
                     <div className="relative w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
                             <div>
-                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Recruiter</p>
+                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Recruitment Channel</p>
                                 <div className="flex items-center gap-2">
                                     <h3 className="text-lg font-semibold text-cyan-700 dark:text-cyan-400">{selectedRep.name}</h3>
                                     <div className="relative group">
-                                        <button onClick={() => {
+                                        <Button onClick={() => {
                                             const rep = repList.find(r => r.id === selectedRep.id);
                                             setSelectedRepDetail(rep);
                                             setEditingRep(false);
@@ -451,7 +451,7 @@ export function Recruiters() {
                                             setEditRepErrors({});
                                         }} className="p-1 rounded-md text-cyan-500 hover:bg-cyan-50 hover:text-cyan-700 dark:hover:bg-cyan-900/20 transition">
                                             <Eye size={14} />
-                                        </button>
+                                        </Button>
                                         <span className="absolute left-1/2 -translate-x-1/2 top-7 z-50 whitespace-nowrap rounded-md bg-gray-800 text-white text-xs px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
                       View recruiter details
                     </span>
@@ -627,8 +627,8 @@ export function Recruiters() {
                                     <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Recruiter Type</label>
                                     <select value={editRepFields.recruiterTypeId || ''} onChange={e => setEditRepFields(p => ({ ...p, recruiterTypeId: e.target.value ? Number(e.target.value) : null }))}
                                             className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
-                                        <option value="">Select recruiter type...</option>
-                                        {RECRUITER_TYPES.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
+                                        <option value="">Select recruitment channel...</option>
+                                        {RECRUITMENT_CHANNELS.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
                                     </select>
                                 </div>
                                 <div>
@@ -674,7 +674,7 @@ export function Recruiters() {
                                 <DRow label="Branch(es)" value={selectedRepDetail.branches || '—'} />
                                 <DRow label="Province" value={selectedRepDetail.provinces || '—'} />
                                 <DRow label="Area" value={selectedRepDetail.areas || '—'} />
-                                <DRow label="Recruiter Type" value={RECRUITER_TYPES.find(rt => rt.id === selectedRepDetail.recruiterTypeId)?.name || '—'} />
+                                <DRow label="Recruiter Type" value={RECRUITMENT_CHANNELS.find(rt => rt.id === selectedRepDetail.recruiterTypeId)?.name || '—'} />
                                 <DRow label="Role" value={ROLES.find(r => r.id === selectedRepDetail.roleId)?.name || '—'} />
                                 <DRow label="Elected Rep" value={selectedRepDetail.isElectedRep ? 'Yes' : 'No'} />
                                 {selectedRepDetail.isElectedRep && <DRow label="Election Date" value={selectedRepDetail.electionDate || '—'} />}
@@ -789,7 +789,7 @@ export function Recruiters() {
                                     <select value={newRepDetails.recruiterTypeId || ''} onChange={e => setNewRepDetails(p => ({ ...p, recruiterTypeId: e.target.value ? Number(e.target.value) : null }))}
                                             className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
                                         <option value="">Select recruiter type...</option>
-                                        {RECRUITER_TYPES.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
+                                        {RECRUITMENT_CHANNELS.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
                                     </select>
                                 </div>
                                 <div>

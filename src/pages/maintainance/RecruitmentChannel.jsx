@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { Pencil, Trash2, UserPlus, Check, X } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import { Button } from '../../components/form';
-import { recruiterTypeService } from '../../services/recruiterTypeService.js';
+import { recruitmentChannelService } from '../../services/recruitmentChannelService.js';
 
-export default function RecruiterType() {
-    const [recruiterTypes, setRecruiterTypes] = useState([]);
+export default function RecruitmentChannel() {
+    const [recruitmentChannels, setRecruipmentChannels] = useState([]);
     const [search, setSearch] = useState('');
     const [saving, setSaving] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -13,23 +13,23 @@ export default function RecruiterType() {
     const [showAdd, setShowAdd] = useState(false);
     const [newName, setNewName] = useState('');
 
-    const refresh = () => recruiterTypeService.getAll().then(setRecruiterTypes);
+    const refresh = () => recruitmentChannelService.getAll().then(setRecruipmentChannels);
 
     useEffect(() => { refresh(); }, []);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return recruiterTypes
+        return recruitmentChannels
             .filter(r => !q || r.name.toLowerCase().includes(q))
             .sort((a, b) => a.name.localeCompare(b.name));
-    }, [recruiterTypes, search]);
+    }, [recruitmentChannels, search]);
 
     const handleAdd = async () => {
         const name = newName.trim();
         if (!name) return;
         setSaving(true);
         try {
-            await recruiterTypeService.create(name);
+            await recruitmentChannelService.create(name);
             await refresh();
             setNewName('');
             setShowAdd(false);
@@ -45,7 +45,7 @@ export default function RecruiterType() {
         if (!name) return;
         setSaving(true);
         try {
-            await recruiterTypeService.update(r.id, { name, enabled: r.enabled });
+            await recruitmentChannelService.update(r.id, { name, enabled: r.enabled });
             await refresh();
             setEditingId(null);
         } catch (err) {
@@ -58,7 +58,7 @@ export default function RecruiterType() {
     const handleToggleEnabled = async (r) => {
         setSaving(true);
         try {
-            await recruiterTypeService.update(r.id, { name: r.name, enabled: !r.enabled });
+            await recruitmentChannelService.update(r.id, { name: r.name, enabled: !r.enabled });
             await refresh();
         } catch (err) {
             alert(err);
@@ -71,7 +71,7 @@ export default function RecruiterType() {
         if (!window.confirm(`Delete recruiter type "${r.name}"?`)) return;
         setSaving(true);
         try {
-            await recruiterTypeService.remove(r.id);
+            await recruitmentChannelService.remove(r.id);
             await refresh();
         } catch (err) {
             alert(err);
@@ -82,7 +82,7 @@ export default function RecruiterType() {
 
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
-            <PageTitle title="Recruiter Type Maintenance" />
+            <PageTitle title="Recruitment Channel Maintenance" />
 
             <div className="max-w-2xl mx-auto mt-4 rounded-2xl shadow-lg bg-white dark:bg-gray-800 p-6">
                 {/* Toolbar */}
@@ -90,7 +90,7 @@ export default function RecruiterType() {
                     <input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        placeholder="Search recruiter types…"
+                        placeholder="Search Recruitment Channels…"
                         className="flex-1 rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                     />
                     <Button variant="primary" onClick={() => { setShowAdd(true); setNewName(''); }}>
@@ -106,7 +106,7 @@ export default function RecruiterType() {
                             value={newName}
                             onChange={e => setNewName(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                            placeholder="Recruiter type name"
+                            placeholder="Recruitment Channel name"
                             className="flex-1 rounded-lg px-3 py-1.5 text-sm border bg-white border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                         />
                         <button
@@ -125,7 +125,7 @@ export default function RecruiterType() {
 
                 {/* Header */}
                 <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-4 py-2 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300 rounded-t-xl">
-                    <div>Name</div>
+                    <div>Channel Name</div>
                     <div>Status</div>
                     <div>Edit</div>
                     <div>Delete</div>

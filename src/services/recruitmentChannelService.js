@@ -5,12 +5,12 @@ const handleResponse = (r) => {
   return r.json();
 };
 
-export const recruiterTypeService = {
+export const recruitmentChannelService = {
   getAll: () =>
-    fetch(apiUrl('/api/recruiter-types'), { credentials: 'include' }).then(handleResponse),
+    fetch(apiUrl('/api/recruitment-channels'), { credentials: 'include' }).then(handleResponse),
 
   create: (name) =>
-    fetch(apiUrl('/api/recruiter-types'), {
+    fetch(apiUrl('/api/recruitment-channels'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -18,7 +18,7 @@ export const recruiterTypeService = {
     }).then(handleResponse),
 
   update: (id, data) =>
-    fetch(apiUrl(`/api/recruiter-types/${id}`), {
+    fetch(apiUrl(`/api/recruitment-channels/${id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -26,7 +26,7 @@ export const recruiterTypeService = {
     }).then(handleResponse),
 
   remove: (id) =>
-    fetch(apiUrl(`/api/recruiter-types/${id}`), {
+    fetch(apiUrl(`/api/recruitment-channels/${id}`), {
       method: 'DELETE',
       credentials: 'include',
     }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); }),

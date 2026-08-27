@@ -103,7 +103,7 @@ export const MEMBER_FIELD_LABEL_MAP = {
   workBankAddress: 'Work Bank Address',
   recruitmentRep: 'Recruitment Rep',
   areasRep: "Area's Rep",
-  recruiterType: 'Recruiter Type',
+  recruitmentChannel: 'Recruitment Channel',
   repElectionDay: 'Sasbo Rep Election Day',
   repElectionMonth: 'Sasbo Rep Election Month',
   repElectionYear: 'Sasbo Rep Election Year',

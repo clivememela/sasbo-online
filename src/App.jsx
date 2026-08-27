@@ -23,7 +23,7 @@ import {Recruiters} from "./pages/members/Recruiters.jsx";
 import CaptureMember from "./pages/members/CaptureMember.jsx";
 import Maintenance from "./pages/admin/Maintenance.jsx";
 import BankListing from "./pages/bank_branch/BankListing.jsx";
-import RecruiterType from "./pages/maintainance/RecruiterType.jsx";
+import RecruitmentChannel from "./pages/maintainance/RecruitmentChannel.jsx";
 import Subscriptions from "./pages/maintainance/Subscriptions.jsx";
 
 
@@ -49,7 +49,7 @@ function App() {
         <Route path="members/apply" element={<MembershipApplication />} />
         <Route path="members/capture" element={<CaptureMember />} />
         <Route path="members/recruiters" element={<Recruiters />} />
-        <Route path="maintenance/subscriptions" element={<Subscriptions />} />
+        <Route path="admin/maintenance/subscriptions" element={<Subscriptions />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="reports/organizer-report" element={<OrganizerReport />} />
         <Route path="reports/forms" element={<Forms />} />
@@ -59,7 +59,7 @@ function App() {
         <Route path="archives/finance-houses" element={<FinanceHouses />} />
         <Route path="archives/research-information" element={<ResearchInformation />} />
         <Route path="admin/maintenance" element={<Maintenance/>} />
-        <Route path="maintenance/recruiter-type" element={<RecruiterType />} />
+        <Route path="admin/maintenance/recruitment-channel" element={<RecruitmentChannel />} />
       </Route>
     </Routes>
   )
