@@ -336,25 +336,25 @@ export const navItems = [
       { title: "Information & Research", icon: LucideInfo, href: "/archives/research-information" }
     ]
   },
-  {
-    title: "Maintenance",
-    desc: "Manage System",
-    href:'/admin/maintenance',
-    icon: LucideConstruction,
-    subItems: [
-      {
-        title: 'Bank/Branch',
-        icon: Landmark,
-        desc: 'Maintain Bank/Branch'
-      },
-      {
-        title: 'Recruitment Channel',
-        icon: LucideCopyCheck,
-        desc: 'Maintain Recruitment Channels',
-        href: '/admin/maintenance/recruitment-channel'
-      },
-    ],
-  },
+  // {
+  //   title: "Maintenance",
+  //   desc: "Manage System",
+  //   href:'/admin/maintenance',
+  //   icon: LucideConstruction,
+  //   subItems: [
+  //     {
+  //       title: 'Bank/Branch',
+  //       icon: Landmark,
+  //       desc: 'Maintain Bank/Branch'
+  //     },
+  //     {
+  //       title: 'Recruitment Channel',
+  //       icon: LucideCopyCheck,
+  //       desc: 'Maintain Recruitment Channels',
+  //       href: '/admin/maintenance/recruitment-channel'
+  //     },
+  //   ],
+  // },
   { 
     title: "Members", 
     icon: Users, 
