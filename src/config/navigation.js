@@ -376,7 +376,7 @@ export const navItems = [
   {
     title: 'Subscriptions',
     icon: LucideMails,
-    href: '/maintenance/subscriptions',
+    href: '/admin/maintenance/subscriptions',
     desc: 'Maintain Subscription Table'
   },
   { 
