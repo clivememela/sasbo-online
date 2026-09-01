@@ -1,8 +1,8 @@
 import PageTitle from '../../components/common/PageTitle';
 import { SearchableSelect, SelectInput } from '../../components/form';
 import { subscriptionsService } from '../../services/subscriptionsService';
+import { bankService } from '../../services/bankService.js';
 import { useState, useEffect, useMemo } from 'react';
-import { BANK_OPTIONS } from '../../config/memberConstants.js';
 import { useLocation } from 'react-router-dom';
 
 const inputCls = 'w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white text-sm';
@@ -19,6 +19,7 @@ export default function Subscriptions() {
     const [error, setError] = useState(null);
     const [editingId, setEditingId] = useState(null);
     const [editData, setEditData] = useState({});
+    const [bankNames, setBankNames] = useState([]);
 
     const formatDate = (d) => {
         if (!d) return '';
@@ -32,6 +33,12 @@ export default function Subscriptions() {
             .then(data => setAllSubscriptions(data))
             .catch(err => setError(String(err)))
             .finally(() => setLoading(false));
+    }, []);
+
+    useEffect(() => {
+        bankService.getBankNames()
+            .then(setBankNames)
+            .catch(() => setBankNames([]));
     }, []);
 
     const subscriptions = useMemo(() => {
@@ -86,7 +93,7 @@ export default function Subscriptions() {
                         value={filters.bankName}
                         onChange={(v) => setFilters(prev => ({ ...prev, bankName: v }))}
                         placeholder="Select/search"
-                        options={[{ value: '', label: 'All Banks' }, ...BANK_OPTIONS.map(b => ({ value: b, label: b }))]}
+                        options={[{ value: '', label: 'All Banks' }, ...bankNames.map(b => ({ value: b, label: b }))]}
                     />
                     <SelectInput
                         label="Core Banking (Y/N)"

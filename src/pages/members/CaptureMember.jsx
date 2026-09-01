@@ -2,12 +2,14 @@ import React, { useState, useEffect, useMemo } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { recruiterService } from "../../services/recruiterService.js";
+import { jobGradeService } from "../../services/jobGradeService.js";
+import { bankService } from "../../services/bankService.js";
 import { Button, PositionTreeSelect } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, YES_NO_OPTIONS,
     SUSPENSION_CODE_OPTIONS, JOB_GRADE_OPTIONS, MEMBER_TABS,
-    BANK_OPTIONS, BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS
+    BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS
 } from "../../config/memberConstants.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
     formatDate } from "../../utils/validateSAID.js";
@@ -332,7 +334,56 @@ export default function CaptureMember() {
     const genderOptions = GENDER_OPTIONS;
     const yesNoOptions = YES_NO_OPTIONS;
     const suspensionCodeOptions = SUSPENSION_CODE_OPTIONS;
-    const jobGradeOptions = JOB_GRADE_OPTIONS;
+    const [jobGradeOptions, setJobGradeOptions] = useState(JOB_GRADE_OPTIONS);
+    const [jobGradeLoading, setJobGradeLoading] = useState(false);
+    const [bankListing, setBankListing] = useState([]);
+    const [bankNames, setBankNames] = useState([]);
+
+    // Load bank listing and bank names on mount so we can resolve a selected bank name to a bank code
+    useEffect(() => {
+        let mounted = true;
+        bankService.getBankListing()
+            .then(list => { if (mounted) setBankListing(list || []); })
+            .catch(() => { if (mounted) setBankListing([]); });
+        bankService.getBankNames()
+            .then(names => { if (mounted) setBankNames(names || []); })
+            .catch(() => { if (mounted) setBankNames([]); });
+        return () => { mounted = false; };
+    }, []);
+
+    // Fetch job grades for the selected bank whenever bankName changes.
+    useEffect(() => {
+        let cancelled = false;
+        const fetchGrades = async () => {
+            if (!form.bankName) {
+                setJobGradeOptions(JOB_GRADE_OPTIONS);
+                setForm(prev => ({ ...prev, jobGrade: "" }));
+                setJobGradeLoading(false);
+                return;
+            }
+
+            setJobGradeLoading(true);
+
+            // Try to resolve bank code locally from bankListing
+            const normalized = String(form.bankName || '').trim().toLowerCase();
+            const found = bankListing.find((b) => {
+                const bn = String(b.bankName || b.name || '').trim().toLowerCase();
+                return bn === normalized || bn.includes(normalized) || normalized.includes(bn);
+            });
+            const bankIdentifier = (found && (found.universalBranchCode || found.universal_branch_code)) || form.bankName;
+
+            try {
+                const grades = await jobGradeService.getByBank(bankIdentifier);
+                if (!cancelled) setJobGradeOptions(Array.isArray(grades) && grades.length ? grades : JOB_GRADE_OPTIONS);
+            } catch (e) {
+                if (!cancelled) setJobGradeOptions(JOB_GRADE_OPTIONS);
+            } finally {
+                if (!cancelled) setJobGradeLoading(false);
+            }
+        };
+        fetchGrades();
+        return () => { cancelled = true; };
+    }, [form.bankName, bankListing]);
 
     return (
         <div className="p-6 text-gray-900 dark:text-gray-100">
@@ -357,10 +408,7 @@ export default function CaptureMember() {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`mr-4 inline-flex items-center gap-1 p-4 border-b-2 font-medium text-sm transition-colors \${activeTab === tab.id
-                                    ? "border-cyan-600 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400"
-                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                                }`}
+                                className={`mr-4 inline-flex items-center gap-1 p-4 border-b-2 font-bold text-sm transition-colors ${activeTab === tab.id ? "border-cyan-600 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400" : "border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"}`}
                             >
                                 <span>{tab.label}</span>
                                 {tabsWithErrors.has(tab.id) && (
@@ -425,8 +473,8 @@ export default function CaptureMember() {
                             <>
                                 <Field label="Employee Number" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
-                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={BANK_OPTIONS} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
-                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} />
+                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
+                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} />
                                 <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
 
@@ -617,14 +665,13 @@ const SectionTitle = ({ title }) => (
 );
 
 const fieldCls = (error, disabled = false) =>
-    `w-full rounded-lg px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400
- \${disabled ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed" : "bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white"}
- \${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"}`;
+    `w-full rounded-lg px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 ${
+        disabled ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed" : "bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white"} ${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"}`;
 
 function RepElectionDatePicker({ form, setForm }) {
     const dateValue =
         form.repElectionYear && form.repElectionMonth && form.repElectionDay
-            ? `\${form.repElectionYear}-\${form.repElectionMonth}-	ext{\${form.repElectionDay}}`
+            ? `${form.repElectionYear}-${form.repElectionMonth}-${form.repElectionDay}`
             : "";
     const handleDateChange = (e) => {
         const [year, month, day] = e.target.value.split("-");
@@ -637,7 +684,7 @@ function RepElectionDatePicker({ form, setForm }) {
             </label>
             <input
                 type="date"
-                value={dateValue.replace('text{', '').replace('}', '')}
+                value={dateValue}
                 onChange={handleDateChange}
                 className={fieldCls(null, false)}
             />
@@ -773,12 +820,18 @@ function EmailFields({ form, setForm, handleChange, fieldErrors }) {
 }
 
 function Field({ label, value, onChange, className = "", options = null, type = "text",
-                   error = null, disabled = false, searchable = false, note = null, id, required = false }) {
+                   error = null, disabled = false, searchable = false, note = null, id, required = false, loading = false }) {
     const fieldId = id || label.toLowerCase().replace(/\s+/g, "-");
     return (
         <div className={className}>
-            <label htmlFor={fieldId} className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                {label} {required && <span className="text-red-500 font-bold">*</span>}
+            <label htmlFor={fieldId} className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+                <span>{label} {required && <span className="text-red-500 font-bold">*</span>}</span>
+                {loading && (
+                    <svg className="w-4 h-4 animate-spin text-cyan-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25" />
+                        <path d="M22 12a10 10 0 00-10-10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+                    </svg>
+                )}
             </label>
             {note && <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">{note}</p>}
             <div className="relative">
@@ -787,9 +840,13 @@ function Field({ label, value, onChange, className = "", options = null, type = 
                 ) : options ? (
                     <select id={fieldId} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled}>
                         <option value="">Select...</option>
-                        {options.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                        ))}
+                        {options.length === 0 ? (
+                            <option value="" disabled>No job grades available</option>
+                        ) : (
+                            options.map((opt) => (
+                                <option key={opt} value={opt}>{opt}</option>
+                            ))
+                        )}
                     </select>
                 ) : (
                     <input id={fieldId} type={type} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled} />

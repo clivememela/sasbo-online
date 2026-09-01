@@ -8,31 +8,16 @@ export const GENDER_OPTIONS = ['Male', 'Female'];
 export const YES_NO_OPTIONS = ['Y', 'N'];
 export const SUSPENSION_CODE_OPTIONS = ['', 'NON-PAY', 'RESIGN'];
 export const EMPLOYMENT_TYPE_OPTIONS = ['Permanent', 'Contract'];
-export const JOB_GRADE_OPTIONS = Array.from({ length: 12 }, (_, i) => (i + 1).toString());
+// Job grades are now provided by the backend per-bank. Keep an empty default here so
+// the front-end does not hard-code values. Components will fetch populated values
+// from the API at runtime and fall back to this array only when necessary.
+export const JOB_GRADE_OPTIONS = [];
 export const MANAGER_OPTIONS = ['MGR-001'];
 export const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 export const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 export const YEAR_OPTIONS = Array.from({ length: 21 }, (_, i) => (new Date().getFullYear() - 10 + i).toString());
 
 export const BEC_STRUCTURE_OPTIONS = ['Shop Stewart', 'Branch Executive Committee'];
-
-export const BANK_OPTIONS = [
-  'Absa Bank', 'Absa Bank Limited', 'Access Bank (South Africa) Limited', 'AfrAsia Bank Limited', 'African Bank Limited',
-  'Albaraka Bank Limited', 'Banco Internacional de Credito', 'Bank Julius Baer & Co. Ltd', 'Bank Lombard Odier & Co Limited',
-  'Bank Of China Limited', 'Bank Of Communication Co., Ltd', 'Bank Vontobel AG', 'Bank Zero Mutual Bank', 'Bank of America N.A.',
-  'Bank of Taiwan', 'Banque SYZ SA', 'Barclays Bank PLC', 'Bidvest Bank Limited', 'CBZ Bank Limited', 'Caixa Geral de Depositos',
-  'CaixaBank', 'Capital International Bank Limited', 'Capitec Bank', 'Capitec Bank Limited', 'China Construction Bank Corporation',
-  'Citibank', 'Commerzbank AG', 'Deutsche Bank (Suisse) SA', 'Deutsche Bank AG', 'Discovery Bank Limited',
-  'Ditsobotla Primary Savings and Credit Co-operative Bank', 'Doha Bank', 'Ecobank', 'Export Import Bank of India',
-  'First National Bank', 'FirstRand Limited', 'GBS Mutual Bank', 'GIG Co-operative Bank', 'GoTyme Bank Limited',
-  'Goldman Sachs International Bank', 'HBZ Bank Limited', 'HSBC Bank Plc', 'Industrial and Commercial Bank of China',
-  'Investec Bank', 'Investec Bank Limited', 'KSK Kooperatiewe Bank Beperk', 'KfW IPEX-Bank GmbH', 'Macquarie Bank Limited',
-  'Metbank Limited', 'Mitsubishi UFJ Financial Group Bank, Ltd.', 'Mizuho Bank Ltd', 'Nedbank', 'OM Bank Limited',
-  'OSK Kooperatiewe Bank Beperk', 'Sasfin Bank Limited', 'Societe Generale', 'Standard Bank', 'Standard Bank South Africa',
-  'State Bank of India', 'Sumitomo Mitsui Banking', 'The Export & Import Bank of China', 'The Mauritius Commercial Bank Limited',
-  'The Standard Bank of South Africa Limited', 'Ubank (under curatorship)', 'Union Bancaire Privee, UBP SA',
-  'Ziphakamise Savings and Credit Co-operative Bank', 'eNL Mutual Bank',
-];
 
 export const BRANCH_OPTIONS = [
   'Cape Town', 'Durban', 'Head Office', 'Johannesburg', 'Johannesburg Branch', 'Midrand', 'Pretoria',

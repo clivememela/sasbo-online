@@ -3,12 +3,14 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { LucideUserRoundPlus, CheckCircle2, Printer } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { recruiterService } from "../../services/recruiterService.js";
+import { jobGradeService } from "../../services/jobGradeService.js";
+import { bankService } from "../../services/bankService.js";
 import { TextInput, SearchableSelect, Button } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, YES_NO_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, SUSPENSION_CODE_OPTIONS,
     JOB_GRADE_OPTIONS, DAY_OPTIONS, MONTH_OPTIONS, YEAR_OPTIONS,
-    BANK_OPTIONS, BRANCH_OPTIONS, REP_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS,
+    BRANCH_OPTIONS, REP_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS,
     DEBIT_DAY_OPTIONS,
 } from "../../config/memberConstants.js";
 import {
@@ -157,6 +159,7 @@ export default function Members() {
     const [structuresTree, setStructuresTree] = useState([]);
     const [roles, setRoles] = useState([]);
     const [membersList, setMembersList] = useState([]);
+    const [bankNames, setBankNames] = useState([]);
 
     useEffect(() => {
         recruiterService.getStructures().then(setStructuresTree).catch(err => console.error("Failed to load structures", err));
@@ -165,6 +168,7 @@ export default function Members() {
             const list = Array.isArray(res) ? res : (res.data || res.members || []);
             setMembersList(list);
         }).catch(err => console.error("Failed fetching records array", err));
+        bankService.getBankNames().then(setBankNames).catch(err => console.error("Failed to load banks", err));
     }, []);
 
     const tabsWithErrors = useMemo(() => {
@@ -182,9 +186,12 @@ export default function Members() {
     const paymentTypeOptions = PAYMENT_TYPE_OPTIONS;
     const statusOptions = STATUS_OPTIONS;
     const yesNoOptions = YES_NO_OPTIONS;
-    const bankOptions = BANK_OPTIONS;
+    const bankOptions = bankNames;
     const branchOptions = BRANCH_OPTIONS;
     const genderOptions = GENDER_OPTIONS;
+    // JOB_GRADE_OPTIONS imported from config — maintain a local, dynamic options list that can be fetched per-bank
+    const [jobGradeOptions, setJobGradeOptions] = useState(JOB_GRADE_OPTIONS);
+    const jobGrade = jobGradeOptions;
 
     useEffect(() => {
         const onKeyDown = (e) => {
@@ -212,6 +219,19 @@ export default function Members() {
             setFieldErrors({});
         }
     }, [selectedMember]);
+
+    // When the edit form's bankName changes, fetch job grades for that bank and clear selection when none selected.
+    useEffect(() => {
+        if (!editForm.bankName) {
+            setJobGradeOptions(JOB_GRADE_OPTIONS);
+            setEditForm(prev => ({ ...prev, jobGrade: "" }));
+            return;
+        }
+
+        jobGradeService.getByBank(editForm.bankName)
+            .then((grades) => setJobGradeOptions(Array.isArray(grades) && grades.length ? grades : JOB_GRADE_OPTIONS))
+            .catch(() => setJobGradeOptions(JOB_GRADE_OPTIONS));
+    }, [editForm.bankName]);
 
     const handleEditToggle = () => {
         setIsEditing((editing) => {
@@ -577,9 +597,9 @@ export default function Members() {
                             {activeTab === "employment" && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
                                     <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} />
-                                    <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
-                                    <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGradeOptions} onChange={handleEditChange("jobGrade")} />
                                     <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
+                                    <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
+                                    <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGrade} onChange={handleEditChange("jobGrade")} disabled={!editForm.bankName} />
                                     <Detail label="Bank Branch" value={editForm.branch} isEditing={isEditing} options={branchOptions} error={fieldErrors.branch} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("branch")} />
                                     <Detail label="Payment Type" value={editForm.paymentType} isEditing={isEditing} options={paymentTypeOptions} onChange={handleEditChange("paymentType")} />
 
@@ -622,8 +642,8 @@ export default function Members() {
 
                             {activeTab === "representatives" && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
-                                    <Detail label="Assigned Lead Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={isEditing} options={reps.map(r=>r.name)} onChange={handleEditChange("recruitmentRepresentativeName")} />
-                                    <Detail label="Regional Area Representative" value={editForm.areasRep} isEditing={isEditing} options={reps.map(r=>r.name)} onChange={handleEditChange("areasRep")} />
+                                    <Detail label="Assigned Lead Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={isEditing} options={roles.map(r => r.name)} onChange={handleEditChange("recruitmentRepresentativeName")} />
+                                    <Detail label="Regional Area Representative" value={editForm.areasRep} isEditing={isEditing} options={roles.map(r => r.name)} onChange={handleEditChange("areasRep")} />
                                 </div>
                             )}
 

@@ -129,6 +129,26 @@ export const bankService = {
         throw err;
       }),
 
+  getBankNames: () =>
+    fetch(apiUrl('/api/banks'), { credentials: 'include' })
+      .then(r => {
+        if (!r.ok) {
+          throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+        }
+        return r.json();
+      })
+      .then(payload => {
+        const banks = normalizeListPayload(payload);
+        return banks
+          .map(bank => bank.name ?? bank.bankName ?? '')
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b));
+      })
+      .catch(err => {
+        console.error('Failed to fetch bank names:', err);
+        return [];
+      }),
+
   getBanks: () =>
     fetch(apiUrl('/api/banks/branches'), { credentials: 'include' })
       .then(r => {
