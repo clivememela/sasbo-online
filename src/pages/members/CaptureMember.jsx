@@ -13,6 +13,7 @@ import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderF
     formatDate } from "../../utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 
+// 44 Unique SASBO Branches for Primary Selection Dropdown
 const SASBO_BRANCHES = [
     "Absa Johannesburg Central", "Absa Pretoria", "Absa Cape Town", "Absa Durban", "Absa Gqeberha",
     "Standard Bank Gauteng South", "Standard Bank KZN", "Standard Bank Western Cape", "Standard Bank Eastern Cape",
@@ -26,10 +27,12 @@ const SASBO_BRANCHES = [
     "Old Mutual Financial Services", "Hollard Insurance Group", "Regent Insurance National"
 ];
 
+// BEC Structure Representative Options (Multiple Selection Allowed)
 const STRUCTURE_REP_OPTIONS = [
     "INC / IC", "NCF / SJC", "VP", "President", "MANCOM", "Resolutions Committee"
 ];
 
+// BEC Executive Positions (Only One Position Allowed)
 const BEC_EXECUTIVE_POSITIONS = [
     "Chairperson", "Deputy Chairperson", "Secretary", "Deputy Secretary", "Treasurer"
 ];
@@ -111,15 +114,17 @@ export default function CaptureMember() {
         printMembershipCards: "Y",
         homeLoanReducedRateOption: "N",
         structure1: "",
+
+        // Exact Flow diagram state bindings
         isShopSteward: "N",
         shopStewardElectionDate: "",
         isBecMember: "N",
-        becBranchName: "",
+        becBranchName: "", // Choice among the 44 unique branches
         isBecRecruiter: "N",
         isBecStructureRep: "N",
-        selectedBecStructures: [],
+        selectedBecStructures: [], // Array for MULTIPLE STRUCTURES ALLOWED
         isBecExecutive: "N",
-        becExecutivePosition: ""
+        becExecutivePosition: "" // Single Selection Allowed
     });
 
     const [fieldErrors, setFieldErrors] = useState({});
@@ -340,7 +345,7 @@ export default function CaptureMember() {
             </p>
             <div className="max-w-6xl mx-auto rounded-2xl shadow-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden relative">
                 {showSavedNotification && (
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
                         <CheckCircle2 size={18} />
                         <span className="text-sm font-medium">Member captured successfully!</span>
                     </div>
@@ -420,8 +425,8 @@ export default function CaptureMember() {
                             <>
                                 <Field label="Employee Number" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
-                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} />
                                 <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={BANK_OPTIONS} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
+                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} />
                                 <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
 
@@ -446,6 +451,7 @@ export default function CaptureMember() {
                             <>
                                 <SectionTitle title="SASBO Hierarchy Core Alignment Matrix" />
 
+                                {/* Flow node 1: Shop Steward? */}
                                 <Field
                                     label="Shop Steward?"
                                     value={form.isShopSteward}
@@ -466,6 +472,7 @@ export default function CaptureMember() {
                                     </div>
                                 )}
 
+                                {/* Flow node 2: BEC? */}
                                 <Field
                                     label="BEC Member?"
                                     value={form.isBecMember}
@@ -476,6 +483,7 @@ export default function CaptureMember() {
                                 {form.isBecMember === "Y" && (
                                     <div className="md:col-span-2 space-y-6 border-l-2 border-cyan-500 pl-4 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
 
+                                        {/* Flow node 3: 44 BEC Committees (Single Selection branch selector) */}
                                         <Field
                                             label="Select primary BEC Committee (44 Unique Branches Available)"
                                             value={form.becBranchName}
@@ -486,6 +494,7 @@ export default function CaptureMember() {
                                             required
                                         />
 
+                                        {/* Flow node 4: BEC Recruiter? */}
                                         <Field
                                             label="BEC Recruiter?"
                                             value={form.isBecRecruiter}
@@ -493,6 +502,7 @@ export default function CaptureMember() {
                                             options={yesNoOptions}
                                         />
 
+                                        {/* Flow node 5: BEC Structure Representative? */}
                                         <Field
                                             label="BEC Structure Representative?"
                                             value={form.isBecStructureRep}
@@ -521,6 +531,7 @@ export default function CaptureMember() {
                                             </div>
                                         )}
 
+                                        {/* Flow node 6: BEC Executive? */}
                                         <Field
                                             label="BEC Executive?"
                                             value={form.isBecExecutive}
