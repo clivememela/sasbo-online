@@ -52,7 +52,7 @@ const TABS = [
     { id: "membership", label: "Membership & Subscriptions" },
     { id: "representatives", label: "Recruitment Channel" },
     { id: "structures", label: "Sasbo Structures" },
-    { id: "history", label: "History & Remarks" },
+    //{ id: "history", label: "History & Remarks" },
 ];
 
 const FIELD_TO_TAB_MAP = {
