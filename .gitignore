@@ -26,3 +26,9 @@ dist-ssr
 *.sln
 *.sw?
 /.junie
+
+# Test output. Added with the reporters that write it, in the same commit --
+# an untracked reports/ directory appearing in someone else's working tree
+# after their first test run is a change to their workflow nobody asked for.
+reports
+coverage
