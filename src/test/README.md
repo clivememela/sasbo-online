@@ -118,3 +118,97 @@ asserts they are present — which is the only reason it was noticed.
    `it(pin(DEFECTS.X, ...))` beside it. Both, or `defectPopulation.test.js`
    reddens — and it will tell you which half is missing.
 4. Run one reddening change against your new test and watch it fail.
+
+---
+
+## Part 7 — The API contract guards, and how to refresh them
+
+Two files in this directory are **copies of artifacts the server generates**:
+
+| File | What it carries |
+| :-- | :-- |
+| `api-surface.txt` | every route the server actually serves, `METHOD /path`, sorted |
+| `api-vocabulary.json` | the payment-type vocabulary *with its `requiresBankAccount` rule*, and the error envelope's key set |
+
+They are what lets a static, sub-30ms test prove this browser cannot call an
+endpoint the server does not have — with **no browser, no database and no
+running server**.
+
+### Refreshing them
+
+In the **server** repository:
+
+```
+./gradlew generateApiSurface     # regenerates both from the live routing table
+git add api-surface.txt api-vocabulary.json
+```
+
+Commit there **first** — the guard here is useless without the artifact it
+reads. Then copy both files into this repository:
+
+```
+cp <server>/api-surface.txt      src/test/api-surface.txt
+cp <server>/api-vocabulary.json  src/test/api-vocabulary.json
+npm test
+```
+
+> 🔑 **Nothing here reads across the repository boundary.** `client/` and
+> `server/` are independent checkouts with independent histories; a test that
+> reached into a sibling directory would pass on the machine where both happen
+> to be cloned side by side and fail everywhere else. The artifact crosses as a
+> **committed file** or it does not cross.
+
+### The three guards
+
+| Guard | What it catches |
+| :-- | :-- |
+| `apiContract.test.js` | a path this browser calls that the server does not serve. Two are known and named on `KNOWN_MISSING` — `/api/districts` (**A21**) and `/api/debounce` (**A22**) — and that list is asserted **exactly**, so an endpoint that starts working reddens too |
+| `vocabulary.parity.test.js` | a string constant that has drifted, and an error envelope the browser parses by the wrong keys. The `*.parity.test.js` name is its own category: a drift guard should read as one |
+| `committedSecrets.test.js` | key-shaped material in a **tracked** file. One allowlist entry — `.env`, row **B2** — kept visible rather than excluded |
+
+### `scripts/contract-witness.mjs` — the runtime counterpart
+
+The endpoint guard is a static scan, and **a discovery guard with no runtime
+counterpart is grading its own homework**: if its regex quietly stops matching a
+module, it reports fewer endpoints and still passes. P3's route smoke mounts all
+27 routes and records every request actually made to
+`reports/observed-endpoints.json`; this script compares the two.
+
+```
+npm run witness       # runs the suite, then the cross-check
+```
+
+An endpoint **observed but not discovered** fails it — the scan missed something
+real. An endpoint **discovered but not observed** is only printed: most need a
+user action the smoke never performs.
+
+> ⚠️ **It is a script and not a test, for an order reason.** The witness file is
+> written by another test file *during* the run, and this suite runs in hostile
+> order — so a test that read it would pass or fail depending on the shuffle.
+> That is a flake by construction. Reading it after the suite has finished is
+> deterministic.
+
+### Three things about these guards that are easy to get wrong
+
+| | |
+| :-- | :-- |
+| **The same literal can be a defect in one file and correct in another** | `'Payroll Deduction'` in `usePaymentTypeValidation` is dead code — the form's value comes from `PAYMENT_TYPE_OPTIONS` and can never be that string. The identical comparison in `Members.jsx` is **live and correct**: `MemberDto.paymentType` is a String passed straight through from storage, so a legacy row really can carry it. This is why `EXPECTED` is keyed by **site**, not by string |
+| **`status` is two different vocabularies** | `sub.status === 'ACTIVE'` is right: subscription status is the server's `SubscriptionsStatus` enum, serialised as enum names. `STATUS_OPTIONS` is the *member* vocabulary and is a different list that happens to share a field name. Both are recorded as `ACCEPTED` in `EXPECTED` with that reason |
+| **Path exclusions come before the secret scan, never after** | `package-lock.json` holds **409** `integrity` hashes *(counted 2026-09-05 — the plan recorded 276 on 2026-09-04; a count expires)*, each indistinguishable from a key. Scan it and the first run reports hundreds — which does not get triaged, it gets silenced. Scope the **input**; never raise the threshold |
+
+### Every row goes in `knownDefects.js`, and nowhere else
+
+These guards discovered three defects the register did not have — **A21** and
+**A22** (endpoints the browser calls that do not exist) and **B2** (the
+committed key). Their first draft recorded them *inside the guards*, in
+`KNOWN_MISSING` and `ALLOWLIST`, which quietly created a **second register**
+that `defectPopulation.test.js` could not see: no skipped test, no live pin, no
+correspondence check. That is the exact failure the register exists to prevent,
+built by the phase that was supposed to be preventing it.
+
+They are now rows in `knownDefects.js` like every other, and the guards' tables
+hold **the row object itself** rather than a copy of its prose. The same review
+found that a copy had *already drifted*: **A7** said the defect was in
+`CaptureMember` alone, and the scan had found it in `Members.jsx` too. The row
+is corrected; if a table had gone on paraphrasing it, nothing would ever have
+said so.

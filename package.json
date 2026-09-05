@@ -17,6 +17,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "floor": "node scripts/suite-floor.mjs",
+    "witness": "vitest run && node scripts/contract-witness.mjs",
     "budget": "node scripts/bundle-budget.mjs"
   },
   "dependencies": {

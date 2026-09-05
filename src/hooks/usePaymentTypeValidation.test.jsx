@@ -5,6 +5,7 @@ import { usePaymentTypeValidation } from './usePaymentTypeValidation'
 import { PAYMENT_TYPE_OPTIONS } from '../config/memberConstants'
 import { server } from '../test/msw/server'
 import { DEFECTS, disabled, pin } from '../test/knownDefects'
+import { committedVocabulary } from '../test/apiContractScan.js'
 
 /**
  * TESTED AGAINST THE REAL OPTION VALUES, AND AGAINST THE SERVER'S RULE.
@@ -23,14 +24,25 @@ import { DEFECTS, disabled, pin } from '../test/knownDefects'
  *     DEBIT_ORDER("Debit Order")  requiresBankAccount() -> true
  *     PAYROLL("Payroll")          requiresBankAccount() -> false
  *
- * It is transcribed rather than imported because three independent
- * repositories cannot share a module. Phase 4's vocabulary guard is what keeps
- * this transcription honest; here it is the standard the client is held to.
+ * IT IS NO LONGER TRANSCRIBED. P3 wrote the rule out by hand here and said in
+ * this comment that "Phase 4's vocabulary guard is what keeps this
+ * transcription honest". P4 arrived and the honest thing was to delete the
+ * transcription instead: the rule is now READ from `api-vocabulary.json`, the
+ * artifact the server generates from `PaymentType.requiresBankAccount()`
+ * itself and asserts fresh on every server build.
+ *
+ * That still crosses no repository boundary -- the artifact is a committed
+ * file in this repository, copied by a documented step, exactly as
+ * `api-surface.txt` is. What it removes is the second source of truth: a
+ * hand-written table that agreed with the server on the day it was typed and
+ * would drift the moment a payment type was added.
  */
-const SERVER_RULE = {
-  'Debit Order': { requiresBankAccount: true },
-  Payroll: { requiresBankAccount: false },
-}
+const SERVER_RULE = Object.fromEntries(
+  committedVocabulary().paymentTypes.map((type) => [
+    type.displayName,
+    { requiresBankAccount: type.requiresBankAccount },
+  ]),
+)
 
 const render = (paymentType) => renderHook(() => usePaymentTypeValidation(paymentType)).result.current
 

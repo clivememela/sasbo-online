@@ -52,7 +52,11 @@ export const DEFECTS = {
     'CaptureMember branches on identityType === "Passport" while its own dropdown ' +
       'offers "Passport Number". The same shape as A6, on a different field: neither ' +
       'side is wrong alone, they simply do not agree, and the consequence is a rule ' +
-      'that has never once run in production.',
+      'that has never once run in production. IT IS IN TWO SCREENS, not one: this row ' +
+      'named only CaptureMember until P4 scanned for the class rather than the ' +
+      'instance and found the same comparison in Members.jsx (validation and the ' +
+      'date-of-birth field). Corrected 2026-09-05 -- an under-reported row is how a ' +
+      'fix gets called complete while half the defect is still shipping.',
   ),
 
   A9: define(
@@ -208,6 +212,38 @@ export const DEFECTS = {
       'exactly that, and the user is told only that something went wrong. The status ' +
       'code is discarded with it, so a caller cannot distinguish a 400 it caused from ' +
       'a 500 it did not.',
+  ),
+
+  A21: define(
+    'A21',
+    'the browser calls /api/districts and the server has no such route',
+    'locationService.getDistricts requests GET /api/districts?provinceId=... and no ' +
+      'controller maps that path -- confirmed against the generated api-surface.txt, ' +
+      'which is read out of the live routing table rather than out of anyone remembering ' +
+      'memory. The cascading province -> district -> area picker therefore cannot ' +
+      'advance past its first step, and it fails silently: the request errors and the ' +
+      'district list simply stays empty with nothing shown to the user.',
+  ),
+
+  A22: define(
+    'A22',
+    'the browser calls /api/debounce, an endpoint that has never existed',
+    'debounceService requests GET /api/debounce?fn=...&delay=... and no controller ' +
+      'maps it. Debouncing is a browser concern and there is no plausible server ' +
+      'implementation, so this reads as a misunderstanding rather than a missing ' +
+      'feature -- the repair is almost certainly to delete the service. Recorded ' +
+      'rather than deleted because this arc asserts defects and does not fix them.',
+  ),
+
+  B2: define(
+    'B2',
+    'a live Google API key is committed to this repository',
+    'client/.env is TRACKED and holds a real Google API key. The file is listed in ' +
+      '.gitignore, which does nothing: git ignores .gitignore for a path it already ' +
+      'tracks. The key is therefore on every clone, every fork and every backup, and ' +
+      'deleting the file would not remove it from history -- only rotating the key ' +
+      'revokes it. The committed-secret guard names this file on an allowlist rather ' +
+      'than excluding it, so it stays visible in the output of every run.',
   ),
 }
 
