@@ -30,6 +30,27 @@
  *
  * Row identifiers match the arc's defect register exactly. They are the only
  * thing that must never drift.
+ *
+ * 🔴 THE IDENTIFIERS ARE A SHARED NAMESPACE WITH NO ALLOCATOR, AND THIS FILE
+ * HOLDS ONLY A SUBSET OF IT. Rows are numbered once, in the arc's register,
+ * across all three repositories. This file carries the ones the browser suite
+ * can assert -- never all of them, and never a number invented here.
+ *
+ * P4 got this wrong and it is worth the paragraph. It needed rows for the two
+ * missing endpoints, did not find them in THIS file, and concluded they were
+ * new -- inventing A21 and A22. Both already existed twice over: A1 and A2 had
+ * predicted exactly these two endpoints and even named P4 as the phase that
+ * would confirm them, while A21 and A22 were P2's rows for something else
+ * entirely. So the work confirmed a standing prediction while citing two
+ * unrelated defects, and a reader looking up A21 would have found a null
+ * `jobGradeId` and concluded the note was wrong. (B2, the committed key, was
+ * right only because the plan happened to name the number.)
+ *
+ * ⇒ BEFORE ADDING A ROW: search the register, not this file. Absence here means
+ * the browser has no test for it yet, which is the common case and is not
+ * evidence the defect is unknown.
+ *
+ *     grep -nE '^\| \*\*[A-F][0-9]+\*\*' <the register>
  */
 
 const define = (row, headline, detail) => ({ row, headline, detail })
@@ -214,19 +235,20 @@ export const DEFECTS = {
       'a 500 it did not.',
   ),
 
-  A21: define(
-    'A21',
-    'the browser calls /api/districts and the server has no such route',
+  A1: define(
+    'A1',
+    'the province -> district -> area cascade is dead',
     'locationService.getDistricts requests GET /api/districts?provinceId=... and no ' +
       'controller maps that path -- confirmed against the generated api-surface.txt, ' +
-      'which is read out of the live routing table rather than out of anyone remembering ' +
-      'memory. The cascading province -> district -> area picker therefore cannot ' +
-      'advance past its first step, and it fails silently: the request errors and the ' +
-      'district list simply stays empty with nothing shown to the user.',
+      'which is read out of the live routing table rather than out of anyone remembering. ' +
+      'The cascade therefore cannot advance past its first step, and it fails silently: ' +
+      'the request errors and the district list simply stays empty with nothing shown ' +
+      'to the user. The register predicted this and named P4 as the phase that would ' +
+      'confirm it; the artifact is that confirmation.',
   ),
 
-  A22: define(
-    'A22',
+  A2: define(
+    'A2',
     'the browser calls /api/debounce, an endpoint that has never existed',
     'debounceService requests GET /api/debounce?fn=...&delay=... and no controller ' +
       'maps it. Debouncing is a browser concern and there is no plausible server ' +

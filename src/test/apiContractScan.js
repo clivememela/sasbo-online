@@ -39,8 +39,8 @@ export const VOCABULARY_FILE = join(HERE, 'api-vocabulary.json')
  * still be broken.
  */
 export const KNOWN_MISSING = {
-  '/api/districts': DEFECTS.A21,
-  '/api/debounce': DEFECTS.A22,
+  '/api/districts': DEFECTS.A1,
+  '/api/debounce': DEFECTS.A2,
 }
 
 /**

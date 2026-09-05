@@ -134,19 +134,19 @@ describe('the API contract between this browser and its server', () => {
    * `KNOWN_MISSING` and no correspondence guard could see them.
    */
   describe('the endpoints the server does not have', () => {
-    it.skip(disabled(DEFECTS.A21, 'the districts endpoint exists'), () => {
+    it.skip(disabled(DEFECTS.A1, 'the districts endpoint exists'), () => {
       expect(surface.has('/api/districts')).toBe(true)
     })
 
-    it(pin(DEFECTS.A21, 'the districts endpoint is still missing'), () => {
+    it(pin(DEFECTS.A1, 'the districts endpoint is still missing'), () => {
       expect(surface.has('/api/districts')).toBe(false)
     })
 
-    it.skip(disabled(DEFECTS.A22, 'the debounce endpoint exists'), () => {
+    it.skip(disabled(DEFECTS.A2, 'the debounce endpoint exists'), () => {
       expect(surface.has('/api/debounce')).toBe(true)
     })
 
-    it(pin(DEFECTS.A22, 'the debounce endpoint is still missing'), () => {
+    it(pin(DEFECTS.A2, 'the debounce endpoint is still missing'), () => {
       expect(surface.has('/api/debounce')).toBe(false)
     })
   })

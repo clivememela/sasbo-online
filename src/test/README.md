@@ -162,7 +162,7 @@ npm test
 
 | Guard | What it catches |
 | :-- | :-- |
-| `apiContract.test.js` | a path this browser calls that the server does not serve. Two are known and named on `KNOWN_MISSING` — `/api/districts` (**A21**) and `/api/debounce` (**A22**) — and that list is asserted **exactly**, so an endpoint that starts working reddens too |
+| `apiContract.test.js` | a path this browser calls that the server does not serve. Two are known and named on `KNOWN_MISSING` — `/api/districts` (**A1**) and `/api/debounce` (**A2**) — and that list is asserted **exactly**, so an endpoint that starts working reddens too |
 | `vocabulary.parity.test.js` | a string constant that has drifted, and an error envelope the browser parses by the wrong keys. The `*.parity.test.js` name is its own category: a drift guard should read as one |
 | `committedSecrets.test.js` | key-shaped material in a **tracked** file. One allowlist entry — `.env`, row **B2** — kept visible rather than excluded |
 
@@ -196,19 +196,33 @@ user action the smoke never performs.
 | **`status` is two different vocabularies** | `sub.status === 'ACTIVE'` is right: subscription status is the server's `SubscriptionsStatus` enum, serialised as enum names. `STATUS_OPTIONS` is the *member* vocabulary and is a different list that happens to share a field name. Both are recorded as `ACCEPTED` in `EXPECTED` with that reason |
 | **Path exclusions come before the secret scan, never after** | `package-lock.json` holds **409** `integrity` hashes *(counted 2026-09-05 — the plan recorded 276 on 2026-09-04; a count expires)*, each indistinguishable from a key. Scan it and the first run reports hundreds — which does not get triaged, it gets silenced. Scope the **input**; never raise the threshold |
 
-### Every row goes in `knownDefects.js`, and nowhere else
+### Every row goes in `knownDefects.js`, and its number comes from the register
 
-These guards discovered three defects the register did not have — **A21** and
-**A22** (endpoints the browser calls that do not exist) and **B2** (the
-committed key). Their first draft recorded them *inside the guards*, in
-`KNOWN_MISSING` and `ALLOWLIST`, which quietly created a **second register**
-that `defectPopulation.test.js` could not see: no skipped test, no live pin, no
+These guards needed rows for the two missing endpoints and the committed key.
+Their first draft recorded them *inside the guards*, in `KNOWN_MISSING` and
+`ALLOWLIST`, which quietly created a **second register** that
+`defectPopulation.test.js` could not see: no skipped test, no live pin, no
 correspondence check. That is the exact failure the register exists to prevent,
-built by the phase that was supposed to be preventing it.
+built by the phase that was supposed to be preventing it. They are now rows here
+like every other, and the guards' tables hold **the row object itself** rather
+than a copy of its prose.
 
-They are now rows in `knownDefects.js` like every other, and the guards' tables
-hold **the row object itself** rather than a copy of its prose. The same review
-found that a copy had *already drifted*: **A7** said the defect was in
-`CaptureMember` alone, and the scan had found it in `Members.jsx` too. The row
-is corrected; if a table had gone on paraphrasing it, nothing would ever have
-said so.
+🔴 **And the numbers were wrong.** Not finding them in *this* file, P4 concluded
+they were new and invented **A21** and **A22**. Both already existed twice over:
+**A1** and **A2** had predicted exactly these two endpoints and even named P4 as
+the phase that would confirm them, while **A21/A22 are P2's rows for entirely
+different defects** — a null `jobGradeId`, and controllers reaching past the
+service layer. So the work confirmed a standing prediction while citing two
+unrelated defects, and a reader looking up A21 would have found the wrong thing
+and concluded the note was wrong. (**B2**, the committed key, was right only
+because the plan happened to name the number.)
+
+> **The identifiers are a shared namespace with no allocator, and this file
+> holds only a subset of it.** Absence here means the browser has no test for a
+> row yet — the common case — and is *not* evidence the defect is unknown.
+> Search the register before allocating anything.
+
+The same review found that a copied row had **already drifted**: **A7** said the
+defect was in `CaptureMember` alone, and the scan had found it in `Members.jsx`
+too. The row is corrected; if a table had gone on paraphrasing it, nothing would
+ever have said so.
