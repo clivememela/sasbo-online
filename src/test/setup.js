@@ -39,13 +39,27 @@ vi.mock('@vis.gl/react-google-maps', () => ({
 }))
 
 // ---------------------------------------------------------------------------
+// Is there a DOM in this file's environment?
+// ---------------------------------------------------------------------------
+// Most of this suite runs under jsdom. The pure ones -- the SA ID
+// specification table, the source-scanning guards, and the service tests,
+// which need `fetch` but never a document -- declare
+// `@vitest-environment node` instead, because creating a jsdom per file was
+// measured at ~half the suite's total wall clock.
+//
+// This setup file runs in BOTH, so everything DOM-shaped below is guarded. The
+// alternative -- a second setup file -- means two places to register a matcher
+// and one of them eventually gets forgotten.
+const hasDom = typeof window !== 'undefined' && typeof document !== 'undefined'
+
+// ---------------------------------------------------------------------------
 // Browser APIs jsdom does not implement
 // ---------------------------------------------------------------------------
 // ONLY what this codebase actually calls. SASBO has zero `@radix-ui` imports,
 // so the pointer-capture stubs other projects need are deliberately absent.
 // Anything added here must be justified by a thrown error in a real run, never
 // added speculatively -- a stub nobody needs is a stub that hides a regression.
-if (!window.matchMedia) {
+if (hasDom && !window.matchMedia) {
   window.matchMedia = (query) => ({
     matches: false,
     media: query,
@@ -58,7 +72,7 @@ if (!window.matchMedia) {
   })
 }
 
-if (!Element.prototype.scrollIntoView) {
+if (hasDom && !Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {}
 }
 
@@ -71,15 +85,18 @@ beforeAll(() => {
 })
 
 afterEach(() => {
-  cleanup()
   server.resetHandlers()
 
   // Steerable state. The suite is SHUFFLED, so any of these left set by one
   // test is a defect that only reproduces on some seeds -- which is the exact
   // shape of the flakes this arc refuses to tolerate.
-  localStorage.clear()
-  sessionStorage.clear()
-  document.documentElement.classList.remove('dark')
+  if (hasDom) {
+    cleanup()
+    localStorage.clear()
+    sessionStorage.clear()
+    document.documentElement.classList.remove('dark')
+  }
+
   vi.useRealTimers()
   vi.restoreAllMocks()
 })

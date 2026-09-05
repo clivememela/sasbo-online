@@ -76,16 +76,30 @@ export const DEFECTS = {
       'way back.',
   ),
 
-  A12: define(
-    'A12',
-    'services do not check response.ok on every call',
-    'fetch does not reject on 4xx or 5xx. Skip the response.ok check and the failing ' +
-      'response goes straight to .json() -- and because Spring returns its error ' +
-      'envelope AS JSON, .json() SUCCEEDS. The component receives ' +
-      '{ timestamp, status: 500, error: "Internal Server Error" } as though it were ' +
-      'data. That is a confident wrong answer one layer below where the three-state ' +
-      'rule is looking for it.',
-  ),
+// A12 is deliberately NOT a row here, and that is a CORRECTION to the register
+// rather than an omission.
+//
+// A12 reads: "four of nine client services do not check response.ok on every
+// call, and two have no catch at all... so .json() succeeds and the component
+// receives { status: 500, error: ... } AS DATA."
+//
+// The first half is true as a source observation. The SECOND half -- the
+// consequence, which is what makes it a defect -- does not reproduce.
+// Measured 2026-09-05 by executing all 31 methods under a 500 carrying the
+// envelope: recruiterService, recruitmentChannelService and
+// subscriptionsService all REJECT, because their shared `handleResponse` does
+// check `r.ok`. Having no `catch` is harmless on its own; a rejection simply
+// propagates to the caller, which is the correct behaviour anyway.
+//
+// The methods that really do hand a failure back as data are three, and each
+// has its own row with its own evidence: A13, A25 and A26. Keeping A12 as a
+// fourth, vaguer row would double-count them and leave a claim in the register
+// that an executed test contradicts.
+//
+// What stands from A12 is recorded where it is provable: the CASE 2 assertion
+// in services.errorContract.test.js runs against every method, so if a service
+// ever does start resolving an error envelope, it reddens there and names the
+// method.
 
   A13: define(
     'A13',
@@ -138,6 +152,34 @@ export const DEFECTS = {
       '200 body, but it does not distinguish an empty body from an unparseable one, so ' +
       'the screen shows the edit as confirmed when nothing was written. Measured ' +
       '2026-09-04.',
+  ),
+
+  A27: define(
+    'A27',
+    'the Members list has no loading state and no error state -- only "no members"',
+    'Its mount effect is four fetches whose failure handling is console.error and ' +
+      'nothing else. membersList stays [], so a backend that is DOWN renders the empty ' +
+      'state: "No Sasbo members match the specified query definitions." An administrator ' +
+      'reads that as a fact about the union rather than a fact about the server, and ' +
+      'there is no retry affordance because there is nothing that knows a request ' +
+      'failed. There is no loading state either -- the page renders its empty table ' +
+      'immediately on mount, so the first thing every user sees is "no members", every ' +
+      'time. This is the three-state rule failing at the layer the rule is written ' +
+      'about, and it is the client counterpart of the service-layer swallows A12/A13. ' +
+      'Measured 2026-09-05.',
+  ),
+
+  A28: define(
+    'A28',
+    'the Members "Identity Type" filter is a select with no accessible name',
+    'axe rates it CRITICAL. Every neighbouring filter is a TextInput or a ' +
+      'SearchableSelect, and both of those set aria-label on the control. This one was ' +
+      'hand-rolled as a plain div with a <span>Identity Type</span> above a bare ' +
+      '<select> -- a span is not a label, so nothing associates the two ' +
+      'programmatically. Sighted users see a heading; a screen-reader user reaches a ' +
+      'dropdown announced only as "combo box", with no way to know what it filters. The ' +
+      'fix is one aria-label, or using the SelectInput component the codebase already ' +
+      'has. Found 2026-09-05 by the a11y gate on its first run.',
   ),
 
   B6: define(

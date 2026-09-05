@@ -29,6 +29,32 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.js'],
     css: false,
 
+    // THE SUITE SUPPLIES ITS OWN CONFIGURATION, AND NEVER INHERITS ONE.
+    //
+    // `client/.env` is COMMITTED and points VITE_API_BASE_URL at the deployed
+    // backend. Without this block every test run silently picked that up, and
+    // two consequences followed:
+    //
+    //   1. The tests were exercising an absolute-URL configuration by
+    //      accident. Two files had already been caught asserting against it
+    //      (api.test.js), and the rest were relying on it without saying so.
+    //   2. The `@vitest-environment node` files DEPENDED on it. Node's fetch
+    //      refuses a relative URL, so with .env moved aside -- the
+    //      CI-readiness proof -- 72 tests failed at once. A fresh clone does
+    //      have .env, since it is tracked, so this would never have shown up
+    //      as a CI failure. It would have shown up the day someone finally
+    //      untracked that file, which is a change nobody would connect to a
+    //      test suite.
+    //
+    // A fixed, obviously-fake origin removes both. Tests that care about the
+    // base URL stub it explicitly and re-import the module; nothing else has
+    // to think about it, and no test result depends on a developer's local
+    // environment or on a file that ought not to be committed.
+    env: {
+      VITE_API_BASE_URL: 'http://api.test.invalid',
+      VITE_GOOGLE_API_KEY: '',
+    },
+
     // Co-located `*.test.js(x)` beside the unit under test. Stated explicitly
     // rather than inherited from the default, so that breaking this glob is a
     // runnable reddening change.
@@ -43,6 +69,24 @@ export default defineConfig({
     // Zero, explicitly, so that nobody raises it "just for CI" later. A retry
     // is a flake hidden rather than fixed.
     retry: 0,
+
+    // The PER-TEST deadline -- not the suite's performance budget, which is
+    // recorded in src/test/README.md.
+    //
+    // Measured 2026-09-05: CaptureMember is an 858-line component that
+    // re-renders on every keystroke, and its round-trip cases cost ~2.4s each
+    // when their file runs alone and ~5.7s when another file runs beside them.
+    // Against Vitest's 5s default that is a test whose result depends on how
+    // busy the machine is -- the defining shape of a flake, and it was
+    // observed as one before it was fixed.
+    //
+    // The design was fixed first: src/test/user.js removes userEvent's
+    // artificial inter-keystroke delay for the whole suite, and the pure test
+    // files declare `@vitest-environment node` so no jsdom is built for them.
+    // What remains is the component's real cost, and this deadline sits well
+    // above the worst observed figure rather than just above it, so a loaded
+    // runner has room. Nothing is retried and nothing is skipped for slowness.
+    testTimeout: 20_000,
 
     reporters: ['default', 'junit'],
     outputFile: {

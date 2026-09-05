@@ -1,3 +1,8 @@
+// @vitest-environment node
+//
+// No DOM is needed here, and creating a jsdom per file was measured at roughly
+// half this suite's wall clock. src/test/setup.js guards its DOM-shaped parts
+// so the same setup serves both environments.
 import { describe, expect, it } from 'vitest'
 
 import {
