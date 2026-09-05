@@ -117,6 +117,46 @@ export const DEFECTS = {
       'it addresses.',
   ),
 
+  A25: define(
+    'A25',
+    'jobGradeService.getByBank can never report a failure',
+    'It was written with a deliberate graceful fallback to the static ' +
+      'JOB_GRADE_OPTIONS when the API is unavailable. JOB_GRADE_OPTIONS was later ' +
+      'EMPTIED -- grades now come from the backend per bank -- so the fallback silently ' +
+      'became a swallow: every failure resolves as [], which the UI renders as "this ' +
+      'bank has no job grades". Neither change was wrong on its own. The defect is what ' +
+      'they became together, which is why it survived both reviews. Measured 2026-09-04: ' +
+      'the method resolves [] on a 500, on a network failure and on a non-JSON body.',
+  ),
+
+  A26: define(
+    'A26',
+    'bankService.updateBank echoes the caller input back as if the server had saved it',
+    'On a 2xx whose body is not JSON -- a proxy or gateway page, typically -- updateBank ' +
+      'falls through to "return { ...data, id }": the object the CALLER just passed in, ' +
+      'handed back as the saved record. The tolerance is there for a legitimate empty ' +
+      '200 body, but it does not distinguish an empty body from an unparseable one, so ' +
+      'the screen shows the edit as confirmed when nothing was written. Measured ' +
+      '2026-09-04.',
+  ),
+
+  B6: define(
+    'B6',
+    'apiUrl()\'s SSRF guard is bypassed by a backslash',
+    'api.js strips a leading protocol and leading FORWARD slashes, with a comment ' +
+      'saying it does so to prevent open redirect and SSRF. It does not strip ' +
+      'BACKSLASHES -- and every URL parser that implements the WHATWG standard treats ' +
+      'a backslash as a slash for http/https. So "\\\\\\\\evil.example/steal" survives the ' +
+      'guard as "/\\\\\\\\evil.example/steal" and the browser resolves that to ' +
+      'http://evil.example/steal: a different origin, reached by the one function ' +
+      'written to make that impossible. "/\\\\evil.example/x" and "/\\\\/evil.example/x" ' +
+      'do the same. Measured 2026-09-04 against Node\'s WHATWG URL parser, which is the ' +
+      'same algorithm browsers use. The fix is one character in the existing character ' +
+      'class. Exploitability depends on whether any caller passes a path it did not ' +
+      'construct itself -- but a guard is not sound because its callers happen to be ' +
+      'safe today, and this one is asserted, not assumed.',
+  ),
+
   A24: define(
     'A24',
     'error detail does not survive the service layer',
