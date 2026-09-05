@@ -26,7 +26,7 @@
  * about 2% larger -- the two are not disagreeing):
  *   dist/assets/index-*.js         502.08 KiB   (gzip 141.12 KiB)
  *   dist/assets/logo-*.png         118.30 KiB
- *   dist/Tansparent Lady Robot.png 118.30 KiB   <-- register F7: the SAME image
+ *   dist/Tansparent Lady Robot.png 118.30 KiB   <-- register F8: the SAME image
  *                                                   again, copied through from
  *                                                   public/. 118 KiB shipped
  *                                                   twice on every first load.
