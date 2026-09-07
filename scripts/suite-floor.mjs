@@ -32,8 +32,14 @@ import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import process from 'node:process'
 
-/** Measured 2026-09-05: 355. Never raise this to match a new actual. */
-const FLOOR = 260
+import { FLOORS } from '../src/test/floors.js'
+
+// The floor lives in the registry with every other floor. It was a bare
+// constant here, which made "the floors, in one place" untrue of the single
+// most load-bearing floor in the repository -- and the comment beside it read
+// "Measured 2026-09-05: 355" against a value of 260, so the number and its
+// justification had already come apart.
+const FLOOR = FLOORS.SUITE_TESTS
 const REPORT = 'reports/junit.xml'
 
 const run = spawnSync('npx', ['vitest', 'run'], {
@@ -55,16 +61,24 @@ try {
   process.exit(1)
 }
 
-// Vitest's JUnit output nests <testsuite> elements; sum their counts.
-const suites = [...xml.matchAll(/<testsuite\b[^>]*>/g)].map((m) => m[0])
-const attr = (tag, name) => {
-  const m = tag.match(new RegExp(`${name}="(\\d+)"`))
-  return m ? Number(m[1]) : 0
-}
+// 🔑 COUNT THE ELEMENTS, DO NOT TRUST THE ATTRIBUTES.
+//
+// This read `tests=` / `failures=` / `skipped=` off each <testsuite>. The
+// workspace's `merge-reports.mjs` documents at length why it deliberately does
+// not: "Those are written by three different tools here, and F6 in the register
+// is a case of a report that stayed green while the evidence underneath it was
+// silently short." Two readers of the same artifact class, disagreeing on the
+// exact point one of them names as a defect -- and this is the reader that
+// decides whether the suite discovered itself.
+//
+// CDATA is stripped first: <system-out> carries whole application logs, and a
+// logged line containing "<testcase" would otherwise be counted as a test.
+const scrubbed = xml.replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '')
 
-const total = suites.reduce((n, t) => n + attr(t, 'tests'), 0)
-const failures = suites.reduce((n, t) => n + attr(t, 'failures') + attr(t, 'errors'), 0)
-const skipped = suites.reduce((n, t) => n + attr(t, 'skipped'), 0)
+const suites = [...scrubbed.matchAll(/<testsuite\b[^>]*>/g)].map((m) => m[0])
+const total = [...scrubbed.matchAll(/<testcase\b/g)].length
+const failures = [...scrubbed.matchAll(/<(?:failure|error)\b/g)].length
+const skipped = [...scrubbed.matchAll(/<skipped\b/g)].length
 
 console.log(
   `\n  suite floor -- ${total} tests in ${suites.length} file(s), ` +

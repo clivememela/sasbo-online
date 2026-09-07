@@ -21,18 +21,15 @@ import { http, HttpResponse } from 'msw'
  * They are `http.get` only. A write is never incidental to rendering a page,
  * so a POST or PUT reaching this layer would be a request a test did not
  * expect -- and it should fail loudly, not be quietly answered.
+ *
+ * 🔑 ONE WILDCARD, NOT A LIST OF TEN. The GET-only restriction above is the
+ * load-bearing property, and it is expressed by the verb, not by enumerating
+ * paths. The header three paragraphs up records three copies of this list
+ * drifting "the moment a page gained a fetch"; consolidating them to one copy
+ * removed two of the three, and left the last one still needing an edit every
+ * time a page gains a mount-time read. This has nothing to keep current.
+ *
+ * A test that needs a specific response still declares it, and a later
+ * `server.use(...)` takes precedence over this layer exactly as before.
  */
-const empty = (path) => http.get(path, () => HttpResponse.json([]))
-
-export const pageFixtures = [
-  empty('*/api/members'),
-  empty('*/api/members/structures/tree'),
-  empty('*/api/members/userRoles'),
-  empty('*/api/banks'),
-  empty('*/api/banks/branches'),
-  empty('*/api/job-grades'),
-  empty('*/api/recruitment-channels'),
-  empty('*/api/subscriptions'),
-  empty('*/api/representatives'),
-  empty('*/api/provinces'),
-]
+export const pageFixtures = [http.get('*/api/*', () => HttpResponse.json([]))]

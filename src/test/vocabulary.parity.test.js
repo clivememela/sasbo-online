@@ -391,14 +391,18 @@ describe('vocabulary parity between this browser and its server', () => {
       const BODY = 'body|payload|json|data|envelope|problem|errorBody|responseBody'
       const sources = discoverServiceModules()
 
-      const keysRead = vocabulary.errorEnvelopeKeys.filter((key) =>
-        sources.some((source) =>
-          new RegExp(
-            `\\b(?:${BODY})\\s*\\.\\s*${key}\\b` + `|\\{[^}]*\\b${key}\\b[^}]*\\}\\s*=[^=]`,
-            'i',
-          ).test(source.code),
-        ),
-      )
+      // Built once per KEY, not once per (key, source) pair. The pattern
+      // depends only on the key, and this file already paid for that lesson 260
+      // lines above: "building it inside the loop meant 119,070 RegExp
+      // constructions per run to find 47 matches -- measured 2026-09-05 at
+      // ~450ms cold, against ~330ms hoisted." Same slip, smaller loop.
+      const keysRead = vocabulary.errorEnvelopeKeys.filter((key) => {
+        const reads = new RegExp(
+          `\\b(?:${BODY})\\s*\\.\\s*${key}\\b` + `|\\{[^}]*\\b${key}\\b[^}]*\\}\\s*=[^=]`,
+          'i',
+        )
+        return sources.some((source) => reads.test(source.code))
+      })
 
       expect(
         keysRead,

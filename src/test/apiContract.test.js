@@ -12,6 +12,7 @@ import {
   discoverEndpoints,
   discoverServiceModules,
   normalisePath,
+  parameterShape,
 } from './apiContractScan.js'
 import {
   FLOORS,
@@ -48,7 +49,12 @@ describe('the API contract between this browser and its server', () => {
   const modules = discoverServiceModules()
   const distinctPaths = [...new Set(calls.map((call) => call.path))].sort()
   const surface = committedPaths()
-  const missing = distinctPaths.filter((path) => !surface.has(path)).sort()
+
+  // Compared on route SHAPE, not on the parameter's name -- see
+  // `parameterShape`. The displayed paths stay unshaped, so a failure names the
+  // real route rather than a normalised one.
+  const surfaceShapes = new Set([...surface].map(parameterShape))
+  const missing = distinctPaths.filter((path) => !surfaceShapes.has(parameterShape(path))).sort()
 
   describe('the scan actually scanned something', () => {
     it('read at least the floor of service modules', () => {
@@ -162,7 +168,7 @@ describe('the API contract between this browser and its server', () => {
         expect(line, `${line} is not a METHOD /path line`).toMatch(/^[A-Z]+ \/\S*$/)
       }
 
-      expect(lines.length).toBeGreaterThanOrEqual(FLOORS.ENDPOINTS)
+      expect(lines.length).toBeGreaterThanOrEqual(FLOORS.SURFACE_LINES)
     })
 
     it('has LF line endings, so the copy compares byte for byte', () => {

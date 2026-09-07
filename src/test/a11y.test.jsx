@@ -8,7 +8,7 @@ import MembersPage from '../pages/members/Members'
 import CaptureMember from '../pages/members/CaptureMember'
 import BankListing from '../pages/bank_branch/BankListing'
 import { renderWithProviders } from './renderWithProviders'
-import { expectNoA11yViolations } from './assertions'
+import { AXE_RULES, expectNoA11yViolations } from './assertions'
 import { server } from './msw/server'
 import { smokeHandlers } from './msw/smokeLayer'
 import { pageFixtures } from './msw/pageFixtures'
@@ -70,7 +70,12 @@ describe('accessibility', () => {
       const { container } = renderWithProviders(<MembersPage />)
       await screen.findByText(/No Sasbo members match/i)
 
-      const results = await axe(container, { rules: { 'color-contrast': { enabled: false } } })
+      // AXE_RULES, not an inline copy. This file's own header says the rule
+      // config must live only in `expectNoA11yViolations` "so it cannot be
+      // re-enabled in one file and forgotten in another" -- and then restated it
+      // here. This pin needs the raw violation ids rather than a pass/fail, so
+      // it calls `axe` directly, but it takes the shared config to do it.
+      const results = await axe(container, { rules: AXE_RULES })
       const ids = (results.violations ?? []).map((v) => v.id).sort()
 
       expect(

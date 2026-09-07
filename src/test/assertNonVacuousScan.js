@@ -71,84 +71,8 @@ export function assertBlankingPreservedCode(destroyed) {
 }
 
 /**
- * The floors, in one place, each measured through its own guard's discovery.
- *
- * MEASURED 2026-09-04 against the real client tree. The "actual" beside each is
- * what the guard found on the day the floor was set; the floor sits below it
- * with headroom, and is NEVER edited up to match a new actual.
+ * The floors live in `./floors.js`, which imports nothing from vitest so that
+ * the three `scripts/*.mjs` guards running outside the runner can share them.
+ * Re-exported here because that is where every existing caller looks for them.
  */
-export const FLOORS = {
-  /** Route smoke. Actual on 2026-09-04: 27 path-bearing routes in App.jsx. */
-  ROUTES: 20,
-
-  /** Service modules under src/services/. Actual on 2026-09-04: 9. */
-  SERVICE_MODULES: 7,
-
-  /**
-   * Exported service methods across all nine modules, as the error-contract
-   * guard enumerates them. Actual on 2026-09-04: 25 fetching methods.
-   */
-  SERVICE_METHODS: 18,
-
-  /**
-   * Test FILES discovered by the suite-level floor. Actual is recorded in
-   * `src/test/suiteFloor.test.js`, which is the only caller.
-   */
-  TEST_FILES: 20,
-
-  /**
-   * Distinct endpoints the API-contract guard finds in `src/services/`.
-   *
-   * MEASURED 2026-09-05 through `discoverEndpoints()` itself: 31 `apiUrl(...)`
-   * call sites collapsing to **20** distinct normalised paths, across 9 service
-   * modules.
-   *
-   * NOTE THE PLAN SAID 19. It was written on 2026-09-03 and the actual is 20 --
-   * a count expires, which is the doctrine this arc keeps restating about its
-   * own numbers. The floor is set from what the guard produces today, not from
-   * what a document remembered.
-   *
-   * This is the single highest risk in P4: a regex that matches nothing gives a
-   * guard that passes while checking ZERO endpoints, which is worse than no
-   * guard because it reads as green.
-   */
-  ENDPOINTS: 15,
-
-  /**
-   * Files git tracks in this repository. Actual on 2026-09-05: 122.
-   *
-   * What it catches is `git ls-files` returning nothing -- in a detached
-   * checkout, or with git absent from the PATH. The secret guard would then
-   * report no secrets and pass.
-   */
-  TRACKED_FILES: 60,
-
-  /**
-   * Files the secret guard still scans AFTER its path exclusions. Actual on
-   * 2026-09-05: 117 of 122.
-   *
-   * The mirror image of the exclusion list, and the reason it is a separate
-   * floor: an over-broad exclusion silences that guard exactly as effectively
-   * as a raised threshold would, and the finding count alone would never show
-   * it.
-   */
-  SCANNED_AFTER_EXCLUSIONS: 60,
-
-  /**
-   * Option-backed fields the vocabulary guard derives from `memberConstants`.
-   * Actual on 2026-09-05: 18 (16 by naming convention, 2 by alias).
-   */
-  OPTION_BACKED_FIELDS: 8,
-
-  /**
-   * Comparisons against those fields found in `src/pages` and `src/hooks`.
-   * Actual on 2026-09-05: 47.
-   */
-  VOCABULARY_COMPARISONS: 20,
-
-  /**
-   * Keys the server publishes in its error envelope. Actual on 2026-09-05: 6
-   * (`timestamp`, `status`, `error`, `message`, `path`, `validationErrors`).
-   */
-  ENVELOPE_KEYS: 3,
-}
+export { FLOORS } from './floors.js'

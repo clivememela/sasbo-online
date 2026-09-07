@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { DEFECTS, DEFECT_ROWS } from './knownDefects'
-import { assertNonVacuousScan } from './assertNonVacuousScan'
+import { assertNonVacuousScan, FLOORS } from './assertNonVacuousScan'
 
 /**
  * EVERY SKIPPED TEST IS ACCOUNTED FOR, IN BOTH DIRECTIONS.
@@ -103,8 +103,8 @@ const ALL_SKIPS = TEST_SOURCES.flatMap(([path, src]) =>
 
 describe('the disabled population', () => {
   it('read the test sources at all', () => {
-    assertNonVacuousScan(TEST_SOURCES, 8, 'test source files')
-    assertNonVacuousScan(DEFECT_ROWS, 8, 'register rows in knownDefects.js')
+    assertNonVacuousScan(TEST_SOURCES, FLOORS.TEST_SOURCE_FILES, 'test source files')
+    assertNonVacuousScan(DEFECT_ROWS, FLOORS.DEFECT_ROWS, 'register rows in knownDefects.js')
   })
 
   it('FORWARDS -- every skipped test cites a row that exists', () => {

@@ -110,17 +110,23 @@ export function expectFieldRejected(field, { container } = {}) {
  * device-matrix job and is out of this arc's scope, recorded rather than
  * pretended.
  */
+export const AXE_RULES = { 'color-contrast': { enabled: false } }
+
 export async function expectNoA11yViolations(container, { rules = {} } = {}) {
   const results = await axe(container, {
     rules: {
-      'color-contrast': { enabled: false },
+      ...AXE_RULES,
       ...rules,
     },
   })
 
   const violations = results.violations ?? []
   const summary = violations
-    .map((v) => `  - ${v.id} (${v.impact}): ${v.help} [${v.nodes.length} node(s)]`)
+    .map(
+      (v) =>
+        `  - ${v.id} (${v.impact}): ${v.help}\n` +
+        v.nodes.map((n) => `      at ${[n.target].flat().join(' ')}`).join('\n'),
+    )
     .join('\n')
 
   expect(

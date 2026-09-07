@@ -99,7 +99,44 @@ export function normalisePath(raw) {
 }
 
 /** The service modules the scan reads: `src/services/*.js`, tests excluded. */
+/**
+ * Read once and held, for each of the five readers below.
+ *
+ * The server's `MainSourceInventory` and `TestSourceInventory` each carry a
+ * paragraph explaining why their read is cached; this is that repository's
+ * counterpart of the same concept and cached nothing. Within one run,
+ * `apiContract.test.js` alone walked and comment-blanked `src/services` twice
+ * and read `api-surface.txt` three times, and `vocabulary.parity.test.js` added
+ * a fourth walk and two more reads. Source and committed artifacts cannot
+ * change while the run is in flight.
+ */
+const memo = new Map()
+const once = (key, produce) => {
+  if (!memo.has(key)) memo.set(key, produce())
+  return memo.get(key)
+}
+
+/**
+ * A route with its parameter NAMES removed: `/api/banks/{bankId}` -> `/api/banks/{}`.
+ *
+ * The two sides of this comparison disagree about what a parameter is called,
+ * and only one of them controls the name. This scan collapses every
+ * interpolation to the literal `{id}`, while the server writes the real Spring
+ * path-variable name into `api-surface.txt` straight from `getPatternValues()`.
+ * They agree today only because every route happens to use `id`; the first
+ * `@PathVariable("bankId")` would make this scan report a live endpoint as
+ * missing, and take the `KNOWN_MISSING` exact-match assertion with it.
+ *
+ * Comparing on shape removes the coincidence. The unshaped path is what gets
+ * displayed, so failure messages still name the real route.
+ */
+export const parameterShape = (path) => path.replace(/\{[^}]*\}/g, '{}')
+
 export function discoverServiceModules() {
+  return once('modules', discoverServiceModulesUncached)
+}
+
+function discoverServiceModulesUncached() {
   return readSources(join(REPO_ROOT, 'src', 'services'), {
     root: REPO_ROOT,
     pattern: /\.js$/,
@@ -115,6 +152,10 @@ export function discoverServiceModules() {
  * template literal, which is most of them here.
  */
 export function discoverEndpoints() {
+  return once('endpoints', discoverEndpointsUncached)
+}
+
+function discoverEndpointsUncached() {
   const calls = []
 
   // Built once, not once per line. `lastIndex` is reset explicitly, because a
@@ -143,6 +184,10 @@ export function discoverEndpoints() {
 
 /** The routes the server publishes, as `METHOD /path` lines. */
 export function committedSurface() {
+  return once('surface', committedSurfaceUncached)
+}
+
+function committedSurfaceUncached() {
   return readFileSync(SURFACE_FILE, 'utf8')
     .split('\n')
     .map((line) => line.trim())
@@ -151,10 +196,15 @@ export function committedSurface() {
 
 /** Just the paths from the committed surface, deduplicated. */
 export function committedPaths() {
-  return new Set(committedSurface().map((line) => line.slice(line.indexOf(' ') + 1)))
+  return once('paths', () =>
+    new Set(committedSurface().map((line) => line.slice(line.indexOf(' ') + 1))))
 }
 
 /** The committed vocabulary artifact, parsed. */
 export function committedVocabulary() {
+  return once('vocabulary', committedVocabularyUncached)
+}
+
+function committedVocabularyUncached() {
   return JSON.parse(readFileSync(VOCABULARY_FILE, 'utf8'))
 }

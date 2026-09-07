@@ -1,9 +1,44 @@
 import { afterAll, afterEach, beforeAll, expect, vi } from 'vitest'
-import { cleanup } from '@testing-library/react'
-import '@testing-library/jest-dom/vitest'
 import * as axeMatchers from 'vitest-axe/matchers'
 
 import { server } from './msw/server'
+
+// ---------------------------------------------------------------------------
+// Is there a DOM in this file's environment?
+// ---------------------------------------------------------------------------
+// Declared FIRST, because it now decides what gets imported at all. Most of
+// this suite runs under jsdom. The pure ones -- the SA ID specification table,
+// the source-scanning guards, and the service tests, which need `fetch` but
+// never a document -- declare `@vitest-environment node` instead, because
+// creating a jsdom per file was measured at ~half the suite's total wall clock.
+//
+// This setup file runs in BOTH. The alternative -- a second setup file --
+// means two places to register a matcher and one of them eventually gets
+// forgotten, so everything DOM-shaped stays here and is guarded.
+const hasDom = typeof window !== 'undefined' && typeof document !== 'undefined'
+
+// ---------------------------------------------------------------------------
+// The DOM-only libraries, imported ONLY where there is a DOM
+// ---------------------------------------------------------------------------
+// `@testing-library/react` and `@testing-library/jest-dom/vitest` were static
+// imports, so the seven `@vitest-environment node` files paid to evaluate both
+// and could never use either: `cleanup` is already behind `hasDom` below, and
+// the jest-dom matchers are unreachable without a document.
+//
+// The cost that matters is not the wall clock, it is the RESIDENT SET. Each
+// worker carries whatever its setup file pulled in, and this repository's
+// recorded failure (F11) is six Vitest workers failing to START on a
+// memory-pressured box -- 62 tests that never ran, reported as "336 tests, 6
+// failed" against a true 398.
+//
+// Vitest setup files support top-level await, so this is a conditional import
+// rather than a second setup file.
+let cleanup = () => {}
+
+if (hasDom) {
+  await import('@testing-library/jest-dom/vitest')
+  ;({ cleanup } = await import('@testing-library/react'))
+}
 
 // ---------------------------------------------------------------------------
 // The axe matchers, registered by hand -- and why not the documented way
@@ -37,20 +72,6 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   Marker: () => null,
   AdvancedMarker: () => null,
 }))
-
-// ---------------------------------------------------------------------------
-// Is there a DOM in this file's environment?
-// ---------------------------------------------------------------------------
-// Most of this suite runs under jsdom. The pure ones -- the SA ID
-// specification table, the source-scanning guards, and the service tests,
-// which need `fetch` but never a document -- declare
-// `@vitest-environment node` instead, because creating a jsdom per file was
-// measured at ~half the suite's total wall clock.
-//
-// This setup file runs in BOTH, so everything DOM-shaped below is guarded. The
-// alternative -- a second setup file -- means two places to register a matcher
-// and one of them eventually gets forgotten.
-const hasDom = typeof window !== 'undefined' && typeof document !== 'undefined'
 
 // ---------------------------------------------------------------------------
 // Browser APIs jsdom does not implement
