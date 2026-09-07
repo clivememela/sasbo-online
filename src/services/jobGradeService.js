@@ -32,23 +32,25 @@ export const jobGradeService = {
         if (found && found.universalBranchCode) bankCode = found.universalBranchCode;
       }
     } catch (e) {
-      // ignore resolution errors and continue using raw identifier
+      // ignore mapping errors gracefully
     }
 
     const qs = `?bankCode=${encodeURIComponent(String(bankCode))}`;
+
     return fetch(apiUrl(`/api/job-grades${qs}`), { credentials: 'include' })
-      .then(async (r) => {
-        if (!r.ok) {
-          // Graceful fallback
-          return JOB_GRADE_OPTIONS;
-        }
-        const payload = await r.json();
-        const list = normalizeList(payload);
-        // If API returns objects with label/value, map to simple strings
-        const normalized = list.map((it) => (typeof it === 'string' ? it : (it.value ?? it.label ?? ''))).filter(Boolean);
-        return normalized.length ? normalized : JOB_GRADE_OPTIONS;
-      })
-      .catch(() => JOB_GRADE_OPTIONS);
+        .then(async (r) => {
+          if (!r.ok) {
+            return JOB_GRADE_OPTIONS;
+          }
+          const payload = await r.json();
+          const list = normalizeList(payload);
+
+          const normalized = list
+              .map((it) => (it && typeof it === 'object' ? (it.value ?? it.label ?? '') : String(it || '')))
+              .filter(Boolean);
+
+          return normalized.length ? normalized : JOB_GRADE_OPTIONS;
+        })
+        .catch(() => JOB_GRADE_OPTIONS);
   }
 };
-
