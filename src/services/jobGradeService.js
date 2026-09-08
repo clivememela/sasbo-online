@@ -45,8 +45,14 @@ export const jobGradeService = {
           const payload = await r.json();
           const list = normalizeList(payload);
 
+          // Preserve {value, label} objects so the dropdown shows the full label
+          // (grade - description - contractType) while saving only the grade code.
           const normalized = list
-              .map((it) => (it && typeof it === 'object' ? (it.value ?? it.label ?? '') : String(it || '')))
+              .map((it) => {
+                if (it && typeof it === 'object' && it.value != null) return it;
+                const str = String(it || '').trim();
+                return str ? { value: str, label: str } : null;
+              })
               .filter(Boolean);
 
           return normalized.length ? normalized : JOB_GRADE_OPTIONS;
