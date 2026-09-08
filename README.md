@@ -41,6 +41,28 @@ Both are build output and are git-ignored.
 nothing else needs parsing to find out — a suite that prints a green summary and exits
 non-zero has still failed.
 
+### Dependency vulnerabilities — `npm run audit`
+
+```bash
+npm run audit          # npm audit --audit-level=high
+```
+
+🔴 **DELIBERATELY NOT PART OF `npm test`, and the reason is not convenience.** Every other guard here
+is a function of the code: the same tree gives the same answer today and next month. This one is a
+function of the code **and of what the world has published since**, so wiring it into the gate makes
+a green tree turn red overnight with nothing changed — which is a flake, and this suite does not
+have flaky tests. Vulnerability scanning belongs on a schedule and before a release, where a new
+advisory is news rather than an interruption.
+
+⚠️ **Measured 2026-09-08, so the deferral is informed rather than blind: 13 vulnerabilities — 2 low,
+2 moderate, 9 high.** One is a direct dependency (`vite`); the rest are transitive. Most are build
+tooling that never reaches a browser, but **`react-router` is not** — it ships. None is critical, and
+none was known before this was run, because nothing had ever run it.
+
+> *(For comparison, the automation suite reports **zero**. It pins two devDependencies exactly and
+> that is the whole tree — an argument for small dependency sets that is easier to make with a
+> number.)*
+
 ### Useful subsets
 
 These are conveniences for a tight edit loop. **None of them is the suite** — only `npm test`
