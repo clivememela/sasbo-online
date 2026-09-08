@@ -128,8 +128,8 @@ To simplify local configuration, `.env` files have been added to both projects. 
    - Start command: `./gradlew bootRun`
    - Environment variables (minimum):
      - `SPRING_DATASOURCE_URL` = Render PostgreSQL internal URL
-     - `DB_USERNAME` = Render PostgreSQL user
-     - `DB_PASSWORD` = Render PostgreSQL password
+     - `SPRING_DATASOURCE_USERNAME` = Render PostgreSQL user
+     - `SPRING_DATASOURCE_PASSWORD` = Render PostgreSQL password
      - `SERVER_PORT` = `10000`
    - Ensure backend accepts frontend origin via CORS (set your Render frontend URL in backend CORS config).
 
