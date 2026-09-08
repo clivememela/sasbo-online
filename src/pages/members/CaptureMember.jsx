@@ -130,8 +130,8 @@ export default function CaptureMember() {
 
         // COSATU Structure
         isCosatu: "N",
-        cosatuLocal: "",
-        cosatuRegion: "",
+        isCosatuLocal: "",
+        isCosatuRegional: "",
         cosatuPositions: [] // Multi-select: PEC, CEC, Treasurer, Chairperson, Secretary
     });
 
@@ -543,8 +543,18 @@ export default function CaptureMember() {
                                     <div className="md:col-span-2 space-y-4 border-l-2 border-orange-400 pl-4 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
                                         <p className="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">COSATU Structure</p>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <Field label="Local" value={form.cosatuLocal} onChange={handleChange("cosatuLocal")} />
-                                            <Field label="Region" value={form.cosatuRegion} onChange={handleChange("cosatuRegion")} />
+                                            <Field
+                                                label="Local?"
+                                                value={form.isCosatuLocal}
+                                                onChange={handleChange("isCosatuLocal")}
+                                                options={yesNoOptions}
+                                            />
+                                            <Field
+                                                label="Regional?"
+                                                value={form.isCosatuRegional}
+                                                onChange={handleChange("isCosatuRegional")}
+                                                options={yesNoOptions}
+                                            />
                                         </div>
                                         <div className="p-4 bg-orange-50/50 dark:bg-orange-950/10 border border-orange-200 dark:border-orange-800 rounded-lg">
                                             <label className="block text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-400 mb-2">
