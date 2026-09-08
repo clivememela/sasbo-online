@@ -32,23 +32,31 @@ export const jobGradeService = {
         if (found && found.universalBranchCode) bankCode = found.universalBranchCode;
       }
     } catch (e) {
-      // ignore resolution errors and continue using raw identifier
+      // ignore mapping errors gracefully
     }
 
     const qs = `?bankCode=${encodeURIComponent(String(bankCode))}`;
+
     return fetch(apiUrl(`/api/job-grades${qs}`), { credentials: 'include' })
-      .then(async (r) => {
-        if (!r.ok) {
-          // Graceful fallback
-          return JOB_GRADE_OPTIONS;
-        }
-        const payload = await r.json();
-        const list = normalizeList(payload);
-        // If API returns objects with label/value, map to simple strings
-        const normalized = list.map((it) => (typeof it === 'string' ? it : (it.value ?? it.label ?? ''))).filter(Boolean);
-        return normalized.length ? normalized : JOB_GRADE_OPTIONS;
-      })
-      .catch(() => JOB_GRADE_OPTIONS);
+        .then(async (r) => {
+          if (!r.ok) {
+            return JOB_GRADE_OPTIONS;
+          }
+          const payload = await r.json();
+          const list = normalizeList(payload);
+
+          // Preserve {value, label} objects so the dropdown shows the full label
+          // (grade - description - contractType) while saving only the grade code.
+          const normalized = list
+              .map((it) => {
+                if (it && typeof it === 'object' && it.value != null) return it;
+                const str = String(it || '').trim();
+                return str ? { value: str, label: str } : null;
+              })
+              .filter(Boolean);
+
+          return normalized.length ? normalized : JOB_GRADE_OPTIONS;
+        })
+        .catch(() => JOB_GRADE_OPTIONS);
   }
 };
-

@@ -44,7 +44,7 @@ export const MEMBER_TABS = [
   { id: 'membership', label: 'Membership & Subscriptions' },
   { id: 'representatives', label: 'Recruitment Channel' },
   { id: 'structures', label: 'Sasbo Structures' },
-  { id: 'history', label: 'History & Remarks' },
+  // { id: 'history', label: 'History & Remarks' },
 ];
 
 export const DEBIT_DAY_OPTIONS = ['20', '25', '31'];

@@ -126,7 +126,13 @@ export default function CaptureMember() {
         isBecStructureRep: "N",
         selectedBecStructures: [], // Array for MULTIPLE STRUCTURES ALLOWED
         isBecExecutive: "N",
-        becExecutivePosition: "" // Single Selection Allowed
+        becExecutivePosition: "", // Single Selection Allowed
+
+        // COSATU Structure
+        isCosatu: "N",
+        cosatuLocal: "",
+        cosatuRegion: "",
+        cosatuPositions: [] // Multi-select: PEC, CEC, Treasurer, Chairperson, Secretary
     });
 
     const [fieldErrors, setFieldErrors] = useState({});
@@ -195,6 +201,11 @@ export default function CaptureMember() {
             }
             if (field === "isBecExecutive" && value === "N") {
                 updatedForm.becExecutivePosition = "";
+            }
+            if (field === "isCosatu" && value === "N") {
+                updatedForm.cosatuLocal = "";
+                updatedForm.cosatuRegion = "";
+                updatedForm.cosatuPositions = [];
             }
 
             return updatedForm;
@@ -517,6 +528,51 @@ export default function CaptureMember() {
                                             type="date"
                                             required
                                         />
+                                    </div>
+                                )}
+
+                                {/* COSATU Structure */}
+                                <Field
+                                    label="COSATU Member?"
+                                    value={form.isCosatu}
+                                    onChange={handleChange("isCosatu")}
+                                    options={yesNoOptions}
+                                />
+
+                                {form.isCosatu === "Y" && (
+                                    <div className="md:col-span-2 space-y-4 border-l-2 border-orange-400 pl-4 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <p className="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">COSATU Structure</p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <Field label="Local" value={form.cosatuLocal} onChange={handleChange("cosatuLocal")} />
+                                            <Field label="Region" value={form.cosatuRegion} onChange={handleChange("cosatuRegion")} />
+                                        </div>
+                                        <div className="p-4 bg-orange-50/50 dark:bg-orange-950/10 border border-orange-200 dark:border-orange-800 rounded-lg">
+                                            <label className="block text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-400 mb-2">
+                                                COSATU Positions — Multiple Allowed
+                                            </label>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {["PEC", "CEC", "Treasurer", "Chairperson", "Secretary"].map((pos) => (
+                                                    <label key={pos} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={(form.cosatuPositions || []).includes(pos)}
+                                                            onChange={(e) => {
+                                                                const checked = e.target.checked;
+                                                                setForm(prev => ({
+                                                                    ...prev,
+                                                                    cosatuPositions: checked
+                                                                        ? [...(prev.cosatuPositions || []), pos]
+                                                                        : (prev.cosatuPositions || []).filter(p => p !== pos)
+                                                                }));
+                                                            }}
+                                                            className="rounded border-gray-300 text-orange-500 focus:ring-orange-400 w-4 h-4"
+                                                        />
+                                                        {pos === "PEC" ? "PEC (Provincial Executive Committee)" :
+                                                         pos === "CEC" ? "CEC (Central Executive Committee)" : pos}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
 
@@ -843,9 +899,11 @@ function Field({ label, value, onChange, className = "", options = null, type = 
                         {options.length === 0 ? (
                             <option value="" disabled>No job grades available</option>
                         ) : (
-                            options.map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                            ))
+                            options.map((opt) => {
+                                const val = opt?.value !== undefined ? opt.value : opt;
+                                const lbl = opt?.label !== undefined ? opt.label : opt;
+                                return <option key={val} value={val}>{lbl}</option>;
+                            })
                         )}
                     </select>
                 ) : (

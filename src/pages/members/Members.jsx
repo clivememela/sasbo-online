@@ -52,7 +52,7 @@ const TABS = [
     { id: "membership", label: "Membership & Subscriptions" },
     { id: "representatives", label: "Recruitment Channel" },
     { id: "structures", label: "Sasbo Structures" },
-    { id: "history", label: "History & Remarks" },
+    //{ id: "history", label: "History & Remarks" },
 ];
 
 const FIELD_TO_TAB_MAP = {
@@ -206,7 +206,14 @@ export default function Members() {
 
     useEffect(() => {
         if (selectedMember) {
-            setEditForm({ ...selectedMember, paymentType: normalizePaymentType(selectedMember.paymentType) });
+            const normalized = { ...selectedMember, paymentType: normalizePaymentType(selectedMember.paymentType) };
+            // cosatuPositions comes back from the API as a comma-separated string — split to array
+            if (typeof normalized.cosatuPositions === "string" && normalized.cosatuPositions) {
+                normalized.cosatuPositions = normalized.cosatuPositions.split(",").map(s => s.trim()).filter(Boolean);
+            } else if (!Array.isArray(normalized.cosatuPositions)) {
+                normalized.cosatuPositions = [];
+            }
+            setEditForm(normalized);
             if (prevMemberIdRef.current !== selectedMember.membershipNumber) {
                 setActiveTab("personal");
             }
@@ -747,6 +754,44 @@ export default function Members() {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                                                <Detail label="COSATU Member?" value={editForm.isCosatu === "Y" || editForm.isCosatu === true ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
+                                                    const isYes = e.target.value === "Yes";
+                                                    setEditForm(prev => ({
+                                                        ...prev,
+                                                        isCosatu: isYes ? "Y" : "N",
+                                                        ...(!isYes ? { cosatuLocal: "", cosatuRegion: "", cosatuPositions: [] } : {})
+                                                    }));
+                                                }} />
+                                                {(editForm.isCosatu === "Y" || editForm.isCosatu === true) && (
+                                                    <div className="mt-4 pl-4 border-l-2 border-orange-400 space-y-4 animate-slideDown">
+                                                        <p className="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">COSATU Structure</p>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            <Detail label="Local" value={editForm.cosatuLocal || ""} isEditing={true} onChange={(e) => setEditForm(prev => ({ ...prev, cosatuLocal: e.target.value }))} />
+                                                            <Detail label="Region" value={editForm.cosatuRegion || ""} isEditing={true} onChange={(e) => setEditForm(prev => ({ ...prev, cosatuRegion: e.target.value }))} />
+                                                        </div>
+                                                        <div className="p-4 bg-orange-50/50 dark:bg-orange-950/10 border border-orange-200 dark:border-orange-800 rounded-lg">
+                                                            <label className="block text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-400 mb-2">COSATU Positions — Multiple Allowed</label>
+                                                            <div className="grid grid-cols-2 gap-3">
+                                                                {["PEC", "CEC", "Treasurer", "Chairperson", "Secretary"].map((pos) => {
+                                                                    const current = editForm.cosatuPositions || [];
+                                                                    return (
+                                                                        <label key={pos} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                                                            <input type="checkbox" checked={current.includes(pos)} className="accent-orange-500 rounded h-4 w-4" onChange={() => {
+                                                                                const next = current.includes(pos) ? current.filter(p => p !== pos) : [...current, pos];
+                                                                                setEditForm(prev => ({ ...prev, cosatuPositions: next }));
+                                                                            }} />
+                                                                            {pos === "PEC" ? "PEC (Provincial Executive Committee)" :
+                                                                             pos === "CEC" ? "CEC (Central Executive Committee)" : pos}
+                                                                        </label>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 divide-y md:divide-y-0 divide-gray-100 dark:divide-gray-800">
@@ -765,6 +810,17 @@ export default function Members() {
                                                         <Detail label="Structure Representative Roles" value={selectedMember.isBecStructureRep && selectedMember.becStructures?.length > 0 ? selectedMember.becStructures.join(", ") : "None Assigned"} isEditing={false} />
                                                         <Detail label="BEC Executive Position" value={selectedMember.isBecExecutive ? selectedMember.becExecutivePosition : "None"} isEditing={false} />
                                                     </>
+                                                )}
+                                            </div>
+                                            <div className="space-y-3 pt-4 md:col-span-2">
+                                                <h4 className="text-xs font-bold uppercase tracking-wider text-orange-500">COSATU Structure</h4>
+                                                <Detail label="COSATU Member" value={selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true ? "Yes" : "No"} isEditing={false} />
+                                                {(selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true) && (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        <Detail label="Local" value={selectedMember.cosatuLocal || "-"} isEditing={false} />
+                                                        <Detail label="Region" value={selectedMember.cosatuRegion || "-"} isEditing={false} />
+                                                        <Detail label="Positions Held" value={selectedMember.cosatuPositions?.length > 0 ? selectedMember.cosatuPositions.join(", ") : "None"} isEditing={false} className="md:col-span-2" />
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
