@@ -33,6 +33,7 @@ import { readFileSync } from 'node:fs'
 import process from 'node:process'
 
 import { FLOORS } from '../src/test/floors.js'
+import { junitCounts } from './lib/junitCounts.mjs'
 
 // The floor lives in the registry with every other floor. It was a bare
 // constant here, which made "the floors, in one place" untrue of the single
@@ -61,27 +62,18 @@ try {
   process.exit(1)
 }
 
-// 🔑 COUNT THE ELEMENTS, DO NOT TRUST THE ATTRIBUTES.
+// The counting lives in `scripts/lib/junitCounts.mjs` so that it can be put
+// under test -- see `scripts/junitCounts.test.js`. It could not be while it
+// lived here: this file's first act is to spawn the entire suite, so a test
+// inside the suite exercising it would run the suite inside itself.
 //
-// This read `tests=` / `failures=` / `skipped=` off each <testsuite>. The
-// workspace's `merge-reports.mjs` documents at length why it deliberately does
-// not: "Those are written by three different tools here, and F6 in the register
-// is a case of a report that stayed green while the evidence underneath it was
-// silently short." Two readers of the same artifact class, disagreeing on the
-// exact point one of them names as a defect -- and this is the reader that
-// decides whether the suite discovered itself.
-//
-// CDATA is stripped first: <system-out> carries whole application logs, and a
-// logged line containing "<testcase" would otherwise be counted as a test.
-const scrubbed = xml.replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '')
-
-const suites = [...scrubbed.matchAll(/<testsuite\b[^>]*>/g)].map((m) => m[0])
-const total = [...scrubbed.matchAll(/<testcase\b/g)].length
-const failures = [...scrubbed.matchAll(/<(?:failure|error)\b/g)].length
-const skipped = [...scrubbed.matchAll(/<skipped\b/g)].length
+// That extraction is not tidiness. This is the mechanism behind F11, and a
+// counting bug in it does not produce a wrong number in a log -- it produces a
+// short run that reads as a complete one.
+const { suites, total, failures, skipped } = junitCounts(xml)
 
 console.log(
-  `\n  suite floor -- ${total} tests in ${suites.length} file(s), ` +
+  `\n  suite floor -- ${total} tests in ${suites} file(s), ` +
     `${failures} failure(s), ${skipped} skipped, exit ${exitCode}\n`,
 )
 

@@ -44,6 +44,8 @@ import { readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 
+import { FLOORS } from '../src/test/floors.js'
+
 const KB = 1024
 
 /** Measured 2026-09-04. Raise only with a reason recorded beside the change. */
@@ -52,6 +54,18 @@ const CEILINGS = {
   css: 70 * KB, // measured  48.94 KiB
   total: 900 * KB, // measured 788.13 KiB across every emitted asset
 }
+
+// 🔴 THE FLOORS COME FROM THE REGISTRY, not from here. A ceiling-only guard
+// passes hardest on the worst input -- every assertion below is
+// `actual <= ceiling`, which a `dist/` holding nothing but `index.html`
+// satisfies completely. The floors that close that are in `src/test/floors.js`
+// with every other floor in the repository, including the reasoning and the
+// date they were measured. Declaring a second `FLOORS` here would make the
+// registry's own claim to be "the floors, in one place" false again, on the
+// day it became true.
+//
+// The CEILINGS stay local: a ceiling is not a non-vacuity canary and the
+// registry is explicitly about floors.
 
 const walk = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
@@ -78,30 +92,58 @@ const total = sum(() => true)
 
 const fmt = (n) => `${(n / KB).toFixed(2)} KiB`
 
+const count = (n) => `${n} file(s)`
+
+// The file count is a row like any other, not a special case ahead of the
+// table. It has no ceiling -- a build emitting many files is not a defect --
+// and `Infinity` says that in the same shape rather than in a second code path
+// that sets the same flag from somewhere else.
 const rows = [
-  ['javascript', js, CEILINGS.js],
-  ['css', css, CEILINGS.css],
-  ['all assets', total, CEILINGS.total],
+  ['javascript', js, FLOORS.BUNDLE_JS_BYTES, CEILINGS.js, fmt],
+  ['css', css, FLOORS.BUNDLE_CSS_BYTES, CEILINGS.css, fmt],
+  ['all assets', total, FLOORS.BUNDLE_TOTAL_BYTES, CEILINGS.total, fmt],
+  // 🔑 The count catches what the byte floors cannot: one large asset copied
+  // into an otherwise empty dist/ clears every byte floor while shipping no
+  // application at all.
+  ['emitted files', files.length, FLOORS.BUNDLE_FILES, Infinity, count],
 ]
 
 console.log(`\n  bundle budget -- ${files.length} emitted file(s)\n`)
-let failed = false
-for (const [name, actual, ceiling] of rows) {
-  const ok = actual <= ceiling
-  if (!ok) failed = true
+let over = false
+let under = false
+
+for (const [name, actual, floor, ceiling, format] of rows) {
+  const isOver = actual > ceiling
+  const isUnder = actual < floor
+  if (isOver) over = true
+  if (isUnder) under = true
+  const mark = isOver ? 'OVER ' : isUnder ? 'UNDER' : 'OK   '
+  const limit = ceiling === Infinity ? 'none'.padStart(10) : format(ceiling).padStart(10)
   console.log(
-    `  ${ok ? 'OK  ' : 'OVER'}  ${name.padEnd(12)} ${fmt(actual).padStart(10)}  ` +
-      `ceiling ${fmt(ceiling).padStart(10)}  ` +
-      `(${((actual / ceiling) * 100).toFixed(0)}% of budget)`,
+    `  ${mark} ${name.padEnd(13)} ${format(actual).padStart(10)}  ` +
+      `floor ${format(floor).padStart(10)}  ceiling ${limit}`,
   )
 }
 console.log('')
 
-if (failed) {
+if (over) {
   console.error(
     '  The shipped bundle is over its ceiling. Before raising the number, check\n' +
       '  whether test tooling has leaked into the product: an import from\n' +
       '  src/test/ into a component is the failure this guard was built for.\n',
   )
-  process.exit(1)
 }
+
+if (under) {
+  console.error(
+    '  The shipped bundle is under its FLOOR, which almost never means the product\n' +
+      '  got smaller. It means the build did not emit what it should have -- a failed\n' +
+      '  or partial build, a changed output directory, or a stale dist/ from a run\n' +
+      '  that produced almost nothing.\n\n' +
+      '  This is here because every other assertion in this file is `actual <= ceiling`,\n' +
+      '  and a dist/ containing nothing but index.html satisfies all of them. Rebuild\n' +
+      '  and look at what was emitted. Do not lower the floor.\n',
+  )
+}
+
+if (over || under) process.exit(1)

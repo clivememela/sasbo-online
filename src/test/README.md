@@ -9,10 +9,10 @@ counterpart of `server/src/test/README.md`.
 
 | | Command | What it is for |
 | :-- | :-- | :-- |
-| **Everything** | `npm test` | The gate. Shuffled, `retry: 0`, JUnit XML written to `reports/junit.xml` |
+| **Everything** | `npm test` | **The test gate.** Runs the suite from outside via `scripts/suite-floor.mjs` -- asserting the total and the **exit code** -- then the runtime witness cross-check. Shuffled, `retry: 0`, JUnit XML to `reports/junit.xml`. ⚠️ The bundle budget is deliberately NOT in here; it needs a build, and this name must not grow one |
 | **Inner loop** | `npm run test:fast` | Services, utils, hooks, context and the guards — what you run on save |
 | **Screens** | `npm run test:ui` | Pages, the route smoke and the a11y gate. Slower by an order of magnitude |
-| **Floor** | `npm run floor` | Runs the suite, then asserts the COUNT **and the exit code**. See Part 4 |
+| **Raw runner** | `npm run test:raw` | `vitest run` with no guards around it, for a tight edit loop. **It is not the gate** and it cannot see a short run |
 | **Coverage** | `npm run test:coverage` | Thresholds enforced per directory; fails the run if unmet |
 | **Bundle** | `npm run build && npm run budget` | Proves the test tooling stayed out of the shipped product |
 
@@ -175,7 +175,7 @@ module, it reports fewer endpoints and still passes. P3's route smoke mounts all
 `reports/observed-endpoints.json`; this script compares the two.
 
 ```
-npm run witness       # runs the suite, then the cross-check
+npm test              # runs the suite, then this cross-check, in order
 ```
 
 An endpoint **observed but not discovered** fails it — the scan missed something

@@ -1,4 +1,5 @@
 import process from 'node:process'
+import { availableParallelism } from 'node:os'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -12,8 +13,16 @@ const isVitest =
 
 const seed = Number(process.env.VITEST_SEED) || (Date.now() % 2147483647)
 
+// The worker cap, derived rather than written out -- see `poolOptions` below
+// for what it defends against. Never more workers than the host has cores, and
+// never more than four, whichever is smaller.
+const MAX_FORKS = Number(process.env.VITEST_MAX_FORKS) || Math.min(4, availableParallelism())
+
 if (isVitest) {
-  console.log(`\n  vitest sequence.seed=${seed}  (replay with VITEST_SEED=${seed})\n`)
+  console.log(
+    `\n  vitest sequence.seed=${seed}  (replay with VITEST_SEED=${seed})` +
+      `\n  vitest maxForks=${MAX_FORKS}  (override with VITEST_MAX_FORKS)\n`,
+  )
 }
 
 // https://vite.dev/config/
@@ -58,7 +67,14 @@ export default defineConfig({
     // Co-located `*.test.js(x)` beside the unit under test. Stated explicitly
     // rather than inherited from the default, so that breaking this glob is a
     // runnable reddening change.
-    include: ['src/**/*.test.{js,jsx}'],
+    //
+    // `scripts/` is in scope as well as `src/`. The guards there run OUTSIDE
+    // the suite -- they assert its exit code and its total, which nothing
+    // inside a short run can do -- but the logic they are built from is
+    // ordinary code and was the only unguarded code in the repository. It is
+    // tested here, in the suite, like everything else. See
+    // `scripts/junitCounts.test.js`.
+    include: ['src/**/*.test.{js,jsx}', 'scripts/**/*.test.{js,jsx}'],
     exclude: ['node_modules/**', 'dist/**'],
 
     sequence: {
@@ -87,6 +103,55 @@ export default defineConfig({
     // above the worst observed figure rather than just above it, so a loaded
     // runner has room. Nothing is retried and nothing is skipped for slowness.
     testTimeout: 20_000,
+
+    // 🔴 A BOUNDED WORKER POOL, and this is the fix for a failure that has
+    // already happened here once -- register row F11.
+    //
+    // What F11 was: this suite reported "336 tests, 6 failed" against a true
+    // total of 398. SIXTY-TWO TESTS NEVER RAN. Six Vitest worker processes
+    // failed to start under host memory pressure, and the report presented
+    // that as six ordinary failures.
+    //
+    // 🔑 The dangerous half is not the red -- it is that the 62 missing tests
+    // were invisible in the count. Under the same conditions a run whose
+    // remaining tests all passed would have said "336 passed", and nobody
+    // would have looked at all.
+    //
+    // Unset, Vitest sizes its pool from the host's CPU count and a starved box
+    // is free to try to start workers it cannot afford. Capping it converts
+    // that failure from ABSENT into SLOW, which is the trade worth making: a
+    // slow suite is visible and a short one is not. Four is well below this
+    // box's core count and comfortably above one, so the suite still
+    // parallelises.
+    //
+    // ⚠️ The cap is half the fix. The other half is outside the suite --
+    // `scripts/suite-floor.mjs` asserts the total and the exit code, because
+    // nothing running INSIDE a short run can notice that it was short.
+    //
+    // 🔑 DERIVED, NOT A CONSTANT. A bare `4` is a fact about one developer's
+    // machine committed into shared config: a no-op on a 2-core CI runner and a
+    // 16x throttle on a 64-core one, neither of which anybody chose. `min(4,
+    // availableParallelism())` never asks for more workers than the host has,
+    // and `VITEST_MAX_FORKS` lets a host that knows better say so -- the same
+    // pick-a-value / allow-an-override / print-it shape `VITEST_SEED` uses
+    // above, so the run's own log records what it actually used.
+    //
+    // 🔴 `maxWorkers`, TOP-LEVEL. This was first written as
+    // `poolOptions.forks.maxForks`, which is the Vitest 3 spelling -- and this
+    // project is on Vitest 5, where `test.poolOptions` was REMOVED. It was
+    // accepted silently, warned about once in a wall of startup output, and
+    // capped nothing at all.
+    //
+    // 🔑 That is worth leaving written down, because it is this finding's own
+    // failure mode happening to its own fix: a mitigation that is present in
+    // the config, reads correctly, and does nothing. The only reason it was
+    // caught is that the run was watched rather than assumed.
+    //
+    // `pool` is stated rather than inherited for the reason the `include` glob
+    // is -- so that a changed default is a reddening change and not a silent
+    // one.
+    pool: 'forks',
+    maxWorkers: MAX_FORKS,
 
     reporters: ['default', 'junit'],
     outputFile: {

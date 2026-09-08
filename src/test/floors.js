@@ -130,4 +130,42 @@ export const FLOORS = {
    * not re-tuned by this pass.
    */
   SUITE_TESTS: 260,
+
+  /**
+   * Endpoints the route smoke ACTUALLY REQUESTED, counted by
+   * `scripts/contract-witness.mjs` from `reports/observed-endpoints.json`.
+   * Measured through that guard's own read on 2026-09-08: 9.
+   *
+   * 🔑 ITS OWN ENTRY RATHER THAN `ENDPOINTS`, which is 15 over a population
+   * that looks similar and is not. `ENDPOINTS` counts what the STATIC scan
+   * finds in `src/services/`; this counts what a browser was observed asking
+   * for. Most discovered endpoints need a user action the smoke never performs,
+   * so this number is legitimately much smaller, and lending the larger floor
+   * to it would disarm the guard it was lent to.
+   *
+   * What it is for: `contract-witness.mjs` compares the two sets by DIFFERENCE,
+   * and a difference against an empty set is empty -- so with no witness the
+   * script reported success. This is the floor that makes that state loud.
+   */
+  OBSERVED_ENDPOINTS: 5,
+
+  /**
+   * The shipped bundle, in bytes, floored by `scripts/bundle-budget.mjs`.
+   * Measured through that guard's own walk of `dist/` on 2026-09-08:
+   * 502.08 KiB JavaScript, 48.97 KiB CSS, 788.16 KiB across 5 emitted files.
+   *
+   * 🔑 FLOORS ON A GUARD THAT WAS ALL CEILING. Every other assertion there is
+   * `actual <= ceiling`, which a build emitting nothing but `index.html`
+   * satisfies completely -- three cheerful OK lines and exit 0. A broken build
+   * is far likelier than a bundle that doubled, and it was the one case the
+   * guard could not see.
+   *
+   * These are not size targets. They separate "a real build" from "no build".
+   * If a legitimate change ever takes the bundle below one, that is worth a
+   * conversation rather than an edit.
+   */
+  BUNDLE_JS_BYTES: 200 * 1024,
+  BUNDLE_CSS_BYTES: 10 * 1024,
+  BUNDLE_TOTAL_BYTES: 300 * 1024,
+  BUNDLE_FILES: 4,
 }

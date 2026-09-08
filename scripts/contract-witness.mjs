@@ -28,12 +28,14 @@
  *                                    performs, so this is normal and is
  *                                    printed rather than failed on.
  *
- * Run it AFTER `npm test`. `npm run witness` does both in order.
+ * It runs as the second half of `npm test`, after `scripts/suite-floor.mjs` has
+ * run the suite. Run it standalone only when a witness file already exists.
  */
 import { readFileSync } from 'node:fs'
 import process from 'node:process'
 
 import { discoverEndpoints, normalisePath } from '../src/test/apiContractScan.js'
+import { FLOORS } from '../src/test/floors.js'
 
 const WITNESS = 'reports/observed-endpoints.json'
 
@@ -44,8 +46,8 @@ try {
   console.error(
     `\n  ${WITNESS} is not there.\n\n` +
       `  It is written by the route smoke during a suite run and is git-ignored, so a\n` +
-      `  fresh clone has none. Run \`npm test\` first, or \`npm run witness\` which does\n` +
-      `  both in order.\n`,
+      `  fresh clone has none. Run \`npm test\`, which runs the suite and then this\n` +
+      `  cross-check, in that order.\n`,
   )
   process.exit(1)
 }
@@ -57,6 +59,38 @@ const observed = new Map()
 for (const { endpoint, calls } of witness.endpoints) {
   const path = normalisePath(endpoint.slice(endpoint.indexOf(' ') + 1))
   observed.set(path, (observed.get(path) ?? 0) + calls)
+}
+
+// 🔴 BOTH POPULATIONS ARE FLOORED BEFORE THEY ARE COMPARED, because the whole
+// check below is a SET DIFFERENCE and a set difference against an empty set is
+// empty. `missedByTheScan` is `observed - discovered`: with no witness
+// endpoints it is `[] - discovered` = `[]`, the script prints "every endpoint
+// the browser actually requested was found by the static scan", and exits 0.
+//
+// That is not hypothetical. The route smoke writes this file DURING the suite
+// run, so anything that stops it running -- a renamed spec, a changed glob, a
+// worker that died before reaching it, an msw handler that intercepts nothing
+// -- yields a witness with zero endpoints and a green, confident report about
+// a comparison that had nothing on one side of it.
+//
+// Both come from `src/test/floors.js`, which is where every floor in this
+// repository lives -- and which says in its own header that these scripts
+// hand-rolling their thresholds was the defect it was written to retire.
+// `ENDPOINTS` is reused because the static population here is the same one
+// `apiContract.test.js` floors, through the same `discoverEndpoints()`.
+// `OBSERVED_ENDPOINTS` is its own entry because the runtime population is not
+// the same set and a floor is never lent between populations.
+if (observed.size < FLOORS.OBSERVED_ENDPOINTS || discovered.size < FLOORS.ENDPOINTS) {
+  console.error(
+    `\n  WITNESS FAILED: this comparison would have been vacuous.\n` +
+      `    endpoints observed at runtime  ${observed.size}  (floor ${FLOORS.OBSERVED_ENDPOINTS})\n` +
+      `    endpoints found by the scan    ${discovered.size}  (floor ${FLOORS.ENDPOINTS})\n\n` +
+      `  Neither number is a coverage target. They are here because the check below is a\n` +
+      `  set difference, and a set difference against an empty set finds nothing and\n` +
+      `  reports success. An empty witness means the route smoke did not run or recorded\n` +
+      `  nothing -- fix that rather than lowering these.\n`,
+  )
+  process.exit(1)
 }
 
 const missedByTheScan = [...observed.keys()].filter((path) => !discovered.has(path)).sort()
