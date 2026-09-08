@@ -26,7 +26,6 @@ import BankListing from "./pages/bank_branch/BankListing.jsx";
 import RecruitmentChannel from "./pages/maintainance/RecruitmentChannel.jsx";
 import Subscriptions from "./pages/maintainance/Subscriptions.jsx";
 
-
 function App() {
   return (
     <Routes>
