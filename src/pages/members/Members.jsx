@@ -7,11 +7,10 @@ import { jobGradeService } from "../../services/jobGradeService.js";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, SearchableSelect, Button } from "../../components/form";
 import {
-    FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
-    STATUS_OPTIONS, YES_NO_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, SUSPENSION_CODE_OPTIONS,
-    JOB_GRADE_OPTIONS, DAY_OPTIONS, MONTH_OPTIONS, YEAR_OPTIONS,
-    BRANCH_OPTIONS, REP_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS,
-    DEBIT_DAY_OPTIONS,
+    TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
+    STATUS_OPTIONS, YES_NO_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
+    JOB_GRADE_OPTIONS,
+    BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS,
 } from "../../config/memberConstants.js";
 import {
     validateSAID, validateEmail, formatDate, extractDateOfBirthFromSAID, extractGenderFromSAID
@@ -52,7 +51,6 @@ const TABS = [
     { id: "membership", label: "Membership & Subscriptions" },
     { id: "representatives", label: "Recruitment Channel" },
     { id: "structures", label: "Sasbo Structures" },
-    //{ id: "history", label: "History & Remarks" },
 ];
 
 const FIELD_TO_TAB_MAP = {
@@ -126,7 +124,6 @@ export const SASBO_BEC_BRANCHES = [
     { id: "bec-44", name: "BankservAfrica & Financial Infrastructure Committee", region: "Corporate National" }
 ];
 
-const normalize = (value) => String(value ?? "").trim().toLowerCase();
 const normalizePaymentType = (paymentType) => paymentType === "Payroll Deduction" ? "Payroll" : paymentType;
 
 const getInitialFilters = (locationState) => ({
@@ -156,13 +153,11 @@ export default function Members() {
     const [showSavedNotification, setShowSavedNotification] = useState(false);
     const [fieldErrors, setFieldErrors] = useState({});
     const prevMemberIdRef = useRef(null);
-    const [structuresTree, setStructuresTree] = useState([]);
     const [roles, setRoles] = useState([]);
     const [membersList, setMembersList] = useState([]);
     const [bankNames, setBankNames] = useState([]);
 
     useEffect(() => {
-        recruiterService.getStructures().then(setStructuresTree).catch(err => console.error("Failed to load structures", err));
         recruiterService.getRoles().then(setRoles).catch(err => console.error("Failed to load roles", err));
         memberService.getMembers().then(res => {
             const list = Array.isArray(res) ? res : (res.data || res.members || []);
@@ -189,7 +184,6 @@ export default function Members() {
     const bankOptions = bankNames;
     const branchOptions = BRANCH_OPTIONS;
     const genderOptions = GENDER_OPTIONS;
-    // JOB_GRADE_OPTIONS imported from config — maintain a local, dynamic options list that can be fetched per-bank
     const [jobGradeOptions, setJobGradeOptions] = useState(JOB_GRADE_OPTIONS);
     const jobGrade = jobGradeOptions;
 
@@ -207,7 +201,6 @@ export default function Members() {
     useEffect(() => {
         if (selectedMember) {
             const normalized = { ...selectedMember, paymentType: normalizePaymentType(selectedMember.paymentType) };
-            // cosatuPositions comes back from the API as a comma-separated string — split to array
             if (typeof normalized.cosatuPositions === "string" && normalized.cosatuPositions) {
                 normalized.cosatuPositions = normalized.cosatuPositions.split(",").map(s => s.trim()).filter(Boolean);
             } else if (!Array.isArray(normalized.cosatuPositions)) {
@@ -227,7 +220,6 @@ export default function Members() {
         }
     }, [selectedMember]);
 
-    // When the edit form's bankName changes, fetch job grades for that bank and clear selection when none selected.
     useEffect(() => {
         if (!editForm.bankName) {
             setJobGradeOptions(JOB_GRADE_OPTIONS);
@@ -259,10 +251,10 @@ export default function Members() {
 
         const hasNonNumericInput =
             field === "identityNumber" && editForm.identityType === "I.D. Number" &&
-            /\\D/.test(rawValue);
+            /\D/.test(rawValue);
         const value =
             field === "identityNumber" && editForm.identityType === "I.D. Number"
-                ? rawValue.replace(/\\D/g, "")
+                ? rawValue.replace(/\D/g, "")
                 : rawValue;
 
         setEditForm((prev) => {
@@ -271,7 +263,7 @@ export default function Members() {
             if (field === "firstNames") {
                 next.initials = value
                     .trim()
-                    .split(/\\s+/)
+                    .split(/\s+/)
                     .map(name => name.charAt(0).toUpperCase())
                     .join("");
             }
@@ -351,8 +343,10 @@ export default function Members() {
             const dynamicFields = Object.keys(mergedErrors);
             setActiveTab(FIELD_TO_TAB_MAP[dynamicFields[0]] || "personal");
 
-            const summary = Object.values(mergedErrors).map(msg => `• ${msg}`).join("\n");
-            alert(`Please fix the following validation errors before saving:\n\n${summary}`);
+            const summary = Object.values(mergedErrors).map(msg => `• ${msg}`).join("");
+            alert(`Please fix the following validation errors before saving:
+
+${summary}`);
             return;
         }
 
@@ -363,7 +357,7 @@ export default function Members() {
             return;
         }
 
-        const confirmed = window.confirm("Are you sure you want to save the following changes?\n\n" + changes.join("\n"));
+        const confirmed = window.confirm("Are you sure you want to save the following changes?" + changes.join(""));
         if (!confirmed) return;
 
         try {
@@ -613,8 +607,6 @@ export default function Members() {
                                     {editForm.paymentType === "Debit Order" && (
                                         <>
                                             <Detail label="Bank Account Number" value={editForm.bankAccountNumber} isEditing={isEditing} error={fieldErrors.bankAccountNumber} required onChange={handleEditChange("bankAccountNumber")} />
-
-                                            {/* 🛠️ Explicitly enforce allowed selections here */}
                                             <Detail
                                                 label="Debit Day"
                                                 value={editForm.debitDay}
@@ -681,7 +673,7 @@ export default function Members() {
                                                     setEditForm(prev => ({
                                                         ...prev,
                                                         isBec: isYes,
-                                                        ...(isYes ? {} : { becCommitteeId: "", isBecRecruiter: false, becRecruiterRole: "", isBecStructureRep: false, becStructures: [], isBecExecutive: false, becExecutivePosition: "" })
+                                                        ...(!isYes ? { becCommitteeId: "", isBecRecruiter: false, becRecruiterRole: "", isBecStructureRep: false, becStructures: [], isBecExecutive: false, becExecutivePosition: "" } : {})
                                                     }));
                                                 }} />
                                             </div>
@@ -752,46 +744,59 @@ export default function Members() {
                                                             <Detail label="Select Executive Position" value={editForm.becExecutivePosition} isEditing={true} options={["Chairperson", "Deputy Chairperson", "Secretary", "Deputy Secretary", "Treasurer"]} onChange={(e) => setEditForm(prev => ({ ...prev, becExecutivePosition: e.target.value }))} />
                                                         )}
                                                     </div>
+
+                                                    <div className="border-t border-cyan-200 dark:border-cyan-800 pt-4 mt-4">
+                                                        <Detail label="COSATU Member (within this BEC Committee)?" value={editForm.isCosatu === "Y" || editForm.isCosatu === true ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
+                                                            const isYes = e.target.value === "Yes";
+                                                            setEditForm(prev => ({
+                                                                ...prev,
+                                                                isCosatu: isYes ? "Y" : "N",
+                                                                ...(!isYes ? { cosatuLocal: "", cosatuRegion: "", cosatuPositions: [] } : {})
+                                                            }));
+                                                        }} />
+                                                        {(editForm.isCosatu === "Y" || editForm.isCosatu === true) && (
+                                                            <div className="mt-4 pl-4 border-l-2 border-orange-400 space-y-4 animate-slideDown">
+                                                                <p className="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">COSATU Structure within BEC Committee</p>
+                                                                <div className="grid grid-cols-2 gap-3">
+                                                                    {["COSATU Local", "Region within Local"].map((pos) => {
+                                                                        const current = editForm.cosatuPositions || [];
+                                                                        return (
+                                                                            <label key={pos} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                                                                <input type="checkbox" checked={current.includes(pos)} className="accent-orange-500 rounded h-4 w-4" onChange={() => {
+                                                                                    const next = current.includes(pos) ? current.filter(p => p !== pos) : [...current, pos];
+                                                                                    setEditForm(prev => ({ ...prev, cosatuPositions: next }));
+                                                                                }} />
+                                                                            </label>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                                {/*<div className="grid grid-cols-1 md:grid-cols-2 gap-4">*/}
+                                                                {/*    <Detail label="COSATU Local" value={editForm.cosatuLocal || ""} isEditing={true} onChange={(e) => setEditForm(prev => ({ ...prev, cosatuLocal: e.target.value }))} />*/}
+                                                                {/*    <Detail label="Region within Local" value={editForm.cosatuRegion || ""} isEditing={true} onChange={(e) => setEditForm(prev => ({ ...prev, cosatuRegion: e.target.value }))} />*/}
+                                                                {/*</div>*/}
+                                                                <div className="p-4 bg-orange-50/50 dark:bg-orange-950/10 border border-orange-200 dark:border-orange-800 rounded-lg">
+                                                                    <label className="block text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-400 mb-2">COSATU Positions — Multiple Allowed</label>
+                                                                    <div className="grid grid-cols-2 gap-3">
+                                                                        {["PEC", "CEC", "Treasurer", "Chairperson", "Secretary"].map((pos) => {
+                                                                            const current = editForm.cosatuPositions || [];
+                                                                            return (
+                                                                                <label key={pos} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                                                                    <input type="checkbox" checked={current.includes(pos)} className="accent-orange-500 rounded h-4 w-4" onChange={() => {
+                                                                                        const next = current.includes(pos) ? current.filter(p => p !== pos) : [...current, pos];
+                                                                                        setEditForm(prev => ({ ...prev, cosatuPositions: next }));
+                                                                                    }} />
+                                                                                    {pos === "PEC" ? "PEC (Provincial Executive Committee)" :
+                                                                                     pos === "CEC" ? "CEC (Central Executive Committee)" : pos}
+                                                                                </label>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )}
-
-                                            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                                                <Detail label="COSATU Member?" value={editForm.isCosatu === "Y" || editForm.isCosatu === true ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
-                                                    const isYes = e.target.value === "Yes";
-                                                    setEditForm(prev => ({
-                                                        ...prev,
-                                                        isCosatu: isYes ? "Y" : "N",
-                                                        ...(!isYes ? { cosatuLocal: "", cosatuRegion: "", cosatuPositions: [] } : {})
-                                                    }));
-                                                }} />
-                                                {(editForm.isCosatu === "Y" || editForm.isCosatu === true) && (
-                                                    <div className="mt-4 pl-4 border-l-2 border-orange-400 space-y-4 animate-slideDown">
-                                                        <p className="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">COSATU Structure</p>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                            <Detail label="Local" value={editForm.cosatuLocal || ""} isEditing={true} onChange={(e) => setEditForm(prev => ({ ...prev, cosatuLocal: e.target.value }))} />
-                                                            <Detail label="Region" value={editForm.cosatuRegion || ""} isEditing={true} onChange={(e) => setEditForm(prev => ({ ...prev, cosatuRegion: e.target.value }))} />
-                                                        </div>
-                                                        <div className="p-4 bg-orange-50/50 dark:bg-orange-950/10 border border-orange-200 dark:border-orange-800 rounded-lg">
-                                                            <label className="block text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-400 mb-2">COSATU Positions — Multiple Allowed</label>
-                                                            <div className="grid grid-cols-2 gap-3">
-                                                                {["PEC", "CEC", "Treasurer", "Chairperson", "Secretary"].map((pos) => {
-                                                                    const current = editForm.cosatuPositions || [];
-                                                                    return (
-                                                                        <label key={pos} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                                                                            <input type="checkbox" checked={current.includes(pos)} className="accent-orange-500 rounded h-4 w-4" onChange={() => {
-                                                                                const next = current.includes(pos) ? current.filter(p => p !== pos) : [...current, pos];
-                                                                                setEditForm(prev => ({ ...prev, cosatuPositions: next }));
-                                                                            }} />
-                                                                            {pos === "PEC" ? "PEC (Provincial Executive Committee)" :
-                                                                             pos === "CEC" ? "CEC (Central Executive Committee)" : pos}
-                                                                        </label>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 divide-y md:divide-y-0 divide-gray-100 dark:divide-gray-800">
@@ -809,18 +814,19 @@ export default function Members() {
                                                         <Detail label="BEC Recruiter" value={selectedMember.isBecRecruiter ? `Yes (${selectedMember.becRecruiterRole || 'Standard'})` : "No"} isEditing={false} />
                                                         <Detail label="Structure Representative Roles" value={selectedMember.isBecStructureRep && selectedMember.becStructures?.length > 0 ? selectedMember.becStructures.join(", ") : "None Assigned"} isEditing={false} />
                                                         <Detail label="BEC Executive Position" value={selectedMember.isBecExecutive ? selectedMember.becExecutivePosition : "None"} isEditing={false} />
+                                                        
+                                                        <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
+                                                            <h5 className="text-xs font-bold uppercase tracking-wider text-orange-500 mb-2">COSATU Structure (within BEC)</h5>
+                                                            <Detail label="COSATU Member" value={selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true ? "Yes" : "No"} isEditing={false} />
+                                                            {(selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true) && (
+                                                                <div className="grid grid-cols-1 gap-3 mt-2">
+                                                                    <Detail label="COSATU Local" value={selectedMember.cosatuLocal || "-"} isEditing={false} />
+                                                                    <Detail label="Region within Local" value={selectedMember.cosatuRegion || "-"} isEditing={false} />
+                                                                    <Detail label="Positions Held" value={selectedMember.cosatuPositions?.length > 0 ? selectedMember.cosatuPositions.join(", ") : "None"} isEditing={false} />
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </>
-                                                )}
-                                            </div>
-                                            <div className="space-y-3 pt-4 md:col-span-2">
-                                                <h4 className="text-xs font-bold uppercase tracking-wider text-orange-500">COSATU Structure</h4>
-                                                <Detail label="COSATU Member" value={selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true ? "Yes" : "No"} isEditing={false} />
-                                                {(selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true) && (
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                        <Detail label="Local" value={selectedMember.cosatuLocal || "-"} isEditing={false} />
-                                                        <Detail label="Region" value={selectedMember.cosatuRegion || "-"} isEditing={false} />
-                                                        <Detail label="Positions Held" value={selectedMember.cosatuPositions?.length > 0 ? selectedMember.cosatuPositions.join(", ") : "None"} isEditing={false} className="md:col-span-2" />
-                                                    </div>
                                                 )}
                                             </div>
                                         </div>
@@ -865,7 +871,7 @@ const fieldCls = (error, disabled = false) =>
         disabled ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed" : "bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white"} ${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"}`;
 
 function Detail({ label, value, isEditing, onChange, className = "", options = null, type = "text", error = null, disabled = false, required = false }) {
-    const detailId = `detail-${label.toLowerCase().replace(/\\s+/g, "-")}`;
+    const detailId = `detail-${label.toLowerCase().replace(/\s+/g, "-")}`;
     return (
         <div className={className}>
             <label htmlFor={detailId} className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
