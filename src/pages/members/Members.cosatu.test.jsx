@@ -56,6 +56,15 @@ const MEMBER_WITH_POSITIONS = {
   // proves the defect is absent.
   isCosatu: 'Y',
   cosatuPositions: 'PEC,CEC',
+  // 🔴 `isBec`, AND IT IS LOAD-BEARING -- added when upstream moved the gate.
+  // The COSATU detail block used to sit at the top level of the panel. It is
+  // now nested inside `{selectedMember.isBec && (...)}`, so a member who is not
+  // a BEC member never renders it. Without this line the pin below stops
+  // throwing -- not because the defect was fixed, but because the fixture no
+  // longer reaches the code that has it. That reads as green-turned-red and
+  // would have been "closed" on the next pass. The `.join(", ")` on line 825 of
+  // Members.jsx is still exactly where it was.
+  isBec: true,
 }
 
 /**
