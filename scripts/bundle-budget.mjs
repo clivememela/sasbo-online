@@ -48,24 +48,22 @@ import { FLOORS } from '../src/test/floors.js'
 
 const KB = 1024
 
-/** Measured 2026-09-04. Raise only with a reason recorded beside the change. */
+/**
+ * Raise only with a reason recorded beside the change.
+ *
+ * The measurements these sit above are NOT repeated here: they belong to
+ * `FLOORS.BUNDLE_*` in `src/test/floors.js`, which carries the actual and the
+ * date. Two copies had already drifted by 0.03 KiB before anyone read them
+ * together, which is the whole argument for one home.
+ */
 const CEILINGS = {
-  js: 600 * KB, // measured 502.08 KiB
-  css: 70 * KB, // measured  48.94 KiB
-  total: 900 * KB, // measured 788.13 KiB across every emitted asset
+  js: 600 * KB,
+  css: 70 * KB,
+  total: 900 * KB,
 }
 
-// 🔴 THE FLOORS COME FROM THE REGISTRY, not from here. A ceiling-only guard
-// passes hardest on the worst input -- every assertion below is
-// `actual <= ceiling`, which a `dist/` holding nothing but `index.html`
-// satisfies completely. The floors that close that are in `src/test/floors.js`
-// with every other floor in the repository, including the reasoning and the
-// date they were measured. Declaring a second `FLOORS` here would make the
-// registry's own claim to be "the floors, in one place" false again, on the
-// day it became true.
-//
-// The CEILINGS stay local: a ceiling is not a non-vacuity canary and the
-// registry is explicitly about floors.
+// Floors come from the registry; CEILINGS stay local -- a ceiling is not a
+// non-vacuity canary, and `src/test/floors.js` owns the why and the dates.
 
 const walk = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
@@ -108,7 +106,7 @@ const rows = [
   ['emitted files', files.length, FLOORS.BUNDLE_FILES, Infinity, count],
 ]
 
-console.log(`\n  bundle budget -- ${files.length} emitted file(s)\n`)
+console.log('\n  bundle budget\n')
 let over = false
 let under = false
 

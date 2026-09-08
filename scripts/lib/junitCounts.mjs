@@ -9,10 +9,11 @@
  * broken XML through it.
  *
  * 🔑 THAT MATTERS MORE HERE THAN IT USUALLY WOULD. This function is the
- * mechanism behind register row F11 -- the run that reported "336 tests, 6
- * failed" when the true total was 398 and sixty-two tests had never started. A
- * counting bug here does not produce a wrong number in a log; it produces a
- * short run that reads as a complete one.
+ * mechanism behind register row F11, where a run reported fewer tests than it
+ * had because some workers never started. A counting bug here does not produce
+ * a wrong number in a log; it produces a short run that reads as a complete
+ * one. The numbers live in the register and in the `maxWorkers` comment in
+ * `vite.config.js`, where the other half of that fix is -- not here.
  */
 
 /**

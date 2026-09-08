@@ -22,11 +22,10 @@
  * being stricter -- it reddens for reasons nobody caused, and then gets
  * lowered by whoever is unlucky enough to hit it.
  *
- * MEASURED 2026-09-05, at the end of Phase 3:
- *   355 tests across 15 files -- 334 passing, 21 skipped
- * The floor below is 260, about 73% of that: room for a domain or two to be
- * deleted or moved without a false alarm, and nowhere near low enough for a
- * broken glob to slip past.
+ * The floor and the measurement it was calibrated against both live in
+ * `FLOORS.SUITE_TESTS`. They are deliberately not repeated here -- the comment
+ * beside the old inline constant had already drifted away from its own value,
+ * which is why the constant moved.
  */
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -35,11 +34,6 @@ import process from 'node:process'
 import { FLOORS } from '../src/test/floors.js'
 import { junitCounts } from './lib/junitCounts.mjs'
 
-// The floor lives in the registry with every other floor. It was a bare
-// constant here, which made "the floors, in one place" untrue of the single
-// most load-bearing floor in the repository -- and the comment beside it read
-// "Measured 2026-09-05: 355" against a value of 260, so the number and its
-// justification had already come apart.
 const FLOOR = FLOORS.SUITE_TESTS
 const REPORT = 'reports/junit.xml'
 
@@ -67,9 +61,6 @@ try {
 // lived here: this file's first act is to spawn the entire suite, so a test
 // inside the suite exercising it would run the suite inside itself.
 //
-// That extraction is not tidiness. This is the mechanism behind F11, and a
-// counting bug in it does not produce a wrong number in a log -- it produces a
-// short run that reads as a complete one.
 const { suites, total, failures, skipped } = junitCounts(xml)
 
 console.log(

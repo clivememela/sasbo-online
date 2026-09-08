@@ -13,15 +13,19 @@ const isVitest =
 
 const seed = Number(process.env.VITEST_SEED) || (Date.now() % 2147483647)
 
-// The worker cap, derived rather than written out -- see `poolOptions` below
-// for what it defends against. Never more workers than the host has cores, and
+// The worker cap, derived rather than written out -- see `maxWorkers` below for
+// what it defends against. Never more workers than the host has cores, and
 // never more than four, whichever is smaller.
-const MAX_FORKS = Number(process.env.VITEST_MAX_FORKS) || Math.min(4, availableParallelism())
+// 🔑 NAMED FOR THE SETTING IT FEEDS. It was MAX_FORKS/VITEST_MAX_FORKS, from
+// the removed `poolOptions.forks.maxForks` -- so grepping for `maxWorkers`, the
+// thing actually configured, found neither the override nor the log line.
+const MAX_WORKERS =
+  Number(process.env.VITEST_MAX_WORKERS) || Math.min(4, availableParallelism())
 
 if (isVitest) {
   console.log(
     `\n  vitest sequence.seed=${seed}  (replay with VITEST_SEED=${seed})` +
-      `\n  vitest maxForks=${MAX_FORKS}  (override with VITEST_MAX_FORKS)\n`,
+      `\n  vitest maxWorkers=${MAX_WORKERS}  (override with VITEST_MAX_WORKERS)\n`,
   )
 }
 
@@ -132,7 +136,7 @@ export default defineConfig({
     // machine committed into shared config: a no-op on a 2-core CI runner and a
     // 16x throttle on a 64-core one, neither of which anybody chose. `min(4,
     // availableParallelism())` never asks for more workers than the host has,
-    // and `VITEST_MAX_FORKS` lets a host that knows better say so -- the same
+    // and `VITEST_MAX_WORKERS` lets a host that knows better say so -- the same
     // pick-a-value / allow-an-override / print-it shape `VITEST_SEED` uses
     // above, so the run's own log records what it actually used.
     //
@@ -151,7 +155,7 @@ export default defineConfig({
     // is -- so that a changed default is a reddening change and not a silent
     // one.
     pool: 'forks',
-    maxWorkers: MAX_FORKS,
+    maxWorkers: MAX_WORKERS,
 
     reporters: ['default', 'junit'],
     outputFile: {

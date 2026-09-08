@@ -136,8 +136,8 @@ export const FLOORS = {
    * `scripts/contract-witness.mjs` from `reports/observed-endpoints.json`.
    * Measured through that guard's own read on 2026-09-08: 9.
    *
-   * 🔑 ITS OWN ENTRY RATHER THAN `ENDPOINTS`, which is 15 over a population
-   * that looks similar and is not. `ENDPOINTS` counts what the STATIC scan
+   * 🔑 ITS OWN ENTRY RATHER THAN `ENDPOINTS`, which counts a population that
+   * looks similar and is not. `ENDPOINTS` counts what the STATIC scan
    * finds in `src/services/`; this counts what a browser was observed asking
    * for. Most discovered endpoints need a user action the smoke never performs,
    * so this number is legitimately much smaller, and lending the larger floor

@@ -7,10 +7,9 @@ import { junitCounts } from './lib/junitCounts.mjs'
  * The counter behind the discovery floor, tested against reports that lie.
  *
  * 🔴 WHY THIS FILE EXISTS. `scripts/suite-floor.mjs` is the only thing that can
- * notice register row F11 -- a run that reported "336 tests, 6 failed" when the
- * true total was 398, because six worker processes never started and the 62
- * tests inside them were absent rather than failing. Nothing running INSIDE a
- * short run can see that it was short.
+ * notice register row F11 -- a run whose workers did not all start, so tests
+ * were ABSENT rather than failing and the total was quietly short. Nothing
+ * running INSIDE a short run can see that it was short.
  *
  * That makes this counter load-bearing, and until now it was the one guard in
  * this repository with no test of its own: it lived inline in a script whose

@@ -61,17 +61,13 @@ for (const { endpoint, calls } of witness.endpoints) {
   observed.set(path, (observed.get(path) ?? 0) + calls)
 }
 
-// 🔴 BOTH POPULATIONS ARE FLOORED BEFORE THEY ARE COMPARED, because the whole
-// check below is a SET DIFFERENCE and a set difference against an empty set is
-// empty. `missedByTheScan` is `observed - discovered`: with no witness
-// endpoints it is `[] - discovered` = `[]`, the script prints "every endpoint
-// the browser actually requested was found by the static scan", and exits 0.
-//
-// That is not hypothetical. The route smoke writes this file DURING the suite
-// run, so anything that stops it running -- a renamed spec, a changed glob, a
-// worker that died before reaching it, an msw handler that intercepts nothing
-// -- yields a witness with zero endpoints and a green, confident report about
-// a comparison that had nothing on one side of it.
+// 🔴 BOTH POPULATIONS ARE FLOORED BEFORE THEY ARE COMPARED. The failure message
+// below states the mechanism, so it is not restated here -- what that message
+// cannot say is how an empty witness ARISES, which is the part worth writing
+// down. The route smoke writes that file DURING the suite run, so a renamed
+// spec, a changed glob, a worker that died before reaching it, or an msw
+// handler that intercepts nothing all produce one, and not one of them looks
+// like a failure from the outside.
 //
 // Both come from `src/test/floors.js`, which is where every floor in this
 // repository lives -- and which says in its own header that these scripts

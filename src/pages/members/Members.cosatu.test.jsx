@@ -58,6 +58,16 @@ const MEMBER_WITH_POSITIONS = {
   cosatuPositions: 'PEC,CEC',
 }
 
+/**
+ * What A38 needs on top: the BEC block is gated separately, and the field is a
+ * delimited string for the same reason the COSATU one is.
+ */
+const BEC_STRUCTURES = {
+  isBec: true,
+  isBecStructureRep: true,
+  becStructures: 'BEC A,BEC B',
+}
+
 const membersRespond = (body) => http.get('*/api/members', () => HttpResponse.json(body))
 
 /** Open the member, then the tab the positions are rendered on. */
@@ -124,41 +134,23 @@ describe('a member whose COSATU positions arrive as a delimited string', () => {
     },
   )
 
-  it(pin(DEFECTS.A38, 'the unsafe expression is still in the source, one field over'), () => {
-    // 🔑 A SOURCE PIN, because A38 has no runtime symptom to assert yet -- the
-    // field is not sent. That is what makes it latent rather than fixed, and a
-    // latent defect with no assertion is one nobody will remember. This reddens
-    // the day somebody repairs the expression, which is the signal the pin is
-    // for.
+  it(pin(DEFECTS.A38, 'the same call, one field over, throws the same way'), async () => {
+    // 🔑 BEHAVIOURAL, not a source scan. The first version of this pin regexed
+    // Members.jsx for the unguarded `.join(`, on the reasoning that A38 has no
+    // runtime symptom because the server does not send the field.
     //
-    // Comments are blanked first: a fix that leaves the old line quoted in a
-    // comment above the new one would otherwise keep this pin green.
-    // Read from the project root, which is where Vitest runs, rather than
-    // relative to this module -- `import.meta.url` points at the TRANSFORMED
-    // module under Vitest and does not resolve back to the file on disk.
-    const source = blankComments(readFileSync('src/pages/members/Members.jsx', 'utf8'))
+    // That reasoning was wrong in the one way that matters: msw IS the server
+    // here, and `selectedMember` is the raw API object with nothing
+    // whitelisting its fields. So the symptom is one fixture away -- and the
+    // text pin was strictly worse than this, because the actual repair
+    // (normalising `selectedMember` upstream, which is what the skipped test
+    // above describes) leaves the `.join(` call exactly where it is. The source
+    // pin would have stayed GREEN through the fix it exists to detect.
+    const user = setupUser()
+    server.use(membersRespond([{ ...MEMBER_WITH_POSITIONS, ...BEC_STRUCTURES }]))
+    renderWithProviders(<MembersPage />)
 
-    expect(
-      /selectedMember\.becStructures\.join\(/.test(source),
-      'becStructures is no longer joined unguarded -- if that is a fix, delete this pin, ' +
-        'un-skip the A38 test above and close the register row',
-    ).toBe(true)
+    await expect(openStructuresTab(user)).rejects.toThrow(/\.join is not a function/)
   })
 
-  it(
-    pin(DEFECTS.A37, 'the guard beside the call does not protect, and this is why'),
-    () => {
-      // The defect in one line, isolated from React entirely. This is the shape
-      // the codebase should stop writing, and it is worth pinning separately
-      // because the same expression appears a second time twelve lines away --
-      // register A38, latent only because that field is not sent yet.
-      const fromTheApi = 'PEC,CEC'
-
-      expect(fromTheApi?.length > 0).toBe(true) // the guard passes...
-      expect(() => fromTheApi.join(', ')).toThrow(TypeError) // ...and the call throws
-
-      // An array of the same content is what the view is written for.
-      expect(['PEC', 'CEC'].join(', ')).toBe('PEC, CEC')
-    },
-  )
 })
