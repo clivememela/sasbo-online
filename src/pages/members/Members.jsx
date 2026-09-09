@@ -618,7 +618,7 @@ ${summary}`);
                                         </>
                                     )}
                                     <Detail label="IBT No." value={editForm.ibtNo} isEditing={isEditing} onChange={handleEditChange("ibtNo")} />
-                                    <Detail label="Work IBT No." value={editForm.workIbtNo} isEditing={isEditing} onChange={handleEditChange("workIbtNo")} />
+                                    {/*<Detail label="Work IBT No." value={editForm.workIbtNo} isEditing={isEditing} onChange={handleEditChange("workIbtNo")} />*/}
                                     <div className="md:col-span-2">
                                         {isEditing ? (
                                             <AddressAutocomplete label="Bank Work Address" value={editForm.bankAddress} onChange={handleEditChange("bankAddress")} placeholder="Search coordinates..." />
