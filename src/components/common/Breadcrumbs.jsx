@@ -34,14 +34,14 @@ export default function Breadcrumbs() {
   if (location.pathname === "/home") {
     return (
       <nav className="flex items-center text-sm font-medium mt-4">
-        <span className="text-gray-500 dark:text-gray-400">Home</span>
+        <span className="text-ink-faint">Home</span>
       </nav>
     );
   }
 
   return (
     <nav className="flex items-center text-sm font-medium mt-4">
-      <Link to="/home" className="hover:underline text-cyan-700 dark:text-cyan-400">Home</Link>
+      <Link to="/home" className="hover:underline text-brand-ink">Home</Link>
       {pathnames.map((name, index) => {
         const routeTo = `/${pathnames.slice(0, index + 1).join("/")}`;
         const isLast = index === pathnames.length - 1;
@@ -49,11 +49,11 @@ export default function Breadcrumbs() {
 
         return (
           <div key={routeTo} className="flex items-center">
-            <ChevronRight size={16} strokeWidth={1.5} className="mx-2 text-gray-400" />
+            <ChevronRight size={16} strokeWidth={1.5} className="mx-2 text-ink-faint" />
             {isLast ? (
-              <span className="text-gray-500 dark:text-gray-400">{displayName}</span>
+              <span className="text-ink-faint">{displayName}</span>
             ) : (
-              <Link to={routeTo} className="hover:underline text-cyan-700 dark:text-cyan-400">
+              <Link to={routeTo} className="hover:underline text-brand-ink">
                 {displayName}
               </Link>
             )}

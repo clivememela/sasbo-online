@@ -7,8 +7,11 @@ export default function AppLayout() {
   const [sideBarOpen, setSideBarOpen] = useState(false);
   const [selectedCardHref, setSelectedCardHref] = useState(null);
 
+  // h-screen is deliberately UNCHANGED here: swapping it for h-dvh is a real fix for mobile
+  // browser chrome (responsiveness.md, R-RESP-F) and it is P5's, not P1's. This phase migrates
+  // colour to tokens and changes nothing else.
   return (
-    <div className="bg-gray-300 dark:bg-gray-900 h-screen">
+    <div className="bg-bg h-screen">
       <Sidebar
         sideBarOpen={sideBarOpen}
         setSideBarOpen={setSideBarOpen}

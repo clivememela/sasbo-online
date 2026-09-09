@@ -15,9 +15,9 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
   return (
     <div>
       <div
-        className={`flex items-center p-4 hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-white cursor-pointer transition-colors rounded-lg ${
+        className={`flex items-center p-4 hover:bg-surface-2 text-nav-ink cursor-pointer transition-colors rounded-lg ${
           isActive || hasActiveSubItem || isCardSelected
-            ? 'bg-cyan-100 dark:bg-cyan-900 ring-1 ring-cyan-400'
+            ? 'bg-brand-soft ring-1 ring-brand-ring'
             : ''
         }`}
         onClick={() => {
@@ -71,8 +71,8 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
               <Link
                 key={`${subItem.href}-${subItem.title}-${index}`}
                 to={subItem.href}
-                className={`flex items-center p-3 hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-white cursor-pointer transition-colors rounded-lg text-sm ${
-                  isSubActive ? 'bg-gray-200 dark:bg-gray-700' : ''
+                className={`flex items-center p-3 hover:bg-surface-2 text-nav-ink cursor-pointer transition-colors rounded-lg text-sm ${
+                  isSubActive ? 'bg-surface-2' : ''
                 }`}
                 onClick={onClick}
               >

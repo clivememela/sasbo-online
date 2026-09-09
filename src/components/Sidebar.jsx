@@ -59,16 +59,16 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref}
       )}
 
       <div
-        className={`fixed bg-white dark:bg-gray-800 z-20 w-64 h-screen shadow flex flex-col ${
+        className={`fixed bg-bg-raised z-20 w-64 h-screen shadow flex flex-col ${
           sideBarOpen ? "translate-x-0" : "-translate-x-64"
         } lg:translate-x-0 lg:static transition ease-in-out duration-300`}
       >
-        <div className="p-4 flex justify-between items-center border-b dark:border-gray-700">
-          <div className="flex items-center gap-2 text-xl text-cyan-700 dark:text-cyan-400">
+        <div className="p-4 flex justify-between items-center border-b border-line">
+          <div className="flex items-center gap-2 text-xl text-brand-ink">
             <Logo className="h-12 w-auto" />
             <span>Enquiry Navigation Menu</span>
           </div>
-          <button className="lg:hidden dark:text-white" onClick={() => setSideBarOpen(false)}>
+          <button className="lg:hidden text-ink" onClick={() => setSideBarOpen(false)}>
             <X size={24} strokeWidth={1} />
           </button>
         </div>
@@ -86,7 +86,7 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref}
             />
           ))}
           
-          <div className="my-4 border-t border-gray-200 dark:border-gray-700"></div>
+          <div className="my-4 border-t border-line"></div>
           
           {authItems.map((item) => {
             const Icon = item.icon;
@@ -94,10 +94,10 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref}
               <Link
                 key={item.href}
                 to={item.href}
-                className="flex items-center p-4 hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-white cursor-pointer transition-colors rounded-lg"
+                className="flex items-center p-4 hover:bg-surface-2 text-nav-ink cursor-pointer transition-colors rounded-lg"
                 onClick={() => setSideBarOpen(false)}
               >
-                <Icon size={24} strokeWidth={1} className="mr-6 text-cyan-500" />
+                <Icon size={24} strokeWidth={1} className="mr-6 text-brand" />
                 <div className="font-medium">{item.title}</div>
               </Link>
             );
