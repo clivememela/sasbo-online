@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import TextInput from '../../components/form/TextInput';
+import DateField from '../../components/form/DateField';
 import Button from '../../components/form/Button';
 
 export const OrganizerReport = ({ filters }) => {
@@ -52,12 +53,18 @@ export const OrganizerReport = ({ filters }) => {
         </label>
     );
 
+    // 🔴 `03.3`: `type="date"` routes to DateField rather than to a native date input.
+    // ONE edit reaches all FOUR of this form's date fields, which is the point of the
+    // wrapper existing at all -- and it is why the conversion is done here rather than at
+    // each site. (This wrapper is one of BR-4's four; replacing it wholesale is `04.3`.)
     const Field = ({ label, name, type = 'text', fullWidth = false, textarea = false }) =>
         textarea
             ? <TextArea label={label} name={name} />
             : (
                 <div className={fullWidth ? 'col-span-2' : ''}>
-                    <TextInput label={label} name={name} type={type} value={formData[name]} onChange={handleChange} />
+                    {type === 'date'
+                        ? <DateField label={label} name={name} value={formData[name]} onChange={handleChange} hint="ago" />
+                        : <TextInput label={label} name={name} type={type} value={formData[name]} onChange={handleChange} />}
                 </div>
             );
 

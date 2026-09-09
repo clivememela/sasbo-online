@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
-import { TextInput, SearchableSelect, Button, PositionTreeSelect } from '../../components/form';
+import { TextInput, SearchableSelect, Button, PositionTreeSelect, DateField } from '../../components/form';
 import { memberService } from '../../services/memberService.js';
 import { recruiterService } from '../../services/recruiterService.js';
 import { recruitmentChannelService } from '../../services/recruitmentChannelService.js';
@@ -650,9 +650,13 @@ export function Recruiters() {
                                 </div>
                                 {editRepFields.isElectedRep && (
                                     <div>
-                                        <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Election Date</label>
-                                        <input type="date" value={editRepFields.electionDate || ''} onChange={e => setEditRepFields(p => ({ ...p, electionDate: e.target.value }))}
-                                               className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                                        <DateField
+                                            label="Election Date"
+                                            value={editRepFields.electionDate || ''}
+                                            max="today"
+                                            hint="ago"
+                                            onChange={e => setEditRepFields(p => ({ ...p, electionDate: e.target.value }))}
+                                        />
                                     </div>
                                 )}
                                 <div className="md:col-span-2">
@@ -811,9 +815,13 @@ export function Recruiters() {
                                 </div>
                                 {newRepDetails.isElectedRep && (
                                     <div>
-                                        <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Election Date</label>
-                                        <input type="date" value={newRepDetails.electionDate || ''} onChange={e => setNewRepDetails(p => ({ ...p, electionDate: e.target.value }))}
-                                               className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                                        <DateField
+                                            label="Election Date"
+                                            value={newRepDetails.electionDate || ''}
+                                            max="today"
+                                            hint="ago"
+                                            onChange={e => setNewRepDetails(p => ({ ...p, electionDate: e.target.value }))}
+                                        />
                                     </div>
                                 )}
                                 <div>

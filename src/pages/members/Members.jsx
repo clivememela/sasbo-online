@@ -5,7 +5,7 @@ import { memberService } from "../../services/memberService.js";
 import { recruiterService } from "../../services/recruiterService.js";
 import { jobGradeService } from "../../services/jobGradeService.js";
 import { bankService } from "../../services/bankService.js";
-import { TextInput, SearchableSelect, Button } from "../../components/form";
+import { TextInput, SearchableSelect, Button, DateField } from "../../components/form";
 import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, YES_NO_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
@@ -661,8 +661,18 @@ ${summary}`);
                                                 }} />
                                                 {editForm.isShopSteward && (
                                                     <div className="animate-slideDown">
-                                                        <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Shop Steward Election Date *</label>
-                                                        <input type="date" value={editForm.shopStewardElectionDate || ""} className={fieldCls(fieldErrors.shopStewardElectionDate)} onChange={(e) => setEditForm(prev => ({ ...prev, shopStewardElectionDate: e.target.value }))} />
+                                                        {/* 🔴 `03.3`: was a native <input type="date"> with a <label> that named
+                                                            no control -- the label had no htmlFor, so a screen reader reached an
+                                                            unnamed date box. DateField carries its own real label. */}
+                                                        <DateField
+                                                            label="Shop Steward Election Date"
+                                                            required
+                                                            value={editForm.shopStewardElectionDate || ""}
+                                                            error={fieldErrors.shopStewardElectionDate || undefined}
+                                                            max="today"
+                                                            hint="ago"
+                                                            onChange={(e) => setEditForm(prev => ({ ...prev, shopStewardElectionDate: e.target.value }))}
+                                                        />
                                                     </div>
                                                 )}
                                             </div>

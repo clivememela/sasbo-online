@@ -46,7 +46,7 @@ export const EMPTY = '—';
 const pad2 = (n) => String(n).padStart(2, '0');
 
 /** Days in a month, 1-indexed, with February resolved against the actual year. */
-function daysInMonth(y, m) {
+export function daysInMonth(y, m) {
   return [31, (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][
     m - 1
   ];
@@ -194,4 +194,98 @@ export function dash(value) {
   if (value === '' || value == null) return EMPTY;
   if (Array.isArray(value)) return value.length === 0 ? EMPTY : value.join(', ');
   return String(value);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   CALENDAR ARITHMETIC — added by `03.3` for the date field.
+
+   🔴 EVERY FUNCTION BELOW THAT TOUCHES `Date` USES THE **LOCAL FIELDS**
+   CONSTRUCTOR, `new Date(y, m - 1, d)`, and that distinction is the whole of
+   R-ROB-N. `new Date(y, m - 1, d)` builds midnight in the USER'S zone and its
+   `getFullYear`/`getMonth`/`getDate` read back the same calendar day, always.
+   What is forbidden is `new Date("1988-06-15")` — midnight UTC — and
+   `.toISOString().split("T")[0]`, which converts back through UTC. Date is a
+   perfectly good calendar calculator; it is a terrible calendar serialiser.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/** Negative if a is earlier, 0 if equal, positive if later. Field comparison, no Date. */
+export function compareDates(a, b) {
+  return a.y - b.y || a.m - b.m || a.d - b.d;
+}
+
+/** Same calendar day? Tolerates null on either side, because callers hold optional dates. */
+export function sameDate(a, b) {
+  return Boolean(a) && Boolean(b) && compareDates(a, b) === 0;
+}
+
+/** 0 = Sunday. The CLDR first day for South Africa, and what the current app shows. */
+export function weekdayOf(date) {
+  return new Date(date.y, date.m - 1, date.d).getDay();
+}
+
+/** n days later (or earlier). Month and year roll over correctly, including leap days. */
+export function shiftDays(date, days) {
+  const moved = new Date(date.y, date.m - 1, date.d + days);
+  return { y: moved.getFullYear(), m: moved.getMonth() + 1, d: moved.getDate() };
+}
+
+/**
+ * n months later (or earlier), with the day CLAMPED to the target month's length.
+ * 31 January + 1 month is 28 February, not 3 March — a rollover would silently move
+ * the user two days past where they aimed.
+ */
+export function shiftMonths(date, months) {
+  const total = date.y * 12 + (date.m - 1) + months;
+  const y = Math.floor(total / 12);
+  const m = (total % 12) + 1;
+  return { y, m, d: Math.min(date.d, daysInMonth(y, m)) };
+}
+
+/** A `CalendarDate` as a local-midnight `Date`, for a library that speaks Date. */
+export function toDate(date) {
+  const parsed = parseDate(date);
+  return parsed ? new Date(parsed.y, parsed.m - 1, parsed.d) : null;
+}
+
+/** A `Date`'s LOCAL calendar fields. The inverse of `toDate`, and never via UTC. */
+export function fromDate(value) {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
+  return { y: value.getFullYear(), m: value.getMonth() + 1, d: value.getDate() };
+}
+
+/**
+ * "3 months ago" / "in 2 years" / "today" — the picker's readout for a non-birth date.
+ * Approximate by design: nobody wants "97 days ago" for a visit last quarter.
+ */
+export function timeAgo(value, from = today()) {
+  const date = parseDate(value);
+  const now = parseDate(from);
+  if (!date || !now) return '';
+
+  const days = Math.round(
+    (new Date(now.y, now.m - 1, now.d) - new Date(date.y, date.m - 1, date.d)) / 86400000,
+  );
+  if (days === 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days === -1) return 'tomorrow';
+
+  const magnitude = Math.abs(days);
+  const months = Math.round(magnitude / 30.44);
+  const years = Math.floor(magnitude / 365.25);
+  const word =
+    magnitude < 31
+      ? `${magnitude} days`
+      : magnitude < 365
+        ? `${months} month${months === 1 ? '' : 's'}`
+        : `${years} year${years === 1 ? '' : 's'}`;
+  return days > 0 ? `${word} ago` : `in ${word}`;
+}
+
+/** "38 years old" / "under a year old" / "not born yet" — the readout for a birth date. */
+export function ageInWords(value, from = today()) {
+  const years = yearsBetween(value, from);
+  if (years === null) return '';
+  if (years < 0) return 'not born yet';
+  if (years === 0) return 'under a year old';
+  return `${years} year${years === 1 ? '' : 's'} old`;
 }
