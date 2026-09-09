@@ -2,6 +2,7 @@ import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
+import jsxA11y from 'eslint-plugin-jsx-a11y'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
@@ -19,6 +20,7 @@ export default defineConfig([
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
     ],
+    plugins: { 'jsx-a11y': jsxA11y },
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
@@ -30,6 +32,26 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]' }],
+      // ── jsx-a11y, at `warn` and DELIBERATELY NOT `error` (design arc, 00.5) ───────────
+      //
+      // 🔴 THE LEVEL IS THE WHOLE POINT. MobiZone turned this on at `error` mid-arc, could
+      // not land anything until the backlog was cleared, and turned it back off -- so the
+      // rule shipped disabled and the findings shipped with it. At `warn` the existing
+      // violations are VISIBLE and COUNTED without blocking a commit, every one is mapped
+      // to the phase that owns it, and `10.4` flips the whole plugin to `error` once that
+      // worklist is empty. A gate you cannot pass is a gate somebody removes.
+      //
+      // ⚠️ The warning count is part of this arc's baseline. A phase that raises it without
+      // saying so has regressed something; the count belongs in each phase's BUILT: line.
+      //
+      // 🔑 EVERY recommended rule is forced to 'warn' by mapping over the preset rather than
+      // spreading it: the preset ships most of its rules at 'error', so spreading it would
+      // turn the gate red on the first run and silently be the thing `10.4` is supposed to
+      // do LAST. Derived from the preset, so a rule added upstream arrives at 'warn' too --
+      // never a hand-kept list.
+      ...Object.fromEntries(
+        Object.keys(jsxA11y.flatConfigs.recommended.rules).map((rule) => [rule, 'warn'])
+      ),
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/set-state-in-render': 'off',
       'react-hooks/purity': 'off',
