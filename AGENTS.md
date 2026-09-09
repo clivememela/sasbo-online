@@ -4,7 +4,11 @@
 
 ## Architecture Overview
 
-**Tech Stack**: React 19.2 | Vite | Tailwind CSS 4.1 | React Router 7 | Redux Toolkit | JavaScript
+**Tech Stack**: React 19.2 | Vite | Tailwind CSS 4.1 | React Router 7 | JavaScript
+
+> ⚠️ **Redux Toolkit is NOT in this project.** `@reduxjs/toolkit` and `react-redux` were declared in
+> `package.json` and imported by nothing; both were removed on 2026-09-09. There is no store, no provider and
+> no slice. Global state is React Context — see *State Management* below.
 
 Single project repo serving as SPA on port 5173 (dev) or Render static site (prod).
 
@@ -100,24 +104,31 @@ Example structure:
   - `src/assets/styles/App.css`: Page-specific overrides (minimal)
 - **Usage**: Inline Tailwind classes in JSX (e.g., `<div className="flex gap-4 p-8">`)
 
-Note: The project also uses the `@tailwindcss/vite` plugin (configured in `vite.config.js`) to integrate Tailwind with Vite, and includes `shadcn-ui` as an additional component/ui helper in `package.json`. Agents should preserve the plugin when editing `vite.config.js` and can reference `shadcn-ui` for UI patterns where present.
+Note: The project also uses the `@tailwindcss/vite` plugin (configured in `vite.config.js`) to integrate Tailwind with Vite. Agents should preserve the plugin when editing `vite.config.js`.
+
+> ⚠️ **The `shadcn-ui` package was removed on 2026-09-09** — it was a legacy package name (the CLI is now
+> `shadcn`), was imported by nothing, and provided no UI patterns to reference. shadcn/ui **is** the adopted
+> component approach for this project *(decision D2)*, but it is installed per-component with
+> `npx shadcn@latest add <component>`, which copies source into the repo rather than adding a dependency.
+> It has not been initialised yet — that is unit `03.1` of the design arc.
 
 - **Print / modal helpers**: Components use simple print utilities and modal overlays. Look for `no-print` and `print-area` CSS classes (used in pages such as `src/pages/bank/BankBranch.jsx`) and calls to `globalThis.print()` for printable views. Modals are typically controlled by boolean state (e.g., `showAddBank`) and rendered as fixed overlays with backdrop blur.
 
 ### State Management
-- **Redux Toolkit**: Centralized state (if complex state exists)
-- **React Context**: `ThemeContext.jsx` manages dark/light mode globally
+- **React Context**: `ThemeContext.jsx` manages dark/light mode globally — this is the only global state
+  mechanism in the project. Do not reach for Redux; it is not installed.
 - **Custom Hooks**: `src/hooks/` folder for reusable stateful logic (e.g., `useTheme.js`)
 
-### Icon Libraries
-Multiple icon libraries available:
-- **FontAwesome** (`@fortawesome/react-fontawesome`): Standard icons
-- **Heroicons** (`@heroicons/react`): Clean, modern icons
-- **Tabler Icons** (`@tabler/icons-react`): Data visualization icons
-- **Lucide React** (`lucide-react`): Minimal line icons
-- **React Icons** (`react-icons`): Fallback/utility icons
+### Icon Library
 
-Choose icon library per component; prefer Heroicons for consistency.
+🔴 **One icon library: `lucide-react`. There is no choice to make.**
+
+This section previously listed five and told agents to "choose per component; prefer Heroicons". That was
+wrong in both halves: **`lucide-react` was the only one any file actually imported** (29 files), and the other
+four — `@fortawesome/*`, `@heroicons/react`, `@tabler/icons-react`, `react-icons` — were declared and imported
+by nothing. **All four were removed on 2026-09-09** *(decision D3)*. Importing from them now fails the build.
+
+`lucide-react` is also shadcn/ui's default set, so D2 and D3 agree rather than compete.
 
 ## Build & Local Development
 
@@ -257,7 +268,7 @@ useEffect(() => {
 ✅ **Environment Variables**: Prefix with `VITE_` for Vite to expose them
 ✅ **Tailwind for Styling**: Prefer utility classes; avoid inline CSS
 ✅ **Reusable Form Components**: Build generic TextInput, SelectInput, Button
-✅ **React Context for Global State**: Theme, auth state (minimal Redux if complex)
+✅ **React Context for Global State**: Theme, auth state — Context only; Redux is not installed
 ✅ **Page-level Components**: Colocate related components in `src/pages/section/`
 
 ## PDF Integration

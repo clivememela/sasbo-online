@@ -44,19 +44,45 @@ export default defineConfig([
       // ⚠️ The warning count is part of this arc's baseline. A phase that raises it without
       // saying so has regressed something; the count belongs in each phase's BUILT: line.
       //
-      // 🔑 EVERY recommended rule is forced to 'warn' by mapping over the preset rather than
-      // spreading it: the preset ships most of its rules at 'error', so spreading it would
-      // turn the gate red on the first run and silently be the thing `10.4` is supposed to
-      // do LAST. Derived from the preset, so a rule added upstream arrives at 'warn' too --
-      // never a hand-kept list.
+      // 🔑 THE WHOLE ENTRY IS DERIVED, NOT JUST THE KEY -- and the first version of this got
+      // it wrong in the exact way the plan had already written down.
+      //
+      // `10.4` records MobiZone's sixth corrected premise: "their config's off-detection
+      // silently mis-mapped a rule that recommended ships as `off`, lighting up 18 phantom
+      // warnings for the whole arc. SPREAD THE RECOMMENDED CONFIG DIRECTLY RATHER THAN
+      // RECONSTRUCTING IT." The first version here reconstructed it with `Object.keys`, which
+      // throws away the VALUE of every entry -- and the value is where the preset keeps its
+      // judgement. Of its 34 rules, 3 ship `off` and 7 carry tuned options. Measured: the
+      // keys-only map produced 149 warnings, this one produces 67. The 82 difference was
+      // entirely phantom:
+      //   +44 control-has-associated-label  -- upstream ships it OFF; its ignoreElements list
+      //                                        (input, textarea, tr, video ...) was dropped
+      //   +35 label-has-for                 -- upstream ships it OFF and marks it DEPRECATED,
+      //                                        replacedBy label-has-associated-control, which
+      //                                        was already reporting 22 of the same labels
+      //   + 3 no-noninteractive-element-...  -- its role allow-list was dropped
+      //
+      // So the severity is remapped and NOTHING ELSE IS: `off` stays `off`, options ride
+      // along. Still derived, so a rule added upstream still arrives here at `warn` -- and now
+      // a rule upstream DISABLES arrives disabled, which is the half that was missing.
       ...Object.fromEntries(
-        Object.keys(jsxA11y.flatConfigs.recommended.rules).map((rule) => [rule, 'warn'])
+        Object.entries(jsxA11y.flatConfigs.recommended.rules).map(([rule, config]) => {
+          const [severity, ...options] = Array.isArray(config) ? config : [config]
+          return [rule, severity === 'off' ? 'off' : ['warn', ...options]]
+        })
       ),
-      'react-hooks/set-state-in-effect': 'off',
-      'react-hooks/set-state-in-render': 'off',
-      'react-hooks/purity': 'off',
-      'react-hooks/immutability': 'off',
-      'react-hooks/static-components': 'off',
+      // ── R-ROB-I: the five React Compiler rules come back, at `warn` (design arc, 00.5) ──
+      //
+      // These were switched OFF because the code violates them today. That is the reason to
+      // SEE them, not the reason to hide them -- they are the React Compiler's own rules, and
+      // an app that breaks them is an app the compiler cannot optimise. Same schedule and same
+      // level as jsx-a11y above: visible and counted now, mapped to owning phases, flipped to
+      // `error` by `10.4` once the worklist is clear. `00.5` is the unit that owes this.
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/set-state-in-render': 'warn',
+      'react-hooks/purity': 'warn',
+      'react-hooks/immutability': 'warn',
+      'react-hooks/static-components': 'warn',
       'react-refresh/only-export-components': 'off',
     },
   },
