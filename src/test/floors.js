@@ -88,6 +88,21 @@ export const FLOORS = {
   TRACKED_SOURCES: 60,
 
   /**
+   * The ENTRY javascript chunk -- what a first paint actually downloads before
+   * anything can render. Actual on 2026-09-09, after 03.1 split every route:
+   * 286.58 KiB, down from 506.41 KiB when every page was a static import.
+   *
+   * 🔑 IT IS A SEPARATE ROW BECAUSE TOTAL JS CANNOT SEE THE WIN. Splitting moved
+   * bytes out of the entry and into 47 lazy chunks, so the TOTAL went UP (506 ->
+   * 520 KiB, the cost of module boundaries) while the number a user waits for
+   * nearly halved. A budget watching only the total would have called that a
+   * regression, and a budget watching only the total is also blind to the reverse:
+   * someone converting a lazy route back to a static import moves 40 KiB into the
+   * entry without changing the total at all.
+   */
+  BUNDLE_ENTRY_JS_BYTES: 120 * 1024,
+
+  /**
    * Files the secret guard still scans AFTER its path exclusions. Actual on
    * 2026-09-05: 117 of 122.
    *

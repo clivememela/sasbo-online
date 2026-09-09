@@ -91,15 +91,21 @@ export const DEFECTS = {
       'repair that activates untested behaviour.',
   ),
 
-  A11: define(
-    'A11',
-    'no error boundary -- one render error blanks the whole application',
-    'There is no ErrorBoundary, componentDidCatch or errorElement anywhere in ' +
-      'client/src, across every route in App.jsx. The three-state rule covers a failed ' +
-      'FETCH; nothing covers a failed RENDER. A single throwing component takes the ' +
-      'entire shell with it and the user gets a white screen with no message and no ' +
-      'way back.',
-  ),
+// A11 is RETIRED, 2026-09-09, by the design arc's 03.1.
+//
+// It read: "no error boundary -- one render error blanks the whole application".
+// `ErrorBoundary` now sits beside the <Outlet> in both layouts, so a throwing page is
+// a broken panel and the shell survives. Its pin was deleted and its standard-facing
+// test un-skipped in the same commit -- flipped, not repaired (BR-5) -- and
+// `src/test/errorBoundary.test.jsx` is now the regression pair rather than the record
+// of a defect.
+//
+// It is removed rather than marked closed because this file's population IS the set of
+// open rows: `defectPopulation.test.js` requires every entry here to have a live pin,
+// and a "closed" entry with no pin is exactly the shape that guard exists to reject.
+//
+// ⚠️ What is NOT closed with it: `06.1` owns the DESIGNED failed state. The boundary's
+// fallback today is plain and deliberately says so.
 
 // A12 is deliberately NOT a row here, and that is a CORRECTION to the register
 // rather than an omission.
@@ -277,9 +283,12 @@ export const DEFECTS = {
       'it. The `?.length > 0` guard beside the call does NOT protect, and that is the ' +
       'whole trap: a non-empty string has a length, so the guard passes and the call ' +
       'throws "cosatuPositions.join is not a function". The detail view does not render ' +
-      'at all for any member whose positions are set. With A11 -- no error boundary -- ' +
-      'that takes the whole shell, so the user gets a white screen. ' +
-      'Verified 2026-09-08 from both sides: the DTO field type and the call site.',
+      'at all for any member whose positions are set. ' +
+      'Verified 2026-09-08 from both sides: the DTO field type and the call site. ' +
+      '\u26a0\ufe0f The BLAST RADIUS shrank on 2026-09-09 and the defect did not: this used to take ' +
+      'the whole shell with it (old row A11, no boundary anywhere). With ErrorBoundary now ' +
+      'beside the outlet it is a broken panel with a way back -- still a member whose record ' +
+      'cannot be opened, and still this row.',
   ),
 
   A38: define(

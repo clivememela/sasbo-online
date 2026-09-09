@@ -32,7 +32,7 @@ import { blankComments } from '../../test/sourceScan'
  * somebody met this exact bug, fixed the path they were looking at, and left
  * the other one; the two live twelve lines apart in the same component.
  *
- * ⚠️ With A11 -- no error boundary anywhere in the application -- a render
+ * ⚠️ Until 2026-09-09 (retired row A11) there was no error boundary anywhere, so a render
  * error is not a broken panel. It unmounts the whole tree, and the
  * administrator gets a white screen with no message and no way back.
  *

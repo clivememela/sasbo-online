@@ -218,6 +218,59 @@
 
 }
 
+/* ==========================================================================
+   THE shadcn COMPATIBILITY LAYER -- 03.1.
+
+   shadcn's generated components are written against ITS semantic names:
+   `bg-background`, `text-muted-foreground`, `border-input`, `ring-ring`. Those
+   read `var(--color-background)` and friends. Bind them to OUR tokens here and a
+   component pulled from the registry inherits the locked direction on arrival --
+   no post-edit, no palette to strip, and no second set of values to keep in step.
+
+   🔴 THIS IS WHY THE shadcn CLI's INIT WAS NOT RUN. shadcn 4.x installs a PRESET
+   -- Nova, Vega, Maia -- and every one of them writes its own palette and font
+   stack into the stylesheet. `03.1`'s DoD is explicit: `no shadcn default palette`.
+   Letting the CLI paint one in so it could be painted back out would also have
+   fought this generator, which rewrites index.css whole on every run.
+
+   Aliases, not copies. Each is `var(--color-...)` pointing at a token defined
+   above, so it follows the theme through `.dark` without being restated -- and a
+   change to a token cannot leave a shadcn component behind.
+   ========================================================================== */
+@theme inline {
+  /* Ground and ink */
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-ink);
+  --color-card: var(--color-surface);  /* shadcn's `card` is a raised surface, which is what --surface is */
+  --color-card-foreground: var(--color-ink);
+  --color-popover: var(--color-surface);
+  --color-popover-foreground: var(--color-ink);
+
+  /* Action */
+  --color-primary: var(--color-brand);
+  --color-primary-foreground: var(--color-on-brand);
+  --color-secondary: var(--color-surface-2);
+  --color-secondary-foreground: var(--color-ink);
+
+  /* Quiet */
+  --color-muted: var(--color-surface-2);
+  --color-muted-foreground: var(--color-ink-muted);  /* NOT ink-faint: card.css calls that one 'never body text' */
+
+  /* Emphasis */
+  --color-accent: var(--color-surface-2);  /* shadcn's accent is a hover wash, NOT Card's gold */
+  --color-accent-foreground: var(--color-ink);
+
+  /* Danger */
+  --color-destructive: var(--color-status-suspended);  /* the palette already has one red, and it is this */
+  --color-destructive-foreground: var(--color-on-brand);
+
+  /* Edges */
+  --color-border: var(--color-line);
+  --color-input: var(--color-line);
+  --color-ring: var(--color-brand-ring);
+
+}
+
 /* Tell the UA which scheme is live, so form controls, scrollbars and the caret follow. */
 :root { color-scheme: light; }
 .dark { color-scheme: dark; }

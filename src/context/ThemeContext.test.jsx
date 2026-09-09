@@ -9,7 +9,8 @@ import { useTheme } from './useTheme'
  * `ThemeContext` is the ONLY `createContext` in this codebase, and it wraps the
  * whole application. A break here is total: every page loses its theme at once,
  * and `useTheme` throwing takes the entire tree with it -- there is no error
- * boundary anywhere in the client to catch it (register A11).
+ * boundary anywhere in the client to catch it (retired row A11 -- a boundary now sits
+ * beside the outlet in both layouts, so the blast radius is one panel, not the app).
  *
  * It is also the only piece of genuinely shared state, which makes it the one
  * place a shuffled suite can leak: `darkMode` is persisted to `localStorage`

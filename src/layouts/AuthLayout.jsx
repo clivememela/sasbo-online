@@ -1,7 +1,10 @@
+import { Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useTheme } from '../context/useTheme';
 import { MoonIcon, SunIcon } from 'lucide-react';
 import Footer from '../components/Footer';
+import ErrorBoundary from '../components/common/ErrorBoundary';
+import RoutePending from '../components/common/RoutePending';
 
 export default function AuthLayout() {
   const { darkMode, toggleDarkMode } = useTheme();
@@ -35,7 +38,13 @@ export default function AuthLayout() {
         </button>
       </div>
       <div className="flex-1 flex flex-col">
-        <Outlet />
+        {/* The auth screens are lazy too, and they are the FIRST thing anyone loads --
+            so this is the outlet most likely to meet a chunk that never arrives. */}
+        <ErrorBoundary>
+          <Suspense fallback={<RoutePending />}>
+            <Outlet />
+          </Suspense>
+        </ErrorBoundary>
       </div>
       <Footer absolute />
     </div>

@@ -40,7 +40,7 @@
  * reddens for reasons nobody caused, and gets raised by whoever is unlucky
  * enough to hit it first.
  */
-import { readdirSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 
@@ -57,6 +57,11 @@ const KB = 1024
  * together, which is the whole argument for one home.
  */
 const CEILINGS = {
+  // The entry chunk: what a first paint downloads before anything renders. Added by
+  // 03.1, which cut it from 506 KiB to 287 by splitting every route. The ceiling is
+  // deliberately BELOW the pre-split figure -- its job is to notice a route quietly
+  // becoming a static import again, which would show up here and nowhere else.
+  entryJs: 350 * KB,
   js: 600 * KB,
   css: 70 * KB,
   total: 900 * KB,
@@ -84,6 +89,30 @@ try {
 const sum = (pred) =>
   files.filter(pred).reduce((n, f) => n + statSync(f).size, 0)
 
+/**
+ * The entry chunk, read from index.html rather than guessed from a filename.
+ *
+ * Vite hashes every chunk and several are called `index-*.js`, so picking "the one
+ * that looks like the entry" is a guess that goes wrong on the day a lazy page is
+ * also named index. The document says which script it loads; that is the answer.
+ */
+const entryJs = (() => {
+  let html
+  try {
+    html = readFileSync('dist/index.html', 'utf8')
+  } catch {
+    return 0
+  }
+  const srcs = [...html.matchAll(/<script[^>]+src="([^"]+\.js)"/g)].map((m) => m[1])
+  return srcs.reduce((n, src) => {
+    try {
+      return n + statSync(join('dist', src.replace(/^\//, ''))).size
+    } catch {
+      return n
+    }
+  }, 0)
+})()
+
 const js = sum((f) => f.endsWith('.js'))
 const css = sum((f) => f.endsWith('.css'))
 const total = sum(() => true)
@@ -97,6 +126,9 @@ const count = (n) => `${n} file(s)`
 // and `Infinity` says that in the same shape rather than in a second code path
 // that sets the same flag from somewhere else.
 const rows = [
+  // 🔑 FIRST, because it is the only row a user experiences directly. Every other
+  // byte here is paid later, or never.
+  ['entry js', entryJs, FLOORS.BUNDLE_ENTRY_JS_BYTES, CEILINGS.entryJs, fmt],
   ['javascript', js, FLOORS.BUNDLE_JS_BYTES, CEILINGS.js, fmt],
   ['css', css, FLOORS.BUNDLE_CSS_BYTES, CEILINGS.css, fmt],
   ['all assets', total, FLOORS.BUNDLE_TOTAL_BYTES, CEILINGS.total, fmt],
