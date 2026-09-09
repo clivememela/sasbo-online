@@ -4,7 +4,25 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/Tansparent%20Lady%20Robot.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- R-ROB-E / R-PERF-H. Tells the UA both schemes exist before any CSS arrives, so the
+         browser paints its own canvas, form controls and scrollbars in the right one from
+         the first frame instead of assuming light. index.css narrows it per theme. -->
+    <meta name="color-scheme" content="light dark" />
     <title>Sasbo - Membership Administration System</title>
+    <script>
+      /* R-ROB-E. Set the theme class BEFORE first paint.
+         React reads the same key, but it does so after the bundle has parsed and mounted --
+         so a dark-theme user watched the app render LIGHT and then flip. That flash is the
+         mock's own defect, found on 2026-09-08 and fixed there the same way.
+         Deliberately inline and blocking: an external file would race the paint it exists
+         to beat. It is four lines, it runs once, and it must never throw -- a storage read
+         throws outright in Safari private mode, and this runs above every boundary. */
+      try {
+        if (localStorage.getItem('darkMode') === 'true') {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) { /* no storage: light, which is the same answer a missing key gives */ }
+    </script>
   </head>
   <body>
     <div id="root"></div>

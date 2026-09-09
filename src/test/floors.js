@@ -77,6 +77,17 @@ export const FLOORS = {
   TRACKED_FILES: 60,
 
   /**
+   * Tracked files under src/ plus index.html -- everything Tailwind's source
+   * detection must be able to reach. Actual on 2026-09-09: 114.
+   *
+   * What it catches is `git ls-files src` returning nothing. The shadowing
+   * guard would then find zero shadowed files out of zero files and report the
+   * repository clean, which is the precise shape of the defect it exists to
+   * catch: a check that cannot tell its subject from nothing.
+   */
+  TRACKED_SOURCES: 60,
+
+  /**
    * Files the secret guard still scans AFTER its path exclusions. Actual on
    * 2026-09-05: 117 of 122.
    *

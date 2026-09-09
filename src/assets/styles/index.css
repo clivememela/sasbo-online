@@ -18,16 +18,29 @@
   --font-sans: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-engrave: Marcellus, Georgia, serif;
 
-  /* The scale Card actually ships, replacing Tailwind's defaults. */
-  --text-2xs: 10.5px;
-  --text-xs: 11.5px;
-  --text-sm: 13px;
-  --text-base: 14px;
-  --text-md: 15px;
-  --text-lg: 16px;
-  --text-xl: 20px;
-  --text-2xl: 24px;
-  --text-3xl: 26px;
+  /* The scale Card actually ships, replacing Tailwind's defaults.
+
+     R-RESP-E: in `rem`, NOT `px`. A px size ignores the browser's default-font-size
+     setting and Android's `Font size` preference -- the one accessibility control every
+     staff member already knows how to use. Card itself is 51 px declarations and 0 rem,
+     because a mock is shot at one size; a shipped app is not. The px value is kept in the
+     comment as the documentation of each step, which is what tokens.md records.
+
+     🔴 --text-base is 14px, and conventions 5 says inputs `keep text-base at base`
+     because iOS Safari zooms under 16px. Following that sentence now PRODUCES the bug it
+     exists to prevent. Card solves it a different way -- `@media (max-width: 760px)` sets
+     body and every input to 16px -- and that rule belongs to the input primitive in
+     03.2a, locked by the mutation-checked test F-D01 already demands. It is NOT in this
+     file, and this comment is here so the next reader does not assume it is. */
+  --text-2xs: 0.65625rem;  /* 10.5px */
+  --text-xs: 0.71875rem;  /* 11.5px */
+  --text-sm: 0.8125rem;  /* 13px */
+  --text-base: 0.875rem;  /* 14px */
+  --text-md: 0.9375rem;  /* 15px */
+  --text-lg: 1rem;  /* 16px */
+  --text-xl: 1.25rem;  /* 20px */
+  --text-2xl: 1.5rem;  /* 24px */
+  --text-3xl: 1.625rem;  /* 26px */
 
   /* Radii: 8 / 14 / 18, plus 4 for focus rings and a pill.
      `--radius` (no suffix) is what bare `rounded` reads in Tailwind 4 -- NOT
@@ -216,6 +229,15 @@
 /* ==========================================================================
    Utilities that must be STRUCTURAL rather than remembered (contract 15).
    ========================================================================== */
+
+/* R-RESP-H. The app has 96 `hover:` sites and NO pointer branching, so on a touch
+   screen every one of them latches after a tap and stays lit until something else
+   is tapped -- the "why is that row still highlighted" complaint, which reads as a
+   rendering fault rather than as a hover. `hover-hover:` is the opt-in that applies
+   only where hover is real. It lives HERE, as a variant, because 96 call sites
+   cannot each be trusted to remember an arbitrary @media query. P5 migrates them. */
+@custom-variant hover-hover (@media (hover: hover));
+
 @utility touch-target {
   /* A 44px hit area WITHOUT growing the visible control -- the pattern that stops
      'make it bigger' turning into a redesign. Applied on a coarse pointer only, so

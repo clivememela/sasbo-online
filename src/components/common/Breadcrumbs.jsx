@@ -34,7 +34,7 @@ export default function Breadcrumbs() {
   if (location.pathname === "/home") {
     return (
       <nav className="flex items-center text-sm font-medium mt-4">
-        <span className="text-ink-faint">Home</span>
+        <span className="text-ink-muted">Home</span>
       </nav>
     );
   }
@@ -49,9 +49,13 @@ export default function Breadcrumbs() {
 
         return (
           <div key={routeTo} className="flex items-center">
+            {/* ink-faint, and the spans above are ink-muted, DELIBERATELY. card.css calls
+                --ink-3 "icons, dividers; never body text" -- 01.2 first mapped both roles
+                onto it, which failed AA at 3.89:1 and was also darker than the gray-400
+                these labels had before the migration. An icon is what the token is for. */}
             <ChevronRight size={16} strokeWidth={1.5} className="mx-2 text-ink-faint" />
             {isLast ? (
-              <span className="text-ink-faint">{displayName}</span>
+              <span className="text-ink-muted">{displayName}</span>
             ) : (
               <Link to={routeTo} className="hover:underline text-brand-ink">
                 {displayName}

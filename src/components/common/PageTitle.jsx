@@ -15,8 +15,16 @@ export default function PageTitle({ title, subtitle }) {
       <h2 className="text-3xl text-center text-brand-ink">
         {title}
       </h2>
+      {/* brand, not brand-ink -- the SUBTITLE is deliberately the quieter of the two.
+          01.2 first migrated both onto brand-ink and flattened a step the shell had:
+          the title was cyan-700 and the subtitle cyan-600 in light, cyan-400 and
+          cyan-500 in dark, so the subtitle was the lower-contrast one in BOTH themes.
+          --color-brand sits exactly there against --color-brand-ink (light 5.47 vs
+          8.26 on surface; dark 7.98 vs 11.17), so the pair needs no new token -- and
+          "the shell should look approximately the same" is the invariant this
+          restores, not a preference. */}
       {subtitle && (
-        <p className="text-xl text-center mt-2 text-brand-ink">
+        <p className="text-xl text-center mt-2 text-brand">
           {subtitle}
         </p>
       )}
