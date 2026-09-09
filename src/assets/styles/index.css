@@ -335,14 +335,95 @@
   }
 }
 
-/* The print surface -- 5 files, 7 sites (findings.md F-R05). Unchanged by P1. */
+/* ==========================================================================
+   PRINT -- and print is LIVE, not decorative (the owner, 2026-09-09).
+
+   🔴 WHAT WAS HERE BEFORE, AND WHY IT WAS NOT ENOUGH. `visibility: hidden` on
+   everything, `visible` on `.print-area`, and the area pinned `position: fixed`.
+   Three problems, all of which only appear on paper:
+
+     1. `visibility: hidden` HIDES BUT DOES NOT REMOVE. Every hidden element keeps
+        its box, so the printed page carried the full height of the application
+        shell as blank space above the content -- and `position: fixed` on the
+        area meant a record taller than one sheet was simply CUT OFF at the page
+        break rather than continuing. `display: none` on the chrome removes the
+        boxes, and static flow lets content paginate.
+     2. IT PRINTED THE DARK THEME. A member record printed from dark mode came
+        out as light text on white -- the backgrounds do not print by default --
+        which is invisible ink. The theme is forced light below.
+     3. It said nothing about page breaks, so a member's Employment section could
+        split across two sheets with its heading orphaned on the first.
+
+   `no-print` marks chrome the page carries but paper does not want: pagers,
+   toolbars, tab strips, toasts, dismissible notices.
+   ========================================================================== */
 @media print {
-  body * { visibility: hidden; }
-  .print-area, .print-area * { visibility: visible; }
-  .print-area {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
+  /* Force the light palette. A print stylesheet that inherits the dark theme
+     produces a page that is blank to the eye and expensive to the toner. */
+  :root, :root.dark {
+    --color-bg: #ffffff;
+    --color-bg-raised: #ffffff;
+    --color-surface: #ffffff;
+    --color-surface-2: #ffffff;
+    --color-ink: #111111;
+    --color-ink-muted: #333333;
+    --color-ink-faint: #555555;
+    --color-line: #cccccc;
+    --color-line-strong: #999999;
   }
+
+  @page { margin: 14mm; }
+
+  html, body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  /* Chrome the reader does not need on paper. `display: none`, not
+     `visibility: hidden`: the second one leaves the box behind. */
+  .no-print,
+  header, nav, footer,
+  [role="tablist"] { display: none !important; }
+
+  /* The legacy single-area mode, kept for the seven sites that use it -- but
+     STATIC, so a long area paginates instead of being clipped at the fold. */
+  .print-area {
+    position: static !important;
+    width: 100% !important;
+  }
+
+  /* 🖨️ THE MEMBER RECORD. It prints from inside a Radix dialog, which is a
+     portalled fixed overlay with its own scroller and a scrim -- none of which
+     means anything on paper. This unwinds it to ordinary flowing content. */
+  [data-radix-dialog-overlay],
+  [role="dialog"] {
+    position: static !important;
+    inset: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  .member-record { color: #111; }
+
+  /* One column. A two-column grid at A4 width gives 90mm columns of label/value
+     pairs, which reads worse on paper than a single run. */
+  .member-record .grid { display: block !important; }
+  .member-record .grid > * { margin-bottom: 4mm; }
+
+  /* Keep a section and its heading together, and never orphan a label from its
+     value across a page break. */
+  .member-record section,
+  .member-record fieldset,
+  .member-record dl { break-inside: avoid; }
+  .member-record h2,
+  .member-record h3,
+  .member-record h4 { break-after: avoid; }
+
+  /* A link's destination is invisible on paper unless it is written out. */
+  .member-record a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; }
 }

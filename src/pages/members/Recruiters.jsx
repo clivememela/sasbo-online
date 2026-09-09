@@ -1,7 +1,9 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
-import { ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
+import { useDeferredValue, useMemo, useRef, useState, useEffect, useCallback } from 'react';
+import { AlertCircle, ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
-import { TextInput, SearchableSelect, Button, PositionTreeSelect, DateField } from '../../components/form';
+import { TextInput, SearchableSelect, SelectInput, Button, PositionTreeSelect, DateField } from '../../components/form';
+import Table from '../../components/table/Table.jsx';
+import StatusChip from '../../components/common/StatusChip.jsx';
 import Modal, { ConfirmDialog, closeOn } from '../../components/overlay/Modal.jsx';
 import { memberService } from '../../services/memberService.js';
 import { recruiterService } from '../../services/recruiterService.js';
@@ -35,14 +37,46 @@ export function Recruiters() {
     const [structures, setStructures] = useState([]);
     const [roles, setRoles] = useState([]);
     const [recruitmentChannels, setRecruitmentChannels] = useState([]);
+    const [listState, setListState] = useState('loading');
 
-    const refreshAll = useCallback(() => Promise.all([
-        memberService.getMembers(),
-        recruitmentChannelService.getAll(),
-    ]).then(([m, r]) => {
-        setMembers(m);
-        setReps(r);
-    }).catch(err => console.error("Error fetching dependencies:", err)), []);
+    /**
+     * What the last action said, when it did not simply work.
+     *
+     * 🔴 IT WAS SIX `alert()` CALLS -- assignment failed, removal failed, "please select a
+     * recruiter type", "this member is already a recruiter", a bare `alert(err)` twice.
+     * A native modal blocks the thread, cannot be styled, is suppressible, and -- worst
+     * here -- ARRIVES AND LEAVES: dismissing "Assignment Failed" returned the member to a
+     * screen that looked exactly as it had, with no record of what went wrong. Two of the
+     * six were `alert(err)` with a raw Error object, which prints "[object Error]" in some
+     * browsers.
+     *
+     * 06.1 owns the shared error CONTRACT. What this wave owes the screen is that a
+     * failure is visible ON the screen.
+     */
+    const [notice, setNotice] = useState(null);
+    const noticeRef = useRef(null);
+    const fail = useCallback((message) => setNotice({ tone: 'error', message }), []);
+
+    // Focus it once it EXISTS -- the same shape as `Auth` and `Members`, and for the same
+    // reason: the element is not in the document at the moment the handler sets the state.
+    useEffect(() => {
+        if (notice) noticeRef.current?.focus();
+    }, [notice]);
+
+    const refreshAll = useCallback(() => {
+        setListState((current) => (current === 'ready' ? 'ready' : 'loading'));
+        return Promise.all([
+            memberService.getMembers(),
+            recruitmentChannelService.getAll(),
+        ]).then(([m, r]) => {
+            setMembers(m);
+            setReps(r);
+            setListState('ready');
+        }).catch(err => {
+            console.error("Error fetching dependencies:", err);
+            setListState('error');
+        });
+    }, []);
 
     useEffect(() => {
         refreshAll();
@@ -188,19 +222,44 @@ export function Recruiters() {
         );
     }, [repMembers, repSearch]);
 
+    /**
+     * R-PERF-J. Both member pickers filter the WHOLE member list on every keystroke.
+     * `useDeferredValue` lets React paint the keystroke first and the filtered list a beat
+     * later, so typing stays responsive however long the list is.
+     *
+     * ⚠️ NOT `useDebounce`, and R-PERF-E's premise is corrected rather than followed. That
+     * hook delays a VALUE by a fixed time -- the right instrument when a keystroke costs a
+     * REQUEST, and neither of these does: both filter an array already in memory. Adding a
+     * debounce here would add latency for nothing. The one place in this application where
+     * a keystroke does reach the network is `AddressAutocomplete`, and it already debounces
+     * correctly, in the component that makes the call. findings.md, corrected premise ⑭.
+     */
+    const deferredAddSearch = useDeferredValue(addSearch);
+    const deferredNewRepSearch = useDeferredValue(newRepSearch);
+
+    /** How many rows a picker shows before it says "refine your search". */
+    const PICKER_CAP = 50;
+
+    const matchesQuery = (m, q) => !q || (
+        (m.membershipNumber ?? '').toLowerCase().includes(q) ||
+        `${m.initials || ''} ${m.surname || ''}`.toLowerCase().includes(q) ||
+        (m.firstNames ?? '').toLowerCase().includes(q) ||
+        (m.bankName ?? '').toLowerCase().includes(q)
+    );
+
     const candidateMembers = useMemo(() => {
-        const q = addSearch.trim().toLowerCase();
-        return members.filter(m => {
-            if (m.recruitmentRepresentativeId === selectedRep?.id) return false;
-            if (!q) return true;
-            return (
-                (m.membershipNumber ?? '').toLowerCase().includes(q) ||
-                `${m.initials || ''} ${m.surname || ''}`.toLowerCase().includes(q) ||
-                (m.firstNames ?? '').toLowerCase().includes(q) ||
-                (m.bankName ?? '').toLowerCase().includes(q)
-            );
-        });
-    }, [members, selectedRep, addSearch]);
+        const q = deferredAddSearch.trim().toLowerCase();
+        return members.filter(m => m.recruitmentRepresentativeId !== selectedRep?.id && matchesQuery(m, q));
+    }, [members, selectedRep, deferredAddSearch]);
+
+    const visibleCandidates = useMemo(() => candidateMembers.slice(0, PICKER_CAP), [candidateMembers]);
+
+    const newRepCandidates = useMemo(() => {
+        const q = deferredNewRepSearch.trim().toLowerCase();
+        return members.filter(m => !repList.some(r => r.memberId === m.id) && matchesQuery(m, q));
+    }, [members, repList, deferredNewRepSearch]);
+
+    const visibleNewRepCandidates = useMemo(() => newRepCandidates.slice(0, PICKER_CAP), [newRepCandidates]);
 
     const handleRepSearchChange = useCallback((field) => (e) => {
         const targetValue = e.target.value;
@@ -236,6 +295,7 @@ export function Recruiters() {
     const handlePrevPage = useCallback(() => setPage(p => Math.max(1, p - 1)), []);
     const handleNextPage = useCallback(() => setPage(p => Math.min(totalPages, p + 1)), [totalPages]);
 
+
     const sanitizeMemberPayload = (member, updateFields) => {
         return {
             id: member.id,
@@ -260,7 +320,6 @@ export function Recruiters() {
             branch: member.branch || '',
             bankAccountNumber: member.bankAccountNumber || '',
             ibtNo: member.ibtNo || '',
-            /*workIbtNo: member.workIbtNo || '',*/
             paymentType: member.paymentType || '',
             workBankAddress: member.workBankAddress || '',
             joinDate: member.joinDate || '',
@@ -278,18 +337,18 @@ export function Recruiters() {
         };
     };
 
-    const handleAssign = async (member) => {
+    const handleAssign = useCallback(async (member) => {
         try {
             setSaving(true);
             const cleanData = sanitizeMemberPayload(member, { areasRep: selectedRep.name });
             await memberService.updateMember(cleanData);
             await refreshAll();
         } catch (err) {
-            alert(`Assignment Failed: ${err.message || err}`);
+            fail(`That member could not be assigned to ${selectedRep?.name ?? 'this recruiter'}. ${err?.message || ''}`.trim());
         } finally {
             setSaving(false);
         }
-    };
+    }, [selectedRep, refreshAll, fail]);
 
     // 🔴 `03.4`: both of this file's `window.confirm()` calls become ConfirmDialogs. The
     // second one is the reason it matters: it sets EVERY member of a recruiter to Inactive,
@@ -307,7 +366,7 @@ export function Recruiters() {
             await memberService.updateMember(cleanData);
             await refreshAll();
         } catch (err) {
-            alert(`Removal Failed: ${err.message || err}`);
+            fail(`That member could not be removed from the recruiter. ${err?.message || ''}`.trim());
         } finally {
             setSaving(false);
         }
@@ -318,11 +377,11 @@ export function Recruiters() {
     const handleAddRep = async () => {
         if (!newRepMember) return;
         if (!newRepDetails.recruiterTypeId) {
-            alert('Please select a recruiter type.');
+            fail('Choose a recruiter type before making this member a recruiter.');
             return;
         }
         if (repList.some(r => r.memberId === newRepMember.id)) {
-            alert('This member is already a recruiter.');
+            fail('That member is already a recruiter.');
             return;
         }
         try {
@@ -343,8 +402,9 @@ export function Recruiters() {
             setNewRepMember(null);
             setNewRepDetails({ roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] });
             setSelectedRep({ id: createdRep?.id, name: repName });
+            setNotice(null);
         } catch (err) {
-            alert(err);
+            fail(`That recruiter could not be created. ${err?.message || ''}`.trim());
         } finally {
             setSaving(false);
         }
@@ -364,19 +424,199 @@ export function Recruiters() {
             await recruiterService.remove(rep.id);
             await refreshAll();
         } catch (err) {
-            alert(`Could not remove recruiter context completely: ${err.message || err}`);
+            // 🔴 THE HONEST WORDING MATTERS HERE. This action updates every one of the
+            // recruiter's members and then deletes the recruiter, so a failure part-way
+            // through leaves the data half-changed -- and the old message ("could not
+            // remove recruiter context completely") said that without saying what to do.
+            fail(`The recruiter may be only partly removed -- some members were updated before this failed. Reload and check before trying again. ${err?.message || ''}`.trim());
         } finally {
             setSaving(false);
         }
     };
 
+    /**
+     * The four tabular surfaces on this screen, as columns.
+     *
+     * 🔴 ALL FOUR WERE `grid-cols-N` PSEUDO-TABLES -- run 7 found seven of them across the
+     * application and four are here. None of them was a `<table>`, so no `<table>` grep
+     * could see them, none announced a header/cell relationship to a screen reader, and
+     * three of the four had `<div onClick>` rows: click-only, no tab stop, no accessible
+     * name, no Enter. `Table` makes the semantics structural and the row action a real
+     * button.
+     *
+     * 📱 R-RESP-K: seven columns do not fit on a phone, so the ones that are context
+     * rather than identity are `secondary` and drop into the row's detail panel.
+     */
+    const recruiterColumns = useMemo(() => [
+        {
+            key: 'name',
+            header: 'Recruitment Channel',
+            priority: 'essential',
+            cell: (rep) => (
+                <button
+                    type="button"
+                    onClick={() => setSelectedRep({ id: rep.id, name: rep.name })}
+                    aria-label={`${rep.name} — show the members recruited by this channel`}
+                    className="touch-target inline-flex items-center gap-1 rounded-sm font-medium text-brand-ink underline-offset-2 hover-hover:hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+                >
+                    {rep.name}
+                    <ChevronRight size={14} aria-hidden="true" className="shrink-0 text-ink-faint" />
+                </button>
+            ),
+        },
+        { key: 'banks', header: 'Bank(s)', priority: 'secondary', truncate: true, cell: (r) => r.banks || '—' },
+        { key: 'branches', header: 'Branch(es)', priority: 'secondary', truncate: true, cell: (r) => r.branches || '—' },
+        { key: 'provinces', header: 'Province', priority: 'secondary', truncate: true, cell: (r) => r.provinces || '—' },
+        { key: 'areas', header: 'Area', priority: 'secondary', truncate: true, cell: (r) => r.areas || '—' },
+        {
+            key: 'count',
+            header: 'Members',
+            priority: 'essential',
+            cell: (rep) => (
+                <span className="inline-block rounded-full bg-brand-soft px-2 py-0.5 text-xs font-semibold text-brand-ink">
+                    {rep.count}
+                </span>
+            ),
+        },
+        {
+            key: 'remove',
+            header: 'Remove',
+            priority: 'essential',
+            align: 'right',
+            cell: (rep) => (
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setPendingRemoveRep(rep)}
+                    disabled={saving}
+                    aria-label={`Remove recruiter ${rep.name}`}
+                    className="text-status-suspended"
+                >
+                    <UserMinus size={14} aria-hidden="true" />
+                </Button>
+            ),
+        },
+    ], [saving]);
+
+    /** A member as it appears on a recruiter's list. */
+    const memberColumn = useCallback((onOpen) => ({
+        key: 'membershipNumber',
+        header: 'Membership No.',
+        priority: 'essential',
+        cell: (m) => (
+            <button
+                type="button"
+                onClick={() => onOpen(m)}
+                aria-label={`${m.membershipNumber || 'This member'} — open the record for ${[m.title, m.initials, m.surname].filter(Boolean).join(' ') || 'this member'}`}
+                className="touch-target rounded-sm font-medium text-brand-ink underline-offset-2 hover-hover:hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+            >
+                {m.membershipNumber}
+            </button>
+        ),
+    }), []);
+
+    const fullName = (m) => `${m.title ? `${m.title} ` : ''}${m.initials || ''} ${m.surname || ''}`.trim() || '—';
+
+    const repMemberColumns = useMemo(() => [
+        memberColumn(setSelectedMember),
+        { key: 'name', header: 'Name', priority: 'essential', truncate: true, cell: fullName },
+        { key: 'bankName', header: 'Bank', priority: 'secondary', truncate: true, cell: (m) => m.bankName || '—' },
+        { key: 'branch', header: 'Branch', priority: 'secondary', truncate: true, cell: (m) => m.branch || '—' },
+        { key: 'status', header: 'Status', priority: 'essential', cell: (m) => <StatusChip status={m.status} /> },
+        {
+            key: 'remove',
+            header: 'Remove',
+            priority: 'essential',
+            align: 'right',
+            cell: (m) => (
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setPendingRemoveMember(m)}
+                    disabled={saving}
+                    aria-label={`Remove ${fullName(m)} from this recruiter`}
+                    className="text-status-suspended"
+                >
+                    <Trash2 size={14} aria-hidden="true" />
+                </Button>
+            ),
+        },
+    ], [memberColumn, saving]);
+
+    const candidateColumns = useMemo(() => [
+        { key: 'membershipNumber', header: 'Membership No.', priority: 'essential', cell: (m) => <span className="font-medium text-brand-ink">{m.membershipNumber}</span> },
+        { key: 'name', header: 'Name', priority: 'essential', truncate: true, cell: fullName },
+        { key: 'bankName', header: 'Bank', priority: 'secondary', truncate: true, cell: (m) => m.bankName || '—' },
+        {
+            key: 'add',
+            header: 'Add',
+            priority: 'essential',
+            align: 'right',
+            cell: (m) => (
+                <Button
+                    size="sm"
+                    variant="primary"
+                    disabled={saving}
+                    aria-label={`Add ${fullName(m)} to this recruiter`}
+                    onClick={async () => { await handleAssign(m); setShowAddMember(false); }}
+                >
+                    <UserPlus size={12} aria-hidden="true" /> Add
+                </Button>
+            ),
+        },
+    ], [saving, handleAssign]);
+
+    const newRepColumns = useMemo(() => [
+        { key: 'membershipNumber', header: 'Membership No.', priority: 'essential', cell: (m) => <span className="font-medium text-brand-ink">{m.membershipNumber}</span> },
+        {
+            key: 'name',
+            header: 'Name',
+            priority: 'essential',
+            truncate: true,
+            // 🔴 THE ROW WAS `<div onClick>` -- selecting the member who becomes a recruiter
+            // was mouse-only. `aria-pressed` is what says which one is currently chosen,
+            // which the old version conveyed with a background colour alone.
+            cell: (m) => (
+                <button
+                    type="button"
+                    onClick={() => setNewRepMember(m)}
+                    aria-pressed={newRepMember?.id === m.id}
+                    aria-label={`Choose ${fullName(m)} as the recruiter`}
+                    className={`touch-target rounded-sm text-left underline-offset-2 hover-hover:hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring ${newRepMember?.id === m.id ? 'font-semibold text-brand-ink' : 'text-ink'}`}
+                >
+                    {fullName(m)}
+                </button>
+            ),
+        },
+        { key: 'bankName', header: 'Bank', priority: 'secondary', truncate: true, cell: (m) => m.bankName || '—' },
+        { key: 'status', header: 'Status', priority: 'essential', cell: (m) => <StatusChip status={m.status} /> },
+    ], [newRepMember]);
+
     return (
-        <div className="p-6 text-gray-900 dark:text-gray-100">
+        <div className="p-6 text-ink">
             <PageTitle title="Recruiters" />
-            <p className="text-center text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-center text-ink-muted mb-4">
                 Browse Sasbo recruiters and the members they recruit
             </p>
-            <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
+
+            {/* 🔴 WHAT SIX `alert()` CALLS BECAME. Focused rather than `role="alert"`:
+                the primitives already give inline field errors that role, and stacking a
+                page-level live region on top means two announcements for one failure.
+                Dismissible, because unlike a validation summary this describes something
+                that already happened and the member may simply want it out of the way. */}
+            {notice && (
+                <div
+                    ref={noticeRef}
+                    tabIndex={-1}
+                    aria-labelledby="recruiters-notice-title"
+                    className="mx-auto mb-4 flex max-w-6xl items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                >
+                    <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
+                    <p id="recruiters-notice-title" className="flex-1">{notice.message}</p>
+                    <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dismiss</Button>
+                </div>
+            )}
+            <div className="max-w-6xl mx-auto p-6 rounded-card border border-line bg-surface shadow-(--shadow-1)">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
                     <TextInput label="Recruiter Name" value={filters.repName} onChange={handleFilter('repName')} placeholder="Search recruiter name" />
                     <SearchableSelect label="Bank Name" value={filters.bankName} onChange={handleFilter('bankName')} placeholder="All Banks"
@@ -389,12 +629,12 @@ export function Recruiters() {
                                       options={[{ value: '', label: 'All Areas' }, ...AREAS.map(a => ({ value: a, label: a }))]} />
                 </div>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-          <span className="text-gray-600 dark:text-gray-300">
+          <span className="text-ink-muted">
             {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} recruiters
           </span>
                     <div className="flex items-center gap-2">
                         <Button variant="pagination" onClick={handlePrevPage} disabled={page === 1}>Prev</Button>
-                        <span className="text-gray-600 dark:text-gray-300">Page {page} of {totalPages}</span>
+                        <span className="text-ink-muted">Page {page} of {totalPages}</span>
                         <Button variant="pagination" onClick={handleNextPage} disabled={page === totalPages}>Next</Button>
                         <Button onClick={handleClear}>Clear</Button>
                         <Button variant="primary" onClick={handleOpenAddRep}>
@@ -402,44 +642,23 @@ export function Recruiters() {
                         </Button>
                     </div>
                 </div>
-                <div className="mt-4 rounded-xl overflow-hidden border border-transparent max-h-[60vh] overflow-y-auto">
-                    <div className="grid grid-cols-7 gap-3 px-4 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300 sticky top-0 z-10">
-                        <div>Recruitment Channel</div>
-                        <div>Bank(s)</div>
-                        <div>Branch(es)</div>
-                        <div>Province</div>
-                        <div>Area</div>
-                        <div>Members</div>
-                        <div className="flex justify-end">Remove</div>
-                    </div>
-                    <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {visible.length === 0 ? (
-                            <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">No recruiters match your search.</div>
-                        ) : visible.map(repMembers => (
-                            <div key={repMembers.id} onClick={() => setSelectedRep({ id: repMembers.id, name: repMembers.name })}
-                                 className="grid grid-cols-7 gap-3 px-4 py-3 text-sm bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition items-center">
-                                <div className="font-medium flex items-center gap-1">
-                                    {repMembers.name}
-                                    <ChevronRight size={14} className="text-gray-400 shrink-0" />
-                                </div>
-                                <div className="truncate text-xs text-gray-600 dark:text-gray-400" title={repMembers.banks}>{repMembers.banks || '—'}</div>
-                                <div className="truncate text-xs text-gray-600 dark:text-gray-400" title={repMembers.branches}>{repMembers.branches || '—'}</div>
-                                <div className="truncate text-xs text-gray-600 dark:text-gray-400">{repMembers.provinces || '—'}</div>
-                                <div className="truncate text-xs text-gray-600 dark:text-gray-400">{repMembers.areas || '—'}</div>
-                                <div>
-                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">
-                    {repMembers.count}
-                  </span>
-                                </div>
-                                <div className="flex justify-end" onClick={e => e.stopPropagation()}>
-                                    <button onClick={() => setPendingRemoveRep(repMembers)} disabled={saving} title="Remove recruiter"
-                                            className="p-1.5 rounded-md text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition disabled:opacity-40">
-                                        <UserMinus size={14} />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                {/* 🔴 WAS A `grid-cols-7` PSEUDO-TABLE WITH `<div onClick>` ROWS. No header
+                    relationship for a screen reader, no tab stop on the row, and the
+                    "Remove" control lived inside a clickable row with
+                    `onClick={e => e.stopPropagation()}` wrapped around it -- which works
+                    for a mouse and does nothing for a keyboard. */}
+                <div className="mt-4">
+                    <Table
+                        caption="Recruitment channels and the members they recruit"
+                        columns={recruiterColumns}
+                        rows={visible}
+                        rowKey="id"
+                        loading={listState === 'loading'}
+                        error={listState === 'error' ? 'We could not load the recruiters.' : null}
+                        onRetry={refreshAll}
+                        emptyTitle="No recruiters match your search."
+                        emptyMessage="Try clearing the filters above."
+                    />
                 </div>
             </div>
 
@@ -462,74 +681,60 @@ export function Recruiters() {
                 >
                         <div className="flex items-center justify-between pb-4">
                             <div>
-                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Recruitment Channel</p>
+                                <p className="text-xs uppercase tracking-wider font-bold text-ink-muted">Recruitment Channel</p>
                                 <div className="flex items-center gap-2">
-                                    <h3 className="text-lg font-semibold text-cyan-700 dark:text-cyan-400">{selectedRep.name}</h3>
-                                    <div className="relative group">
-                                        <Button onClick={() => {
+                                    <h3 className="text-lg font-semibold text-brand-ink">{selectedRep.name}</h3>
+                                    {/* 🔴 THE TOOLTIP WAS CSS-ONLY AND MOUSE-ONLY. A
+                                        `group-hover:opacity-100` span is in the DOM at all
+                                        times, merely transparent, so it announced itself to
+                                        a screen reader whether or not anything was hovered
+                                        -- and it was unreachable by keyboard. The button's
+                                        own accessible name was an SVG, i.e. nothing. The
+                                        name belongs on the control. */}
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        aria-label="View recruiter details"
+                                        onClick={() => {
                                             const rep = repList.find(r => r.id === selectedRep.id);
                                             setSelectedRepDetail(rep);
                                             setEditingRep(false);
                                             setEditRepFields({ name: rep?.name || '', email: rep?.email || '', phone: rep?.phone || '' });
                                             setEditRepErrors({});
-                                        }} className="p-1 rounded-md text-cyan-500 hover:bg-cyan-50 hover:text-cyan-700 dark:hover:bg-cyan-900/20 transition">
-                                            <Eye size={14} />
-                                        </Button>
-                                        <span className="absolute left-1/2 -translate-x-1/2 top-7 z-50 whitespace-nowrap rounded-md bg-gray-800 text-white text-xs px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
-                      View recruiter details
-                    </span>
-                                    </div>
+                                        }}
+                                    >
+                                        <Eye size={14} aria-hidden="true" />
+                                    </Button>
                                 </div>
                             </div>
-                            <span className="text-sm text-gray-500 dark:text-gray-400">{repMembers.length} member{repMembers.length !== 1 ? 's' : ''}</span>
+                            <span className="text-sm text-ink-muted">{repMembers.length} member{repMembers.length !== 1 ? 's' : ''}</span>
                         </div>
                         <div>
-                            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 text-center">
-                                <h4 className="text-sm font-semibold text-cyan-700 dark:text-cyan-400">Members ({repMembers.length})</h4>
+                            <h3 className="border-b border-line py-3 text-center text-sm font-semibold text-brand-ink">
+                                Members ({repMembers.length})
+                            </h3>
+                            {/* 🔴 FIVE RAW `<input>` TAGS WITH `aria-label` AND NO VISIBLE
+                                LABEL. They read as a header row of search boxes, which is
+                                the intent -- but a placeholder is not a label: it vanishes
+                                the moment anything is typed, so a member who looks away
+                                has no way to tell which column each box filters.
+                                `TextInput` carries a real one. */}
+                            <div className="grid grid-cols-1 gap-2 py-3 sm:grid-cols-2 lg:grid-cols-5">
+                                <TextInput label="Membership No." kind="search" value={repSearch.membershipNumber || ''} onChange={handleRepSearchChange('membershipNumber')} placeholder="Filter…" />
+                                <TextInput label="Name" kind="search" value={repSearch.name || ''} onChange={handleRepSearchChange('name')} placeholder="Filter…" />
+                                <TextInput label="Bank" kind="search" value={repSearch.bank || ''} onChange={handleRepSearchChange('bank')} placeholder="Filter…" />
+                                <TextInput label="Branch" kind="search" value={repSearch.branch || ''} onChange={handleRepSearchChange('branch')} placeholder="Filter…" />
+                                <TextInput label="Status" kind="search" value={repSearch.status || ''} onChange={handleRepSearchChange('status')} placeholder="Filter…" />
                             </div>
-                            <div className="grid grid-cols-5 gap-2 px-4 py-2 border-b border-gray-100 dark:border-gray-700">
-                                <input value={repSearch.membershipNumber || ''} onChange={handleRepSearchChange('membershipNumber')} placeholder="Membership No." aria-label="Filter by membership number"
-                                       className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
-                                <input value={repSearch.name || ''} onChange={handleRepSearchChange('name')} placeholder="Name" aria-label="Filter by name"
-                                       className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
-                                <input value={repSearch.bank || ''} onChange={handleRepSearchChange('bank')} placeholder="Bank" aria-label="Filter by bank"
-                                       className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
-                                <input value={repSearch.branch || ''} onChange={handleRepSearchChange('branch')} placeholder="Branch" aria-label="Filter by branch"
-                                       className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
-                                <input value={repSearch.status || ''} onChange={handleRepSearchChange('status')} placeholder="Status" aria-label="Filter by status"
-                                       className="rounded-lg px-3 py-1.5 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
-                            </div>
-                            <div className="grid grid-cols-6 gap-3 px-4 py-2 text-xs uppercase tracking-wide bg-gray-50 text-gray-500 dark:bg-gray-900/50 dark:text-gray-400 sticky top-0">
-                                <div>Membership No.</div>
-                                <div>Name</div>
-                                <div>Bank</div>
-                                <div>Branch</div>
-                                <div>Status</div>
-                                <div></div>
-                            </div>
-                            <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                                {filteredRepMembers.length === 0 ? (
-                                    <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">No members found.</div>
-                                ) : filteredRepMembers.map(m => (
-                                    <div key={m.id} className="grid grid-cols-6 gap-3 px-4 py-3 text-sm items-center hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                                        <div className="font-medium text-cyan-700 dark:text-cyan-400 cursor-pointer hover:underline" onClick={() => setSelectedMember(m)}>
-                                            {m.membershipNumber}
-                                        </div>
-                                        <div className="truncate cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-400" onClick={() => setSelectedMember(m)}>
-                                            {m.title ? `${m.title} ` : ''}{m.initials} {m.surname}
-                                        </div>
-                                        <div className="truncate text-xs text-gray-600 dark:text-gray-400">{m.bankName}</div>
-                                        <div className="truncate text-xs text-gray-600 dark:text-gray-400">{m.branch}</div>
-                                        <div><StatusBadge status={m.status} /></div>
-                                        <div className="flex justify-end">
-                                            <button onClick={() => setPendingRemoveMember(m)} disabled={saving} title="Remove from rep"
-                                                    className="p-1.5 rounded-md text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition disabled:opacity-40">
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                            <Table
+                                caption={`Members recruited by ${selectedRep.name}`}
+                                columns={repMemberColumns}
+                                rows={filteredRepMembers}
+                                rowKey="id"
+                                emptyTitle="No members found."
+                                emptyMessage="No member on this recruiter's list matches those filters."
+                                dense
+                            />
                         </div>
                 </Modal>
             )}
@@ -545,34 +750,31 @@ export function Recruiters() {
                     footer={<Button onClick={handleCloseAddMember}>Cancel</Button>}
                 >
                         <div className="pb-3">
-                            <input autoFocus value={addSearch} onChange={e => { const val = e.target.value; setAddSearch(val); }} placeholder="Search by name, membership no. or bank…" aria-label="Search members to add"
-                                   className="w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                            <TextInput
+                                label="Search members"
+                                kind="search"
+                                autoFocus
+                                value={addSearch}
+                                onChange={e => setAddSearch(e.target.value)}
+                                placeholder="Search by name, membership no. or bank…"
+                            />
                         </div>
-                        <div className="overflow-y-auto flex-1">
-                            <div className="grid grid-cols-4 gap-3 px-4 py-2 text-xs uppercase tracking-wide bg-gray-50 text-gray-500 dark:bg-gray-900/50 dark:text-gray-400 sticky top-0">
-                                <div>Membership No.</div>
-                                <div>Name</div>
-                                <div>Bank</div>
-                                <div></div>
-                            </div>
-                            <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                                {candidateMembers.length === 0 ? (
-                                    <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">No members found.</div>
-                                ) : candidateMembers.slice(0, 50).map(m => (
-                                    <div key={m.id} className="grid grid-cols-4 gap-3 px-4 py-3 text-sm items-center hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                                        <div className="font-medium text-cyan-700 dark:text-cyan-400">{m.membershipNumber}</div>
-                                        <div className="truncate">{m.title ? `${m.title} ` : ''}{m.initials} {m.surname}</div>
-                                        <div className="truncate text-xs text-gray-600 dark:text-gray-400">{m.bankName}</div>
-                                        <div className="flex justify-end">
-                                            <button onClick={async () => { await handleAssign(m); setShowAddMember(false); }} disabled={saving}
-                                                    className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-40 transition">
-                                                <UserPlus size={12} /> Add
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        {/* 🔴 R-SCALE-E: `slice(0, 50)` USED TO LIE BY OMISSION. It rendered
+                            the first fifty matches and said nothing, so a search returning
+                            four hundred members looked like a search returning fifty --
+                            and the member somebody was looking for was simply not there,
+                            with no way to tell. `total` is what turns that into the
+                            table's own "showing the first N of M -- refine your search". */}
+                        <Table
+                            caption="Members who can be added to this recruiter"
+                            columns={candidateColumns}
+                            rows={visibleCandidates}
+                            total={candidateMembers.length}
+                            rowKey="id"
+                            emptyTitle="No members found."
+                            emptyMessage="Every member matching that search is already on this recruiter's list."
+                            dense
+                        />
                 </Modal>
             )}
 
@@ -588,7 +790,7 @@ export function Recruiters() {
                         <div className="flex items-center justify-end gap-2 pb-4">
                             <div className="flex items-center gap-2">
                                 {!editingRep && (
-                                    <button className="px-3 py-1 rounded-md text-xs font-medium bg-cyan-600 text-white hover:bg-cyan-700 transition"
+                                    <Button variant="primary" size="sm"
                                             onClick={() => {
                                                 setEditRepFields({
                                                     name: selectedRepDetail.name,
@@ -604,76 +806,77 @@ export function Recruiters() {
                                                 setEditingRep(true);
                                             }}>
                                         Edit
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
                         </div>
                         {editingRep ? (
-                            <div className="px-6 py-5 space-y-4">
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Full Name *</label>
-                                    <input value={editRepFields.name} onChange={e => { const val = e.target.value; setEditRepFields(p => ({ ...p, name: val })); }}
-                                           className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Email</label>
-                                    <input value={editRepFields.email} type="email" onChange={e => {
+                            <div className="space-y-4 py-5">
+                                {/* 🔴 SIX HAND-ROLLED CONTROLS, EACH WITH A `<label>` THAT NAMED
+                                    NOTHING. Every one carried `className="text-[10px] …"` and
+                                    no `htmlFor`, so a screen-reader user met six unnamed
+                                    inputs -- the A28 shape, six times, in one dialog. The
+                                    primitives carry the label, the error wiring and the
+                                    16px-on-a-phone rule. */}
+                                <TextInput
+                                    label="Full Name"
+                                    required
+                                    kind="name"
+                                    value={editRepFields.name}
+                                    onChange={e => { const val = e.target.value; setEditRepFields(p => ({ ...p, name: val })); }}
+                                />
+                                <TextInput
+                                    label="Email"
+                                    kind="email"
+                                    value={editRepFields.email}
+                                    error={editRepErrors.email || undefined}
+                                    onChange={e => {
                                         const val = e.target.value;
                                         setEditRepFields(p => ({ ...p, email: val }));
                                         setEditRepErrors(p => ({ ...p, email: validateEmail(val) || undefined }));
-                                    }} className={`mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 ${editRepErrors.email ? 'border-red-500 dark:border-red-400' : 'border-gray-200 dark:border-gray-700'}`} />
-                                    {editRepErrors.email && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{editRepErrors.email}</p>}
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Phone</label>
-                                    <input value={editRepFields.phone} type="tel" onChange={e => { const val = e.target.value; setEditRepFields(p => ({ ...p, phone: val })); }}
-                                           className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Recruiter Type</label>
-                                    <select value={editRepFields.recruiterTypeId || ''} onChange={e => setEditRepFields(p => ({ ...p, recruiterTypeId: e.target.value ? Number(e.target.value) : null }))}
-                                            className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
-                                        <option value="">Select recruitment channel...</option>
-                                        {RECRUITMENT_CHANNELS.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Role</label>
-                                    <select value={editRepFields.roleId || ''} onChange={e => setEditRepFields(p => ({ ...p, roleId: e.target.value ? Number(e.target.value) : null }))}
-                                            className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
-                                        <option value="">Select role...</option>
-                                        {ROLES.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Elected Recruiter</label>
-                                    <div className="mt-1 flex items-center gap-3">
-                                        <button type="button" onClick={() => setEditRepFields(p => ({ ...p, isElectedRep: true }))}
-                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${editRepFields.isElectedRep ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>Yes</button>
-                                        <button type="button" onClick={() => setEditRepFields(p => ({ ...p, isElectedRep: false, electionDate: '' }))}
-                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${!editRepFields.isElectedRep ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>No</button>
-                                    </div>
-                                </div>
+                                    }}
+                                />
+                                <TextInput
+                                    label="Phone"
+                                    kind="tel"
+                                    value={editRepFields.phone}
+                                    onChange={e => { const val = e.target.value; setEditRepFields(p => ({ ...p, phone: val })); }}
+                                />
+                                <SelectInput
+                                    label="Recruiter Type"
+                                    value={editRepFields.recruiterTypeId ?? ''}
+                                    placeholder="Select recruitment channel..."
+                                    options={RECRUITMENT_CHANNELS.map(rt => ({ value: rt.id, label: rt.name }))}
+                                    onChange={(next) => setEditRepFields(p => ({ ...p, recruiterTypeId: next ? Number(next) : null }))}
+                                />
+                                <SelectInput
+                                    label="Role"
+                                    value={editRepFields.roleId ?? ''}
+                                    placeholder="Select role..."
+                                    options={ROLES.map(r => ({ value: r.id, label: r.name }))}
+                                    onChange={(next) => setEditRepFields(p => ({ ...p, roleId: next ? Number(next) : null }))}
+                                />
+                                <YesNo
+                                    legend="Elected Recruiter"
+                                    value={editRepFields.isElectedRep}
+                                    onChange={(yes) => setEditRepFields(p => ({ ...p, isElectedRep: yes, ...(yes ? {} : { electionDate: '' }) }))}
+                                />
                                 {editRepFields.isElectedRep && (
-                                    <div>
-                                        <DateField
-                                            label="Election Date"
-                                            value={editRepFields.electionDate || ''}
-                                            max="today"
-                                            hint="ago"
-                                            onChange={e => setEditRepFields(p => ({ ...p, electionDate: e.target.value }))}
-                                        />
-                                    </div>
-                                )}
-                                <div className="md:col-span-2">
-                                    <PositionTreeSelect
-                                        label="Structures / Positions"
-                                        structures={STRUCTURES_TREE}
-                                        selectedIds={editRepFields.structureIds || []}
-                                        onChange={(ids) => setEditRepFields(p => ({ ...p, structureIds: ids }))}
-                                        placeholder="Select positions..."
+                                    <DateField
+                                        label="Election Date"
+                                        value={editRepFields.electionDate || ''}
+                                        max="today"
+                                        hint="ago"
+                                        onChange={e => setEditRepFields(p => ({ ...p, electionDate: e.target.value }))}
                                     />
-                                </div>
+                                )}
+                                <PositionTreeSelect
+                                    label="Structures / Positions"
+                                    structures={STRUCTURES_TREE}
+                                    selectedIds={editRepFields.structureIds || []}
+                                    onChange={(ids) => setEditRepFields(p => ({ ...p, structureIds: ids }))}
+                                    placeholder="Select positions..."
+                                />
                             </div>
                         ) : (
                             <div className="px-6 py-5 space-y-4">
@@ -692,7 +895,7 @@ export function Recruiters() {
                                 <DRow label="Members Recruited" value={selectedRepDetail.count} />
                             </div>
                         )}
-                        <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+                        <div className="py-3 border-t border-line flex justify-end gap-2">
                             {editingRep ? (
                                 <>
                                     <Button onClick={handleCancelEdit}>Cancel</Button>
@@ -714,7 +917,7 @@ export function Recruiters() {
                                                     if (selectedRep?.id === selectedRepDetail.id) setSelectedRep(r => ({ ...r, ...editRepFields }));
                                                     setEditingRep(false);
                                                 } catch (err) {
-                                                    alert(err);
+                                                    fail(`Those recruiter details could not be saved. ${err?.message || ''}`.trim());
                                                 } finally {
                                                     setSaving(false);
                                                 }
@@ -747,102 +950,76 @@ export function Recruiters() {
                     }
                 >
                         {newRepMember && (
-                            <div className="mx-4 mt-3 px-4 py-3 rounded-lg bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-700 flex items-center justify-between shrink-0">
+                            <div className="mt-3 px-4 py-3 rounded-lg bg-brand-soft border border-brand-ring flex items-center justify-between shrink-0">
                                 <div>
-                                    <p className="text-xs font-bold text-cyan-700 dark:text-cyan-400 uppercase tracking-wider">Selected Member</p>
-                                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                    <p className="text-xs font-bold text-brand-ink uppercase tracking-wider">Selected Member</p>
+                                    <p className="text-sm font-semibold text-ink">
                                         {newRepMember.title ? `${newRepMember.title} ` : ''}{newRepMember.initials} {newRepMember.surname}
                                     </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">{newRepMember.membershipNumber} · {newRepMember.bankName}</p>
+                                    <p className="text-xs text-ink-muted">{newRepMember.membershipNumber} · {newRepMember.bankName}</p>
                                 </div>
-                                <button onClick={() => setNewRepMember(null)} className="text-xs text-red-400 hover:text-red-600 dark:hover:text-red-300 transition">✕ Clear</button>
+                                <Button size="sm" variant="ghost" onClick={() => setNewRepMember(null)}>Clear</Button>
                             </div>
                         )}
-                        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
-                            <input autoFocus value={newRepSearch} onChange={e => { const val = e.target.value; setNewRepSearch(val); }} placeholder="Search by name, membership no. or bank…"
-                                   className="w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                        <div className="shrink-0 border-b border-line pb-3">
+                            <TextInput
+                                label="Search members"
+                                kind="search"
+                                autoFocus
+                                value={newRepSearch}
+                                onChange={e => setNewRepSearch(e.target.value)}
+                                placeholder="Search by name, membership no. or bank…"
+                            />
                         </div>
-                        <div className="overflow-y-auto flex-1">
-                            <div className="grid grid-cols-4 gap-3 px-4 py-2 text-xs uppercase tracking-wide bg-gray-50 text-gray-500 dark:bg-gray-900/50 dark:text-gray-400 sticky top-0">
-                                <div>Membership No.</div>
-                                <div>Name</div>
-                                <div>Bank</div>
-                                <div>Status</div>
-                            </div>
-                            <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                                {members
-                                    .filter(m => {
-                                        if (repList.some(r => r.memberId === m.id)) return false;
-                                        const q = newRepSearch.trim().toLowerCase();
-                                        if (!q) return true;
-                                        return (
-                                            (m.membershipNumber ?? '').toLowerCase().includes(q) ||
-                                            `${m.initials || ''} ${m.surname || ''}`.toLowerCase().includes(q) ||
-                                            (m.firstNames ?? '').toLowerCase().includes(q) ||
-                                            (m.bankName ?? '').toLowerCase().includes(q)
-                                        );
-                                    })
-                                    .slice(0, 50)
-                                    .map(m => (
-                                        <div key={m.id} onClick={() => setNewRepMember(m)}
-                                             className={`grid grid-cols-4 gap-3 px-4 py-3 text-sm cursor-pointer transition ${newRepMember?.id === m.id ? 'bg-cyan-50 dark:bg-cyan-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
-                                            <div className="font-medium text-cyan-700 dark:text-cyan-400">{m.membershipNumber}</div>
-                                            <div className="truncate">{m.title ? `${m.title} ` : ''}{m.initials} {m.surname}</div>
-                                            <div className="truncate text-xs text-gray-600 dark:text-gray-400">{m.bankName}</div>
-                                            <div><StatusBadge status={m.status} /></div>
-                                        </div>
-                                    ))
-                                }
-                            </div>
-                        </div>
+                        <Table
+                            caption="Members who could become a recruiter"
+                            columns={newRepColumns}
+                            rows={visibleNewRepCandidates}
+                            total={newRepCandidates.length}
+                            rowKey="id"
+                            emptyTitle="No members found."
+                            emptyMessage="Every member matching that search is already a recruiter."
+                            dense
+                        />
                         {newRepMember && (
-                            <div className="px-6 py-4 space-y-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
-                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Recruiter Details</p>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Recruiter Type *</label>
-                                    <select value={newRepDetails.recruiterTypeId || ''} onChange={e => setNewRepDetails(p => ({ ...p, recruiterTypeId: e.target.value ? Number(e.target.value) : null }))}
-                                            className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
-                                        <option value="">Select recruiter type...</option>
-                                        {RECRUITMENT_CHANNELS.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Role</label>
-                                    <select value={newRepDetails.roleId || ''} onChange={e => setNewRepDetails(p => ({ ...p, roleId: e.target.value ? Number(e.target.value) : null }))}
-                                            className="mt-1 w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
-                                        <option value="">Select role...</option>
-                                        {ROLES.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">Elected Recruiter</label>
-                                    <div className="mt-1 flex items-center gap-3">
-                                        <button type="button" onClick={() => setNewRepDetails(p => ({ ...p, isElectedRep: true }))}
-                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${newRepDetails.isElectedRep ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>Yes</button>
-                                        <button type="button" onClick={() => setNewRepDetails(p => ({ ...p, isElectedRep: false, electionDate: '' }))}
-                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${!newRepDetails.isElectedRep ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>No</button>
-                                    </div>
-                                </div>
+                            <div className="shrink-0 space-y-4 border-t border-line py-4">
+                                <p className="text-xs font-bold uppercase tracking-wider text-ink-muted">Recruiter Details</p>
+                                <SelectInput
+                                    label="Recruiter Type"
+                                    required
+                                    value={newRepDetails.recruiterTypeId ?? ''}
+                                    placeholder="Select recruiter type..."
+                                    options={RECRUITMENT_CHANNELS.map(rt => ({ value: rt.id, label: rt.name }))}
+                                    onChange={(next) => setNewRepDetails(p => ({ ...p, recruiterTypeId: next ? Number(next) : null }))}
+                                />
+                                <SelectInput
+                                    label="Role"
+                                    value={newRepDetails.roleId ?? ''}
+                                    placeholder="Select role..."
+                                    options={ROLES.map(r => ({ value: r.id, label: r.name }))}
+                                    onChange={(next) => setNewRepDetails(p => ({ ...p, roleId: next ? Number(next) : null }))}
+                                />
+                                <YesNo
+                                    legend="Elected Recruiter"
+                                    value={newRepDetails.isElectedRep}
+                                    onChange={(yes) => setNewRepDetails(p => ({ ...p, isElectedRep: yes, ...(yes ? {} : { electionDate: '' }) }))}
+                                />
                                 {newRepDetails.isElectedRep && (
-                                    <div>
-                                        <DateField
-                                            label="Election Date"
-                                            value={newRepDetails.electionDate || ''}
-                                            max="today"
-                                            hint="ago"
-                                            onChange={e => setNewRepDetails(p => ({ ...p, electionDate: e.target.value }))}
-                                        />
-                                    </div>
-                                )}
-                                <div>
-                                    <PositionTreeSelect
-                                        label="Structures / Positions"
-                                        structures={STRUCTURES_TREE}
-                                        selectedIds={newRepDetails.structureIds}
-                                        onChange={(ids) => setNewRepDetails(p => ({ ...p, structureIds: ids }))}
-                                        placeholder="Select positions..."
+                                    <DateField
+                                        label="Election Date"
+                                        value={newRepDetails.electionDate || ''}
+                                        max="today"
+                                        hint="ago"
+                                        onChange={e => setNewRepDetails(p => ({ ...p, electionDate: e.target.value }))}
                                     />
-                                </div>
+                                )}
+                                <PositionTreeSelect
+                                    label="Structures / Positions"
+                                    structures={STRUCTURES_TREE}
+                                    selectedIds={newRepDetails.structureIds}
+                                    onChange={(ids) => setNewRepDetails(p => ({ ...p, structureIds: ids }))}
+                                    placeholder="Select positions..."
+                                />
                             </div>
                         )}
                 </Modal>
@@ -859,28 +1036,28 @@ export function Recruiters() {
                 >
                         <div className="flex items-start justify-between pb-4">
                             <div>
-                                <div className="mt-1 flex flex-wrap items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-base font-semibold text-ink">
                                     <span>{selectedMember.title ? `${selectedMember.title} ` : ''}{selectedMember.initials} {selectedMember.surname}</span>
-                                    <span className="text-gray-400">•</span>
-                                    <span className="text-sm font-normal text-gray-600 dark:text-gray-300">{selectedMember.membershipNumber}</span>
-                                    <span className="text-gray-400">•</span>
-                                    <StatusBadge status={selectedMember.status} />
+                                    <span aria-hidden="true" className="text-ink-faint">•</span>
+                                    <span className="text-sm font-normal text-ink-muted">{selectedMember.membershipNumber}</span>
+                                    <span aria-hidden="true" className="text-ink-faint">•</span>
+                                    <StatusChip status={selectedMember.status} />
                                 </div>
                             </div>
                         </div>
-                        <div className="py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700 flex items-center gap-1">
-                            <button onClick={() => setSelectedMember(null)} className="hover:text-cyan-600 dark:hover:text-cyan-400 transition">{selectedRep?.name}</button>
+                        <div className="py-2 text-xs text-ink-muted border-b border-line flex items-center gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => setSelectedMember(null)}>{selectedRep?.name}</Button>
                             <ChevronRight size={12} />
-                            <span className="font-medium text-gray-700 dark:text-gray-200">{selectedMember.membershipNumber}</span>
+                            <span className="font-medium text-ink">{selectedMember.membershipNumber}</span>
                         </div>
-                        <div className="overflow-y-auto flex-1 px-6 py-5 bg-gray-50 dark:bg-gray-900/40">
+                        <div className="overflow-y-auto flex-1 py-5">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <Section title="Personal">
                                     <DRow label="First Names" value={selectedMember.firstNames || selectedMember.firstName} />
                                     <DRow label="Surname" value={selectedMember.surname} />
                                     <DRow label="ID Number" value={selectedMember.identityNumber} />
                                     <DRow label="Race" value={selectedMember.race} />
-                                    <DRow label="Email" value={selectedMember.preferredEmail === "both" ? [selectedMember.personalEmail, selectedMember.workEmail].filter(Boolean).join(', ') || '—' : ((selectedMember.preferredEmail === "work" ? selectedMember.workEmail : selectedMember.personalEmail) || '—')} className="break-all text-cyan-600 dark:text-cyan-400" />
+                                    <DRow label="Email" value={selectedMember.preferredEmail === "both" ? [selectedMember.personalEmail, selectedMember.workEmail].filter(Boolean).join(', ') || '—' : ((selectedMember.preferredEmail === "work" ? selectedMember.workEmail : selectedMember.personalEmail) || '—')} className="break-all text-brand-ink" />
                                     <DRow label="Cell" value={selectedMember.phone || selectedMember.cellTel} />
                                     <DRow label="Work Tel" value={selectedMember.workTel} />
                                     <DRow label="Home Tel" value={selectedMember.homeTel} />
@@ -893,7 +1070,6 @@ export function Recruiters() {
                                     <DRow label="Branch" value={selectedMember.branch} />
                                     <DRow label="Account Number" value={selectedMember.bankAccountNumber} />
                                     <DRow label="IBT No." value={selectedMember.ibtNo} />
-                                    {/*<DRow label="Work IBT No." value={selectedMember.workIbtNo} />*/}
                                     <DRow label="Payment Type" value={selectedMember.paymentType} />
                                     <DRow label="Work Address" value={selectedMember.workBankAddress} />
                                 </Section>
@@ -956,18 +1132,40 @@ export function Recruiters() {
 }
 
 
-function StatusBadge({ status }) {
-    const cls = status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-        : status === 'Pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-            : status === 'Suspended' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400';
-    return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}>{status || 'Unknown'}</span>;
+/**
+ * A yes/no answer, as a pair of buttons.
+ *
+ * 🔴 THE TWO COPIES IT REPLACES WERE A `<label>` OVER TWO UNGROUPED `<button>`s. The label
+ * named nothing -- no `htmlFor`, and there is no single control to point at anyway -- and
+ * the SELECTED state was carried by a background colour and nothing else, so a
+ * screen-reader user could not tell which of the two was the current answer. A
+ * `<fieldset>` with a `<legend>` is what associates the question with the pair, and
+ * `aria-pressed` is what says which one is the answer.
+ */
+function YesNo({ legend, value, onChange }) {
+    return (
+        <fieldset>
+            <legend className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{legend}</legend>
+            <div className="mt-1 flex items-center gap-3">
+                {[true, false].map((choice) => (
+                    <Button
+                        key={String(choice)}
+                        variant={value === choice ? 'primary' : 'default'}
+                        aria-pressed={value === choice}
+                        onClick={() => onChange(choice)}
+                    >
+                        {choice ? 'Yes' : 'No'}
+                    </Button>
+                ))}
+            </div>
+        </fieldset>
+    );
 }
 
 function Section({ title, children }) {
     return (
         <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-cyan-600 dark:text-cyan-500 border-b border-gray-200 dark:border-gray-700 pb-1">{title}</h4>
+            <h4 className="border-b border-line pb-1 text-xs font-bold uppercase tracking-widest text-brand-ink">{title}</h4>
             {children}
         </div>
     );
@@ -976,8 +1174,8 @@ function Section({ title, children }) {
 function DRow({ label, value, className = '' }) {
     return (
         <div>
-            <p className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">{label}</p>
-            <p className={`text-sm font-semibold text-gray-800 dark:text-gray-200 ${className}`}>{value || '—'}</p>
+            <p className="text-2xs font-bold uppercase tracking-wider text-ink-muted">{label}</p>
+            <p className={`text-sm font-semibold text-ink ${className}`}>{value || '—'}</p>
         </div>
     );
 }

@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { CheckCircle2 } from "lucide-react";
+import React, { useRef, useState, useEffect, useMemo } from "react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { recruiterService } from "../../services/recruiterService.js";
 import { jobGradeService } from "../../services/jobGradeService.js";
 import { bankService } from "../../services/bankService.js";
-import { Button, PositionTreeSelect } from "../../components/form";
+import PageTitle from "../../components/common/PageTitle";
+import {
+    Button, CheckboxGroup, DateField, PositionTreeSelect, SearchableSelect, SelectInput, TextInput,
+} from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, YES_NO_OPTIONS,
@@ -308,6 +311,20 @@ export default function CaptureMember() {
         return errors;
     };
 
+    /**
+     * What the last save attempt said. Replaces this file's two `alert()` calls.
+     *
+     * Focused rather than `role="alert"`: the shared `Field` gives every inline message
+     * that role already, so a form failing six validations would queue seven
+     * announcements at once. findings.md F-P23.
+     */
+    const [saveNotice, setSaveNotice] = useState(null);
+    const saveNoticeRef = useRef(null);
+
+    useEffect(() => {
+        if (saveNotice) saveNoticeRef.current?.focus();
+    }, [saveNotice]);
+
     const handleSave = () => {
         const clientSideErrors = validateFormBeforeSave();
         const mergedErrors = { ...fieldErrors, ...clientSideErrors };
@@ -320,20 +337,26 @@ export default function CaptureMember() {
             const fallbackTabContext = FIELD_TO_TAB_MAP[firstFailedField] || "personal";
             setActiveTab(fallbackTabContext);
 
-            const errorSummaryList = Object.values(mergedErrors)
-                .map((errMsg) => `• ${errMsg}`)
-                .join("\n");
-
-            alert(`Please fix the following validation errors before saving:\n\n${errorSummaryList}`);
+            // 🔴 IT WAS AN `alert()` OF BULLETED LINES. A native modal blocks the thread,
+            // cannot be styled, is suppressible, and -- worst on a five-tab form -- it
+            // ARRIVES AND LEAVES: dismissing it returned the member to a form that looked
+            // unchanged, with the list of problems now only in their memory. The summary
+            // below stays on the screen, takes focus, and the tab switch above puts them
+            // on the tab holding the first bad field.
+            setSaveNotice({ kind: "invalid", messages: Object.values(mergedErrors) });
             return;
         }
 
+        setSaveNotice(null);
         memberService.createMember(form)
             .then(() => {
                 setShowSavedNotification(true);
                 setTimeout(() => setShowSavedNotification(false), 3000);
             })
-            .catch((err) => alert(`Failed to save member: ${err.message}`));
+            .catch((err) => setSaveNotice({
+                kind: "failed",
+                messages: [`This member was not saved. ${err?.message || "Please try again."}`],
+            }));
     };
 
     const tabs = MEMBER_TABS;
@@ -397,40 +420,78 @@ export default function CaptureMember() {
     }, [form.bankName, bankListing]);
 
     return (
-        <div className="p-6 text-gray-900 dark:text-gray-100">
-            <h2 className="text-3xl text-center mb-4 text-cyan-700 dark:text-cyan-400">
-                Capture Member
-            </h2>
-            <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+        <div className="p-6 text-ink">
+            {/* BR-18: the page's only <h1>, from the shared component, so this route stops
+                being one of the nine with no heading of its own. */}
+            <PageTitle title="Capture Member" />
+            <p className="max-w-3xl mx-auto text-center text-ink-muted mb-8 leading-relaxed">
                 Securely capture a new Sasbo member. Ensure all required personal,
                 employment, and banking information is accurately entered to maintain the integrity of our member database.
             </p>
-            <div className="max-w-6xl mx-auto rounded-2xl shadow-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden relative">
+            <div className="max-w-6xl mx-auto rounded-card border border-line bg-surface shadow-(--shadow-1) relative">
                 {showSavedNotification && (
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
-                        <CheckCircle2 size={18} />
+                    <div role="status" className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-lg border border-status-active-dot bg-status-active-bg px-4 py-2 text-status-active shadow-(--shadow-2)">
+                        <CheckCircle2 size={18} aria-hidden="true" />
                         <span className="text-sm font-medium">Member captured successfully!</span>
                     </div>
                 )}
-                {/* Tab Navigation */}
-                <div className="px-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
-                    <div className="flex -mb-px">
+
+                {/* 🔴 WHAT REPLACED THE `alert()`. It stays on screen, it takes focus, and
+                    the tab switch that runs beside it puts the member on the tab holding
+                    the first bad field -- so the list of problems and the fields that
+                    caused them are visible at the same time, which a modal made impossible. */}
+                {saveNotice && (
+                    <div
+                        ref={saveNoticeRef}
+                        tabIndex={-1}
+                        aria-labelledby="capture-save-notice-title"
+                        className="m-4 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                    >
+                        <p id="capture-save-notice-title" className="flex items-center gap-2 font-medium">
+                            <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+                            {saveNotice.kind === "invalid" ? "Fix these before saving" : "This member was not saved"}
+                        </p>
+                        <ul className="mt-1 list-disc pl-6">
+                            {saveNotice.messages.map((message) => <li key={message}>{message}</li>)}
+                        </ul>
+                    </div>
+                )}
+
+                {/* 📱 R-RESP-J: A SCROLLABLE STRIP. Six tabs do not fit at 390px -- they
+                    wrapped into crushed rows, and the last two were effectively hidden.
+                    `overflow-x-auto` with `whitespace-nowrap` makes them reachable by
+                    swiping, which is how a phone expects to meet a row that is too long.
+
+                    ⚠️ Not `role="tab"`: the ARIA tabs pattern promises arrow-key
+                    movement between tabs, which needs roving focus. `05.3` owns that, with
+                    the shared hook RF already has on its list. `aria-current` says which
+                    section is showing and promises nothing else. */}
+                <div className="border-b border-line bg-surface-2">
+                    <div className="flex -mb-px overflow-x-auto whitespace-nowrap px-6">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
+                                type="button"
+                                aria-current={activeTab === tab.id ? "true" : undefined}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`mr-4 inline-flex items-center gap-1 p-4 border-b-2 font-bold text-sm transition-colors ${activeTab === tab.id ? "border-cyan-600 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400" : "border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"}`}
+                                className={`touch-target mr-4 inline-flex items-center gap-1 p-4 border-b-2 font-bold text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring ${activeTab === tab.id ? "border-brand text-brand-ink" : "border-transparent text-ink-faint hover-hover:hover:text-ink"}`}
                             >
                                 <span>{tab.label}</span>
                                 {tabsWithErrors.has(tab.id) && (
-                                    <span className="text-red-500 font-bold animate-pulse text-sm" title="Contains required validation errors">*</span>
+                                    <>
+                                        {/* The asterisk was the ONLY signal that a tab held
+                                            errors -- invisible to a screen reader, and to
+                                            anyone who cannot distinguish the colour. */}
+                                        <span aria-hidden="true" className="text-status-suspended font-bold text-sm">*</span>
+                                        <span className="sr-only">(has errors)</span>
+                                    </>
                                 )}
                             </button>
                         ))}
                     </div>
                 </div>
                 {/* Body */}
-                <div className="px-6 py-8 overflow-y-auto max-h-[70vh] text-sm bg-white dark:bg-gray-800">
+                <div className="px-6 py-8 text-sm">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         {activeTab === "personal" && (
                             <>
@@ -485,7 +546,7 @@ export default function CaptureMember() {
                                 <Field label="Employee Number" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
                                 <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
-                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} />
+                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} emptyLabel="No job grades available" />
                                 <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
 
@@ -496,9 +557,9 @@ export default function CaptureMember() {
                                     </>
                                 )}
                                 {form.paymentType === "Payroll" && (
-                                    <div className="md:col-span-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-700 dark:text-blue-300">
-                                        ℹ️ Bank account details are not required for Payroll. Debit day is handled by payroll.
-                                    </div>
+                                    <p className="md:col-span-2 rounded-lg border border-line-strong bg-surface-2 p-3 text-sm text-ink-muted">
+                                        Bank account details are not required for Payroll. Debit day is handled by payroll.
+                                    </p>
                                 )}
                                 <Field label="IBT No." value={form.ibtNo} onChange={handleChange("ibtNo")} />
                                 {/*<Field label="Work IBT No." value={form.workIbtNo} onChange={handleChange("workIbtNo")} />*/}
@@ -519,7 +580,7 @@ export default function CaptureMember() {
                                 />
 
                                 {form.isShopSteward === "Y" && (
-                                    <div className="md:col-span-2 p-4 bg-cyan-50/50 dark:bg-cyan-950/10 border border-cyan-100 rounded-lg animate-in fade-in duration-200">
+                                    <div className="md:col-span-2 rounded-lg border border-line bg-surface-2 p-4">
                                         <Field
                                             label="Enter Shop Steward Election Date"
                                             value={form.shopStewardElectionDate}
@@ -540,8 +601,8 @@ export default function CaptureMember() {
                                 />
 
                                 {form.isCosatu === "Y" && (
-                                    <div className="md:col-span-2 space-y-4 border-l-2 border-orange-400 pl-4 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <p className="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">COSATU Structure</p>
+                                    <div className="md:col-span-2 space-y-4 border-l-2 border-accent pl-4 mt-2">
+                                        <p className="text-xs font-bold uppercase tracking-wide text-accent-ink">COSATU Structure</p>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <Field
                                                 label="Local?"
@@ -556,33 +617,22 @@ export default function CaptureMember() {
                                                 options={yesNoOptions}
                                             />
                                         </div>
-                                        <div className="p-4 bg-orange-50/50 dark:bg-orange-950/10 border border-orange-200 dark:border-orange-800 rounded-lg">
-                                            <label className="block text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-400 mb-2">
-                                                COSATU Positions — Multiple Allowed
-                                            </label>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                {["PEC", "CEC", "Treasurer", "Chairperson", "Secretary"].map((pos) => (
-                                                    <label key={pos} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={(form.cosatuPositions || []).includes(pos)}
-                                                            onChange={(e) => {
-                                                                const checked = e.target.checked;
-                                                                setForm(prev => ({
-                                                                    ...prev,
-                                                                    cosatuPositions: checked
-                                                                        ? [...(prev.cosatuPositions || []), pos]
-                                                                        : (prev.cosatuPositions || []).filter(p => p !== pos)
-                                                                }));
-                                                            }}
-                                                            className="rounded border-gray-300 text-orange-500 focus:ring-orange-400 w-4 h-4"
-                                                        />
-                                                        {pos === "PEC" ? "PEC (Provincial Executive Committee)" :
-                                                         pos === "CEC" ? "CEC (Central Executive Committee)" : pos}
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
+                                        {/* 🔴 THE `<label>` OVER THIS GROUP NAMED NOTHING --
+                                            no `htmlFor`, and there is no single control to
+                                            point one at -- so a screen-reader user met five
+                                            checkboxes with no idea what question they
+                                            answered. `CheckboxGroup` is a real <fieldset>
+                                            with a <legend>, which is the element pair that
+                                            exists for exactly this. */}
+                                        <CheckboxGroup
+                                            legend="COSATU Positions — Multiple Allowed"
+                                            options={["PEC", "CEC", "Treasurer", "Chairperson", "Secretary"]}
+                                            labelFor={(pos) =>
+                                                pos === "PEC" ? "PEC (Provincial Executive Committee)" :
+                                                pos === "CEC" ? "CEC (Central Executive Committee)" : pos}
+                                            selected={form.cosatuPositions || []}
+                                            onToggle={(next) => setForm(prev => ({ ...prev, cosatuPositions: next }))}
+                                        />
                                     </div>
                                 )}
 
@@ -595,7 +645,7 @@ export default function CaptureMember() {
                                 />
 
                                 {form.isBecMember === "Y" && (
-                                    <div className="md:col-span-2 space-y-6 border-l-2 border-cyan-500 pl-4 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="md:col-span-2 space-y-6 border-l-2 border-brand pl-4 mt-2">
 
                                         {/* Flow node 3: 44 BEC Committees (Single Selection branch selector) */}
                                         <Field
@@ -625,24 +675,12 @@ export default function CaptureMember() {
                                         />
 
                                         {form.isBecStructureRep === "Y" && (
-                                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 animate-in fade-in duration-200">
-                                                <label className="block text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:text-cyan-400 mb-2">
-                                                    Select BEC Structure(s) - MULTIPLE STRUCTURES ALLOWED
-                                                </label>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    {STRUCTURE_REP_OPTIONS.map((struct) => (
-                                                        <label key={struct} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={form.selectedBecStructures.includes(struct)}
-                                                                onChange={handleStructureCheckboxChange(struct)}
-                                                                className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500 w-4 h-4"
-                                                            />
-                                                            {struct}
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
+                                            <CheckboxGroup
+                                                legend="Select BEC Structure(s) — multiple allowed"
+                                                options={STRUCTURE_REP_OPTIONS}
+                                                selected={form.selectedBecStructures}
+                                                onToggle={(next) => setForm(prev => ({ ...prev, selectedBecStructures: next }))}
+                                            />
                                         )}
 
                                         {/* Flow node 6: BEC Executive? */}
@@ -654,7 +692,7 @@ export default function CaptureMember() {
                                         />
 
                                         {form.isBecExecutive === "Y" && (
-                                            <div className="p-4 bg-purple-50/50 dark:bg-purple-950/10 rounded-lg border border-purple-200 dark:border-purple-800 animate-in slide-in-from-left-2 duration-300">
+                                            <div className="rounded-lg border border-line bg-surface-2 p-4">
                                                 <Field
                                                     label="Select BEC Executive Position - ONLY ONE POSITION ALLOWED"
                                                     value={form.becExecutivePosition}
@@ -714,8 +752,22 @@ export default function CaptureMember() {
                         )}
                     </div>
                 </div>
-                {/* Footer */}
-                <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                {/* 📱 R-RESP-J: SAVE IS A STICKY ACTION BAR NOW.
+                    This form is six tabs of fields and the body used to scroll inside its
+                    own `max-h-[70vh]` box, so on a phone Save sat below a scroller that
+                    was itself below the fold -- reachable only by scrolling the page to
+                    the bottom, past a panel that scrolls independently. The inner scroller
+                    is gone (the page scrolls, which is what a phone expects) and the bar
+                    is pinned to the bottom of the viewport.
+
+                    `pb-[env(safe-area-inset-bottom)]` is the half that only shows up on
+                    real hardware: without it the bar sits under the home indicator on an
+                    iPhone, and Save is a button you can see and cannot press.
+
+                    🔑 SAVE IS FIRST IN THE DOM AND VISUALLY LAST. `flex-row-reverse`
+                    puts the primary action on the right for a mouse while leaving it first
+                    in the tab order -- the order the two audiences each expect. */}
+                <div className="sticky bottom-0 z-10 flex flex-row-reverse justify-start gap-3 border-t border-line bg-surface/95 px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm">
                     <Button variant="primary" onClick={handleSave}>Save Member</Button>
                     <Button onClick={() => window.history.back()}>Cancel</Button>
                 </div>
@@ -725,15 +777,23 @@ export default function CaptureMember() {
 }
 
 const SectionTitle = ({ title }) => (
-    <div className="md:col-span-2 mt-4 border-b border-gray-200 dark:border-gray-700 pb-1 font-semibold text-cyan-700 dark:text-cyan-400">
+    <div className="md:col-span-2 mt-4 border-b border-line pb-1 font-semibold text-brand-ink">
         {title}
     </div>
 );
 
-const fieldCls = (error, disabled = false) =>
-    `w-full rounded-lg px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 ${
-        disabled ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed" : "bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white"} ${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"}`;
-
+/**
+ * The rep's election date.
+ *
+ * 🔴 IT WAS A NATIVE `<input type="date">` UNDER A `<label>` THAT NAMED NOTHING -- no
+ * `htmlFor`, so a screen-reader user reached an unnamed date box -- and it was the fourth
+ * of the four native date inputs P3 could not reach, because BR-10 owned this file until
+ * now. `DateField` is the approved picker: a real label, a keyboard grid, and the same
+ * behaviour on every browser instead of whatever the platform happens to supply.
+ *
+ * ⚠️ THE THREE-FIELD STORAGE IS UNCHANGED. The server keeps day, month and year as
+ * separate strings, and re-shaping that is a wire change, not a presentation one.
+ */
 function RepElectionDatePicker({ form, setForm }) {
     const dateValue =
         form.repElectionYear && form.repElectionMonth && form.repElectionDay
@@ -745,63 +805,7 @@ function RepElectionDatePicker({ form, setForm }) {
     };
     return (
         <div className="md:col-span-2">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                Election Date
-            </label>
-            <input
-                type="date"
-                value={dateValue}
-                onChange={handleDateChange}
-                className={fieldCls(null, false)}
-            />
-        </div>
-    );
-}
-
-function SearchableSelect({ value, onChange, options, error, disabled }) {
-    const [query, setQuery] = useState("");
-    const [open, setOpen] = useState(false);
-    const ref = React.useRef(null);
-    const filtered = options.filter((o) => o.toLowerCase().includes(query.toLowerCase()));
-    const handleSelect = (opt) => {
-        onChange({ target: { value: opt } });
-        setQuery("");
-        setOpen(false);
-    };
-    const handleClear = () => {
-        onChange({ target: { value: "" } });
-        setQuery("");
-    };
-    React.useEffect(() => {
-        const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
-    }, []);
-    return (
-        <div ref={ref} className="relative">
-            <input
-                type="text"
-                value={open ? query : value || ""}
-                onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-                onFocus={() => setOpen(true)}
-                placeholder="Search..."
-                disabled={disabled}
-                className={fieldCls(error, disabled)}
-            />
-            {value && !open && (
-                <button type="button" onClick={handleClear} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs">✕</button>
-            )}
-            {open && filtered.length > 0 && (
-                <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg text-sm">
-                    {filtered.map((opt) => (
-                        <li key={opt} role="option" aria-selected={false} onClick={() => handleSelect(opt)}
-                            className="px-4 py-2 cursor-pointer hover:bg-cyan-50 dark:hover:bg-cyan-900/30 text-gray-900 dark:text-white">
-                            {opt}
-                        </li>
-                    ))}
-                </ul>
-            )}
-            {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
+            <DateField label="Election Date" value={dateValue} max="today" hint="ago" onChange={handleDateChange} />
         </div>
     );
 }
@@ -828,99 +832,123 @@ function toggleWorkPreferred(setForm) {
     });
 }
 
+/**
+ * The two email addresses, each with a "preferred" tick beside it.
+ *
+ * The toggles keep their existing three-state behaviour exactly -- personal, work, both --
+ * because that is a data question the wire already answers. What changed is the chrome
+ * around them: `TextInput` supplies the label, the error wiring and the 16px-on-a-phone
+ * rule that the hand-rolled `fieldCls` did not.
+ */
 function EmailFields({ form, setForm, handleChange, fieldErrors }) {
+    const preferred = (label, checked, onChange) => (
+        <label className="touch-target flex cursor-pointer items-center gap-1 whitespace-nowrap text-xs text-ink-muted">
+            <input type="checkbox" checked={checked} onChange={onChange} className="size-4 accent-brand" />
+            {label}
+        </label>
+    );
+
     return (
         <>
-            <div>
-                <label htmlFor="personalEmail" className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                    Personal Email
-                </label>
-                <div className="flex items-center gap-2">
-                    <input
-                        id="personalEmail"
-                        type="email"
-                        value={form.personalEmail || ""}
-                        onChange={handleChange("personalEmail")}
-                        className={fieldCls(fieldErrors.personalEmail)}
-                    />
-                    <label htmlFor="prefPersonal" className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
-                        <input
-                            id="prefPersonal"
-                            type="checkbox"
-                            checked={form.preferredEmail === "personal" || form.preferredEmail === "both"}
-                            onChange={() => togglePersonalPreferred(setForm)}
-                            className="accent-cyan-600 w-4 h-4"
-                        />
-                        Preferred
-                    </label>
-                </div>
-                {fieldErrors.personalEmail && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{fieldErrors.personalEmail}</p>}
+            <div className="flex items-end gap-2">
+                <TextInput
+                    label="Personal Email"
+                    kind="email"
+                    value={form.personalEmail || ""}
+                    onChange={handleChange("personalEmail")}
+                    error={fieldErrors.personalEmail || undefined}
+                    className="flex-1"
+                />
+                {preferred("Preferred", form.preferredEmail === "personal" || form.preferredEmail === "both", () => togglePersonalPreferred(setForm))}
             </div>
-            <div>
-                <label htmlFor="workEmail" className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                    Work Email
-                </label>
-                <div className="flex items-center gap-2">
-                    <input
-                        id="workEmail"
-                        type="email"
-                        value={form.workEmail || ""}
-                        onChange={handleChange("workEmail")}
-                        className={fieldCls(fieldErrors.workEmail)}
-                    />
-                    <label htmlFor="prefWork" className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
-                        <input
-                            id="prefWork"
-                            type="checkbox"
-                            checked={form.preferredEmail === "work" || form.preferredEmail === "both"}
-                            onChange={() => toggleWorkPreferred(setForm)}
-                            className="accent-cyan-600 w-4 h-4"
-                        />
-                        Preferred
-                    </label>
-                </div>
-                {fieldErrors.workEmail && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{fieldErrors.workEmail}</p>}
+            <div className="flex items-end gap-2">
+                <TextInput
+                    label="Work Email"
+                    kind="email"
+                    value={form.workEmail || ""}
+                    onChange={handleChange("workEmail")}
+                    error={fieldErrors.workEmail || undefined}
+                    className="flex-1"
+                />
+                {preferred("Preferred", form.preferredEmail === "work" || form.preferredEmail === "both", () => toggleWorkPreferred(setForm))}
             </div>
         </>
     );
 }
 
+/**
+ * ONE FIELD OF THE CAPTURE FORM -- and this is where BR-4's four-way fracture ends.
+ *
+ * 🔴 WHAT WAS HERE. A private `Field` and a private `SearchableSelect`, both shadowing
+ * shared components of the same name, and a `fieldCls` restating the border, the focus
+ * ring and the disabled treatment the token layer already owns. Between them they carried
+ * four defects the shared primitives do not have:
+ *
+ *   1. THE ID WAS DERIVED FROM THE LABEL TEXT -- `label.toLowerCase().replace(/\s+/g,"-")`
+ *      -- so two fields with the same label produced two elements with the same id, and
+ *      the second label pointed at the first control. This form renders "Preferred" twice.
+ *   2. THE PRIVATE `SearchableSelect` WAS MOUSE-ONLY. Its options were `<li onClick>` with
+ *      `role="option"` and `aria-selected={false}` HARD-CODED on every one -- so it
+ *      announced a listbox in which nothing is ever selected, and no arrow key, Enter or
+ *      Escape did anything. The shared one is driven by `aria-activedescendant`.
+ *   3. EVERY CONTROL WAS `text-sm`, which this design renders at 13px -- under the 16px
+ *      floor, so iOS Safari zooms the page on focus and does not zoom back out. Fourteen
+ *      of the fifteen remaining offenders in the whole tree were in this file.
+ *      `controlClasses` uses `field-text`, which is 16px on a coarse pointer.
+ *   4. `type="date"` GAVE A NATIVE DATE INPUT, three of them, which is what P3's
+ *      "zero native date inputs" box could not close while BR-10 owned this file.
+ *
+ * 🔑 IT IS A THIN ADAPTER NOW, NOT A WRAPPER. It maps this form's call shape --
+ * `options`, `searchable`, `type`, `note` -- onto the shared primitives, so the ~90 call
+ * sites in this file did not each have to change. That is the whole point of BR-4
+ * converging rather than rewriting: the fracture closes without touching the form's logic,
+ * which is the Capture Member arc's.
+ */
 function Field({ label, value, onChange, className = "", options = null, type = "text",
-                   error = null, disabled = false, searchable = false, note = null, id, required = false, loading = false }) {
-    const fieldId = id || label.toLowerCase().replace(/\s+/g, "-");
-    return (
-        <div className={className}>
-            <label htmlFor={fieldId} className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                <span>{label} {required && <span className="text-red-500 font-bold">*</span>}</span>
-                {loading && (
-                    <svg className="w-4 h-4 animate-spin text-cyan-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25" />
-                        <path d="M22 12a10 10 0 00-10-10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-                    </svg>
-                )}
-            </label>
-            {note && <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">{note}</p>}
-            <div className="relative">
-                {options && searchable ? (
-                    <SearchableSelect value={value} onChange={onChange} options={options} error={error} disabled={disabled} />
-                ) : options ? (
-                    <select id={fieldId} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled}>
-                        <option value="">Select...</option>
-                        {options.length === 0 ? (
-                            <option value="" disabled>No job grades available</option>
-                        ) : (
-                            options.map((opt) => {
-                                const val = opt?.value !== undefined ? opt.value : opt;
-                                const lbl = opt?.label !== undefined ? opt.label : opt;
-                                return <option key={val} value={val}>{lbl}</option>;
-                            })
-                        )}
-                    </select>
-                ) : (
-                    <input id={fieldId} type={type} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled} />
-                )}
-                {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
-            </div>
-        </div>
-    );
+                   error = null, disabled = false, searchable = false, note = null, kind, required = false,
+                   loading = false, emptyLabel }) {
+    const shared = {
+        label,
+        value,
+        onChange,
+        error: error || undefined,
+        disabled,
+        required,
+        hint: note || undefined,
+        className,
+    };
+
+    if (type === "date") {
+        return <DateField {...shared} max="today" />;
+    }
+
+    if (options && searchable) {
+        return (
+            <SearchableSelect
+                {...shared}
+                options={options}
+                loading={loading}
+                onChange={(next) => onChange?.({ target: { value: next } })}
+                placeholder="Search..."
+            />
+        );
+    }
+
+    if (options) {
+        return (
+            <SelectInput
+                {...shared}
+                options={options}
+                loading={loading}
+                onChange={(next) => onChange?.({ target: { value: next } })}
+                placeholder="Select..."
+                // The caller's wording, not a generic one. "No job grades available" tells
+                // a member the BANK has no grades on file; "No options available" tells
+                // them nothing they can act on, and it is the copy the suite pins.
+                emptyLabel={emptyLabel}
+            />
+        );
+    }
+
+    return <TextInput {...shared} kind={kind || "text"} />;
 }

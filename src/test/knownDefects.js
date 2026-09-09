@@ -185,33 +185,43 @@ export const DEFECTS = {
       '2026-09-04.',
   ),
 
-  A27: define(
-    'A27',
-    'the Members list has no loading state and no error state -- only "no members"',
-    'Its mount effect is four fetches whose failure handling is console.error and ' +
-      'nothing else. membersList stays [], so a backend that is DOWN renders the empty ' +
-      'state: "No Sasbo members match the specified query definitions." An administrator ' +
-      'reads that as a fact about the union rather than a fact about the server, and ' +
-      'there is no retry affordance because there is nothing that knows a request ' +
-      'failed. There is no loading state either -- the page renders its empty table ' +
-      'immediately on mount, so the first thing every user sees is "no members", every ' +
-      'time. This is the three-state rule failing at the layer the rule is written ' +
-      'about, and it is the client counterpart of the service-layer swallows A12/A13. ' +
-      'Measured 2026-09-05.',
-  ),
+// A27 is RETIRED, 2026-09-10, by the design arc's 04.2.
+//
+// It read: "the Members list has no loading state and no error state -- only 'no
+// members'". The register now renders through the `Table` primitive, whose four data
+// states are separate branches by construction: `loading` is a live status row, `error`
+// carries the message AND a retry that re-runs the fetch, and `error` can never render as
+// `empty`. The page tracks one `listState` value rather than two booleans, so the illegal
+// fourth combination cannot be reached.
+//
+// Its three pins were deleted and its two standard-facing tests un-skipped in the same
+// commit -- flipped, not repaired (BR-5). The "CANNOT be told apart" test was INVERTED
+// rather than deleted: it now asserts the two screens DIFFER, which is the same fact
+// stated the right way round and the thing that would notice a regression.
+//
+// Removed rather than marked closed, for the reason A11 records: this file's population
+// IS the set of open rows.
+//
+// ⚠️ What is NOT closed with it: `06.1b` owns generalising these states across the
+// remaining list screens, and the shared error CONTRACT. This closes the row on the
+// surface the row was written about.
 
-  A28: define(
-    'A28',
-    'the Members "Identity Type" filter is a select with no accessible name',
-    'axe rates it CRITICAL. Every neighbouring filter is a TextInput or a ' +
-      'SearchableSelect, and both of those set aria-label on the control. This one was ' +
-      'hand-rolled as a plain div with a <span>Identity Type</span> above a bare ' +
-      '<select> -- a span is not a label, so nothing associates the two ' +
-      'programmatically. Sighted users see a heading; a screen-reader user reaches a ' +
-      'dropdown announced only as "combo box", with no way to know what it filters. The ' +
-      'fix is one aria-label, or using the SelectInput component the codebase already ' +
-      'has. Found 2026-09-05 by the a11y gate on its first run.',
-  ),
+// A28 is RETIRED, 2026-09-10, by the design arc's 04.2.
+//
+// It read: "the Members 'Identity Type' filter is a select with no accessible name",
+// which axe rated CRITICAL. It was a bare <select> under a <span>Identity Type</span> --
+// a span is not a label, so nothing associated the two and a screen-reader user reached a
+// dropdown announced only as "combo box". It is now `SelectInput`, which carries a real
+// <label htmlFor> through `Field`.
+//
+// Its pin was deleted and both standard-facing a11y tests un-skipped in the same commit.
+// ⚠️ The FIX went in with the flip and the ASSERTION was never touched -- the pin
+// asserted `['select-name']` exactly, and it is gone rather than edited to expect `[]`.
+//
+// 🔑 It had a SECOND site the register never named: the BEC committee <select> in the
+// member dialog had the same defect, and the a11y gate could not see it because that gate
+// scans the LIST page. Found by sweeping the class rather than fixing the list
+// (contract 17), and fixed in the same commit through `Field`.
 
   B6: define(
     'B6',

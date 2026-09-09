@@ -72,9 +72,9 @@ const ROUTES = discoverRoutes()
 const AWAITING_PAGE_TITLE = {
   /** `04.1` keeps the auth screens headed by their own markup, not `PageTitle`. */
 
-  /** `04.2` -- the members lane. */
-  '/members/apply': '04.2',
-  '/members/capture': '04.2',
+  /** `04.2` -- the members lane. `/members/capture` adopted PageTitle; `/members/apply`
+      is `MembershipApplication`, which belongs to `04.3`'s forms wave despite its path. */
+  '/members/apply': '04.3',
 
   /** `04.3` -- admin, maintainance, archives, reports, bank_branch, acb, forms. */
   '/archives/affiliations-other-trade-unions': '04.3',

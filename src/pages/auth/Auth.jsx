@@ -135,23 +135,26 @@ export default function Auth() {
           </span>
         </p>
 
-        {/* The two modes are a pair of buttons that swap one form for another, which is
-            what a tablist is. Announcing it as one is what tells a screen-reader user
-            that "Sign Up" changes the form below rather than navigating away. */}
-        <div role="tablist" aria-label="Sign in or sign up" className="mb-6 flex rounded-lg bg-surface-2 p-1">
+        {/* ⚠️ NOT A `role="tablist"`, though it looks like one and the first draft said so.
+            The ARIA tabs pattern is a contract — arrow keys move between tabs, the set
+            takes ONE tab stop, each tab owns a `tabpanel` — and declaring the role without
+            implementing it announces "tab 1 of 2" and then ignores the arrow key. Two
+            plain buttons carrying `aria-current` promise nothing they do not do, and they
+            already work from the keyboard. The full pattern needs the shared roving-focus
+            hook that `05.3` owns. */}
+        <div className="mb-6 flex rounded-lg bg-surface-2 p-1">
           {[
             { label: 'Login', active: isLogin, to: true },
             { label: 'Sign Up', active: !isLogin, to: false },
           ].map(({ label, active, to }) => (
-            // The `Button` primitive rather than a raw tag, even wearing a tab's skin:
-            // what it brings is the 44px coarse-pointer hit area and the focus ring,
-            // neither of which the raw version had. `role` and `aria-selected` pass
-            // straight through, and `cn` is tailwind-merge so the tab's own border,
+            // The `Button` primitive rather than a raw tag, even wearing a segmented
+            // control's skin: what it brings is the 44px coarse-pointer hit area and the
+            // focus ring, neither of which the raw version had. `aria-current` passes
+            // straight through, and `cn` is tailwind-merge so this skin's own border,
             // radius and fill win over the variant's.
             <Button
               key={label}
-              role="tab"
-              aria-selected={active}
+              aria-current={active ? 'true' : undefined}
               onClick={() => switchMode(to)}
               className={`flex-1 justify-center rounded-md border-transparent py-2 ${
                 active
@@ -243,7 +246,12 @@ export default function Auth() {
               validation the member meets — one behaviour rather than two that disagree. */}
           <Button type="submit" variant="primary" className="mt-4 w-full justify-center">
             {isLogin ? <LogIn size={20} aria-hidden="true" /> : <UserPlus size={20} aria-hidden="true" />}
-            {isLogin ? 'Log In' : 'Sign up'}
+            {/* ⚠️ "Create account", NOT "Sign up". The segmented control above already
+                says "Sign Up", and so did the switch below -- THREE controls on one small
+                card, two of them with the same accessible name. A screen-reader user
+                tabbing through hears "Sign up, button" three times and cannot tell which
+                one submits. Naming each for what it DOES fixes it for everybody. */}
+            {isLogin ? 'Log In' : 'Create account'}
           </Button>
         </form>
 
@@ -254,7 +262,7 @@ export default function Auth() {
         <div className="mt-6 flex flex-col items-center gap-1 text-sm text-ink-muted">
           <p>{isLogin ? "Don't have an account?" : 'Already have an account?'}</p>
           <Button variant="ghost" size="sm" onClick={() => switchMode(!isLogin)}>
-            {isLogin ? 'Sign up' : 'Log in'}
+            {isLogin ? 'Create one instead' : 'Log in instead'}
           </Button>
         </div>
       </div>

@@ -57,14 +57,20 @@ const MEMBER_WITH_POSITIONS = {
   // proves the defect is absent.
   isCosatu: 'Y',
   cosatuPositions: 'PEC,CEC',
-  // 🔴 `isBec`, AND IT IS LOAD-BEARING -- added when upstream moved the gate.
-  // The COSATU detail block used to sit at the top level of the panel. It is
-  // now nested inside `{selectedMember.isBec && (...)}`, so a member who is not
-  // a BEC member never renders it. Without this line the pin below stops
-  // throwing -- not because the defect was fixed, but because the fixture no
-  // longer reaches the code that has it. That reads as green-turned-red and
-  // would have been "closed" on the next pass. The `.join(", ")` on line 825 of
-  // Members.jsx is still exactly where it was.
+  // ⚠️ `isBec` IS STILL HERE, AND THE REASON HAS CHANGED -- which is worth writing
+  // down, because a line kept for a reason that has expired is how a fixture quietly
+  // stops testing what it claims to.
+  //
+  // It was added when `07cd8ec` nested the COSATU block inside
+  // `{selectedMember.isBec && (...)}`: without it the A37 pin stopped throwing, not
+  // because the defect was fixed but because the fixture no longer reached the code that
+  // had it. `04.2` UN-NESTED that block (N5 / BR-15), so A37 is now reachable for any
+  // COSATU member, BEC or not.
+  //
+  // 🔑 It stays because A38 needs it. `becStructures` is still inside the BEC gate,
+  // so the second pin -- the same `.join(", ")` one field over -- would go quiet without
+  // it. Same line, different pin, and the two must not be confused: the `04.2` test below
+  // asserts the un-nesting precisely so nothing has to infer it from this fixture.
   isBec: true,
 }
 
@@ -80,9 +86,19 @@ const BEC_STRUCTURES = {
 
 const membersRespond = (body) => http.get('*/api/members', () => HttpResponse.json(body))
 
-/** Open the member, then the tab the positions are rendered on. */
+/**
+ * Open the member, then the section the positions are rendered on.
+ *
+ * ⚠️ THE FIRST STEP CHANGED IN `04.2` AND THE PINS ARE OTHERWISE UNTOUCHED. The row
+ * used to be a `<tr onClick>`, so clicking the member's NAME opened the record -- and only
+ * a mouse could do it. The register is the `Table` primitive now, which offers no
+ * `onRowClick` at all, so the action is a real button on the membership number. That is a
+ * presentation change to the register; A37 and A38 are the Capture Member arc's to fix
+ * (IMPLEMENTATION.md: "A37 and A38 are not ours to fix"), and the `.join(", ")` they pin
+ * is exactly where it was.
+ */
 async function openStructuresTab(user) {
-  await user.click(await screen.findByText(/Testperson/))
+  await user.click(await screen.findByRole('button', { name: /open the record for/i }))
   await user.click(await screen.findByRole('button', { name: /Sasbo Structures/i }))
 }
 
@@ -163,4 +179,119 @@ describe('a member whose COSATU positions arrive as a delimited string', () => {
     await expect(openStructuresTab(user)).rejects.toThrow(/\.join is not a function/)
   })
 
+})
+
+/**
+ * N5 / BR-15 -- COSATU IS PARALLEL TO BEC, NOT NESTED INSIDE IT.
+ *
+ * 🔴 THE DEFECT: `07cd8ec` put the whole COSATU block inside `editForm.isBec &&` in
+ * this file while leaving it UNGATED in `CaptureMember.jsx`. So the same member could be
+ * captured as COSATU and then have that disappear from their record the moment they were
+ * not also a BEC member -- data that exists, was entered deliberately, and cannot be seen
+ * or edited. `V19` models COSATU parallel to BEC, and a stakeholder confirmed via the
+ * owner on 2026-09-09 that there is no eligibility gate. Two independent sources.
+ *
+ * 🔑 THIS IS THE ASSERTION THAT MAKES THE FIX PERMANENT. A comment saying "un-nested"
+ * is undone by one well-meaning edit that re-adds the guard; a fixture with `isBec: false`
+ * and COSATU data is not.
+ */
+describe('a COSATU member who is not a BEC member', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    server.use(...pageFixtures)
+    server.use(
+      membersRespond([
+        {
+          ...MEMBER_WITH_POSITIONS,
+          isBec: false,
+          cosatuPositions: ['PEC'],
+          cosatuLocal: 'Braamfontein',
+          cosatuRegion: 'Gauteng South',
+        },
+      ]),
+    )
+  })
+
+  it('can still see their COSATU record', async () => {
+    const user = setupUser()
+    renderWithProviders(<MembersPage />)
+    await openStructuresTab(user)
+
+    // The three facts that used to vanish with the BEC flag.
+    expect(await screen.findByText('Braamfontein')).toBeInTheDocument()
+    expect(screen.getByText('Gauteng South')).toBeInTheDocument()
+    expect(screen.getByText('PEC')).toBeInTheDocument()
+  })
+
+  it('can still EDIT their COSATU record', async () => {
+    // 🔴 THE READ SIDE AND THE EDIT SIDE ARE TWO GATES, AND THE FIRST VERSION OF THIS
+    // FILE ONLY COVERED ONE. Proved by mutation: re-adding `editForm.isBec &&` to the
+    // edit branch left every assertion above GREEN, because they all read the record
+    // rather than edit it. A member whose COSATU data is visible but uneditable is half
+    // of N5, and half of a defect is still a defect.
+    const user = setupUser()
+    renderWithProviders(<MembersPage />)
+    await openStructuresTab(user)
+    await user.click(screen.getByRole('button', { name: /Edit Member/i }))
+
+    expect(await screen.findByLabelText(/^COSATU Local/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Region within Local/i)).toBeInTheDocument()
+  })
+
+  it('and the BEC-only detail is still absent, so the un-nesting did not flatten everything', () => {
+    // 🔑 THE MUST-PASS HALF. "COSATU shows for a non-BEC member" is also satisfied by a
+    // panel that renders every block unconditionally -- which would be a different defect,
+    // showing BEC roles for someone who has none. This asserts the BEC gate SURVIVED.
+    // Synchronous and query-based: the point is what is NOT there.
+    renderWithProviders(<MembersPage />)
+    expect(screen.queryByText(/BEC Executive Position/i)).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * BR-14 -- THE TWO UNLABELLED CHECKBOXES ARE GONE.
+ *
+ * 🔴 What was there: `["COSATU Local", "Region within Local"].map(...)` rendering a
+ * `<label>` containing a checkbox and NO TEXT AT ALL. Two controls with an empty
+ * accessible name, side by side -- and they wrote their labels into `cosatuPositions`, the
+ * POSITIONS array, so a member's STRUCTURE was recorded as though it were a role. The
+ * agreed `cosatuPositions` wire shape is positions only.
+ */
+describe('BR-14 -- COSATU structure is two named fields, not two nameless checkboxes', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    server.use(...pageFixtures)
+    server.use(membersRespond([{ ...MEMBER_WITH_POSITIONS, cosatuPositions: [], isCosatu: 'Y' }]))
+  })
+
+  it('offers COSATU Local and Region as labelled text fields while editing', async () => {
+    const user = setupUser()
+    renderWithProviders(<MembersPage />)
+    await openStructuresTab(user)
+    await user.click(screen.getByRole('button', { name: /Edit Member/i }))
+
+    // By LABEL, which is the whole point: the controls these replace had none.
+    expect(await screen.findByLabelText(/^COSATU Local/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Region within Local/i)).toBeInTheDocument()
+  })
+
+  it('leaves no control on the form without an accessible name', async () => {
+    const user = setupUser()
+    renderWithProviders(<MembersPage />)
+    await openStructuresTab(user)
+    await user.click(screen.getByRole('button', { name: /Edit Member/i }))
+
+    // 🔑 THE CLASS, NOT THE INSTANCE (contract 17). Naming the two checkboxes would
+    // have fixed the two the register happened to describe. This asks the same question
+    // of every checkbox on the panel, so the next one to arrive nameless is caught by the
+    // test that was written for the last one.
+    const nameless = [...document.querySelectorAll('input[type="checkbox"]')].filter(
+      (box) => !(box.labels?.[0]?.textContent || box.getAttribute('aria-label') || '').trim(),
+    )
+    expect(
+      nameless.length,
+      'A checkbox on the member panel has no accessible name -- the BR-14 shape, back ' +
+        'again. A screen-reader user meets a box and cannot know what ticking it means.',
+    ).toBe(0)
+  })
 })

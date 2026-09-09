@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { LucideUserRoundPlus, CheckCircle2, Printer } from "lucide-react";
+import { LucideUserRoundPlus, AlertCircle, CheckCircle2, Printer } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { recruiterService } from "../../services/recruiterService.js";
 import { jobGradeService } from "../../services/jobGradeService.js";
 import { bankService } from "../../services/bankService.js";
-import { TextInput, SearchableSelect, Button, DateField } from "../../components/form";
+import { TextInput, SearchableSelect, SelectInput, Button, CheckboxGroup, DateField, Field, controlClasses } from "../../components/form";
+import StatusChip from "../../components/common/StatusChip.jsx";
+import Table from "../../components/table/Table.jsx";
 import Modal, { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
 import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
@@ -158,14 +160,42 @@ export default function Members() {
     const [membersList, setMembersList] = useState([]);
     const [bankNames, setBankNames] = useState([]);
 
-    useEffect(() => {
-        recruiterService.getRoles().then(setRoles).catch(err => console.error("Failed to load roles", err));
-        memberService.getMembers().then(res => {
+    /**
+     * A27 — THE THREE STATES, AT LAST, AND THE DEFECT WAS THAT THERE WAS ONLY ONE.
+     *
+     * The mount effect's entire failure handling was `console.error`, and `membersList`
+     * simply stayed `[]`. So a backend that is DOWN rendered "No Sasbo members match the
+     * specified query definitions" — which an administrator reads as a fact about the
+     * union rather than a fact about the server, with no retry, because nothing in the
+     * page knew a request had failed. There was no loading state either: the empty table
+     * rendered synchronously on mount, so the first thing every user saw, every time, was
+     * "no members", flickering into data.
+     *
+     * 🔑 `listState` IS ONE VALUE, NOT TWO BOOLEANS. `loading` and `error` as separate
+     * flags is four combinations for three legal states, and the illegal fourth
+     * (`loading && error`) is what renders an error and a spinner at once.
+     */
+    const [listState, setListState] = useState("loading");
+
+    const loadMembers = useCallback(() => {
+        setListState("loading");
+        return memberService.getMembers().then(res => {
             const list = Array.isArray(res) ? res : (res.data || res.members || []);
             setMembersList(list);
-        }).catch(err => console.error("Failed fetching records array", err));
-        bankService.getBankNames().then(setBankNames).catch(err => console.error("Failed to load banks", err));
+            setListState("ready");
+        }).catch(err => {
+            // Still logged — the log is what a developer reads. What changed is that the
+            // SCREEN now knows too.
+            console.error("Failed fetching records array", err);
+            setListState("error");
+        });
     }, []);
+
+    useEffect(() => {
+        recruiterService.getRoles().then(setRoles).catch(err => console.error("Failed to load roles", err));
+        loadMembers();
+        bankService.getBankNames().then(setBankNames).catch(err => console.error("Failed to load banks", err));
+    }, [loadMembers]);
 
     const tabsWithErrors = useMemo(() => {
         const errorTabs = new Set();
@@ -335,6 +365,18 @@ export default function Members() {
         return errors;
     };
 
+    /**
+     * What the last save attempt said, when it was not a validation failure.
+     *
+     * 🔴 IT WAS THREE `alert()` CALLS. A native modal cannot be styled, blocks the thread,
+     * names no field, and is SUPPRESSIBLE — a member who ticks "don't show me these again"
+     * silently loses every confirmation in the application. It also arrives and leaves,
+     * so after dismissing "please fix the following validation errors" the form looked
+     * exactly as it had, with nothing on screen saying what was wrong.
+     */
+    const [saveNotice, setSaveNotice] = useState(null);
+    const errorSummaryRef = useRef(null);
+
     const handleSaveChanges = async () => {
         const clientSideErrors = validateEditForm();
         const mergedErrors = { ...fieldErrors, ...clientSideErrors };
@@ -343,20 +385,21 @@ export default function Members() {
             setFieldErrors(mergedErrors);
             const dynamicFields = Object.keys(mergedErrors);
             setActiveTab(FIELD_TO_TAB_MAP[dynamicFields[0]] || "personal");
-
-            const summary = Object.values(mergedErrors).map(msg => `• ${msg}`).join("");
-            alert(`Please fix the following validation errors before saving:
-
-${summary}`);
+            // The summary is rendered in the dialog and focused, so the member is told
+            // where the problem is AND left looking at it. The tab switch above is what
+            // makes that true for a form whose fields are behind five tabs.
+            setSaveNotice({ kind: "invalid", messages: Object.values(mergedErrors) });
             return;
         }
 
         const changes = getChangedFields(editForm, selectedMember);
         if (changes.length === 0) {
-            alert("No changes detected.");
+            setSaveNotice({ kind: "unchanged", messages: ["Nothing on this record has changed, so there is nothing to save."] });
             setIsEditing(false);
             return;
         }
+
+        setSaveNotice(null);
 
         // 🔴 `03.4`: was `window.confirm()`. It listed the changes in a browser dialog that
         // cannot be styled, cannot be scrolled sensibly, blocks the whole thread, and is
@@ -378,11 +421,25 @@ ${summary}`);
             window.setTimeout(() => setShowSavedNotification(false), 3000);
         } catch (error) {
             console.error("Unable to save member changes", error);
-            alert("Unable to save changes. Please try again.");
+            // 06.1 owns the shared error CONTRACT; what this wave owes the screen is that
+            // a failed save is visible on the screen the member is looking at, rather than
+            // in a dialog they dismiss and a console they never open.
+            setSaveNotice({
+                kind: "failed",
+                messages: ["We could not save these changes. Nothing was written — please try again."],
+            });
         }
     };
 
     const [pendingSave, setPendingSave] = useState(null);
+
+    // Same shape as `Auth`'s, and for the same reason: the summary does not exist yet when
+    // the handler that sets it runs, so focusing it there is a silent no-op. `saveNotice`
+    // is replaced by a fresh object on every attempt, so a second failed save moves focus
+    // again rather than looking ignored.
+    useEffect(() => {
+        if (saveNotice) errorSummaryRef.current?.focus();
+    }, [saveNotice]);
 
     const handleInputChange = useCallback((field) => (event) => {
         const value = event && event.target ? event.target.value : event;
@@ -390,14 +447,28 @@ ${summary}`);
         setPage(1);
     }, []);
 
+    /**
+     * R-PERF-J. The filter runs against the WHOLE member list on every keystroke, and the
+     * result re-renders a table of up to a hundred rows. `useDeferredValue` lets React
+     * paint the keystroke first and the filtered list a beat later, so typing stays
+     * responsive on a list that is large enough to matter.
+     *
+     * ⚠️ DEFERRED, NOT DEBOUNCED, AND THE DIFFERENCE IS WHICH ONE IS CORRECT HERE. A
+     * debounce delays by a fixed time whether or not the machine needed it; deferring
+     * costs nothing on a fast machine and degrades gracefully on a slow one. `useDebounce`
+     * is the right tool where a keystroke triggers a REQUEST — this filter is local, so
+     * there is no request to spare.
+     */
+    const deferredFilters = useDeferredValue(filters);
+
     const filteredMembers = useMemo(() => {
         const activeFilters = FILTER_FIELDS
-            .map((field) => [field, filters[field] ? String(filters[field]).trim().toLowerCase() : ""])
+            .map((field) => [field, deferredFilters[field] ? String(deferredFilters[field]).trim().toLowerCase() : ""])
             .filter(([, value]) => value);
         return membersList.filter((member) => activeFilters.every(([field, value]) =>
             String(member[field] ?? "").trim().toLowerCase().includes(value)
         ));
-    }, [filters, membersList]);
+    }, [deferredFilters, membersList]);
 
     const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE)), [filteredMembers]);
     useEffect(() => {
@@ -421,31 +492,105 @@ ${summary}`);
         }
         return String(dateVal).split("T")[0];
     };
+    /**
+     * The register's columns. R-RESP-K: every column declares what it is worth, so a phone
+     * shows three real columns and puts the rest in the row's detail panel instead of
+     * crushing nine into 390px.
+     *
+     * 🔴 THE ROW IS NOT CLICKABLE ANY MORE, AND THAT WAS A REAL DEFECT. It was
+     * `<tr onClick>` — no tab stop, no accessible name, no Enter, so the only way to open a
+     * member record was a mouse. `Table` offers no `onRowClick` at all, deliberately, so
+     * the action is a real `<button>` in the row: the membership number itself, which is
+     * the thing a user is looking at when they decide to open it.
+     */
+    const columns = useMemo(() => [
+        {
+            key: "membershipNumber",
+            header: "Membership No",
+            priority: "essential",
+            cell: (member) => {
+                const number = member.membershipNumber || "-";
+                const who = [member.title, member.initials, member.surname].filter(Boolean).join(" ");
+                return (
+                    <button
+                        type="button"
+                        onClick={() => setSelectedMember(member)}
+                        // The number alone is not a name a screen-reader user can act on:
+                        // "1002" says nothing about what pressing it does, and every row
+                        // has one.
+                        //
+                        // ⚠️ `aria-label` RATHER THAN A VISUALLY-HIDDEN SPAN, and the
+                        // difference is not cosmetic. A hidden span is real text content,
+                        // so the member's surname then appears TWICE in the row -- once in
+                        // the name column and once inside this button -- and every
+                        // `getByText(surname)` in the suite starts finding two nodes. It
+                        // begins as a test annoyance and ends as a page where "find the
+                        // name" is ambiguous. `aria-label` is not text content.
+                        //
+                        // It OPENS with the visible number, which WCAG 2.5.3 requires: an
+                        // accessible name that does not contain the visible label breaks
+                        // speech control ("press 1002").
+                        aria-label={who ? `${number} — open the record for ${who}` : `${number} — open this member's record`}
+                        className="touch-target rounded-sm font-semibold text-brand-ink underline-offset-2 hover-hover:hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+                    >
+                        {number}
+                    </button>
+                );
+            },
+        },
+        { key: "employeeNumber", header: "Employee No", priority: "secondary", cell: (m) => m.employeeNumber || "-" },
+        {
+            key: "fullName",
+            header: "Full Names & Surname",
+            priority: "essential",
+            // R-RESP-I: `truncate` is safe ONLY because Table puts the full value in the
+            // detail panel and in the cell's `title`. A truncated name with no way to read
+            // it is a register that cannot do its job.
+            truncate: true,
+            cell: (m) => [m.title, m.initials, m.surname].filter(Boolean).join(" ") || "-",
+        },
+        { key: "bankName", header: "Bank Institution", priority: "secondary", cell: (m) => m.bankName || "-" },
+        { key: "branch", header: "Branch Location", priority: "secondary", cell: (m) => m.branch || "-" },
+        {
+            key: "status",
+            header: "Status",
+            priority: "essential",
+            cell: (member) => <StatusChip status={member.status} />,
+        },
+    ], []);
 
     return (
-        <div className="p-6 text-gray-900 dark:text-gray-100">
+        <div className="p-6 text-ink">
             <PageTitle title="Members" subtitle="Search and manage Sasbo member records across all major financial institutions" />
-            <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
+            <div className="max-w-6xl mx-auto p-6 rounded-card border border-line bg-surface shadow-(--shadow-1)">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                     <SearchableSelect label="Title" value={filters.title} onChange={handleInputChange("title")} placeholder="All Titles" options={[{ value: "", label: "All Titles" }, ...titleOptions.map(o => ({ value: o, label: o }))]} />
-                    <TextInput label="Employee Number" value={filters.employeeNumber} onChange={handleInputChange("employeeNumber")} placeholder="Search by employee number" />
-                    <TextInput label="Membership Number" value={filters.membershipNumber} onChange={handleInputChange("membershipNumber")} placeholder="Search by membership number" />
+                    <TextInput label="Employee Number" kind="identifier" value={filters.employeeNumber} onChange={handleInputChange("employeeNumber")} placeholder="Search by employee number" />
+                    <TextInput label="Membership Number" kind="identifier" value={filters.membershipNumber} onChange={handleInputChange("membershipNumber")} placeholder="Search by membership number" />
                     <TextInput label="Initials" value={filters.initials} onChange={handleInputChange("initials")} placeholder="Search by initials" />
-                    <TextInput label="Surname" value={filters.surname} onChange={handleInputChange("surname")} placeholder="Search by surname" />
-                    <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        <span>Identity Type</span>
-                        <select value={filters.identityType} onChange={handleInputChange("identityType")} className="rounded-lg px-3 py-2 text-sm font-normal normal-case tracking-normal border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
-                            <option value="">All Types</option>
-                            {idTypeOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                    </div>
-                    <TextInput label="Identity Number" value={filters.identityNumber} onChange={handleInputChange("identityNumber")} placeholder="Search by identity number" />
+                    <TextInput label="Surname" kind="name" value={filters.surname} onChange={handleInputChange("surname")} placeholder="Search by surname" />
+                    {/* 🔴 A28, CLOSED. This was a bare <select> under a <span>Identity Type</span>
+                        — a span is not a label, so nothing associated the two and a
+                        screen-reader user reached a dropdown announced only as "combo box",
+                        with no way to know what it filtered. axe rated it CRITICAL, it was
+                        the only violation the Members list had, and every neighbouring
+                        filter was already a primitive. `SelectInput` carries the real
+                        <label htmlFor>. The pin in `a11y.test.jsx` is flipped in this same
+                        commit — never repaired. */}
+                    <SelectInput
+                        label="Identity Type"
+                        value={filters.identityType}
+                        onChange={handleInputChange("identityType")}
+                        placeholder="All Types"
+                        options={[{ value: "", label: "All Types" }, ...idTypeOptions.map(o => ({ value: o, label: o }))]}
+                    />
+                    <TextInput label="Identity Number" kind="identifier" value={filters.identityNumber} onChange={handleInputChange("identityNumber")} placeholder="Search by identity number" />
                     <SearchableSelect label="Bank Name" value={filters.bankName} onChange={handleInputChange("bankName")} placeholder="All Banks" options={[{ value: '', label: 'All BankBranch' }, ...bankOptions.map(b => ({ value: b, label: b }))]} />
                     <TextInput label="Branch" value={filters.branch} onChange={handleInputChange("branch")} placeholder="Search by branch" />
-                    <TextInput label="Bank Account Number" value={filters.bankAccountNumber} onChange={handleInputChange("bankAccountNumber")} placeholder="Search by bank account number" />
-                    <TextInput label="Cellphone Number" value={filters.phone} onChange={handleInputChange("phone")} placeholder="Search by cellphone number" />
-                    <TextInput label="Personal Email" value={filters.personalEmail} onChange={handleInputChange("personalEmail")} placeholder="Search by personal email" />
-                    <TextInput label="Work Email" value={filters.workEmail} onChange={handleInputChange("workEmail")} placeholder="Search by work email" />
+                    <TextInput label="Bank Account Number" kind="identifier" value={filters.bankAccountNumber} onChange={handleInputChange("bankAccountNumber")} placeholder="Search by bank account number" />
+                    <TextInput label="Cellphone Number" kind="tel" value={filters.phone} onChange={handleInputChange("phone")} placeholder="Search by cellphone number" />
+                    <TextInput label="Personal Email" kind="email" value={filters.personalEmail} onChange={handleInputChange("personalEmail")} placeholder="Search by personal email" />
+                    <TextInput label="Work Email" kind="email" value={filters.workEmail} onChange={handleInputChange("workEmail")} placeholder="Search by work email" />
                     <SearchableSelect label="Status" value={filters.status} onChange={handleInputChange("status")} placeholder="All Statuses" options={[{ value: "", label: "All Statuses" }, ...statusOptions.map(o => ({ value: o, label: o }))]} />
                     <SearchableSelect label="Race" value={filters.race || ""} onChange={handleInputChange("race")} placeholder="All Races" options={[{ value: "", label: "All Races" }, ...raceOptions.map(o => ({ value: o, label: o }))]} />
                     <div className="flex items-end">
@@ -454,64 +599,41 @@ ${summary}`);
                 </div>
                 <div className="flex items-end justify-end mt-4 gap-3">
                     <Button variant="primary" onClick={() => navigate("/members/capture")}>
-                        <LucideUserRoundPlus size={16} strokeWidth={2} /> Capture Member
+                        <LucideUserRoundPlus size={16} strokeWidth={2} aria-hidden="true" /> Capture Member
                     </Button>
                 </div>
 
-                <div className="mt-6 overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-sm">
-                        <thead>
-                        <tr className="border-b border-gray-200 dark:border-gray-700 text-xs uppercase text-gray-500 font-bold bg-gray-50 dark:bg-gray-900/20">
-                            <th className="p-3">Membership No</th>
-                            <th className="p-3">Employee No</th>
-                            <th className="p-3">Full Names & Surname</th>
-                            <th className="p-3">Bank Institution</th>
-                            <th className="p-3">Branch Location</th>
-                            <th className="p-3">Status</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {visibleMembers.length > 0 ? (
-                            visibleMembers.map((member) => (
-                                <tr
-                                    key={member.id}
-                                    onClick={() => setSelectedMember(member)}
-                                    className="border-b border-gray-100 dark:border-gray-800/60 hover:bg-cyan-50/40 dark:hover:bg-cyan-950/20 cursor-pointer transition-colors"
-                                >
-                                    <td className="p-3 font-semibold text-cyan-600 dark:text-cyan-400">{member.membershipNumber || "-"}</td>
-                                    <td className="p-3 font-medium text-gray-600 dark:text-gray-400">{member.employeeNumber || "-"}</td>
-                                    <td className="p-3 font-medium">{`${member.title || ""} ${member.initials || ""} ${member.surname || ""}`}</td>
-                                    <td className="p-3 text-gray-700 dark:text-gray-300">{member.bankName || "-"}</td>
-                                    <td className="p-3 text-gray-500">{member.branch || "-"}</td>
-                                    <td className="p-3">
-                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${member.status === "Active" ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300" : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"}`}>
-                                                {member.status || "Unknown"}
-                                            </span>
-                                    </td>
-                                </tr>
-                            ))
-                        ) : (
-                            <tr>
-                                <td colSpan="6" className="text-center py-12 text-gray-400 font-medium">
-                                    No Sasbo members match the specified query definitions.
-                                </td>
-                            </tr>
-                        )}
-                        </tbody>
-                    </table>
+                {/* 🔴 A27, CLOSED. `Table` renders loading, error and empty as three separate
+                    branches, and `error` NEVER renders as `empty` — which is the whole
+                    defect: a backend that is down used to say "No Sasbo members match the
+                    specified query definitions", and an administrator reads that as a fact
+                    about the union. The retry re-runs the same fetch the mount effect does. */}
+                <div className="mt-6">
+                    <Table
+                        caption="Sasbo members matching the current search"
+                        columns={columns}
+                        rows={visibleMembers}
+                        rowKey="id"
+                        loading={listState === "loading"}
+                        error={listState === "error" ? "We could not load the member register." : null}
+                        onRetry={loadMembers}
+                        emptyTitle="No Sasbo members match the specified query definitions."
+                        emptyMessage="Try widening or clearing the filters above."
+                    />
                 </div>
+
                 <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm no-print">
-                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 font-medium">
+                    <div className="flex items-center gap-2 text-ink-muted font-medium">
                         Showing {filteredMembers.length === 0 ? 0 : startIndex + 1}-{endIndex} of {filteredMembers.length} members
                         {filteredMembers.length > 0 && (
-                            <button onClick={() => window.print()} title="Print results" className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition">
-                                <Printer size={16} />
-                            </button>
+                            <Button size="icon" variant="ghost" onClick={() => window.print()} aria-label="Print these results">
+                                <Printer size={16} aria-hidden="true" />
+                            </Button>
                         )}
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="pagination" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
-                        <span className="text-gray-600 dark:text-gray-300 text-sm font-semibold">Page {page} of {totalPages}</span>
+                        <span className="text-ink-muted text-sm font-semibold">Page {page} of {totalPages}</span>
                         <Button variant="pagination" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
                         <Button onClick={handleClear}>Clear</Button>
                     </div>
@@ -544,42 +666,104 @@ ${summary}`);
                     ) : (
                         <>
                             <Button onClick={() => setSelectedMember(null)}>Close</Button>
+                            {/* 🗣️ PRINT IS LIVE (the owner, 2026-09-09) and the member record is
+                                the first thing to get a real print layout: `print.css` hides
+                                the shell, the dialog chrome and every control, drops the
+                                record to a single column, and forces the light theme so a
+                                dark-mode user does not print a black page. */}
+                            <Button onClick={() => window.print()}>
+                                <Printer size={16} aria-hidden="true" /> Print
+                            </Button>
                             <Button variant="primary" onClick={handleEditToggle}>Edit Member</Button>
                         </>
                     )
                 }
             >
-                    <div className="relative">
+                    <div className="relative member-record">
                         {showSavedNotification && (
-                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg">
-                                <CheckCircle2 size={18} />
+                            <div role="status" className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-status-active-bg text-status-active border border-status-active-dot rounded-lg shadow-(--shadow-2) no-print">
+                                <CheckCircle2 size={18} aria-hidden="true" />
                                 <span className="text-sm font-medium">Changes saved successfully!</span>
+                            </div>
+                        )}
+
+                        {/* THE ERROR SUMMARY that replaced three `alert()` calls. Focused
+                            rather than `role="alert"`: `Field` already gives every inline
+                            message that role, so a form failing four validations would
+                            queue five announcements at once. F-P23. */}
+                        {saveNotice && (
+                            <div
+                                ref={errorSummaryRef}
+                                tabIndex={-1}
+                                aria-labelledby="member-save-notice-title"
+                                className={`mb-4 rounded-lg border p-3 text-sm no-print focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring ${
+                                    saveNotice.kind === "unchanged"
+                                        ? "border-line-strong bg-surface-2 text-ink-muted"
+                                        : "border-status-suspended-dot bg-status-suspended-bg text-status-suspended"
+                                }`}
+                            >
+                                <p id="member-save-notice-title" className="flex items-center gap-2 font-medium">
+                                    <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+                                    {saveNotice.kind === "invalid"
+                                        ? "Fix these before saving"
+                                        : saveNotice.kind === "unchanged"
+                                            ? "Nothing to save"
+                                            : "The changes were not saved"}
+                                </p>
+                                <ul className="mt-1 list-disc pl-6">
+                                    {saveNotice.messages.map((message) => <li key={message}>{message}</li>)}
+                                </ul>
                             </div>
                         )}
 
                         <div className="flex items-start justify-between gap-4 pb-4">
                             <div>
-                                <div className="mt-1 flex flex-wrap items-center gap-2 text-base font-bold text-gray-900 dark:text-gray-100">
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-base font-bold text-ink">
                                     <span>{`${editForm.title ? editForm.title + " " : ""}${[editForm.initials, editForm.surname].filter(Boolean).join(" ") || "-"}`}</span>
-                                    <span className="text-gray-300 dark:text-gray-600">•</span>
-                                    <span className="text-gray-600 dark:text-gray-400 text-sm font-semibold">{editForm.membershipNumber || "No Account ID"}</span>
-                                    <span className="text-gray-300 dark:text-gray-600">•</span>
-                                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${editForm.status === "Active" ? "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-300" : "bg-gray-100 text-gray-600 dark:bg-gray-900/40"}`}>{editForm.status}</span>
+                                    <span aria-hidden="true" className="text-ink-faint">•</span>
+                                    <span className="text-ink-muted text-sm font-semibold">{editForm.membershipNumber || "No Account ID"}</span>
+                                    <span aria-hidden="true" className="text-ink-faint">•</span>
+                                    <StatusChip status={editForm.status} />
                                 </div>
                             </div>
                         </div>
 
-                        <div className="px-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                        {/* 📱 A SCROLLABLE STRIP. Five sections at 390px do not fit; before
+                            this they wrapped into two crushed rows.
+
+                            ⚠️ NOT `role="tab"`, AND THAT IS DELIBERATE. It looks like a tab
+                            strip and the first draft said so — but the ARIA tabs pattern is
+                            a CONTRACT: arrow keys move between tabs, one tab stop covers the
+                            set, and each tab owns a `tabpanel`. Declaring the role without
+                            implementing the keyboard behaviour tells a screen-reader user
+                            "tab 3 of 5" and then does nothing when they press the arrow key,
+                            which is worse than a plain group of buttons — those simply work.
+                            `aria-current` says which section is showing without promising
+                            anything that is not here.
+
+                            ⏳ The full pattern needs roving focus, and a shared
+                            `useRovingFocus` is already on RF's list precisely because this
+                            application has three places that want it. `05.3` (keyboard and
+                            focus) is where it lands. */}
+                        <div className="border-b border-line no-print">
                             <div className="flex -mb-px overflow-x-auto whitespace-nowrap">
                                 {TABS.map((tab) => (
                                     <button
                                         key={tab.id}
+                                        type="button"
+                                        aria-current={activeTab === tab.id ? "true" : undefined}
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`mr-4 inline-flex items-center gap-1 p-4 border-b-2 font-bold text-sm transition-colors ${activeTab === tab.id ? "border-cyan-600 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400" : "border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"}`}
+                                        className={`touch-target mr-4 inline-flex items-center gap-1 p-4 border-b-2 font-bold text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring ${activeTab === tab.id ? "border-brand text-brand-ink" : "border-transparent text-ink-faint hover-hover:hover:text-ink"}`}
                                     >
                                         <span>{tab.label}</span>
                                         {isEditing && tabsWithErrors.has(tab.id) && (
-                                            <span className="text-red-500 font-extrabold text-sm animate-pulse">*</span>
+                                            <>
+                                                <span aria-hidden="true" className="text-status-suspended font-extrabold text-sm">*</span>
+                                                {/* The asterisk was the only signal, and it is
+                                                    invisible to a screen reader and to anyone
+                                                    who cannot distinguish the colour. */}
+                                                <span className="sr-only">(has errors)</span>
+                                            </>
                                         )}
                                     </button>
                                 ))}
@@ -588,11 +772,11 @@ ${summary}`);
 
                         <div className="text-sm">
                             {activeTab === "personal" && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-surface p-6 rounded-lg border border-line">
                                     <Detail label="Title" value={editForm.title} isEditing={isEditing} options={titleOptions} onChange={handleEditChange("title")} />
                                     <Detail label="Initials" value={editForm.initials} isEditing={isEditing} onChange={handleEditChange("initials")} />
-                                    <Detail label="First Name(s)" value={editForm.firstNames} isEditing={isEditing} onChange={handleEditChange("firstNames")} error={fieldErrors.firstNames} required />
-                                    <Detail label="Surname" value={editForm.surname} isEditing={isEditing} onChange={handleEditChange("surname")} error={fieldErrors.surname} required />
+                                    <Detail label="First Name(s)" value={editForm.firstNames} isEditing={isEditing} onChange={handleEditChange("firstNames")} error={fieldErrors.firstNames} required kind="name" />
+                                    <Detail label="Surname" value={editForm.surname} isEditing={isEditing} onChange={handleEditChange("surname")} error={fieldErrors.surname} required kind="name" />
                                     <Detail label="Identity Type" value={editForm.identityType} isEditing={isEditing} options={idTypeOptions} onChange={handleEditChange("identityType")} error={fieldErrors.identityType} required />
                                     <Detail
                                         label={editForm.identityType || "Identity Number"}
@@ -601,23 +785,33 @@ ${summary}`);
                                         onChange={handleEditChange("identityNumber")}
                                         error={fieldErrors.identityNumber}
                                         disabled={!editForm.identityType}
+                                        kind="identifier"
                                         required
                                     />
-                                    <Detail
-                                        label="Date of Birth"
-                                        value={editForm.identityType === "I.D. Number" ? formatDate(editForm.dateOfBirth) : editForm.dateOfBirth}
-                                        isEditing={isEditing}
-                                        type={editForm.identityType === "I.D. Number" ? "text" : "date"}
-                                        onChange={handleEditChange("dateOfBirth")}
-                                        disabled={editForm.identityType === "I.D. Number"}
-                                        error={fieldErrors.dateOfBirth}
-                                        required={editForm.identityType === "Passport"}
-                                    />
+                                    {/* 🔴 `04.2`: was a native <input type="date"> reached through
+                                        `Detail`'s `type` prop -- one of the three the P3 box
+                                        could not close, because BR-10 owned this file until
+                                        now. The I.D.-derived case stays read-only text: it is
+                                        computed from the identity number, not typed. */}
+                                    {editForm.identityType === "I.D. Number" ? (
+                                        <Detail label="Date of Birth" value={formatDate(editForm.dateOfBirth)} isEditing={isEditing} disabled onChange={handleEditChange("dateOfBirth")} />
+                                    ) : isEditing ? (
+                                        <DateField
+                                            label="Date of Birth"
+                                            value={editForm.dateOfBirth || ""}
+                                            required={editForm.identityType === "Passport"}
+                                            error={fieldErrors.dateOfBirth || undefined}
+                                            max="today"
+                                            onChange={(e) => setEditForm(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                                        />
+                                    ) : (
+                                        <Detail label="Date of Birth" value={editForm.dateOfBirth} isEditing={false} />
+                                    )}
                                     <Detail label="Gender" value={editForm.gender} isEditing={isEditing} options={editForm.identityType === "I.D. Number" ? null : genderOptions} onChange={handleEditChange("gender")} disabled={editForm.identityType === "I.D. Number"} />
                                     <Detail label="Race" value={editForm.race} isEditing={isEditing} options={raceOptions} onChange={handleEditChange("race")} />
-                                    <Detail label="Cellphone Number" value={editForm.phone} isEditing={isEditing} onChange={handleEditChange("phone")} />
-                                    <Detail label="Work Tel" value={editForm.workTel} isEditing={isEditing} onChange={handleEditChange("workTel")} />
-                                    <Detail label="Home Tel" value={editForm.homeTel} isEditing={isEditing} onChange={handleEditChange("homeTel")} />
+                                    <Detail label="Cellphone Number" value={editForm.phone} isEditing={isEditing} onChange={handleEditChange("phone")} kind="tel" />
+                                    <Detail label="Work Tel" value={editForm.workTel} isEditing={isEditing} onChange={handleEditChange("workTel")} kind="tel" />
+                                    <Detail label="Home Tel" value={editForm.homeTel} isEditing={isEditing} onChange={handleEditChange("homeTel")} kind="tel" />
                                     <div className="md:col-span-2">
                                         {isEditing ? (
                                             <AddressAutocomplete label="Residential Address" value={editForm.address} onChange={handleEditChange("address")} placeholder="Update residential location address strings..." />
@@ -629,8 +823,8 @@ ${summary}`);
                             )}
 
                             {activeTab === "employment" && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
-                                    <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-surface p-6 rounded-lg border border-line">
+                                    <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="identifier" />
                                     <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
                                     <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
                                     <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGrade} onChange={handleEditChange("jobGrade")} disabled={!editForm.bankName} />
@@ -639,7 +833,7 @@ ${summary}`);
 
                                     {editForm.paymentType === "Debit Order" && (
                                         <>
-                                            <Detail label="Bank Account Number" value={editForm.bankAccountNumber} isEditing={isEditing} error={fieldErrors.bankAccountNumber} required onChange={handleEditChange("bankAccountNumber")} />
+                                            <Detail label="Bank Account Number" value={editForm.bankAccountNumber} isEditing={isEditing} error={fieldErrors.bankAccountNumber} required onChange={handleEditChange("bankAccountNumber")} kind="identifier" />
                                             <Detail
                                                 label="Debit Day"
                                                 value={editForm.debitDay}
@@ -650,8 +844,7 @@ ${summary}`);
                                             />
                                         </>
                                     )}
-                                    <Detail label="IBT No." value={editForm.ibtNo} isEditing={isEditing} onChange={handleEditChange("ibtNo")} />
-                                    {/*<Detail label="Work IBT No." value={editForm.workIbtNo} isEditing={isEditing} onChange={handleEditChange("workIbtNo")} />*/}
+                                    <Detail label="IBT No." value={editForm.ibtNo} isEditing={isEditing} onChange={handleEditChange("ibtNo")} kind="identifier" />
                                     <div className="md:col-span-2">
                                         {isEditing ? (
                                             <AddressAutocomplete label="Bank Work Address" value={editForm.bankAddress} onChange={handleEditChange("bankAddress")} placeholder="Search coordinates..." />
@@ -663,26 +856,26 @@ ${summary}`);
                             )}
 
                             {activeTab === "membership" && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-surface p-6 rounded-lg border border-line">
                                     <Detail label="Date Joined Sasbo" value={formatBackendDate(selectedMember.joinDate)} isEditing={false} />
                                     <Detail label="Account Membership Status" value={editForm.status} isEditing={isEditing} options={statusOptions} onChange={handleEditChange("status")} />
-                                    <div className="md:col-span-2 border-t pt-3 font-semibold text-cyan-700 dark:text-cyan-400">Sasbo Subscription Fee Details</div>
+                                    <div className="md:col-span-2 border-t border-line pt-3 font-semibold text-brand-ink">Sasbo Subscription Fee Details</div>
                                     <Detail label="Monthly Subscription (ZAR)" value={selectedMember.monthlySubscription || "182.77"} isEditing={false} />
                                     <Detail label="Billing Frequency" value={selectedMember.subscriptionFrequency || "Monthly"} isEditing={false} />
                                 </div>
                             )}
 
                             {activeTab === "representatives" && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-surface p-6 rounded-lg border border-line">
                                     <Detail label="Assigned Lead Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={isEditing} options={roles.map(r => r.name)} onChange={handleEditChange("recruitmentRepresentativeName")} />
                                     <Detail label="Regional Area Representative" value={editForm.areasRep} isEditing={isEditing} options={roles.map(r => r.name)} onChange={handleEditChange("areasRep")} />
                                 </div>
                             )}
 
                             {activeTab === "structures" && (
-                                <div className="space-y-6 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                                    <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                                        <h3 className="text-sm font-bold uppercase tracking-wide text-cyan-700 dark:text-cyan-400">SASBO Structural Configuration Matrix</h3>
+                                <div className="space-y-6 bg-surface p-6 rounded-lg border border-line">
+                                    <div className="pb-4 border-b border-line">
+                                        <h3 className="text-sm font-bold uppercase tracking-wide text-brand-ink">SASBO Structural Configuration Matrix</h3>
                                     </div>
 
                                     {isEditing ? (
@@ -710,7 +903,7 @@ ${summary}`);
                                                 )}
                                             </div>
 
-                                            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                                            <div className="border-t border-line pt-4">
                                                 <Detail label="BEC (Branch Executive Committee) Member?" value={editForm.isBec ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
                                                     const isYes = e.target.value === "Yes";
                                                     setEditForm(prev => ({
@@ -722,27 +915,43 @@ ${summary}`);
                                             </div>
 
                                             {editForm.isBec && (
-                                                <div className="pl-4 border-l-2 border-cyan-500 dark:border-cyan-600 space-y-6 mt-4 animate-slideDown">
-                                                    <div>
-                                                        <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Select BEC Committee (Single Selection — 44 Available) *</label>
-                                                        <select value={editForm.becCommitteeId || ""} className={fieldCls(fieldErrors.becCommitteeId)} onChange={(e) => {
-                                                            const selectedId = e.target.value;
-                                                            const foundBranch = SASBO_BEC_BRANCHES.find(b => b.id === selectedId);
-                                                            setEditForm(prev => ({ ...prev, becCommitteeId: selectedId, becCommitteeName: foundBranch ? foundBranch.name : "" }));
-                                                        }}>
-                                                            <option value="">Select Committee...</option>
-                                                            {Object.entries(SASBO_BEC_BRANCHES.reduce((acc, branch) => {
-                                                                (acc[branch.region] = acc[branch.region] || []).push(branch);
-                                                                return acc;
-                                                            }, {})).map(([regionName, branchesInRegion]) => (
-                                                                <optgroup key={regionName} label={regionName.toUpperCase()} className="text-cyan-700 dark:text-cyan-400 font-bold bg-white dark:bg-gray-900">
-                                                                    {branchesInRegion.map(b => (
-                                                                        <option key={b.id} value={b.id} className="text-gray-900 dark:text-gray-100 font-normal">{b.name}</option>
-                                                                    ))}
-                                                                </optgroup>
-                                                            ))}
-                                                        </select>
-                                                    </div>
+                                                <div className="pl-4 border-l-2 border-brand space-y-6 mt-4 animate-slideDown">
+                                                    {/* 🔴 THE COMMITTEE SELECT HAD NO ACCESSIBLE NAME EITHER — the
+                                                        same defect as A28, one dialog over, and invisible to the
+                                                        a11y gate because that scans the LIST page. The <label> above
+                                                        it carried no `htmlFor`. `Field` hands down a real id without
+                                                        forcing the control to be an <input>, which is what lets the
+                                                        44 committees keep their <optgroup> grouping by region —
+                                                        genuinely useful at this length, and something no listbox
+                                                        primitive here offers. */}
+                                                    <Field label="Select BEC Committee (Single Selection — 44 Available)" required error={fieldErrors.becCommitteeId}>
+                                                        {({ id, describedBy, invalid }) => (
+                                                            <select
+                                                                id={id}
+                                                                aria-invalid={invalid}
+                                                                aria-describedby={describedBy}
+                                                                value={editForm.becCommitteeId || ""}
+                                                                className={controlClasses({ invalid, className: "touch-target" })}
+                                                                onChange={(e) => {
+                                                                    const selectedId = e.target.value;
+                                                                    const foundBranch = SASBO_BEC_BRANCHES.find(b => b.id === selectedId);
+                                                                    setEditForm(prev => ({ ...prev, becCommitteeId: selectedId, becCommitteeName: foundBranch ? foundBranch.name : "" }));
+                                                                }}
+                                                            >
+                                                                <option value="">Select Committee...</option>
+                                                                {Object.entries(SASBO_BEC_BRANCHES.reduce((acc, branch) => {
+                                                                    (acc[branch.region] = acc[branch.region] || []).push(branch);
+                                                                    return acc;
+                                                                }, {})).map(([regionName, branchesInRegion]) => (
+                                                                    <optgroup key={regionName} label={regionName.toUpperCase()}>
+                                                                        {branchesInRegion.map(b => (
+                                                                            <option key={b.id} value={b.id}>{b.name}</option>
+                                                                        ))}
+                                                                    </optgroup>
+                                                                ))}
+                                                            </select>
+                                                        )}
+                                                    </Field>
 
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         <Detail label="BEC Recruiter?" value={editForm.isBecRecruiter ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
@@ -760,21 +969,12 @@ ${summary}`);
                                                             setEditForm(prev => ({ ...prev, isBecStructureRep: isYes, ...(!isYes ? { becStructures: [] } : {}) }));
                                                         }} />
                                                         {editForm.isBecStructureRep && (
-                                                            <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg space-y-2">
-                                                                {["INC / IC", "NCF / SJC", "Vice President (VP)", "President", "MANCOM", "Resolutions Committee"].map((struct) => {
-                                                                    const currentSelected = editForm.becStructures || [];
-                                                                    const isChecked = currentSelected.includes(struct);
-                                                                    return (
-                                                                        <label key={struct} className="flex items-center gap-3 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm">
-                                                                            <input type="checkbox" checked={isChecked} className="accent-cyan-600 rounded text-cyan-600 focus:ring-cyan-500 h-4 w-4" onChange={() => {
-                                                                                const nextSelected = isChecked ? currentSelected.filter(item => item !== struct) : [...currentSelected, struct];
-                                                                                setEditForm(prev => ({ ...prev, becStructures: nextSelected }));
-                                                                            }} />
-                                                                            <span className="text-gray-800 dark:text-gray-200">{struct}</span>
-                                                                        </label>
-                                                                    );
-                                                                })}
-                                                            </div>
+                                                            <CheckboxGroup
+                                                                legend="BEC structures represented"
+                                                                options={["INC / IC", "NCF / SJC", "Vice President (VP)", "President", "MANCOM", "Resolutions Committee"]}
+                                                                selected={editForm.becStructures || []}
+                                                                onToggle={(next) => setEditForm(prev => ({ ...prev, becStructures: next }))}
+                                                            />
                                                         )}
                                                     </div>
 
@@ -787,104 +987,99 @@ ${summary}`);
                                                             <Detail label="Select Executive Position" value={editForm.becExecutivePosition} isEditing={true} options={["Chairperson", "Deputy Chairperson", "Secretary", "Deputy Secretary", "Treasurer"]} onChange={(e) => setEditForm(prev => ({ ...prev, becExecutivePosition: e.target.value }))} />
                                                         )}
                                                     </div>
-
-                                                    <div className="border-t border-cyan-200 dark:border-cyan-800 pt-4 mt-4">
-                                                        <Detail label="COSATU Member (within this BEC Committee)?" value={editForm.isCosatu === "Y" || editForm.isCosatu === true ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
-                                                            const isYes = e.target.value === "Yes";
-                                                            setEditForm(prev => ({
-                                                                ...prev,
-                                                                isCosatu: isYes ? "Y" : "N",
-                                                                ...(!isYes ? { cosatuLocal: "", cosatuRegion: "", cosatuPositions: [] } : {})
-                                                            }));
-                                                        }} />
-                                                        {(editForm.isCosatu === "Y" || editForm.isCosatu === true) && (
-                                                            <div className="mt-4 pl-4 border-l-2 border-orange-400 space-y-4 animate-slideDown">
-                                                                <p className="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">COSATU Structure within BEC Committee</p>
-                                                                <div className="grid grid-cols-2 gap-3">
-                                                                    {["COSATU Local", "Region within Local"].map((pos) => {
-                                                                        const current = editForm.cosatuPositions || [];
-                                                                        return (
-                                                                            <label key={pos} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                                                                                <input type="checkbox" checked={current.includes(pos)} className="accent-orange-500 rounded h-4 w-4" onChange={() => {
-                                                                                    const next = current.includes(pos) ? current.filter(p => p !== pos) : [...current, pos];
-                                                                                    setEditForm(prev => ({ ...prev, cosatuPositions: next }));
-                                                                                }} />
-                                                                            </label>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                                {/*<div className="grid grid-cols-1 md:grid-cols-2 gap-4">*/}
-                                                                {/*    <Detail label="COSATU Local" value={editForm.cosatuLocal || ""} isEditing={true} onChange={(e) => setEditForm(prev => ({ ...prev, cosatuLocal: e.target.value }))} />*/}
-                                                                {/*    <Detail label="Region within Local" value={editForm.cosatuRegion || ""} isEditing={true} onChange={(e) => setEditForm(prev => ({ ...prev, cosatuRegion: e.target.value }))} />*/}
-                                                                {/*</div>*/}
-                                                                <div className="p-4 bg-orange-50/50 dark:bg-orange-950/10 border border-orange-200 dark:border-orange-800 rounded-lg">
-                                                                    <label className="block text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-400 mb-2">COSATU Positions — Multiple Allowed</label>
-                                                                    <div className="grid grid-cols-2 gap-3">
-                                                                        {["PEC", "CEC", "Treasurer", "Chairperson", "Secretary"].map((pos) => {
-                                                                            const current = editForm.cosatuPositions || [];
-                                                                            return (
-                                                                                <label key={pos} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                                                                                    <input type="checkbox" checked={current.includes(pos)} className="accent-orange-500 rounded h-4 w-4" onChange={() => {
-                                                                                        const next = current.includes(pos) ? current.filter(p => p !== pos) : [...current, pos];
-                                                                                        setEditForm(prev => ({ ...prev, cosatuPositions: next }));
-                                                                                    }} />
-                                                                                    {pos === "PEC" ? "PEC (Provincial Executive Committee)" :
-                                                                                     pos === "CEC" ? "CEC (Central Executive Committee)" : pos}
-                                                                                </label>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
                                                 </div>
                                             )}
+
+                                            {/* 🔴 N5 / BR-15 — COSATU IS OUT FROM UNDER `isBec`, AND THAT IS A DATA
+                                                MODEL FIX, NOT A LAYOUT ONE.
+                                                `07cd8ec` nested this whole block inside `editForm.isBec &&` while
+                                                leaving it ungated in `CaptureMember.jsx`, so the same member could
+                                                be captured as COSATU and then have it disappear from their record
+                                                the moment they were not a BEC member. `V19` models COSATU as
+                                                PARALLEL to BEC, and a stakeholder confirmed via the owner on
+                                                2026-09-09 that "everyone is a member and linked up with Area,
+                                                Region and all other elements" — no eligibility gate. Two
+                                                independent sources, so the nesting is the defect.
+                                                🟡 What is still open is narrower and blocks nothing: whether a
+                                                member's COSATU Local/Region is the SAME Area/Region already held
+                                                against them (a lookup) or COSATU's own structure (free text, as
+                                                below). BR-15. */}
+                                            <div className="border-t border-line pt-4">
+                                                <Detail label="COSATU Member?" value={editForm.isCosatu === "Y" || editForm.isCosatu === true ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
+                                                    const isYes = e.target.value === "Yes";
+                                                    setEditForm(prev => ({
+                                                        ...prev,
+                                                        isCosatu: isYes ? "Y" : "N",
+                                                        ...(!isYes ? { cosatuLocal: "", cosatuRegion: "", cosatuPositions: [] } : {})
+                                                    }));
+                                                }} />
+                                                {(editForm.isCosatu === "Y" || editForm.isCosatu === true) && (
+                                                    <div className="mt-4 pl-4 border-l-2 border-accent space-y-4 animate-slideDown">
+                                                        <p className="text-xs font-bold uppercase tracking-wide text-accent-ink">COSATU structure</p>
+                                                        {/* 🔴 BR-14 — THE TWO UNLABELLED CHECKBOXES ARE GONE, replaced
+                                                            by the two labelled free-text fields `V19` actually
+                                                            describes. What was here rendered `<label>` elements with
+                                                            a checkbox and NO TEXT AT ALL: an empty accessible name,
+                                                            two of them, side by side, so a screen-reader user met two
+                                                            anonymous checkboxes and a sighted user met two bare
+                                                            boxes. They also wrote "COSATU Local" and "Region within
+                                                            Local" into `cosatuPositions`, the POSITIONS array —
+                                                            structure recorded as though it were a role. The
+                                                            `cosatuPositions` wire shape agreed with the Capture
+                                                            Member arc is positions only. */}
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            <Detail label="COSATU Local" value={editForm.cosatuLocal || ""} isEditing={true} onChange={(e) => setEditForm(prev => ({ ...prev, cosatuLocal: e.target.value }))} />
+                                                            <Detail label="Region within Local" value={editForm.cosatuRegion || ""} isEditing={true} onChange={(e) => setEditForm(prev => ({ ...prev, cosatuRegion: e.target.value }))} />
+                                                        </div>
+                                                        <CheckboxGroup
+                                                            legend="COSATU Positions — Multiple Allowed"
+                                                            options={["PEC", "CEC", "Treasurer", "Chairperson", "Secretary"]}
+                                                            labelFor={(pos) =>
+                                                                pos === "PEC" ? "PEC (Provincial Executive Committee)" :
+                                                                pos === "CEC" ? "CEC (Central Executive Committee)" : pos}
+                                                            selected={editForm.cosatuPositions || []}
+                                                            onToggle={(next) => setEditForm(prev => ({ ...prev, cosatuPositions: next }))}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 divide-y md:divide-y-0 divide-gray-100 dark:divide-gray-800">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="space-y-3">
-                                                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Core Appointments</h4>
+                                                <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted">Core Appointments</h4>
                                                 <Detail label="Shop Steward status" value={selectedMember.isShopSteward ? "Yes" : "No"} isEditing={false} />
                                                 {selectedMember.isShopSteward && <Detail label="Election Date" value={selectedMember.shopStewardElectionDate || "-"} isEditing={false} />}
                                                 <Detail label="BEC Member status" value={selectedMember.isBec ? "Yes" : "No"} isEditing={false} />
                                                 {selectedMember.isBec && <Detail label="Assigned BEC Committee" value={SASBO_BEC_BRANCHES.find(b => b.id === selectedMember.becCommitteeId)?.name || selectedMember.becCommitteeName || "-"} isEditing={false} />}
                                             </div>
                                             <div className="space-y-3 pt-4 md:pt-0">
-                                                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Specialized Assignments</h4>
+                                                <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted">Specialized Assignments</h4>
                                                 {selectedMember.isBec && (
                                                     <>
                                                         <Detail label="BEC Recruiter" value={selectedMember.isBecRecruiter ? `Yes (${selectedMember.becRecruiterRole || 'Standard'})` : "No"} isEditing={false} />
                                                         <Detail label="Structure Representative Roles" value={selectedMember.isBecStructureRep && selectedMember.becStructures?.length > 0 ? selectedMember.becStructures.join(", ") : "None Assigned"} isEditing={false} />
                                                         <Detail label="BEC Executive Position" value={selectedMember.isBecExecutive ? selectedMember.becExecutivePosition : "None"} isEditing={false} />
-                                                        
-                                                        <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
-                                                            <h5 className="text-xs font-bold uppercase tracking-wider text-orange-500 mb-2">COSATU Structure (within BEC)</h5>
-                                                            <Detail label="COSATU Member" value={selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true ? "Yes" : "No"} isEditing={false} />
-                                                            {(selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true) && (
-                                                                <div className="grid grid-cols-1 gap-3 mt-2">
-                                                                    <Detail label="COSATU Local" value={selectedMember.cosatuLocal || "-"} isEditing={false} />
-                                                                    <Detail label="Region within Local" value={selectedMember.cosatuRegion || "-"} isEditing={false} />
-                                                                    <Detail label="Positions Held" value={selectedMember.cosatuPositions?.length > 0 ? selectedMember.cosatuPositions.join(", ") : "None"} isEditing={false} />
-                                                                </div>
-                                                            )}
-                                                        </div>
                                                     </>
                                                 )}
+
+                                                {/* Read side, un-nested to match the edit side. Before this it sat
+                                                    inside `selectedMember.isBec &&`, so a COSATU member who was not
+                                                    BEC had their COSATU record simply not shown. */}
+                                                <div className="pt-3 mt-3 border-t border-line">
+                                                    <h5 className="text-xs font-bold uppercase tracking-wider text-accent-ink mb-2">COSATU Structure</h5>
+                                                    <Detail label="COSATU Member" value={selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true ? "Yes" : "No"} isEditing={false} />
+                                                    {(selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true) && (
+                                                        <div className="grid grid-cols-1 gap-3 mt-2">
+                                                            <Detail label="COSATU Local" value={selectedMember.cosatuLocal || "-"} isEditing={false} />
+                                                            <Detail label="Region within Local" value={selectedMember.cosatuRegion || "-"} isEditing={false} />
+                                                            <Detail label="Positions Held" value={selectedMember.cosatuPositions?.length > 0 ? selectedMember.cosatuPositions.join(", ") : "None"} isEditing={false} />
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     )}
-                                </div>
-                            )}
-
-                            {activeTab === "history" && (
-                                <div className="grid grid-cols-1 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
-                                    <Detail label="Primary Remarks / Audit Comments" value={editForm.remarks} isEditing={isEditing} onChange={handleEditChange("remarks")} />
-                                    <Detail label="Secondary Comments Logging Sub-Field" value={editForm.remarks2} isEditing={isEditing} onChange={handleEditChange("remarks2")} />
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t">
-                                        <Detail label="Record Created Timestamp" value={formatBackendDate(selectedMember.createdAt)} isEditing={false} />
-                                        <Detail label="Last Account Modification" value={formatBackendDate(selectedMember.updatedAt)} isEditing={false} />
-                                    </div>
                                 </div>
                             )}
                         </div>
@@ -920,36 +1115,55 @@ ${summary}`);
     );
 }
 
-const fieldCls = (error, disabled = false) =>
-    `w-full rounded-lg px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 ${
-        disabled ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed" : "bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white"} ${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"}`;
+/**
+ * One field of a member record — a value when reading, a control when editing.
+ *
+ * 🔴 IT WAS A FIFTH ANSWER TO "WHAT WRAPS A FORM CONTROL" (BR-4 counted four). It built its
+ * own id from the label text — `detail-${label.toLowerCase().replace(/\s+/g, "-")}` — which
+ * collides the moment two fields share a label, and this dialog renders "COSATU Local" in
+ * two tabs. It also hand-rolled the border, the focus ring and the error colour, restating
+ * decisions the token layer already owns.
+ *
+ * It now delegates to the primitives: `SelectInput` when there are options, `TextInput`
+ * when there are not, and a definition-list entry when reading. `useId` inside `Field`
+ * makes the collision impossible rather than unlikely.
+ */
+function Detail({ label, value, isEditing, onChange, className = "", options = null, kind = "text", error = null, disabled = false, required = false }) {
+    if (!isEditing) {
+        return (
+            <div className={className}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{label}</p>
+                <p className="mt-0.5 rounded-lg border border-line bg-surface-2 p-2 text-sm font-semibold text-ink">{value || "-"}</p>
+            </div>
+        );
+    }
 
-function Detail({ label, value, isEditing, onChange, className = "", options = null, type = "text", error = null, disabled = false, required = false }) {
-    const detailId = `detail-${label.toLowerCase().replace(/\s+/g, "-")}`;
+    if (options) {
+        return (
+            <SelectInput
+                label={label}
+                value={value}
+                onChange={(next) => onChange?.({ target: { value: next } })}
+                options={options}
+                placeholder="Select..."
+                error={error || undefined}
+                disabled={disabled}
+                required={required}
+                className={className}
+            />
+        );
+    }
+
     return (
-        <div className={className}>
-            <label htmlFor={detailId} className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                {label} {isEditing && required && <span className="text-red-500 font-bold">*</span>}
-            </label>
-            {isEditing ? (
-                <div className="relative">
-                    {options ? (
-                        <select id={detailId} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled}>
-                            <option value="">Select...</option>
-                            {options.map(opt => (
-                                <option key={opt.value !== undefined ? opt.value : opt} value={opt.value !== undefined ? opt.value : opt}>
-                                    {opt.label !== undefined ? opt.label : opt}
-                                </option>
-                            ))}
-                        </select>
-                    ) : (
-                        <input id={detailId} type={type} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled} />
-                    )}
-                    {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400 font-medium">{error}</p>}
-                </div>
-            ) : (
-                <p className="mt-0.5 text-sm font-semibold text-gray-800 dark:text-gray-200 bg-gray-50/50 dark:bg-gray-800/40 p-2 rounded-lg border border-gray-100/70 dark:border-gray-700/30">{value || "-"}</p>
-            )}
-        </div>
+        <TextInput
+            label={label}
+            value={value}
+            onChange={onChange}
+            kind={kind}
+            error={error || undefined}
+            disabled={disabled}
+            required={required}
+            className={className}
+        />
     );
 }

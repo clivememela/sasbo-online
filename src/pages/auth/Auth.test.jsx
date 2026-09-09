@@ -17,7 +17,25 @@ import { setupUser } from '../../test/user'
  * library. What must never happen is a credential reaching any console sink.
  */
 
-const PASSWORD = 'correct-horse-battery-staple'
+/**
+ * The string this suite types into a password field.
+ *
+ * ⚠️ ITS SHAPE IS LOAD-BEARING AND IT IS NOT A STYLE CHOICE. `committedSecrets.js`
+ * watches for an assignment to a credential-shaped NAME with a long literal on the right,
+ * which is exactly what `const PASSWORD = <realistic password>` is -- and it caught this
+ * file the run after `04.1` was committed, because that guard reads `git ls-files` and is
+ * blind to untracked files.
+ *
+ * 🔑 THE GUARD WAS NOT WEAKENED TO FIX IT. No allowlist entry, no path exclusion for
+ * test files, no rename until the regex stops matching -- all three would leave a real
+ * credential pasted here undetected, which is how secrets get committed. Instead the value
+ * uses the guard's OWN affordance: `OBVIOUS_PLACEHOLDERS` clears `your_password_here`
+ * because nothing that shape is ever a real secret.
+ *
+ * 🔴 SO DO NOT MAKE IT LOOK LIKE A REAL PASSWORD. It reads as a downgrade and it will
+ * redden the secret guard.
+ */
+const PASSWORD = 'your_password_here'
 const EMAIL = 'synthetic.member@example.invalid'
 const SUMMARY_HEADING = /There is a problem with this form/i
 
@@ -130,12 +148,12 @@ describe('Auth — R-SEC-C, nothing typed here reaches a console', () => {
     const console_ = spyOnConsole()
     renderWithProviders(<Auth />, { initialEntries: ['/login'] })
 
-    await user.click(screen.getByRole('tab', { name: 'Sign Up' }))
+    await user.click(screen.getByRole('button', { name: 'Sign Up' }))
     await user.type(screen.getByLabelText(/Full Name/i), 'Synthetic Testperson')
     await user.type(screen.getByLabelText(/Email Address/i), EMAIL)
     await user.type(screen.getByLabelText(/^Password/i), PASSWORD)
     await user.type(screen.getByLabelText(/Confirm Password/i), PASSWORD)
-    await user.click(screen.getByRole('button', { name: /Sign up/i }))
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
 
     expect(screen.getByLabelText(/Confirm Password/i)).toHaveValue(PASSWORD)
 
@@ -159,12 +177,12 @@ describe('Auth — validation is inline, and never a native dialog', () => {
     const user = setupUser()
     renderWithProviders(<Auth />, { initialEntries: ['/login'] })
 
-    await user.click(screen.getByRole('tab', { name: 'Sign Up' }))
+    await user.click(screen.getByRole('button', { name: 'Sign Up' }))
     await user.type(screen.getByLabelText(/Full Name/i), 'Synthetic Testperson')
     await user.type(screen.getByLabelText(/Email Address/i), EMAIL)
     await user.type(screen.getByLabelText(/^Password/i), PASSWORD)
     await user.type(screen.getByLabelText(/Confirm Password/i), 'something-else')
-    await user.click(screen.getByRole('button', { name: /Sign up/i }))
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
 
     expect(window.alert, 'A native alert() is back. It names no field and steals focus.')
       .not.toHaveBeenCalled()
@@ -191,8 +209,8 @@ describe('Auth — validation is inline, and never a native dialog', () => {
     const user = setupUser()
     renderWithProviders(<Auth />, { initialEntries: ['/login'] })
 
-    await user.click(screen.getByRole('tab', { name: 'Sign Up' }))
-    await user.click(screen.getByRole('button', { name: /Sign up/i }))
+    await user.click(screen.getByRole('button', { name: 'Sign Up' }))
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
 
     const problems = within(errorSummary()).getAllByRole('listitem')
 
@@ -205,11 +223,11 @@ describe('Auth — validation is inline, and never a native dialog', () => {
     const user = setupUser()
     renderWithProviders(<Auth />, { initialEntries: ['/login'] })
 
-    await user.click(screen.getByRole('tab', { name: 'Sign Up' }))
-    await user.click(screen.getByRole('button', { name: /Sign up/i }))
+    await user.click(screen.getByRole('button', { name: 'Sign Up' }))
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
     expect(errorSummary()).toBeInTheDocument()
 
-    await user.click(screen.getByRole('tab', { name: 'Login' }))
+    await user.click(screen.getByRole('button', { name: 'Login' }))
 
     expect(
       screen.queryByText(SUMMARY_HEADING),
@@ -256,7 +274,7 @@ describe('Auth — the screen says what it actually does', () => {
 
     expect(screen.getByLabelText(/^Password/i)).toHaveAttribute('autocomplete', 'current-password')
 
-    await user.click(screen.getByRole('tab', { name: 'Sign Up' }))
+    await user.click(screen.getByRole('button', { name: 'Sign Up' }))
 
     // 🔴 NOT THE SAME ANSWER. `current-password` on a sign-up form asks the manager to
     // fill in the password being replaced, which is how a new account silently gets the

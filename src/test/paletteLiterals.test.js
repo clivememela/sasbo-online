@@ -35,11 +35,6 @@ import { blankingDestroyedCode, readSources, unreadableDirectories } from './sou
 
 /** The waves, exactly as `IMPLEMENTATION.md` splits them. */
 const NOT_YET_CONVERTED = {
-  /** `04.2` -- the members lane. */
-  'src/pages/members/Recruiters.jsx': '04.2',
-  'src/pages/members/Members.jsx': '04.2',
-  'src/pages/members/CaptureMember.jsx': '04.2',
-
   /** `04.3` -- admin, maintainance, archives, reports, bank_branch, acb, forms. */
   'src/pages/acb/AcbDebits.jsx': '04.3',
   'src/pages/admin/Acb.jsx': '04.3',
