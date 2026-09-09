@@ -1,41 +1,22 @@
 import { Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
-import { useTheme } from '../context/useTheme';
-import { MoonIcon, SunIcon } from 'lucide-react';
 import Footer from '../components/Footer';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import RoutePending from '../components/common/RoutePending';
+import ThemeToggle from '../components/common/ThemeToggle';
 
 export default function AuthLayout() {
-  const { darkMode, toggleDarkMode } = useTheme();
-
   return (
     <div className="bg-bg min-h-screen transition-colors duration-300 flex flex-col">
-      {/* ⚠️ A SECOND THEME CONTROL, and it stays a second one for now.
-          `ThemeToggle` does the same job in the header, and consolidating is right --
-          but it is not right HERE. That component puts its padding and an accent
-          background on the ICON; this one puts padding and a surface background on the
-          BUTTON. Consuming it would change how the auth screens look, and P1 is a
-          like-for-like migration: "if it looks different, the tokens are wrong."
-          The merge belongs to 04.1, which owns the shell and is allowed to change it.
-
-          What IS fixed here is the token-layer hole: this was the only `dark:` colour
-          variant left in the eight shell files. `bg-surface text-ink dark:text-accent`
-          made the component learn a theme, which is the one thing the token layer
-          exists to stop. Each icon renders in exactly one theme, so each takes one
-          token -- the same reasoning ThemeToggle already records. */}
+      {/* 🔑 04.1 MERGED THE SECOND THEME BUTTON AWAY. This was a hand-rolled copy of
+          `ThemeToggle` — the same job in different markup, and therefore a second place
+          for every future accessibility fix to be applied to only one of. P1 left it
+          deliberately, because consuming the shared control changes how the auth screens
+          look and P1 was a like-for-like colour migration; lifting that constraint is
+          this wave's job. What it buys: one accessible name, one `aria-pressed`, one
+          focus ring, one hit area. The floating presentation survives as `compact`. */}
       <div className="absolute top-4 right-4 z-50">
-        <button
-          onClick={toggleDarkMode}
-          type="button"
-          aria-pressed={darkMode}
-          className="p-2 rounded-full bg-surface shadow-md cursor-pointer hover:bg-surface-2 transition-colors"
-          aria-label="Toggle dark mode"
-        >
-          {darkMode
-            ? <SunIcon size={24} strokeWidth={1.5} className="text-accent" />
-            : <MoonIcon size={24} strokeWidth={1.5} className="text-ink" />}
-        </button>
+        <ThemeToggle compact />
       </div>
       <div className="flex-1 flex flex-col">
         {/* The auth screens are lazy too, and they are the FIRST thing anyone loads --

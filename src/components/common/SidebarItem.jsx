@@ -1,6 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 
+/**
+ * ♻️ `item.color` IS GONE -- the twin of the dead prop `NavigationCard` carried, found
+ * in the same pass and for the same reason: every `color:` in `navigation.js` sits in a
+ * commented-out block, so both branches were unreachable and both would have re-admitted
+ * a palette literal the day somebody uncommented one.
+ */
 export default function SidebarItem({ item, isActive, hasActiveSubItem, expandedItems, onToggle, onClick, selectedCardHref }) {
   const location = useLocation();
   const Icon = item.icon;
@@ -34,7 +40,7 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
           onClick={onClick}
         >
           <Icon size={24} strokeWidth={1} className="mr-6" />
-          <div className={`font-medium ${item.color ? item.color : ''}`}>{item.title}</div>
+          <div className="font-medium">{item.title}</div>
         </Link>
         {hasSubItems && (
           <ChevronDown 
@@ -77,7 +83,7 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
                 onClick={onClick}
               >
                 <SubIcon size={20} strokeWidth={1} className="mr-4" />
-                <div className={`font-medium ${subItem.color ? subItem.color : ''}`}>{subItem.title}</div>
+                <div className="font-medium">{subItem.title}</div>
               </Link>
             );
           })}

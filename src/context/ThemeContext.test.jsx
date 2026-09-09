@@ -88,6 +88,46 @@ describe('ThemeProvider', () => {
     )
     expect(screen.getByText('the application')).toBeInTheDocument()
   })
+
+  /**
+   * R-PERF-F. THE CONTEXT VALUE KEEPS ITS IDENTITY WHILE THE THEME DOES NOT CHANGE.
+   *
+   * 🔴 WHY THIS IS A TEST AND NOT A CODE REVIEW NOTE. The defect is invisible: with
+   * `value={{ ... }}` the application renders identically, passes every other test in
+   * this file, and merely re-renders every consumer in the tree on every render of a
+   * provider that wraps the whole app. There is no symptom to assert on except the
+   * identity itself.
+   *
+   * 🔑 IT IS TWO ASSERTIONS BECAUSE ONE OF THEM IS SATISFIED BY A CONSTANT. "The value
+   * is the same object as last time" is trivially true of a provider that never updates
+   * at all -- a memo with an empty dependency array passes it while breaking the theme
+   * outright. So the second half asserts the identity DOES change when `darkMode` does.
+   * Stability and freshness are different claims and a memo can get either one wrong.
+   */
+  it('hands consumers the same value until the theme actually changes', () => {
+    const { result, rerender } = renderTheme()
+    const first = result.current
+
+    rerender()
+
+    expect(
+      result.current,
+      'The context value is a new object after a re-render that changed nothing. Every ' +
+        'consumer of this context -- which is every screen, row and menu in the ' +
+        'application -- re-renders on each render of a provider that wraps all of them. ' +
+        'The value needs `useMemo`, and the callbacks in it need to be stable too.',
+    ).toBe(first)
+
+    act(() => result.current.toggleDarkMode())
+
+    expect(
+      result.current,
+      'The context value did NOT change identity when the theme changed, so consumers ' +
+        'were never told. A memo with the wrong dependencies is worse than no memo: the ' +
+        'theme switches in state and nothing re-renders to show it.',
+    ).not.toBe(first)
+    expect(result.current.darkMode).toBe(true)
+  })
 })
 
 describe('useTheme outside a provider', () => {

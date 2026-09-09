@@ -5,10 +5,10 @@ import Footer from "./Footer";
 import ErrorBoundary from "./common/ErrorBoundary";
 import RoutePending from "./common/RoutePending";
 
-export default function Main({ setSideBarOpen, setSelectedCardHref }) {
+export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref }) {
   return (
     <main className="fixed top-40 bottom-0 left-0 right-0 flex-1 flex flex-col overflow-y-auto lg:left-64">
-      <Header setSideBarOpen={setSideBarOpen} />
+      <Header sideBarOpen={sideBarOpen} setSideBarOpen={setSideBarOpen} />
       <div className="flex-1 w-full flex flex-col pb-14">
         {/* 🔴 THE BOUNDARY IS HERE, INSIDE THE SHELL, and the position is the whole point.
             A11's standard-facing test says it in one line: "the shell must survive, and

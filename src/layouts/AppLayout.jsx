@@ -17,7 +17,11 @@ export default function AppLayout() {
         setSideBarOpen={setSideBarOpen}
         selectedCardHref={selectedCardHref}
       />
-      <Main setSideBarOpen={setSideBarOpen} setSelectedCardHref={setSelectedCardHref} />
+      <Main
+        sideBarOpen={sideBarOpen}
+        setSideBarOpen={setSideBarOpen}
+        setSelectedCardHref={setSelectedCardHref}
+      />
     </div>
   );
 }

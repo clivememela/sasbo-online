@@ -194,4 +194,39 @@ export const FLOORS = {
   BUNDLE_CSS_BYTES: 10 * 1024,
   BUNDLE_TOTAL_BYTES: 300 * 1024,
   BUNDLE_FILES: 4,
+
+  /**
+   * Non-test source files under `src/` that the palette-literal scan walks.
+   * Measured through that guard's own `readSources` walk on 2026-09-09: 81.
+   *
+   * What it catches is the walk returning nothing -- a wrong root, a pattern
+   * that stopped matching `.jsx`. The scan would then find no palette literals
+   * in no files, and P4's "no literal colour utilities, grep-proved" box would
+   * be ticked by a guard that looked at nothing.
+   */
+  SRC_SOURCE_FILES: 50,
+
+  /**
+   * `--color-*` declarations in `index.css`. Measured through that guard's own
+   * regex on 2026-09-09: 87 -- the 34 semantic roles declared twice, once per
+   * theme, plus shadcn's 19 compatibility aliases.
+   *
+   * 🔑 IT FLOORS A COLLISION CHECK, WHICH IS WHY IT EXISTS AT ALL. The check
+   * asks "is any token named after a Tailwind palette family". Against an empty
+   * token list the answer is a truthful, useless "no", and the guard reports
+   * that the detector is safe from a collision it never looked for.
+   */
+  COLOUR_TOKENS: 40,
+
+  /**
+   * Routes the heading-contract guard mounts, from `App.jsx`'s own route table.
+   * Measured through that guard's own render on 2026-09-09: 27 path-bearing
+   * routes, the same population the route smoke drives.
+   *
+   * Its own entry rather than `ROUTES`, which floors the smoke's discovery of
+   * the route TABLE. This floors how many were actually MOUNTED AND MEASURED --
+   * a render that throws for every route leaves an empty result set, and an
+   * assertion that no route has two `<h1>`s is trivially true of no routes.
+   */
+  HEADINGS_MEASURED: 20,
 }

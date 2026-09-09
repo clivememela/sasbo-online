@@ -85,6 +85,33 @@ const KINDS = {
   // Dates go through DateField (03.3), never a bare input. Present so a call site
   // that asks for one gets the right attributes rather than silently getting `text`.
   date: { inputMode: 'numeric', autoComplete: 'off', enterKeyHint: 'next', spellCheck: false },
+
+  /**
+   * 🔑 TWO PASSWORD KINDS, NOT ONE, and the difference is the whole reason this module
+   * exists. `current-password` tells a password manager to OFFER a saved credential;
+   * `new-password` tells it to GENERATE one and, critically, not to autofill the old
+   * one into a field that is creating a new account. Written as one `password` kind,
+   * the sign-up form would have quietly asked managers to fill in the existing
+   * password — the exact class of silent disagreement `fieldKinds` was built to stop.
+   *
+   * `enterKeyHint: 'go'` on both: a password field is the last thing typed before the
+   * form is submitted, so "Go" is what the on-screen key should say.
+   */
+  password: {
+    type: 'password',
+    autoComplete: 'current-password',
+    enterKeyHint: 'go',
+    autoCapitalize: 'none',
+    spellCheck: false,
+  },
+
+  newPassword: {
+    type: 'password',
+    autoComplete: 'new-password',
+    enterKeyHint: 'go',
+    autoCapitalize: 'none',
+    spellCheck: false,
+  },
 }
 
 export const FIELD_KINDS = Object.freeze(Object.keys(KINDS))
