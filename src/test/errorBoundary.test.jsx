@@ -1,3 +1,4 @@
+// @vitest-environment jsdom -- renders a component that throws, inside a boundary
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'

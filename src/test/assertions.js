@@ -120,18 +120,37 @@ export async function expectNoA11yViolations(container, { rules = {} } = {}) {
     },
   })
 
-  const violations = results.violations ?? []
-  const summary = violations
-    .map(
-      (v) =>
-        `  - ${v.id} (${v.impact}): ${v.help}\n` +
-        v.nodes.map((n) => `      at ${[n.target].flat().join(' ')}`).join('\n'),
-    )
-    .join('\n')
-
+  // 🔑 `toHaveNoViolations`, THE MATCHER THIS SUITE REGISTERS AND HAD NEVER
+  // CALLED -- CI-7, closed in the one direction BR-5 leaves open.
+  //
+  // `setup.js` registers vitest-axe's matchers and `harness.test.jsx` asserts
+  // the matcher is present. Nothing used it: every accessibility assertion
+  // hand-rolled its own summary and compared `violations` to length 0. So the
+  // registration's only consumer was the test asserting the registration
+  // existed -- a mechanism kept alive entirely by its own guard.
+  //
+  // 🔴 AND DELETING IT WAS THE WRONG FIX, which is why BR-5 exists. The
+  // registration is the ONLY evidence of a recorded finding: vitest-axe@0.1.0
+  // ships an EMPTY `dist/extend-expect.js`, so the documented registration path
+  // registers nothing, silently. That was caught only because `harness.test.jsx`
+  // asserts the matcher is a function. Removing the assertion would re-open that
+  // hole undetectably at the next dependency bump.
+  //
+  // Using it closes the finding from the other end: the matcher is now exercised
+  // by every a11y assertion in the suite, so a future version that registers
+  // nothing fails HERE as well as in the harness test.
+  //
+  // ⚠️ THE CONSEQUENCE MESSAGE SURVIVES, and that was the reason the literal fix
+  // was declined once already. `expect(value, message)` keeps it as the
+  // assertion's prefix, and vitest-axe's own output is richer than the summary
+  // it replaces -- rule id, impact, description, help URL and the offending
+  // node's HTML, rather than a selector list. So this is not the trade that was
+  // refused; it is the same message plus a better report, and ~12 lines of
+  // hand-rolled formatting removed. The one thing genuinely lost is the leading
+  // violation COUNT, which the matcher's own report enumerates instead.
   expect(
-    violations,
-    `This surface has ${violations.length} accessibility violation(s). Each one is a ` +
-      `member or an administrator who cannot complete the task at all:\n${summary}`,
-  ).toHaveLength(0)
+    results,
+    'This surface has accessibility violations. Each one is a member or an ' +
+      'administrator who cannot complete the task at all.',
+  ).toHaveNoViolations()
 }

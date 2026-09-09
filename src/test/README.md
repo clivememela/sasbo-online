@@ -85,9 +85,17 @@ actual.
 > **Where the time goes**, measured rather than guessed: building a jsdom per
 > test file was **48% of total wall clock**. The pure files — the SA ID table,
 > the source-scanning guards, and the service tests, which need `fetch` but
-> never a document — now declare `@vitest-environment node`, and `setup.js`
-> guards its DOM-shaped parts so one setup serves both. That alone took the
-> suite from **95s to 47s** and the inner loop from 45s to 25s.
+> never a document — get no jsdom, and `setup.js` guards its DOM-shaped parts so
+> one setup serves both. That alone took the suite from **95s to 47s** and the
+> inner loop from 45s to 25s.
+>
+> 🔑 **And the default was later inverted, which is worth another ~40%.** `node`
+> is now the environment a file gets unless it asks for a DOM, rather than jsdom
+> being the environment a file has to escape. A file that renders something
+> declares `@vitest-environment jsdom` and says what it renders. Measured
+> 2026-09-09, two runs each way on one host: **~36s with the node default
+> against ~60s with the jsdom default**, identical results. See `vite.config.js`
+> for the reasoning — the speed was the smaller half of the argument.
 >
 > What remains is real work: 27 route mounts and ~120 MSW-intercepted calls.
 > `npm run test:fast` is the on-save loop; the full gate is a pre-commit one.
@@ -96,7 +104,7 @@ actual.
 
 **`client/.env` is committed** and points `VITE_API_BASE_URL` at the deployed
 backend. Tests inherited it silently: `api.test.js` first asserted against it
-by accident, and — worse — the `@vitest-environment node` files *depended* on
+by accident, and — worse — the files running **without a DOM** *depended* on
 it, because Node's `fetch` refuses a relative URL. Moving `.env` aside failed
 **72 tests**. A fresh clone has the file, since it is tracked, so this would
 never have surfaced as a CI failure; it would have surfaced the day someone

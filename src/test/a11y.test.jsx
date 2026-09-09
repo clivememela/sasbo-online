@@ -1,3 +1,4 @@
+// @vitest-environment jsdom -- axe walks a real DOM tree; there is nothing to scan without one
 import { beforeEach, describe, expect, it } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
@@ -120,8 +121,20 @@ describe('the a11y gate can actually fail', () => {
       </div>,
     )
 
-    await expect(expectNoA11yViolations(container)).rejects.toThrow(
-      /accessibility violation/i,
-    )
+    // Both halves, because they come from different places and only one of them
+    // was ever asserted.
+    //
+    // The first is this repository's own sentence, naming the human consequence.
+    // The second is `toHaveNoViolations`'s own report -- and asserting it is what
+    // proves THE MATCHER did the work. 🔴 `vitest-axe@0.1.0` ships an EMPTY
+    // `dist/extend-expect.js`, so a registration that silently registers nothing
+    // is a live hazard in this exact version. Without the second assertion this
+    // test would pass on the prefix alone, which the prefix would supply even if
+    // the matcher had been replaced by something that threw and reported
+    // nothing at all.
+    const failure = expectNoA11yViolations(container)
+
+    await expect(failure).rejects.toThrow(/accessibility violation/i)
+    await expect(failure).rejects.toThrow(/image-alt/)
   })
 })

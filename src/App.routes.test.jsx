@@ -1,3 +1,4 @@
+// @vitest-environment jsdom -- renders the router and reads the rendered tree
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { act, render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'

@@ -82,6 +82,60 @@ export function blankComments(source) {
   return out
 }
 
+/**
+ * Directories the walk below could not read, recorded rather than skipped in
+ * silence.
+ *
+ * 🔴 THE FAILURE THIS EXISTS FOR REMOVES AN ENTIRE SUBTREE FROM A SCAN AND
+ * REPORTS NOTHING. `readdirSync` throwing was caught and answered with `return`,
+ * so a permission error, a broken symlink or a directory renamed mid-walk
+ * dropped everything beneath it. Three guards read through this walker and their
+ * protection was uneven:
+ *
+ *   - `apiContract.test.js` asserts it "scanned EVERY service module on disk"
+ *     against a second `readdirSync` -- which covers a lost FILE and, it turns
+ *     out, not a lost DIRECTORY: that second read is non-recursive, so an
+ *     unreadable subdirectory disappears from both sides and the two lists
+ *     still agree. It asserts this explicitly now.
+ *   - `vocabulary.parity.test.js` stands on `FLOORS.VOCABULARY_COMPARISONS = 20`
+ *     against an actual of 47. Losing `src/hooks/` takes it to roughly 40, which
+ *     clears the floor, and the guard reports success. 🔴 **27 points of
+ *     headroom is 27 points of silence.**
+ *
+ * 🔑 THAT IS THE FLOORS DOCTRINE'S OWN WARNING, ARRIVING FROM THE OTHER SIDE. A
+ * floor proves a scan was not VACUOUS. Only completeness proves it was not
+ * PARTIAL, and a floor with healthy headroom is exactly what a partial scan
+ * hides behind.
+ *
+ * Collected and exposed rather than thrown at the point of failure, which is the
+ * shape `merge-reports.mjs` already uses for its `parseErrors`: the walk finishes
+ * and reports everything it could not read, so one unreadable directory does not
+ * mask the second.
+ *
+ * ⚠️ MODULE-SCOPED AND PER TEST FILE, which is narrower than it first looks.
+ * Vitest isolates by default and this config does not override it, so every test
+ * file gets a fresh worker and therefore a fresh copy of this array -- the
+ * runner's own "workers spawned, per file" line says so. It accumulates across
+ * every walk WITHIN one file and never across files, so a guard reading it sees
+ * only its own file's walks.
+ *
+ * 🔑 THAT IS WHY EACH CONSUMER ASSERTS IT RATHER THAN ONE PLACE DOING SO for
+ * everybody: there is no "one place" that can see another file's walk.
+ */
+const unreadable = []
+
+/**
+ * Every directory the walk could not read, in the order it met them.
+ *
+ * Pure -- no `vitest` import -- because this module is imported by
+ * `apiContractScan.js`, which the plain-Node scripts under `scripts/` reach.
+ * The assertion that consumes this lives in `assertNonVacuousScan.js`, which is
+ * already the vitest-bound half of this pair.
+ */
+export function unreadableDirectories() {
+  return [...unreadable]
+}
+
 /** Every file under `dir` whose name matches `pattern`, recursively. */
 export function filesUnder(dir, pattern = /\.(jsx?|mjs)$/) {
   const found = []
@@ -90,7 +144,11 @@ export function filesUnder(dir, pattern = /\.(jsx?|mjs)$/) {
     let entries
     try {
       entries = readdirSync(current, { withFileTypes: true })
-    } catch {
+    } catch (error) {
+      // The path AND the reason. "could not read a directory" sends the reader
+      // looking for a bug in the walker; `EACCES` or `ENOENT` with a path names
+      // the actual condition and whether it is theirs to fix.
+      unreadable.push(`${current}: ${error.code ?? error.message}`)
       return
     }
     for (const entry of entries) {

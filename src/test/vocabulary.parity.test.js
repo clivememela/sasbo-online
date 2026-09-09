@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { join } from 'node:path'
 
@@ -12,9 +11,10 @@ import {
   FLOORS,
   assertBlankingPreservedCode,
   assertNonVacuousScan,
+  assertNothingWasSkipped,
 } from './assertNonVacuousScan'
 import { DEFECTS, disabled, pin } from './knownDefects'
-import { blankingDestroyedCode, readSources } from './sourceScan.js'
+import { blankingDestroyedCode, readSources, unreadableDirectories } from './sourceScan.js'
 
 /**
  * VOCABULARY DRIFT: a constant copied instead of referenced.
@@ -38,10 +38,11 @@ import { blankingDestroyedCode, readSources } from './sourceScan.js'
  * searched for -- `usePaymentTypeValidation.test.jsx` says `'Payroll Deduction'`
  * in prose. A guard its own subject's docs can falsify is not a guard.
  *
- * @vitest-environment node -- it reads files and imports arrays of strings.
- * Measured 2026-09-05: 5.39s with jsdom against 1.77s without, for identical
- * results. jsdom was ~47% of this file's wall clock and nothing in it reads a
- * DOM.
+ * Runs under `node`, which is now the suite's DEFAULT rather than an opt-out
+ * this file carries -- see `vite.config.js`, where this file's own measurement
+ * is recorded as part of the argument for inverting it. Measured 2026-09-05:
+ * 5.39s with jsdom against 1.77s without, for identical results. jsdom was ~47%
+ * of this file's wall clock and nothing in it reads a DOM.
  */
 
 const camelCase = (snake) =>
@@ -253,6 +254,23 @@ describe('vocabulary parity between this browser and its server', () => {
         FLOORS.VOCABULARY_COMPARISONS,
         'comparisons against option-backed fields',
       )
+    })
+
+    it('read every directory it walked, rather than skipping one in silence', () => {
+      // 🔴 THE HALF THIS GUARD DID NOT HAVE, and the guard it is missing from
+      // matters more than its neighbour -- E2.
+      //
+      // `apiContract.test.js` next door asserts it "scanned EVERY service module
+      // on disk" against an independent `readdirSync`, so a lost directory
+      // reddens it. This file stands on a floor of 20 against an actual of 47.
+      // Losing `src/hooks/` -- which holds one of the two sites the register
+      // pins -- drops it to roughly 40, clears the floor, and reports success
+      // while no longer looking at the code the pin is about.
+      //
+      // 🔑 So the pinned defects below would go GREEN by not being looked at,
+      // which is this arc's defining failure mode reached through a directory
+      // permission rather than through a test.
+      assertNothingWasSkipped(unreadableDirectories(), 'the vocabulary scan')
     })
 
     it('did not destroy any code while blanking comments', () => {

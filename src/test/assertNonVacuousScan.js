@@ -71,6 +71,32 @@ export function assertBlankingPreservedCode(destroyed) {
 }
 
 /**
+ * Nothing was silently dropped from the walk -- the completeness half that a
+ * floor cannot provide.
+ *
+ * 🔑 A FLOOR AND THIS ASSERTION ANSWER DIFFERENT QUESTIONS, and a guard needs
+ * both. The floor asks "did the scan find anything" and catches a discovery that
+ * broke outright. This asks "did the scan find EVERYTHING it walked over", and
+ * catches the subtler one: a subtree removed by an unreadable directory, leaving
+ * a scan that is partial rather than empty. A guard with generous headroom --
+ * `VOCABULARY_COMPARISONS` is 20 against an actual of 47 -- clears its floor
+ * comfortably while missing a third of its population.
+ *
+ * See `unreadableDirectories()` in `sourceScan.js` for what gets recorded and
+ * why the walk finishes instead of throwing where it fails.
+ */
+export function assertNothingWasSkipped(skipped, what) {
+  expect(
+    skipped,
+    `INCOMPLETE SCAN for ${what}. The walk could not read the directories below, so ` +
+      `everything beneath them was left out -- and a scan missing a subtree still ` +
+      `clears its floor, still finds no offenders, and still reports success. Fix the ` +
+      `access or the path; do not lower the floor, which was never the thing that ` +
+      `noticed:\n  ${skipped.join('\n  ')}`,
+  ).toEqual([])
+}
+
+/**
  * The floors live in `./floors.js`, which imports nothing from vitest so that
  * the three `scripts/*.mjs` guards running outside the runner can share them.
  * Re-exported here because that is where every existing caller looks for them.

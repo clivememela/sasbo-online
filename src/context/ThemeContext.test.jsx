@@ -1,3 +1,4 @@
+// @vitest-environment jsdom -- renders a provider and asserts on documentElement's class list
 import { describe, expect, it } from 'vitest'
 import { act, render, renderHook, screen } from '@testing-library/react'
 

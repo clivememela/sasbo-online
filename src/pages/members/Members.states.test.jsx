@@ -1,3 +1,4 @@
+// @vitest-environment jsdom -- renders the member register in each of its three states
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'

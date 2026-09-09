@@ -1,3 +1,4 @@
+// @vitest-environment jsdom -- renders the capture form and types into it
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'

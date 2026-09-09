@@ -6,11 +6,16 @@ import { server } from './msw/server'
 // ---------------------------------------------------------------------------
 // Is there a DOM in this file's environment?
 // ---------------------------------------------------------------------------
-// Declared FIRST, because it now decides what gets imported at all. Most of
-// this suite runs under jsdom. The pure ones -- the SA ID specification table,
+// Declared FIRST, because it decides what gets imported at all. `node` is the
+// default: a file that renders something declares `@vitest-environment jsdom`
+// and says what it renders, while the pure ones (the SA ID specification table,
 // the source-scanning guards, and the service tests, which need `fetch` but
-// never a document -- declare `@vitest-environment node` instead, because
-// creating a jsdom per file was measured at ~half the suite's total wall clock.
+// never a document) declare nothing and get no jsdom built for them.
+//
+// ⚠️ THE DEFAULT USED TO BE THE OTHER WAY ROUND and this comment described that
+// arrangement. See `vite.config.js` for why it was inverted and for the
+// measurement -- building a jsdom per file was ~half the suite's wall clock,
+// and the inversion is worth ~40% of it.
 //
 // This setup file runs in BOTH. The alternative -- a second setup file --
 // means two places to register a matcher and one of them eventually gets
@@ -21,9 +26,15 @@ const hasDom = typeof window !== 'undefined' && typeof document !== 'undefined'
 // The DOM-only libraries, imported ONLY where there is a DOM
 // ---------------------------------------------------------------------------
 // `@testing-library/react` and `@testing-library/jest-dom/vitest` were static
-// imports, so the seven `@vitest-environment node` files paid to evaluate both
-// and could never use either: `cleanup` is already behind `hasDom` below, and
-// the jest-dom matchers are unreachable without a document.
+// imports, so every DOM-less file paid to evaluate both and could never use
+// either: `cleanup` is already behind `hasDom` below, and the jest-dom matchers
+// are unreachable without a document.
+//
+// ⚠️ NO COUNT HERE, DELIBERATELY. This said "the seven `@vitest-environment
+// node` files" and the number was TEN by the time anyone read it again -- a
+// count of a population that grows with the suite, written into a comment that
+// nothing checks. The population is whatever half of the suite needs no DOM;
+// `vite.config.js` holds the one statement of how that is decided.
 //
 // The cost that matters is not the wall clock, it is the RESIDENT SET. Each
 // worker carries whatever its setup file pulled in, and this repository's

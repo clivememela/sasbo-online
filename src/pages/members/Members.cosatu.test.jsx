@@ -1,3 +1,4 @@
+// @vitest-environment jsdom -- renders the member detail panel
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { screen } from '@testing-library/react'

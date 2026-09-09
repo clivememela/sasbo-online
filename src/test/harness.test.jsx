@@ -1,3 +1,4 @@
+// @vitest-environment jsdom -- it asserts the DOM harness itself -- window, document, cleanup
 import { describe, expect, it } from 'vitest'
 import { screen } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'

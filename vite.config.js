@@ -38,7 +38,69 @@ export default defineConfig({
   // `npm run lint` against this file, because it is the one file where a test
   // change could break the shipped product.
   test: {
-    environment: 'jsdom',
+    // 🔴 `node`, AND THE DEFAULT USED TO BE THE OTHER WAY ROUND -- L1.
+    //
+    // `jsdom` was the global default, and TEN OF THE TWENTY test files carried
+    // `// @vitest-environment node` to escape it. Exactly half. That is a
+    // default which is wrong for half its population, and the half it is wrong
+    // for pays for a DOM it never touches.
+    //
+    // 🔑 THE ARGUMENT IS THAT THE OLD SHAPE MADE EVERY NEW TEST SLOW BY DEFAULT
+    // and fast only by vigilance -- an author had to know a magic comment
+    // existed to avoid a cost their test does not incur. This repository refuses
+    // to rely on vigilance everywhere else; a default is the strongest form of
+    // not relying on it. That argument stands whatever the clock says.
+    //
+    // ⚠️ AND THE CLOCK SAYS MORE THAN THE FINDING EXPECTED. The row proposing
+    // this predicted the speed effect would be small -- "if the DOM half
+    // dominates, the ceiling is small and the finding is about the default being
+    // wrong in principle". MEASURED 2026-09-09, two runs each way, same host,
+    // back to back, whole suite:
+    //
+    //     environment: 'node'    37.17s  35.53s     (environment 43% of wall clock)
+    //     environment: 'jsdom'   64.48s  56.34s     (environment 54%)
+    //
+    // ~36s against ~60s: the suite is roughly 40% faster, for identical results.
+    // The prediction was wrong in the useful direction, and it is written down
+    // here rather than quietly enjoyed -- a read said "probably small" and the
+    // run said otherwise, which is this pass's whole subject.
+    //
+    // The inversion also changes what the directive MEANS, which is the better
+    // half. It was an escape hatch: "this file opts out of the default." It is
+    // now a declaration: "this file needs a DOM, and here is what for." Every
+    // file that needs one says so on its first line and names what it renders.
+    //
+    // ⚠️ NO COUNT OF THEM HERE. The population grows with the suite, and a count
+    // written into a comment is a count nothing checks -- this very paragraph
+    // said "ten" and was falsified by the test added in the same commit.
+    //
+    // ⚠️ WHY THE DIRECTIVE AND NOT `environmentMatchGlobs`. The glob-based
+    // config key is the idiomatic-looking answer and it is a trap here: it was
+    // deprecated in Vitest 3 and this project is on Vitest 5. THAT IS THE EXACT
+    // MISTAKE `maxWorkers` below records -- `poolOptions.forks.maxForks` was
+    // accepted silently, warned about once in a wall of startup output, and
+    // capped nothing at all.
+    //
+    // 🔑 AND IT IS WORSE THAN DEPRECATED: `environmentMatchGlobs` does not exist
+    // in Vitest 5 at all -- zero occurrences anywhere in the installed `vitest`
+    // and `@vitest/*` packages -- so it would be read, ignored, and every file
+    // would silently take the default. That is the `maxForks` failure verbatim.
+    // The v5 successor is `test.projects`, which would work; it just costs the
+    // per-file REASON, which is the better half of this change. The per-file
+    // directive is the mechanism already proven in this repository at this
+    // version, and its failure mode is loud: a DOM test without a DOM cannot
+    // render.
+    //
+    // The measurement, preserved from the file that made the strongest case for
+    // opting out, because the reason has to live where the default now lives:
+    // `vocabulary.parity.test.js` was measured 2026-09-05 at 5.39s under jsdom
+    // against 1.77s without, for identical results -- jsdom was ~47% of that
+    // file's wall clock and nothing in it reads a DOM.
+    // ⚠️ AND `node` IS ALSO VITEST'S OWN DEFAULT, so this line is a statement
+    // rather than a lever -- stated for the reason `pool` and `include` below are
+    // stated, so that a changed default is a reddening change and not a silent
+    // one. A reader should not have to guess whether it is load-bearing.
+    environment: 'node',
     setupFiles: ['./src/test/setup.js'],
     css: false,
 
@@ -101,11 +163,12 @@ export default defineConfig({
     // observed as one before it was fixed.
     //
     // The design was fixed first: src/test/user.js removes userEvent's
-    // artificial inter-keystroke delay for the whole suite, and the pure test
-    // files declare `@vitest-environment node` so no jsdom is built for them.
-    // What remains is the component's real cost, and this deadline sits well
-    // above the worst observed figure rather than just above it, so a loaded
-    // runner has room. Nothing is retried and nothing is skipped for slowness.
+    // artificial inter-keystroke delay for the whole suite, and no jsdom is
+    // built for a file that does not ask for one -- which is now the DEFAULT
+    // rather than ten opt-outs, see `environment` above. What remains is the
+    // component's real cost, and this deadline sits well above the worst
+    // observed figure rather than just above it, so a loaded runner has room.
+    // Nothing is retried and nothing is skipped for slowness.
     testTimeout: 20_000,
 
     // 🔴 A BOUNDED WORKER POOL, and this is the fix for a failure that has

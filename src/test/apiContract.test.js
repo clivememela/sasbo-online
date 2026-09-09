@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -18,9 +17,10 @@ import {
   FLOORS,
   assertBlankingPreservedCode,
   assertNonVacuousScan,
+  assertNothingWasSkipped,
 } from './assertNonVacuousScan'
 import { DEFECTS, disabled, pin } from './knownDefects'
-import { blankingDestroyedCode } from './sourceScan.js'
+import { blankingDestroyedCode, unreadableDirectories } from './sourceScan.js'
 
 /**
  * THE BROWSER MAY NOT CALL AN ENDPOINT THE SERVER DOES NOT HAVE.
@@ -40,9 +40,11 @@ import { blankingDestroyedCode } from './sourceScan.js'
  * as a committed file or it does not cross. Refresh with the copy step in
  * `src/test/README.md`.
  *
- * @vitest-environment node -- this reads files and touches no DOM. P3 measured
- * jsdom construction at ~48% of suite wall clock, so a pure file-reading guard
- * that builds one is paying for nothing.
+ * Runs under `node`, which is now the suite's DEFAULT rather than something this
+ * file opts into -- see `vite.config.js`. It reads files and touches no DOM; P3
+ * measured jsdom construction at ~48% of suite wall clock, and that measurement
+ * is one of the two this file's old opt-out contributed to the case for
+ * inverting the default.
  */
 describe('the API contract between this browser and its server', () => {
   const calls = discoverEndpoints()
@@ -86,6 +88,28 @@ describe('the API contract between this browser and its server', () => {
         'every .js file in src/services/ must be scanned. A module missing here is a ' +
           'module whose endpoints nothing is checking, and it would still clear the floor',
       ).toEqual(onDisk)
+    })
+
+    it('read every directory it walked, rather than skipping one in silence', () => {
+      // 🔴 THE COMPLETENESS CHECK ABOVE DOES NOT COVER THIS, and believing it did
+      // was the mistake -- E2.
+      //
+      // That check compares the scan against a NON-RECURSIVE `readdirSync` of
+      // `src/services`, while the walker underneath is recursive. So an unreadable
+      // SUBDIRECTORY of `src/services` drops out of both sides at once: its name
+      // is not `.js`, so it never appears in `onDisk`, and its files never reach
+      // `modules`. The two lists still agree, and the guard reports success over
+      // a scan that lost a subtree.
+      //
+      // 🔑 `src/services` is flat today, so that is latent rather than live --
+      // which is exactly the shape worth asserting. The protection was a fact
+      // about the directory being flat, not a property of the check.
+      //
+      // ⚠️ AND IT HAS TO BE ASSERTED HERE RATHER THAN ONCE SOMEWHERE ELSE. Vitest
+      // isolates per file, so the walker's record of what it could not read lives
+      // in this file's own worker; `vocabulary.parity.test.js` asserting it covers
+      // only the walks IT performs.
+      assertNothingWasSkipped(unreadableDirectories(), 'the service module scan')
     })
 
     it('did not destroy any code while blanking comments', () => {
