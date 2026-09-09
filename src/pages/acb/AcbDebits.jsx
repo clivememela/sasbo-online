@@ -28,7 +28,7 @@ export default function AcbDebits() {
             branch: selectedMember.branch || "",
             bankAccountNumber: selectedMember.bankAccountNumber || "",
             ibtNo: selectedMember.ibtNo || "",
-            workIbtNo: selectedMember.workIbtNo || "",
+            /*workIbtNo: selectedMember.workIbtNo || "",*/
             bankAddress: selectedMember.bankAddress || "",
             workBankAddress: selectedMember.workBankAddress || "",
             paymentType: selectedMember.paymentType || "",
@@ -232,7 +232,7 @@ export default function AcbDebits() {
                                         <TextInput label="Branch" value={bankForm.branch} onChange={handleBankChange('branch')} />
                                         <TextInput label="Account Number" value={bankForm.bankAccountNumber} onChange={handleBankChange('bankAccountNumber')} />
                                         <TextInput label="IBT No." value={bankForm.ibtNo} onChange={handleBankChange('ibtNo')} />
-                                        <TextInput label="Work IBT No." value={bankForm.workIbtNo} onChange={handleBankChange('workIbtNo')} />
+                                        {/*<TextInput label="Work IBT No." value={bankForm.workIbtNo} onChange={handleBankChange('workIbtNo')} />*/}
                                         <TextInput label="Payment Type" value={bankForm.paymentType} onChange={handleBankChange('paymentType')} />
                                         <TextInput label="Debit Day" value={bankForm.debitDay} onChange={handleBankChange('debitDay')} />
                                         <TextInput label="Bank Address" value={bankForm.bankAddress} onChange={handleBankChange('bankAddress')} />
