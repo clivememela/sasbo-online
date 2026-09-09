@@ -64,6 +64,11 @@ if (hasDom) {
 // registration step whose failure mode is silence. The harness test above is
 // the only reason it was noticed at all rather than surfacing later as a
 // confusing error inside an accessibility assertion.
+//
+// 🔴 AND IT IS WHY `vitest-axe` IS PINNED EXACTLY IN package.json -- the one
+// dependency here without a caret. `^0.1.0` admits 0.1.x patches, and a patch
+// could change the very entry point this hazard is about. package.json cannot
+// carry a comment, so the reason lives here, beside the workaround it protects.
 expect.extend(axeMatchers)
 
 // ---------------------------------------------------------------------------

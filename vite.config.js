@@ -40,10 +40,14 @@ export default defineConfig({
   test: {
     // 🔴 `node`, AND THE DEFAULT USED TO BE THE OTHER WAY ROUND -- L1.
     //
-    // `jsdom` was the global default, and TEN OF THE TWENTY test files carried
-    // `// @vitest-environment node` to escape it. Exactly half. That is a
-    // default which is wrong for half its population, and the half it is wrong
-    // for pays for a DOM it never touches.
+    // `jsdom` was the global default, and EXACTLY HALF the test files carried
+    // `// @vitest-environment node` to escape it. That is a default which is
+    // wrong for half its population, and the half it is wrong for pays for a DOM
+    // it never touches.
+    //
+    // ⚠️ THE COUNT THAT WAS HERE IS GONE, and it was wrong within one commit --
+    // "ten of the twenty" was falsified by the test added alongside it, in the
+    // paragraph directly above the warning against writing counts here.
     //
     // 🔑 THE ARGUMENT IS THAT THE OLD SHAPE MADE EVERY NEW TEST SLOW BY DEFAULT
     // and fast only by vigilance -- an author had to know a magic comment

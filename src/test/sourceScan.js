@@ -97,10 +97,20 @@ export function blankComments(source) {
  *     out, not a lost DIRECTORY: that second read is non-recursive, so an
  *     unreadable subdirectory disappears from both sides and the two lists
  *     still agree. It asserts this explicitly now.
- *   - `vocabulary.parity.test.js` stands on `FLOORS.VOCABULARY_COMPARISONS = 20`
- *     against an actual of 47. Losing `src/hooks/` takes it to roughly 40, which
- *     clears the floor, and the guard reports success. 🔴 **27 points of
- *     headroom is 27 points of silence.**
+ *   - `vocabulary.parity.test.js` stands on `FLOORS.VOCABULARY_COMPARISONS`,
+ *     which has deliberate headroom against a much larger actual. Losing
+ *     `src/hooks/` still clears the floor, and the guard reports success.
+ *     🔴 **Headroom is silence, in exactly the amount of the headroom.**
+ *   - 🔴 `scripts/contract-witness.mjs` READS THROUGH IT TOO, and it is the one
+ *     consumer that CANNOT be given the assertion below. It reaches this walker
+ *     through `apiContractScan.js`'s `discoverEndpoints()`, and it runs as plain
+ *     Node AFTER the suite -- so it cannot import `assertNothingWasSkipped`,
+ *     which pulls in `expect` from vitest. It is left unguarded knowingly rather
+ *     than by oversight.
+ *
+ *     ⏳ The fix, if this ever matters: split the throwing half out of
+ *     `assertNonVacuousScan.js` into a vitest-free module, which is exactly the
+ *     split `floors.js` already exists to provide for these same three scripts.
  *
  * 🔑 THAT IS THE FLOORS DOCTRINE'S OWN WARNING, ARRIVING FROM THE OTHER SIDE. A
  * floor proves a scan was not VACUOUS. Only completeness proves it was not
@@ -119,8 +129,11 @@ export function blankComments(source) {
  * every walk WITHIN one file and never across files, so a guard reading it sees
  * only its own file's walks.
  *
- * 🔑 THAT IS WHY EACH CONSUMER ASSERTS IT RATHER THAN ONE PLACE DOING SO for
- * everybody: there is no "one place" that can see another file's walk.
+ * 🔑 THAT IS WHY EACH CONSUMER INSIDE THE RUNNER ASSERTS IT rather than one place
+ * doing so for everybody: there is no "one place" that can see another file's
+ * walk. ⚠️ "Each consumer" means the two that run under vitest -- the third,
+ * above, cannot, and saying "each" without that exception was the first draft of
+ * this paragraph.
  */
 const unreadable = []
 
