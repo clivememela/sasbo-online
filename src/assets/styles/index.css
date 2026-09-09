@@ -291,6 +291,30 @@
    cannot each be trusted to remember an arbitrary @media query. P5 migrates them. */
 @custom-variant hover-hover (@media (hover: hover));
 
+/* 🔴 THE 16px RULE, AS A UTILITY -- conventions 5, and F-D01.
+
+   iOS Safari ZOOMS THE PAGE when a focused form control is under 16px, and it does
+   it silently: nothing errors, the page just lurches and the rest of the form is
+   off-screen. 74 of this app's 89 controls render under 16px today.
+
+   The rule USED to read `inputs keep text-base at base`, which was correct against
+   Tailwind's scale where text-base is 16px. This design's --text-base is 14px, so
+   that sentence now PRODUCES the bug it was written to prevent. A convention can be
+   falsified by a token change, silently, with nobody editing the convention.
+
+   So the threshold is named in PX, deliberately, and it is the only px left in the
+   type system: 16 is iOS's number, not this design's, and it must not move when the
+   scale moves. Card does exactly this at card.css:453-455.
+
+   `pointer: coarse` as well as the width, because a tablet in landscape is a touch
+   device wider than 760px and zooms just the same. */
+@utility field-text {
+  font-size: var(--text-sm);
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .field-text { font-size: 16px; }
+}
+
 @utility touch-target {
   /* A 44px hit area WITHOUT growing the visible control -- the pattern that stops
      'make it bigger' turning into a redesign. Applied on a coarse pointer only, so
