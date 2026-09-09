@@ -23,6 +23,14 @@ import AuthLayout from './layouts/AuthLayout';
  * header, the navigation and the footer down with the page it caught -- and A11's
  * standard is that the shell survives.
  */
+// 🔴 LAZY, and the measurement is why. Moving the Google Maps `APIProvider` out of
+// `main.jsx` was supposed to take the library off the 24 routes that do not use it -- and
+// a STATIC import here put it straight back into the entry chunk, which is where it
+// already was. The entry did not move by a single byte, which is what said so. Lazy, it
+// rides the three route chunks that actually render an address field.
+// It resolves inside the <Suspense> beside the <Outlet> in `Main`, like every route.
+const MapsScope = lazy(() => import('./components/form/MapsScope'));
+
 const HomePage = lazy(() => import('./pages/Home'));
 const BanksPage = lazy(() => import('./pages/bank_branch/BankBranch.jsx'));
 const MembersPage = lazy(() => import('./pages/members/Members.jsx'));
@@ -73,11 +81,11 @@ function App() {
         <Route path="admin/daily-menu" element={<DailyMenu />} />
         <Route path="admin/monthly-menu" element={<MonthlyMenu />} />
         <Route path="recruiters" element={<Recruiters />} />
-        <Route path="banks" element={<BanksPage />} />
+        <Route path="banks" element={<MapsScope><BanksPage /></MapsScope>} />
         <Route path="banks/listing" element={<BankListing />} />
-        <Route path="members" element={<MembersPage />} />
+        <Route path="members" element={<MapsScope><MembersPage /></MapsScope>} />
         <Route path="members/apply" element={<MembershipApplication />} />
-        <Route path="members/capture" element={<CaptureMember />} />
+        <Route path="members/capture" element={<MapsScope><CaptureMember /></MapsScope>} />
         <Route path="members/recruiters" element={<Recruiters />} />
         <Route path="admin/maintenance/subscriptions" element={<Subscriptions />} />
         <Route path="reports" element={<ReportsPage />} />

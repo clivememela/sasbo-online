@@ -4,7 +4,6 @@ import { BrowserRouter } from 'react-router-dom'
 import './assets/styles/index.css'
 import App from './App.jsx'
 import { ThemeProvider } from './context/ThemeContext'
-import { APIProvider } from '@vis.gl/react-google-maps'
 
 /**
  * R-ROB-J. A GLOBAL `error` listener, narrowed to the one message it was added for.
@@ -36,9 +35,12 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <ThemeProvider>
-        <APIProvider apiKey={import.meta.env.VITE_GOOGLE_API_KEY}>
-          <App />
-        </APIProvider>
+        {/* 🔴 The Google Maps APIProvider USED TO BE HERE, around the whole app, so all 27
+            routes loaded a third-party script and shipped the API key -- including the ones
+            with no address field anywhere on them. It is on the three routes that use it
+            now: see `components/form/MapsScope.jsx` and its three usages in `App.jsx`
+            (R-SEC-D / R-PERF-G). */}
+        <App />
       </ThemeProvider>
     </BrowserRouter>
   </StrictMode>,
