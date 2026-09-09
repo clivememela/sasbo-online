@@ -43,17 +43,26 @@ export const jobGradeService = {
             return JOB_GRADE_OPTIONS;
           }
           const payload = await r.json();
-          const list = normalizeList(payload);
+            const list = normalizeList(payload);
 
-          // Preserve {value, label} objects so the dropdown shows the full label
-          // (grade - description - contractType) while saving only the grade code.
-          const normalized = list
-              .map((it) => {
-                if (it && typeof it === 'object' && it.value != null) return it;
-                const str = String(it || '').trim();
-                return str ? { value: str, label: str } : null;
-              })
-              .filter(Boolean);
+            const normalized = list
+                .map((it) => {
+                    if (!it || typeof it !== 'object') return null;
+
+                    // If the backend sent standard React { value, label } fields
+                    if (it.value != null) return it;
+
+                    // Map your Java JobGradeResponseDto fields structurally
+                    const grade = it.grade || '';
+                    const description = it.description ? ` - ${it.description}` : '';
+                    const contract = it.contractType ? ` (${it.contractType})` : '';
+
+                    return {
+                        value: grade,
+                        label: `${grade}${description}${contract}`.trim() // E.g., "Grade 1 - Clerk (Permanent)"
+                    };
+                })
+                .filter(Boolean);
 
           return normalized.length ? normalized : JOB_GRADE_OPTIONS;
         })
