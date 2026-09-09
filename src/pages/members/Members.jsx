@@ -6,6 +6,7 @@ import { recruiterService } from "../../services/recruiterService.js";
 import { jobGradeService } from "../../services/jobGradeService.js";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, SearchableSelect, Button, DateField } from "../../components/form";
+import Modal, { ConfirmDialog } from "../../components/overlay/Modal.jsx";
 import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, YES_NO_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
@@ -357,9 +358,15 @@ ${summary}`);
             return;
         }
 
-        const confirmed = window.confirm("Are you sure you want to save the following changes?" + changes.join(""));
-        if (!confirmed) return;
+        // 🔴 `03.4`: was `window.confirm()`. It listed the changes in a browser dialog that
+        // cannot be styled, cannot be scrolled sensibly, blocks the whole thread, and is
+        // SUPPRESSIBLE -- a user who ticks "don't show me these again" silently loses this
+        // confirmation and every other one in the application.
+        setPendingSave(changes);
+    };
 
+    const commitSave = async () => {
+        setPendingSave(null);
         try {
             await memberService.updateMember(editForm);
             const refreshed = await memberService.getMembers();
@@ -374,6 +381,8 @@ ${summary}`);
             alert("Unable to save changes. Please try again.");
         }
     };
+
+    const [pendingSave, setPendingSave] = useState(null);
 
     const handleInputChange = useCallback((field) => (event) => {
         const value = event && event.target ? event.target.value : event;
@@ -509,10 +518,38 @@ ${summary}`);
                 </div>
             </div>
 
+            {/* 🔴 `03.4`: was a bare `fixed inset-0` div with `aria-modal="true"` ASSERTED
+                rather than implemented -- no portal, no focus trap, no Escape, and a
+                `<div onClick>` backdrop only a mouse could dismiss. It also capped at
+                `max-h-[90vh]`, a `vh` value (conventions §6). `Modal` supplies all of it. */}
+            {/* ⚠️ STILL GUARDED BY `selectedMember &&`, and that is not belt-and-braces.
+                JSX children are CONSTRUCTED whether or not the dialog renders them, so the
+                body's `selectedMember.address` runs on every render of this page. Passing
+                `open={Boolean(selectedMember)}` alone threw
+                `Cannot read properties of null (reading 'address')` the moment the page
+                mounted -- caught by the route smoke, not by reading. */}
             {selectedMember && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs" role="dialog" aria-modal="true" aria-label="Member Details">
-                    <div className="absolute inset-0" onClick={() => setSelectedMember(null)} />
-                    <div className="relative max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 animate-in fade-in zoom-in-95 duration-200">
+            <Modal
+                open
+                onOpenChange={(next) => { if (!next) setSelectedMember(null); }}
+                title="Member details"
+                description="Sasbo Member Dashboard Profile"
+                size="xl"
+                footer={
+                    isEditing ? (
+                        <>
+                            <Button onClick={handleEditToggle}>Cancel</Button>
+                            <Button variant="primary" onClick={handleSaveChanges}>Save Changes</Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button onClick={() => setSelectedMember(null)}>Close</Button>
+                            <Button variant="primary" onClick={handleEditToggle}>Edit Member</Button>
+                        </>
+                    )
+                }
+            >
+                    <div className="relative">
                         {showSavedNotification && (
                             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg">
                                 <CheckCircle2 size={18} />
@@ -520,9 +557,8 @@ ${summary}`);
                             </div>
                         )}
 
-                        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
+                        <div className="flex items-start justify-between gap-4 pb-4">
                             <div>
-                                <p className="text-xs uppercase tracking-wider text-gray-400 font-bold">Sasbo Member Dashboard Profile</p>
                                 <div className="mt-1 flex flex-wrap items-center gap-2 text-base font-bold text-gray-900 dark:text-gray-100">
                                     <span>{`${editForm.title ? editForm.title + " " : ""}${[editForm.initials, editForm.surname].filter(Boolean).join(" ") || "-"}`}</span>
                                     <span className="text-gray-300 dark:text-gray-600">•</span>
@@ -531,9 +567,6 @@ ${summary}`);
                                     <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${editForm.status === "Active" ? "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-300" : "bg-gray-100 text-gray-600 dark:bg-gray-900/40"}`}>{editForm.status}</span>
                                 </div>
                             </div>
-                            <button onClick={() => setSelectedMember(null)} className="shrink-0 rounded-md p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-gray-700 transition">
-                                <span className="text-lg">✕</span>
-                            </button>
                         </div>
 
                         <div className="px-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
@@ -553,7 +586,7 @@ ${summary}`);
                             </div>
                         </div>
 
-                        <div className="px-6 py-5 overflow-y-auto max-h-[65vh] text-sm bg-gray-50 dark:bg-gray-900/20">
+                        <div className="text-sm">
                             {activeTab === "personal" && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
                                     <Detail label="Title" value={editForm.title} isEditing={isEditing} options={titleOptions} onChange={handleEditChange("title")} />
@@ -856,22 +889,31 @@ ${summary}`);
                             )}
                         </div>
 
-                        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                            {isEditing ? (
-                                <>
-                                    <Button variant="primary" onClick={handleSaveChanges}>Save Changes</Button>
-                                    <Button onClick={handleEditToggle}>Cancel</Button>
-                                </>
-                            ) : (
-                                <>
-                                    <Button variant="primary" onClick={handleEditToggle}>Edit Member</Button>
-                                    <Button onClick={() => setSelectedMember(null)}>Close</Button>
-                                </>
-                            )}
-                        </div>
                     </div>
-                </div>
+            </Modal>
             )}
+
+            <ConfirmDialog
+                open={Boolean(pendingSave)}
+                onOpenChange={(next) => { if (!next) setPendingSave(null); }}
+                title="Save these changes?"
+                confirmLabel="Save changes"
+                cancelLabel="Keep editing"
+                destructive={false}
+                onConfirm={commitSave}
+            >
+                {/* 🔑 The changes are a LIST now, not a string of bullets concatenated into
+                    a browser dialog. A long list scrolls inside the modal body rather than
+                    running off the bottom of an unscrollable native alert. */}
+                <ul className="space-y-1 text-sm text-ink">
+                    {(pendingSave ?? []).map((change) => (
+                        <li key={change} className="flex gap-2">
+                            <span aria-hidden="true" className="text-ink-faint">•</span>
+                            <span>{String(change).replace(/^[\s••]+/, '')}</span>
+                        </li>
+                    ))}
+                </ul>
+            </ConfirmDialog>
         </div>
     );
 }

@@ -2,7 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/Tansparent%20Lady%20Robot.png" />
+    <!-- 🔴 F8, HALF-FIXED HERE AND THE OTHER HALF NAMED. This used to point at
+         `/Tansparent%20Lady%20Robot.png` in `public/`, which is BYTE-IDENTICAL to
+         `src/assets/images/logo.png` (sha256 3863ca94…) -- so the build shipped the SAME
+         121 KiB image TWICE, 242 KiB of a 901 KiB bundle for one picture, and that is what
+         took the bundle over its 900 KiB ceiling. Pointing at the source asset lets Vite
+         hash and emit it ONCE. No pixel changes.
+         ⚠️ It also declared `type="image/svg+xml"` for a PNG, which was simply untrue.
+         ⏳ STILL OPEN (R-PERF-D, P4): a favicon does not need a 121 KiB full-colour photo
+         -- a browser draws it at 16-32px. Replacing it with a real icon needs the OWNER's
+         asset, so it is named rather than invented here. -->
+    <link rel="icon" type="image/png" href="/src/assets/images/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- R-ROB-E / R-PERF-H. Tells the UA both schemes exist before any CSS arrives, so the
          browser paints its own canvas, form controls and scrollbars in the right one from

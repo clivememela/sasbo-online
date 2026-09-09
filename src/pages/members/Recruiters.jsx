@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import { TextInput, SearchableSelect, Button, PositionTreeSelect, DateField } from '../../components/form';
+import Modal, { ConfirmDialog } from '../../components/overlay/Modal.jsx';
 import { memberService } from '../../services/memberService.js';
 import { recruiterService } from '../../services/recruiterService.js';
 import { recruitmentChannelService } from '../../services/recruitmentChannelService.js';
@@ -290,8 +291,16 @@ export function Recruiters() {
         }
     };
 
-    const handleRemove = async (member) => {
-        if (!window.confirm(`Remove ${member.initials || ''} ${member.surname || ''} from ${selectedRep.name}'s list?`)) return;
+    // 🔴 `03.4`: both of this file's `window.confirm()` calls become ConfirmDialogs. The
+    // second one is the reason it matters: it sets EVERY member of a recruiter to Inactive,
+    // and `window.confirm` can only offer "OK".
+    const [pendingRemoveMember, setPendingRemoveMember] = useState(null);
+    const [pendingRemoveRep, setPendingRemoveRep] = useState(null);
+
+    const handleRemove = async () => {
+        const member = pendingRemoveMember;
+        if (!member) return;
+        setPendingRemoveMember(null);
         try {
             setSaving(true);
             const cleanData = sanitizeMemberPayload(member, { areasRep: '' });
@@ -341,9 +350,11 @@ export function Recruiters() {
         }
     };
 
-    const handleRemoveRep = async (rep) => {
+    const handleRemoveRep = async () => {
+        const rep = pendingRemoveRep;
+        if (!rep) return;
         const repMems = members.filter(m => m.recruitmentRepresentativeId === rep.id);
-        if (!window.confirm(`Remove recruiter "${rep.name}"? This will set ${repMems.length} member(s) to Inactive and clear their recruiter assignment.`)) return;
+        setPendingRemoveRep(null);
         try {
             setSaving(true);
             await Promise.all(repMems.map(m => {
@@ -421,7 +432,7 @@ export function Recruiters() {
                   </span>
                                 </div>
                                 <div className="flex justify-end" onClick={e => e.stopPropagation()}>
-                                    <button onClick={() => handleRemoveRep(repMembers)} disabled={saving} title="Remove recruiter"
+                                    <button onClick={() => setPendingRemoveRep(repMembers)} disabled={saving} title="Remove recruiter"
                                             className="p-1.5 rounded-md text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition disabled:opacity-40">
                                         <UserMinus size={14} />
                                     </button>
@@ -434,10 +445,22 @@ export function Recruiters() {
 
             {/* Rep Members Modal */}
             {selectedRep && !selectedMember && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-                    <div className="absolute inset-0 bg-black/50" onClick={handleCloseRepModal} />
-                    <div className="relative w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                <Modal
+                    open
+                    onOpenChange={(next) => { if (!next) handleCloseRepModal(); }}
+                    title={selectedRep.name}
+                    description="Recruitment channel"
+                    size="lg"
+                    footer={
+                        <>
+                            <Button onClick={handleCloseRepModal}>Close</Button>
+                            <Button variant="primary" onClick={handleOpenAddMember}>
+                                <UserPlus size={14} /> Add Member
+                            </Button>
+                        </>
+                    }
+                >
+                        <div className="flex items-center justify-between pb-4">
                             <div>
                                 <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Recruitment Channel</p>
                                 <div className="flex items-center gap-2">
@@ -458,12 +481,9 @@ export function Recruiters() {
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <span className="text-sm text-gray-500 dark:text-gray-400">{repMembers.length} member{repMembers.length !== 1 ? 's' : ''}</span>
-                                <CloseBtn onClick={handleCloseRepModal} />
-                            </div>
+                            <span className="text-sm text-gray-500 dark:text-gray-400">{repMembers.length} member{repMembers.length !== 1 ? 's' : ''}</span>
                         </div>
-                        <div className="overflow-y-auto flex-1">
+                        <div>
                             <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 text-center">
                                 <h4 className="text-sm font-semibold text-cyan-700 dark:text-cyan-400">Members ({repMembers.length})</h4>
                             </div>
@@ -502,7 +522,7 @@ export function Recruiters() {
                                         <div className="truncate text-xs text-gray-600 dark:text-gray-400">{m.branch}</div>
                                         <div><StatusBadge status={m.status} /></div>
                                         <div className="flex justify-end">
-                                            <button onClick={() => handleRemove(m)} disabled={saving} title="Remove from rep"
+                                            <button onClick={() => setPendingRemoveMember(m)} disabled={saving} title="Remove from rep"
                                                     className="p-1.5 rounded-md text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition disabled:opacity-40">
                                                 <Trash2 size={14} />
                                             </button>
@@ -511,29 +531,20 @@ export function Recruiters() {
                                 ))}
                             </div>
                         </div>
-                        <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between shrink-0">
-                            <Button variant="primary" onClick={handleOpenAddMember}>
-                                <UserPlus size={14} /> Add Member
-                            </Button>
-                            <Button onClick={handleCloseRepModal}>Close</Button>
-                        </div>
-                    </div>
-                </div>
+                </Modal>
             )}
 
             {/* Add Member Picker */}
             {showAddMember && selectedRep && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-                    <div className="absolute inset-0 bg-black/60" onClick={handleCloseAddMember} />
-                    <div className="relative w-full max-w-2xl max-h-[80vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
-                            <div>
-                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Add member to recruiter :</p>
-                                <h3 className="text-base font-semibold text-cyan-700 dark:text-cyan-400">{selectedRep.name}</h3>
-                            </div>
-                            <CloseBtn onClick={handleCloseAddMember} />
-                        </div>
-                        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                <Modal
+                    open
+                    onOpenChange={(next) => { if (!next) handleCloseAddMember(); }}
+                    title="Add member to recruiter"
+                    description={selectedRep.name}
+                    size="lg"
+                    footer={<Button onClick={handleCloseAddMember}>Cancel</Button>}
+                >
+                        <div className="pb-3">
                             <input autoFocus value={addSearch} onChange={e => { const val = e.target.value; setAddSearch(val); }} placeholder="Search by name, membership no. or bank…" aria-label="Search members to add"
                                    className="w-full rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" />
                         </div>
@@ -562,23 +573,19 @@ export function Recruiters() {
                                 ))}
                             </div>
                         </div>
-                        <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end shrink-0">
-                            <Button onClick={handleCloseAddMember}>Cancel</Button>
-                        </div>
-                    </div>
-                </div>
+                </Modal>
             )}
 
             {/* Rep Detail Modal */}
             {selectedRepDetail && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-                    <div className="absolute inset-0 bg-black/60" onClick={handleCloseRepDetail} />
-                    <div className="relative w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                            <div>
-                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Recruiter Details</p>
-                                <h3 className="text-base font-semibold text-cyan-700 dark:text-cyan-400">{selectedRepDetail.name}</h3>
-                            </div>
+                <Modal
+                    open
+                    onOpenChange={(next) => { if (!next) handleCloseRepDetail(); }}
+                    title="Recruiter details"
+                    description={selectedRepDetail.name}
+                    size="md"
+                >
+                        <div className="flex items-center justify-end gap-2 pb-4">
                             <div className="flex items-center gap-2">
                                 {!editingRep && (
                                     <button className="px-3 py-1 rounded-md text-xs font-medium bg-cyan-600 text-white hover:bg-cyan-700 transition"
@@ -599,7 +606,6 @@ export function Recruiters() {
                                         Edit
                                     </button>
                                 )}
-                                <CloseBtn onClick={handleCloseRepDetail} />
                             </div>
                         </div>
                         {editingRep ? (
@@ -720,22 +726,26 @@ export function Recruiters() {
                                 <Button onClick={handleCloseRepDetail}>Close</Button>
                             )}
                         </div>
-                    </div>
-                </div>
+                </Modal>
             )}
 
             {/* Add Recruiter Modal */}
             {showAddRep && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-                    <div className="absolute inset-0 bg-black/60" onClick={handleCloseAddRep} />
-                    <div className="relative w-full max-w-lg max-h-[80vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
-                            <div>
-                                <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Add Recruiter</h3>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">A recruiter must be an existing member</p>
-                            </div>
-                            <CloseBtn onClick={handleCloseAddRep} />
-                        </div>
+                <Modal
+                    open
+                    onOpenChange={(next) => { if (!next) handleCloseAddRep(); }}
+                    title="Add Recruiter"
+                    description="A recruiter must be an existing member"
+                    size="md"
+                    footer={
+                        <>
+                            <Button onClick={handleCloseAddRep}>Cancel</Button>
+                            <Button variant="primary" onClick={handleAddRep} disabled={!newRepMember} loading={saving}>
+                                <UserPlus size={14} /> Make Recruiter
+                            </Button>
+                        </>
+                    }
+                >
                         {newRepMember && (
                             <div className="mx-4 mt-3 px-4 py-3 rounded-lg bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-700 flex items-center justify-between shrink-0">
                                 <div>
@@ -835,24 +845,20 @@ export function Recruiters() {
                                 </div>
                             </div>
                         )}
-                        <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2 shrink-0">
-                            <Button onClick={handleCloseAddRep}>Cancel</Button>
-                            <Button variant="primary" onClick={handleAddRep} disabled={!newRepMember || saving}>
-                                <UserPlus size={14} /> Make Recruiter
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+                </Modal>
             )}
 
             {/* Member Detail Modal */}
             {selectedMember && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-                    <div className="absolute inset-0 bg-black/60" onClick={handleCloseMemberModal} />
-                    <div className="relative w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                        <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                <Modal
+                    open
+                    onOpenChange={(next) => { if (!next) handleCloseMemberModal(); }}
+                    title="Member details"
+                    size="lg"
+                    footer={<Button onClick={handleCloseMemberModal}>Close</Button>}
+                >
+                        <div className="flex items-start justify-between pb-4">
                             <div>
-                                <p className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Member Details</p>
                                 <div className="mt-1 flex flex-wrap items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
                                     <span>{selectedMember.title ? `${selectedMember.title} ` : ''}{selectedMember.initials} {selectedMember.surname}</span>
                                     <span className="text-gray-400">•</span>
@@ -861,9 +867,8 @@ export function Recruiters() {
                                     <StatusBadge status={selectedMember.status} />
                                 </div>
                             </div>
-                            <CloseBtn onClick={handleCloseMemberModal} />
                         </div>
-                        <div className="px-6 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 shrink-0 flex items-center gap-1">
+                        <div className="py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700 flex items-center gap-1">
                             <button onClick={() => setSelectedMember(null)} className="hover:text-cyan-600 dark:hover:text-cyan-400 transition">{selectedRep?.name}</button>
                             <ChevronRight size={12} />
                             <span className="font-medium text-gray-700 dark:text-gray-200">{selectedMember.membershipNumber}</span>
@@ -909,12 +914,43 @@ export function Recruiters() {
                                 </Section>
                             </div>
                         </div>
-                        <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end shrink-0">
-                            <Button onClick={handleCloseMemberModal}>Close</Button>
-                        </div>
-                    </div>
-                </div>
+                </Modal>
             )}
+
+            <ConfirmDialog
+                open={Boolean(pendingRemoveMember)}
+                onOpenChange={(next) => { if (!next) setPendingRemoveMember(null); }}
+                title="Remove this member from the recruiter?"
+                description={pendingRemoveMember
+                    ? `${[pendingRemoveMember.initials, pendingRemoveMember.surname].filter(Boolean).join(' ')} will no longer be on ${selectedRep?.name ?? 'this recruiter'}'s list.`
+                    : undefined}
+                confirmLabel="Remove from recruiter"
+                loading={saving}
+                onConfirm={handleRemove}
+            />
+
+            <ConfirmDialog
+                open={Boolean(pendingRemoveRep)}
+                onOpenChange={(next) => { if (!next) setPendingRemoveRep(null); }}
+                title="Remove this recruiter?"
+                confirmLabel="Remove recruiter"
+                loading={saving}
+                onConfirm={handleRemoveRep}
+            >
+                {/* 🔑 The consequence is SPELLED OUT, and it is the reason this one could
+                    never have stayed a `window.confirm`: it sets every one of the
+                    recruiter's members to Inactive. */}
+                {pendingRemoveRep && (
+                    <p className="text-sm text-ink">
+                        <strong className="font-medium">{pendingRemoveRep.name}</strong> will be removed. This sets{' '}
+                        <strong className="font-medium">
+                            {members.filter(m => m.recruitmentRepresentativeId === pendingRemoveRep.id).length}
+                        </strong>{' '}
+                        member(s) to <strong className="font-medium">Inactive</strong> and clears their recruiter
+                        assignment.
+                    </p>
+                )}
+            </ConfirmDialog>
         </div>
     );
 }

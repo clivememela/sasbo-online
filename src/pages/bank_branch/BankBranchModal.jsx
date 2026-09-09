@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, Button } from "../../components/form";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
+import Modal from "../../components/overlay/Modal.jsx";
 import { validateEmail } from "../../utils/validateSAID.js";
 
 const EMPTY = {
@@ -84,21 +85,30 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-gray-100 dark:border-gray-700">
-        <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50">
-          <h3 className="text-2xl font-bold text-cyan-700 dark:text-cyan-400">
-            {isReadOnlyView ? "Bank Details" : isEditMode ? "Edit Bank/Branch Details" : "Add Bank/Branch Details"}
-          </h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition text-gray-500">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
+    // 🔴 `03.4`: was a bare `fixed inset-0` overlay with its own hand-rolled header, its
+    // own close button, and `max-h-[90vh]` -- a `vh` cap, which on a phone puts the Save
+    // button under the browser chrome (conventions §6). `Modal` portals it, traps focus,
+    // handles Escape, locks the page, and caps in `dvh`; the close button is its own.
+    <Modal
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      title={isReadOnlyView ? "Bank Details" : isEditMode ? "Edit Bank/Branch Details" : "Add Bank/Branch Details"}
+      size="xl"
+      footer={
+        <>
+          <Button type="button" onClick={isReadOnlyView ? onClose : handleCancel} variant="secondary">{isReadOnlyView ? "Close" : "Cancel"}</Button>
+          {isReadOnlyView ? (
+            <Button type="button" variant="primary" onClick={() => setIsEditing(true)}>Edit</Button>
+          ) : (
+            <Button type="submit" form="add-bank-form" variant="primary" loading={loading}>
+              {isEditMode ? "Save Changes" : "Save"}
+            </Button>
+          )}
+        </>
+      }
+    >
         {isReadOnlyView ? (
-          <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-6">
+          <div className="space-y-6">
             <section className="space-y-4">
               <h4 className="text-sm font-bold uppercase tracking-widest text-cyan-600 dark:text-cyan-500 border-l-4 border-cyan-600 pl-3">General Info</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -144,7 +154,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
             </section>
           </div>
         ) : (
-          <form id="add-bank-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-6">
+          <form id="add-bank-form" onSubmit={handleSubmit} className="space-y-6">
           <section className="space-y-4">
             <h4 className="text-sm font-bold uppercase tracking-widest text-cyan-600 dark:text-cyan-500 border-l-4 border-cyan-600 pl-3">General Info</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -193,18 +203,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
           </form>
         )}
 
-        <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3 bg-gray-50/50 dark:bg-gray-900/50">
-          <Button type="button" onClick={isReadOnlyView ? onClose : handleCancel} variant="secondary">{isReadOnlyView ? "Close" : "Cancel"}</Button>
-          {isReadOnlyView ? (
-            <Button type="button" variant="primary" onClick={() => setIsEditing(true)}>Edit</Button>
-          ) : (
-            <Button type="submit" form="add-bank-form" variant="primary" disabled={loading}>
-              {loading ? "Saving..." : isEditMode ? "Save Changes" : "Save"}
-            </Button>
-          )}
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

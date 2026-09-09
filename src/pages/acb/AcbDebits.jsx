@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { CheckCircle2 } from "lucide-react";
 import PageTitle from "../../components/common/PageTitle.jsx";
 import { TextInput, Button } from "../../components/form";
+import Modal from "../../components/overlay/Modal.jsx";
 import { memberService } from "../../services/memberService.js";
 import { validateSAID } from "../../utils/validateSAID.js";
 
@@ -222,12 +223,22 @@ export default function AcbDebits() {
                             )}
                         </div>
 
-                        {/* Edit Modal */}
-                        {editing && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                                <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl p-6">
-                                    <h3 className="text-lg font-semibold mb-4">Update Banking Details</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* 🔴 `03.4`: was a bare `fixed inset-0` div -- not portalled, no focus
+                            trap, no Escape, no scroll lock. Tab walked straight out of it into the
+                            page behind. `Modal` brings all four, and the dvh height cap with them. */}
+                        <Modal
+                            open={editing}
+                            onOpenChange={setEditing}
+                            title="Update Banking Details"
+                            size="lg"
+                            footer={
+                                <>
+                                    <Button onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
+                                    <Button variant="primary" onClick={saveBanking} loading={saving}>Update</Button>
+                                </>
+                            }
+                        >
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <TextInput label="Bank" value={bankForm.bankName} onChange={handleBankChange('bankName')} />
                                         <TextInput label="Branch" value={bankForm.branch} onChange={handleBankChange('branch')} />
                                         <TextInput label="Account Number" value={bankForm.bankAccountNumber} onChange={handleBankChange('bankAccountNumber')} />
@@ -236,15 +247,9 @@ export default function AcbDebits() {
                                         <TextInput label="Payment Type" value={bankForm.paymentType} onChange={handleBankChange('paymentType')} />
                                         <TextInput label="Debit Day" value={bankForm.debitDay} onChange={handleBankChange('debitDay')} />
                                         <TextInput label="Bank Address" value={bankForm.bankAddress} onChange={handleBankChange('bankAddress')} />
-                                        <TextInput label="Work Bank Address" value={bankForm.workBankAddress} onChange={handleBankChange('workBankAddress')} />
-                                    </div>
-                                    <div className="flex justify-end gap-2 mt-6">
-                                        <Button onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
-                                        <Button variant="primary" onClick={saveBanking} disabled={saving}>{saving ? 'Updating...' : 'Update'}</Button>
-                                    </div>
-                                </div>
+                                <TextInput label="Work Bank Address" value={bankForm.workBankAddress} onChange={handleBankChange('workBankAddress')} />
                             </div>
-                        )}
+                        </Modal>
                     </div>
                 )}
             </div>

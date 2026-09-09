@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Pencil, Trash2, UserPlus, Check, X } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import { Button } from '../../components/form';
+import { ConfirmDialog } from '../../components/overlay/Modal.jsx';
 import { recruitmentChannelService } from '../../services/recruitmentChannelService.js';
 
 export default function RecruitmentChannel() {
@@ -67,11 +68,19 @@ export default function RecruitmentChannel() {
         }
     };
 
-    const handleDelete = async (r) => {
-        if (!window.confirm(`Delete recruiter type "${r.name}"?`)) return;
+    // 🔴 `03.4`: was `window.confirm()`. That dialog is unstyleable, says only OK/Cancel
+    // rather than naming what will happen, blocks the whole browser thread, and is
+    // SUPPRESSIBLE -- a user who ticks "don't show me these again" silently loses every
+    // confirmation in the application.
+    const [pendingDelete, setPendingDelete] = useState(null);
+
+    const handleDelete = async () => {
+        const r = pendingDelete;
+        if (!r) return;
         setSaving(true);
         try {
             await recruitmentChannelService.remove(r.id);
+            setPendingDelete(null);
             await refresh();
         } catch (err) {
             alert(err);
@@ -186,7 +195,7 @@ export default function RecruitmentChannel() {
                             )}
 
                             <button
-                                onClick={() => handleDelete(r)}
+                                onClick={() => setPendingDelete(r)}
                                 disabled={saving}
                                 title="Delete"
                                 className="p-1.5 rounded-md text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 disabled:opacity-40 transition">
@@ -200,6 +209,16 @@ export default function RecruitmentChannel() {
                     {filtered.length} recruiter type{filtered.length !== 1 ? 's' : ''}
                 </p>
             </div>
+
+            <ConfirmDialog
+                open={Boolean(pendingDelete)}
+                onOpenChange={(next) => { if (!next) setPendingDelete(null); }}
+                title="Delete recruiter type"
+                description={pendingDelete ? `"${pendingDelete.name}" will be removed from the list of recruiter types.` : undefined}
+                confirmLabel="Delete recruiter type"
+                loading={saving}
+                onConfirm={handleDelete}
+            />
         </div>
     );
 }

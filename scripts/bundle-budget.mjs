@@ -35,6 +35,37 @@
  *                                  ----------
  *   total                          788.13 KiB
  *
+ * RE-MEASURED 2026-09-09 on design/00-baseline at the close of the design arc's
+ * P3, same script, after `npm run build`:
+ *   entry js                       251.87 KiB   ceiling 350   OK
+ *   javascript (all chunks)        602.24 KiB   ceiling 640   <-- RAISED, see below
+ *   css                             60.63 KiB   ceiling  70   OK
+ *   all assets                     783.61 KiB   ceiling 900   OK
+ *   emitted files                  59
+ *
+ * ✅ F8 IS CLOSED, on measurement. `public/Tansparent Lady Robot.png` and
+ * `src/assets/images/logo.png` were BYTE-IDENTICAL (sha256 3863ca94...), so the
+ * build really was shipping 121 KiB twice -- 242 KiB of a 901 KiB bundle for one
+ * picture. The favicon now points at the source asset and Vite emits it once:
+ * all assets 901.10 -> 783.61 KiB. ⏳ The other half of R-PERF-D is still open --
+ * a favicon does not need a 121 KiB full-colour photo -- and needs the owner's
+ * asset rather than an invented one.
+ *
+ * 🔴 WHY `js` MOVED 600 -> 640, and what spent it: ONE lazy chunk, `Modal-*.js`
+ * at 41 KiB -- `@radix-ui/react-dialog`, behind the design arc's `03.4` single
+ * overlay primitive. It replaces EIGHT hand-rolled `fixed inset-0` divs across
+ * four files, none portalled, none trapping focus, one handling Escape; the 41 KiB
+ * IS the focus trap, the Escape handling, the scroll lock and the portal. It is
+ * lazy, so the entry chunk did not move.
+ *
+ * ⚠️ THE RAISE IS THE LAST STEP, NOT THE FIRST. Reclaimed before asking: F8's
+ * duplicate image (above), `react-day-picker` removed entirely in `03.3` on its
+ * own measurement (81.91 KiB for the date chunk, all assets 933.65 KiB -- this
+ * guard caught that one too), and three dependencies with zero consumers deleted
+ * (`cn`, `radix-ui`, `class-variance-authority`). Agreed with the automation arc,
+ * 2026-09-09, with these figures beside the ask; `entryJs`, `css`, `total` and
+ * every floor are untouched.
+ *
  * The ceilings below sit above those with headroom, for the same reason every
  * floor in this suite sits below its actual: a limit equal to the measurement
  * reddens for reasons nobody caused, and gets raised by whoever is unlucky
@@ -62,7 +93,10 @@ const CEILINGS = {
   // deliberately BELOW the pre-split figure -- its job is to notice a route quietly
   // becoming a static import again, which would show up here and nowhere else.
   entryJs: 350 * KB,
-  js: 600 * KB,
+  // 600 -> 640 on 2026-09-09: see the re-measured table above. 6% over the 602.24
+  // actual, for the reason the header gives -- a limit equal to the measurement
+  // reddens for things nobody caused.
+  js: 640 * KB,
   css: 70 * KB,
   total: 900 * KB,
 }
