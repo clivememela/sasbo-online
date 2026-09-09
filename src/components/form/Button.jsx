@@ -1,6 +1,6 @@
 import { Loader2 } from 'lucide-react';
 
-import { cn } from '../../lib/utils';
+import { cn, pick } from '../../lib/utils';
 
 /**
  * The button. `03.2a`.
@@ -104,8 +104,8 @@ export default function Button({
         'transition-colors duration-(--duration-instant) ease-(--ease-out)',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        SIZES[size] ?? SIZES.md,
-        VARIANTS[variant] ?? VARIANTS.default,
+        pick(SIZES, size, 'Button size'),
+        pick(VARIANTS, variant, 'Button variant'),
         className,
       )}
     >

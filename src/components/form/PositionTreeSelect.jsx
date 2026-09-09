@@ -53,7 +53,11 @@ export default function PositionTreeSelect({
     return map;
   }, [structures]);
 
-  const initialSelections = useMemo(() => {
+  // A pre-selection, resolved back into a cascade -- ONCE, as the initial state. It was a
+  // `useMemo(…, [])` whose only consumer was the `useState` on the next line, which is a
+  // lazy initialiser written as a memo and needing an `exhaustive-deps` disable to survive.
+  // `useState(fn)` is what that is, and the disable goes with it.
+  const [selectionsByLevel, setSelectionsByLevel] = useState(() => {
     if (!selectedIds.length || !structures.length) return {};
     const deepestId = selectedIds[selectedIds.length - 1];
     const entry = nodeMap.get(deepestId);
@@ -65,13 +69,19 @@ export default function PositionTreeSelect({
     });
     selection[entry.ancestors.length] = deepestId;
     return selection;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- the INITIAL state only; later changes come through the effect below.
-
-  const [selectionsByLevel, setSelectionsByLevel] = useState(initialSelections);
+  });
 
   // Reset when the caller clears the selection (e.g. electedRep toggled back to N).
+  //
+  // 🔑 THE BAIL MATTERS MORE THAN IT LOOKS. `selectedIds` defaults to a new `[]` and call
+  // sites pass computed arrays, so this effect runs on EVERY parent render. Setting a fresh
+  // `{}` each time is never state-equal, so each parent render cost a second full render of
+  // this component -- which invalidated the `levels` memo, produced new `options` identities,
+  // and so defeated the `normaliseOptions` memo inside every `SelectInput` in the cascade.
+  // Returning `previous` when it is already empty stops the whole chain.
   useEffect(() => {
-    if (selectedIds.length === 0) setSelectionsByLevel({});
+    if (selectedIds.length !== 0) return;
+    setSelectionsByLevel((previous) => (Object.keys(previous).length === 0 ? previous : {}));
   }, [selectedIds]);
 
   // One entry per visible level: the options at that depth.

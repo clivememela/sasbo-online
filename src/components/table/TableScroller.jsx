@@ -38,26 +38,38 @@ export default function TableScroller({ children, label, className }) {
     if (!element) return;
     const { scrollLeft, scrollWidth, clientWidth } = element;
     const overflowing = scrollWidth - clientWidth > 1;
+    const start = overflowing && scrollLeft > 1;
+    const end = overflowing && scrollLeft < scrollWidth - clientWidth - 1;
+
     setScrollable(overflowing);
-    setEdges({
-      start: overflowing && scrollLeft > 1,
-      end: overflowing && scrollLeft < scrollWidth - clientWidth - 1,
-    });
+    // 🔑 BAIL WHEN NOTHING CHANGED. `onScroll` fires at frame rate, and a fresh object is
+    // never `Object.is`-equal -- so a plain `setEdges({...})` re-rendered the ENTIRE table,
+    // every row and every cell, on every scroll event. These two booleans only change at
+    // the two ends of the range.
+    setEdges((previous) =>
+      previous.start === start && previous.end === end ? previous : { start, end },
+    );
   }, []);
 
   useEffect(() => {
     const element = ref.current;
     if (!element) return undefined;
 
-    measure();
-
-    // ResizeObserver is absent in jsdom, so the observer is optional and the initial
-    // measurement above stands on its own. A guard here rather than a polyfill: the
-    // affordance is progressive, and a test that cannot resize does not need it.
+    // ResizeObserver is absent in jsdom, so the observer is optional and the re-measure
+    // effect below stands on its own. A guard here rather than a polyfill: the affordance
+    // is progressive, and a test that cannot resize does not need it.
     const observer =
       typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     observer?.observe(element);
     return () => observer?.disconnect();
+    // 🔑 `children` is DELIBERATELY not a dep here. It is a fresh React element on every
+    // parent render, so including it tore down and rebuilt the ResizeObserver on each one.
+    // What `children` actually wants is a re-measure, which is the effect below.
+  }, [measure]);
+
+  // Re-measure when the content changes -- the thing the `children` dep was there for.
+  useEffect(() => {
+    measure();
   }, [measure, children]);
 
   return (

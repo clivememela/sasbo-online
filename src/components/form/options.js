@@ -60,9 +60,10 @@ export function normaliseOptions(options, optionValue, optionLabel) {
     const raw = readValue(option);
     const label = readLabel(option);
     return {
-      // `?? ''` and not `|| ''`: 0 and false are legitimate values and must survive.
-      value: raw === null || raw === undefined ? '' : String(raw),
-      label: label === null || label === undefined ? '' : String(label),
+      // Through `asOptionValue` rather than restated: 0 and false are legitimate values and
+      // must survive, and that rule belongs in ONE function.
+      value: asOptionValue(raw),
+      label: asOptionValue(label),
       disabled: Boolean(option && typeof option === 'object' && option.disabled),
       // The caller's own record, handed back by `onChange(value, option)`.
       option,

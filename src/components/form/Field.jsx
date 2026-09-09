@@ -38,17 +38,13 @@ export default function Field({
   hint,
   className,
   labelClassName,
-  /** A `<label htmlFor>` cannot name a listbox trigger group; those pass `as="group"`. */
-  as = 'label',
   children,
 }) {
   const id = useId();
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
-  const labelId = `${id}-label`;
 
   const describedBy = cn(error && errorId, !error && hint && hintId) || undefined;
-  const isGroup = as === 'group';
 
   const labelText = (
     <>
@@ -64,31 +60,18 @@ export default function Field({
   );
 
   return (
-    <div
-      className={cn('flex min-w-0 flex-col gap-1', className)}
-      role={isGroup ? 'group' : undefined}
-      aria-labelledby={isGroup && label ? labelId : undefined}
-    >
-      {label &&
-        (isGroup ? (
-          <span
-            id={labelId}
-            className={cn('text-xs font-semibold uppercase tracking-wide text-ink-muted', labelClassName)}
-          >
-            {labelText}
-          </span>
-        ) : (
-          <label
-            htmlFor={id}
-            className={cn('text-xs font-semibold uppercase tracking-wide text-ink-muted', labelClassName)}
-          >
-            {labelText}
-          </label>
-        ))}
+    <div className={cn('flex min-w-0 flex-col gap-1', className)}>
+      {label && (
+        <label
+          htmlFor={id}
+          className={cn('text-xs font-semibold uppercase tracking-wide text-ink-muted', labelClassName)}
+        >
+          {labelText}
+        </label>
+      )}
 
       {children({
         id,
-        labelId: label ? labelId : undefined,
         describedBy,
         invalid: error ? true : undefined,
       })}

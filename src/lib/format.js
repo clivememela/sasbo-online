@@ -38,6 +38,15 @@
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+// 🔑 BUILT ONCE. `toLocaleString(locale, opts)` constructs an `Intl.NumberFormat`
+// internally on every call, and constructing the formatter costs far more than using it.
+// These two are what every money and count cell in a table calls, so a 50-row list was 50+
+// constructions per render -- and alternating between them defeats the engine's
+// single-entry cache as well. Identical output by definition: `toLocaleString` is specified
+// as exactly this call.
+const ZAR = new Intl.NumberFormat('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const COUNT = new Intl.NumberFormat('en-ZA');
+
 /** What a missing value renders as, everywhere. One em dash, not "N/A", not blank. */
 export const EMPTY = '—';
 
@@ -173,7 +182,7 @@ export function formatZar(value) {
   if (value == null || value === '') return EMPTY;
   const number = Number(value);
   if (!Number.isFinite(number)) return EMPTY;
-  return `R ${number.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `R ${ZAR.format(number)}`;
 }
 
 /** Counts and quantities, `en-ZA` grouping. */
@@ -181,7 +190,7 @@ export function formatInt(value) {
   if (value == null || value === '') return EMPTY;
   const number = Number(value);
   if (!Number.isFinite(number)) return EMPTY;
-  return number.toLocaleString('en-ZA');
+  return COUNT.format(number);
 }
 
 /**
@@ -239,18 +248,6 @@ export function shiftMonths(date, months) {
   const y = Math.floor(total / 12);
   const m = (total % 12) + 1;
   return { y, m, d: Math.min(date.d, daysInMonth(y, m)) };
-}
-
-/** A `CalendarDate` as a local-midnight `Date`, for a library that speaks Date. */
-export function toDate(date) {
-  const parsed = parseDate(date);
-  return parsed ? new Date(parsed.y, parsed.m - 1, parsed.d) : null;
-}
-
-/** A `Date`'s LOCAL calendar fields. The inverse of `toDate`, and never via UTC. */
-export function fromDate(value) {
-  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
-  return { y: value.getFullYear(), m: value.getMonth() + 1, d: value.getDate() };
 }
 
 /**

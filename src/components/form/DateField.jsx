@@ -106,6 +106,19 @@ const WEEKDAYS = [
 // Sunday, the CLDR first day for South Africa and what the current app already shows.
 const YEARS_PER_PAGE = 20;
 
+// One decision, not ten. This string was written out at ten sites in this file while every
+// other file in the arc states it once -- so a change to the focus treatment was ten edits
+// that had to stay identical, and conventions §7 makes the ring non-optional.
+const FOCUS_RING = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring';
+
+// The month and year grids are the same control with different contents.
+const OPTION_BUTTON = [
+  'touch-target rounded-md px-2 py-2 text-sm text-ink',
+  'hover-hover:hover:bg-surface-2',
+  FOCUS_RING,
+  'disabled:cursor-not-allowed disabled:opacity-40',
+].join(' ');
+
 /** The mock's threshold, and the 16px rule's: a tablet in landscape is a touch device. */
 const SHEET_QUERY = '(max-width: 760px), (pointer: coarse)';
 
@@ -123,6 +136,14 @@ function readBound(bound) {
  * window between the first paint and the listener attaching where the value can be stale.
  * The server snapshot is `false`, so a non-browser render gets the popover, not the sheet.
  */
+// ⚠️ NOT CACHED IN A MODULE-LEVEL MAP, and the refactor pass proposed exactly that.
+// `getSnapshot` runs at least once per render, so a form with three date fields re-parses
+// this query on every keystroke -- a real, if small, waste. Caching the MediaQueryList by
+// query string fixes it and was tried: it makes the component's viewport behaviour
+// UNSTUBBABLE, because the cache outlives a test that replaces `window.matchMedia`, and
+// `DateField.test.jsx`'s bottom-sheet case went red. DECLINED: one `matchMedia` parse per
+// render is not worth a component that cannot be driven into its ≤760px state, which is
+// the state the whole sheet contract lives in (contract ⑤).
 function useMediaQuery(query) {
   const subscribe = useCallback(
     (onChange) => {
@@ -172,9 +193,10 @@ export default function DateField({
   const [text, setText] = useState(() => (value ? formatDate(value) : ''));
   const [refusal, setRefusal] = useState(null);
   const [cursor, setCursor] = useState(() => parseDate(value) ?? todayDate());
-  const [yearBase, setYearBase] = useState(
-    () => Math.floor((parseDate(value) ?? todayDate()).y / YEARS_PER_PAGE) * YEARS_PER_PAGE,
-  );
+  // 🔑 `0`, not a derived value. The year grid only exists while the panel is open, and the
+  // only two ways in -- `openPicker` and the year header button -- both set this first. The
+  // clever initialiser was never once read, which is a derivation that looks load-bearing.
+  const [yearBase, setYearBase] = useState(0);
 
   // Which day the arrows are on. SEPARATE from the selection: moving around the grid must
   // not change the answer, only where you are — the difference between browsing a calendar
@@ -304,35 +326,52 @@ export default function DateField({
   );
 
   // Placement. A popover that runs off the bottom flips above the field.
-  useLayoutEffect(() => {
-    if (!open || isSheet) return undefined;
-
-    const place = () => {
-      const anchor = inputRef.current?.getBoundingClientRect();
-      const panel = popoverRef.current;
-      if (!anchor || !panel) return;
-      const height = panel.offsetHeight;
-      const width = panel.offsetWidth;
-      const viewportH = window.innerHeight;
-      const viewportW = document.documentElement.clientWidth;
-      const below = anchor.bottom + 6;
-      const above = anchor.top - 6 - height;
-      const flip = below + height > viewportH - 8 && above > 8;
-      setPosition({
+  //
+  // 🔑 TWO EFFECTS, not one. `place()` depends on the view and the month (they change the
+  // panel's height); the scroll and resize LISTENERS do not. With one effect keyed on all
+  // four, paging a month or opening the year grid detached and re-attached a capture-phase
+  // scroll listener for nothing.
+  const place = useCallback(() => {
+    const anchor = inputRef.current?.getBoundingClientRect();
+    const panel = popoverRef.current;
+    if (!anchor || !panel) return;
+    const height = panel.offsetHeight;
+    const width = panel.offsetWidth;
+    const viewportH = window.innerHeight;
+    const viewportW = document.documentElement.clientWidth;
+    const below = anchor.bottom + 6;
+    const above = anchor.top - 6 - height;
+    const flip = below + height > viewportH - 8 && above > 8;
+    setPosition((previous) => {
+      const next = {
         top: Math.round(flip ? above : below),
         left: Math.round(Math.min(Math.max(anchor.left, 8), Math.max(8, viewportW - width - 8))),
         above: flip,
-      });
-    };
+      };
+      // A scroll event fires at frame rate; a fresh object is never equal, so without this
+      // the panel re-rendered on every one of them for an unchanged position.
+      return previous.top === next.top && previous.left === next.left && previous.above === next.above
+        ? previous
+        : next;
+    });
+  }, []);
 
+  // Re-place when anything that changes the panel's size changes.
+  useLayoutEffect(() => {
+    if (!open || isSheet) return;
     place();
+  }, [open, isSheet, view, cursor, place]);
+
+  // Attach the listeners once per opening, not per view change.
+  useLayoutEffect(() => {
+    if (!open || isSheet) return undefined;
     window.addEventListener('scroll', place, true);
     window.addEventListener('resize', place);
     return () => {
       window.removeEventListener('scroll', place, true);
       window.removeEventListener('resize', place);
     };
-  }, [open, isSheet, view, cursor]);
+  }, [open, isSheet, place]);
 
   // Dismiss on a pointer outside the field or the panel.
   useEffect(() => {
@@ -392,11 +431,9 @@ export default function DateField({
       else openPicker();
       return;
     }
-    if (event.key === 'Escape' && open) {
-      event.preventDefault();
-      closePicker(true);
-      return;
-    }
+    // Escape is NOT handled here: the document-level listener above owns it, and owns it
+    // from anywhere inside the panel. Two handlers for one key is the "one dismissal path"
+    // argument losing to itself.
     if (event.key === 'Enter') {
       // The field is read whole, and the form is NOT submitted from inside an open picker.
       event.preventDefault();
@@ -415,7 +452,7 @@ export default function DateField({
 
   const message = errorProp || refusal;
 
-  const monthGrid = (
+  const renderMonthGrid = () => (
     <div role="listbox" aria-label="Month" className="grid grid-cols-3 gap-1 p-2">
       {MONTHS_SHORT.map((short, index) => {
         const month = index + 1;
@@ -435,13 +472,7 @@ export default function DateField({
               setCursor({ y: cursor.y, m: month, d: Math.min(cursor.d, daysInMonth(cursor.y, month)) });
               setView('days');
             }}
-            className={cn(
-              'touch-target rounded-md px-2 py-2 text-sm text-ink',
-              'hover-hover:hover:bg-surface-2',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring',
-              'disabled:cursor-not-allowed disabled:opacity-40',
-              cursor.m === month && 'bg-brand-soft font-medium text-brand-ink',
-            )}
+            className={cn(OPTION_BUTTON, cursor.m === month && 'bg-brand-soft font-medium text-brand-ink')}
           >
             {short}
           </button>
@@ -450,7 +481,7 @@ export default function DateField({
     </div>
   );
 
-  const yearGrid = (
+  const renderYearGrid = () => (
     <div role="listbox" aria-label="Year" className="grid grid-cols-4 gap-1 p-2">
       {Array.from({ length: YEARS_PER_PAGE }, (_, index) => yearBase + index).map((year) => {
         const yearDisabled =
@@ -467,13 +498,7 @@ export default function DateField({
               setCursor({ ...cursor, y: year, d: Math.min(cursor.d, daysInMonth(year, cursor.m)) });
               setView('months');
             }}
-            className={cn(
-              'touch-target rounded-md px-2 py-2 text-sm text-ink',
-              'hover-hover:hover:bg-surface-2',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring',
-              'disabled:cursor-not-allowed disabled:opacity-40',
-              cursor.y === year && 'bg-brand-soft font-medium text-brand-ink',
-            )}
+            className={cn(OPTION_BUTTON, cursor.y === year && 'bg-brand-soft font-medium text-brand-ink')}
           >
             {year}
           </button>
@@ -535,7 +560,7 @@ export default function DateField({
     }
   };
 
-  const dayGrid = (
+  const renderDayGrid = () => (
     <div
       role="grid"
       aria-label={`${MONTHS_LONG[cursor.m - 1]} ${cursor.y}`}
@@ -586,7 +611,7 @@ export default function DateField({
                 className={cn(
                   'size-9 rounded-md text-sm text-ink',
                   'hover-hover:hover:bg-surface-2',
-                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring',
+                  FOCUS_RING,
                   outside && 'text-ink-faint opacity-60',
                   unavailable && 'cursor-not-allowed opacity-40',
                   // Today is RINGED in accent; the choice is FILLED in brand. The mock is
@@ -613,7 +638,14 @@ export default function DateField({
 
   const stepUnit = view === 'days' ? 'month' : view === 'months' ? 'year' : `${YEARS_PER_PAGE} years`;
 
-  const panel = (
+  // 🔴 A FUNCTION, NOT A BINDING -- and this is the largest single waste the refactor pass
+  // found. `panel` is only ever used inside `{open && createPortal(...)}`, but as a `const`
+  // it was BUILT ON EVERY RENDER, open or shut: ~80 React elements (12 month buttons, 20
+  // year buttons, 42 day cells and the chrome), ~120 handler closures, and per day cell an
+  // `outOfRange`, three `sameDate`, a `formatDateLong` and a seven-argument `cn` -- so ~42
+  // date formats and ~42 class merges. This component re-renders on EVERY KEYSTROKE in its
+  // own text box, so all of that was paid per character typed with the calendar closed.
+  const renderPanel = () => (
     <div
       ref={popoverRef}
       role="dialog"
@@ -633,7 +665,7 @@ export default function DateField({
           <button
             type="button"
             onClick={() => closePicker(true)}
-            className="touch-target rounded-md px-3 py-1 text-sm font-medium text-brand-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+            className={cn('touch-target rounded-md px-3 py-1 text-sm font-medium text-brand-ink', FOCUS_RING)}
           >
             Done
           </button>
@@ -645,7 +677,7 @@ export default function DateField({
           type="button"
           onClick={() => step(-1)}
           aria-label={`Previous ${stepUnit}`}
-          className="touch-target rounded-md p-1.5 text-ink-muted hover-hover:hover:bg-surface-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+          className={cn('touch-target rounded-md p-1.5 text-ink-muted hover-hover:hover:bg-surface-2', FOCUS_RING)}
         >
           <ChevronLeft aria-hidden="true" className="size-4" />
         </button>
@@ -655,7 +687,7 @@ export default function DateField({
             type="button"
             aria-expanded={view === 'months'}
             onClick={() => setView(view === 'months' ? 'days' : 'months')}
-            className="touch-target inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-sm font-medium text-ink hover-hover:hover:bg-surface-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+            className={cn('touch-target inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-sm font-medium text-ink hover-hover:hover:bg-surface-2', FOCUS_RING)}
           >
             {MONTHS_LONG[cursor.m - 1]}
             <ChevronDown aria-hidden="true" className="size-3.5" />
@@ -670,7 +702,7 @@ export default function DateField({
                 setView('years');
               }
             }}
-            className="touch-target inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-sm font-medium text-ink hover-hover:hover:bg-surface-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+            className={cn('touch-target inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-sm font-medium text-ink hover-hover:hover:bg-surface-2', FOCUS_RING)}
           >
             {view === 'years' ? `${yearBase}–${yearBase + YEARS_PER_PAGE - 1}` : cursor.y}
             <ChevronDown aria-hidden="true" className="size-3.5" />
@@ -681,16 +713,16 @@ export default function DateField({
           type="button"
           onClick={() => step(1)}
           aria-label={`Next ${stepUnit}`}
-          className="touch-target rounded-md p-1.5 text-ink-muted hover-hover:hover:bg-surface-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+          className={cn('touch-target rounded-md p-1.5 text-ink-muted hover-hover:hover:bg-surface-2', FOCUS_RING)}
         >
           <ChevronRight aria-hidden="true" className="size-4" />
         </button>
       </div>
 
-      {view === 'days' && dayGrid}
+      {view === 'days' && renderDayGrid()}
 
-      {view === 'months' && monthGrid}
-      {view === 'years' && yearGrid}
+      {view === 'months' && renderMonthGrid()}
+      {view === 'years' && renderYearGrid()}
 
       <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-2">
         <p className="min-w-0 text-xs text-ink-muted">
@@ -711,7 +743,7 @@ export default function DateField({
               }
               commit(now);
             }}
-            className="touch-target rounded-md px-2 py-1 text-xs font-medium text-brand-ink hover-hover:hover:bg-surface-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+            className={cn('touch-target rounded-md px-2 py-1 text-xs font-medium text-brand-ink hover-hover:hover:bg-surface-2', FOCUS_RING)}
           >
             Today
           </button>
@@ -723,7 +755,7 @@ export default function DateField({
               emit(null);
               closePicker(true);
             }}
-            className="touch-target rounded-md px-2 py-1 text-xs text-ink-muted hover-hover:hover:bg-surface-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+            className={cn('touch-target rounded-md px-2 py-1 text-xs text-ink-muted hover-hover:hover:bg-surface-2', FOCUS_RING)}
           >
             Clear
           </button>
@@ -810,7 +842,7 @@ export default function DateField({
                     reach, which is the shape this arc keeps removing. Escape and Done are
                     the keyboard routes. */}
                 {isSheet && <div aria-hidden="true" className="fixed inset-0 z-50 bg-ink/40" />}
-                {panel}
+                {renderPanel()}
               </div>,
               document.body,
             )}

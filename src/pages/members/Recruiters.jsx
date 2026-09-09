@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import { TextInput, SearchableSelect, Button, PositionTreeSelect, DateField } from '../../components/form';
-import Modal, { ConfirmDialog } from '../../components/overlay/Modal.jsx';
+import Modal, { ConfirmDialog, closeOn } from '../../components/overlay/Modal.jsx';
 import { memberService } from '../../services/memberService.js';
 import { recruiterService } from '../../services/recruiterService.js';
 import { recruitmentChannelService } from '../../services/recruitmentChannelService.js';
@@ -447,7 +447,7 @@ export function Recruiters() {
             {selectedRep && !selectedMember && (
                 <Modal
                     open
-                    onOpenChange={(next) => { if (!next) handleCloseRepModal(); }}
+                    onOpenChange={closeOn(handleCloseRepModal)}
                     title={selectedRep.name}
                     description="Recruitment channel"
                     size="lg"
@@ -538,7 +538,7 @@ export function Recruiters() {
             {showAddMember && selectedRep && (
                 <Modal
                     open
-                    onOpenChange={(next) => { if (!next) handleCloseAddMember(); }}
+                    onOpenChange={closeOn(handleCloseAddMember)}
                     title="Add member to recruiter"
                     description={selectedRep.name}
                     size="lg"
@@ -580,7 +580,7 @@ export function Recruiters() {
             {selectedRepDetail && (
                 <Modal
                     open
-                    onOpenChange={(next) => { if (!next) handleCloseRepDetail(); }}
+                    onOpenChange={closeOn(handleCloseRepDetail)}
                     title="Recruiter details"
                     description={selectedRepDetail.name}
                     size="md"
@@ -733,7 +733,7 @@ export function Recruiters() {
             {showAddRep && (
                 <Modal
                     open
-                    onOpenChange={(next) => { if (!next) handleCloseAddRep(); }}
+                    onOpenChange={closeOn(handleCloseAddRep)}
                     title="Add Recruiter"
                     description="A recruiter must be an existing member"
                     size="md"
@@ -852,7 +852,7 @@ export function Recruiters() {
             {selectedMember && (
                 <Modal
                     open
-                    onOpenChange={(next) => { if (!next) handleCloseMemberModal(); }}
+                    onOpenChange={closeOn(handleCloseMemberModal)}
                     title="Member details"
                     size="lg"
                     footer={<Button onClick={handleCloseMemberModal}>Close</Button>}
@@ -919,7 +919,7 @@ export function Recruiters() {
 
             <ConfirmDialog
                 open={Boolean(pendingRemoveMember)}
-                onOpenChange={(next) => { if (!next) setPendingRemoveMember(null); }}
+                onOpenChange={closeOn(() => setPendingRemoveMember(null))}
                 title="Remove this member from the recruiter?"
                 description={pendingRemoveMember
                     ? `${[pendingRemoveMember.initials, pendingRemoveMember.surname].filter(Boolean).join(' ')} will no longer be on ${selectedRep?.name ?? 'this recruiter'}'s list.`
@@ -931,7 +931,7 @@ export function Recruiters() {
 
             <ConfirmDialog
                 open={Boolean(pendingRemoveRep)}
-                onOpenChange={(next) => { if (!next) setPendingRemoveRep(null); }}
+                onOpenChange={closeOn(() => setPendingRemoveRep(null))}
                 title="Remove this recruiter?"
                 confirmLabel="Remove recruiter"
                 loading={saving}
@@ -955,15 +955,6 @@ export function Recruiters() {
     );
 }
 
-function CloseBtn({ onClick }) {
-    return (
-        <button onClick={onClick} className="shrink-0 p-1.5 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-                <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 11-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clipRule="evenodd" />
-            </svg>
-        </button>
-    );
-}
 
 function StatusBadge({ status }) {
     const cls = status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'

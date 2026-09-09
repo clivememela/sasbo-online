@@ -112,8 +112,14 @@ export default function Table({
     );
   }
 
+  const headCell = cn(
+    'whitespace-nowrap px-3 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted',
+    dense ? 'py-2' : 'py-3',
+  );
+  const bodyCell = cn('px-3 align-middle text-sm text-ink', dense ? 'py-2' : 'py-3');
+
   const { visible, collapsed } = useMemo(() => {
-    const known = columns.filter((column) => {
+    const known = columns.map((column) => {
       const priority = column.priority ?? 'essential';
       if (!PRIORITIES.has(priority)) {
         throw new Error(
@@ -122,13 +128,26 @@ export default function Table({
             `decide, silently, what a phone shows.`,
         );
       }
-      return true;
+      // 🔑 THE CELL CLASSES ARE COMPUTED PER COLUMN, ONCE -- not per cell. They depend only
+      // on the column and on `dense`, never on the row, and computing them in the render
+      // loop meant `rows.length × visible.length` clsx joins and twMerge lookups: 450 of
+      // them for a 50-row, 9-column members table, for at most 9 distinct answers.
+      const alignment =
+        column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : null;
+      const hideBelowMd = priority === 'secondary' ? 'hidden md:table-cell' : null;
+      return {
+        ...column,
+        priority,
+        headClass: cn(headCell, alignment, hideBelowMd),
+        // R-RESP-I: truncate ONLY here; the full value is in the panel.
+        bodyClass: cn(bodyCell, alignment, hideBelowMd, column.truncate && 'max-w-[16rem] truncate'),
+      };
     });
     return {
-      visible: known.filter((column) => (column.priority ?? 'essential') !== 'detail'),
-      collapsed: known.filter((column) => (column.priority ?? 'essential') !== 'essential'),
+      visible: known.filter((column) => column.priority !== 'detail'),
+      collapsed: known.filter((column) => column.priority !== 'essential'),
     };
-  }, [columns]);
+  }, [columns, headCell, bodyCell]);
 
   const expandable = collapsed.length > 0;
   const columnCount = visible.length + (expandable ? 1 : 0);
@@ -141,11 +160,11 @@ export default function Table({
       return next;
     });
 
-  const headCell = cn(
-    'whitespace-nowrap px-3 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted',
-    dense ? 'py-2' : 'py-3',
-  );
-  const bodyCell = cn('px-3 align-middle text-sm text-ink', dense ? 'py-2' : 'py-3');
+  // 🔑 ONE NAMED STATE, not four growing negation chains (`!loading && !error && rows.length
+  // === 0` and so on). conventions §8 says a failed query must NEVER render as an empty
+  // state; with the branches mutually exclusive by construction that is structural rather
+  // than something four conditions have to keep agreeing about.
+  const state = loading ? 'loading' : error ? 'error' : rows.length === 0 ? 'empty' : 'rows';
 
   /** One full-width row carrying a state, so the header stays put while it changes. */
   const stateRow = (content) => (
@@ -174,12 +193,7 @@ export default function Table({
                   key={column.key}
                   scope="col"
                   style={column.width ? { width: column.width } : undefined}
-                  className={cn(
-                    headCell,
-                    column.align === 'right' && 'text-right',
-                    column.align === 'center' && 'text-center',
-                    (column.priority ?? 'essential') === 'secondary' && 'hidden md:table-cell',
-                  )}
+                  className={column.headClass}
                 >
                   {column.header}
                 </th>
@@ -188,7 +202,7 @@ export default function Table({
           </thead>
 
           <tbody className="divide-y divide-line">
-            {loading &&
+            {state === 'loading' &&
               stateRow(
                 <div
                   role="status"
@@ -203,8 +217,7 @@ export default function Table({
                 </div>,
               )}
 
-            {!loading &&
-              error &&
+            {state === 'error' &&
               stateRow(
                 <div role="alert" className="flex flex-col items-center gap-3 text-center">
                   <AlertTriangle aria-hidden="true" className="size-6 text-status-suspended" />
@@ -221,9 +234,7 @@ export default function Table({
                 </div>,
               )}
 
-            {!loading &&
-              !error &&
-              rows.length === 0 &&
+            {state === 'empty' &&
               stateRow(
                 <div className="flex flex-col items-center gap-2 text-center">
                   <Inbox aria-hidden="true" className="size-6 text-ink-faint" />
@@ -232,8 +243,7 @@ export default function Table({
                 </div>,
               )}
 
-            {!loading &&
-              !error &&
+            {state === 'rows' &&
               rows.map((row, index) => {
                 const key = resolveRowKey(rowKey, row, index) ?? index;
                 const isOpen = expanded.has(key);
@@ -269,15 +279,7 @@ export default function Table({
                         return (
                           <td
                             key={column.key}
-                            className={cn(
-                              bodyCell,
-                              column.align === 'right' && 'text-right',
-                              column.align === 'center' && 'text-center',
-                              (column.priority ?? 'essential') === 'secondary' &&
-                                'hidden md:table-cell',
-                              // R-RESP-I: truncate ONLY here; the full value is in the panel.
-                              column.truncate && 'max-w-[16rem] truncate',
-                            )}
+                            className={column.bodyClass}
                             title={
                               column.truncate && typeof content === 'string' ? content : undefined
                             }

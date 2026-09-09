@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, Button } from "../../components/form";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
-import Modal from "../../components/overlay/Modal.jsx";
+import Modal, { closeOn } from "../../components/overlay/Modal.jsx";
 import { validateEmail } from "../../utils/validateSAID.js";
 
 const EMPTY = {
@@ -91,12 +91,16 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
     // handles Escape, locks the page, and caps in `dvh`; the close button is its own.
     <Modal
       open
-      onOpenChange={(next) => { if (!next) onClose(); }}
+      onOpenChange={closeOn(onClose)}
       title={isReadOnlyView ? "Bank Details" : isEditMode ? "Edit Bank/Branch Details" : "Add Bank/Branch Details"}
       size="xl"
       footer={
         <>
-          <Button type="button" onClick={isReadOnlyView ? onClose : handleCancel} variant="secondary">{isReadOnlyView ? "Close" : "Cancel"}</Button>
+          {/* 🔴 was `variant="secondary"`, which Button has never had -- the old
+              `VARIANTS[variant] ?? VARIANTS.default` silently rendered `default` for it. That
+              is the exact silent degrade `pick()` now refuses, and this call site is what it
+              found. Naming the variant it was ALREADY rendering: no pixel changes. */}
+          <Button type="button" onClick={isReadOnlyView ? onClose : handleCancel} variant="default">{isReadOnlyView ? "Close" : "Cancel"}</Button>
           {isReadOnlyView ? (
             <Button type="button" variant="primary" onClick={() => setIsEditing(true)}>Edit</Button>
           ) : (

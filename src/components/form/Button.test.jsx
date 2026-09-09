@@ -178,6 +178,25 @@ describe('Button — the convention, mutation-checked', () => {
     expect(classes).toMatch(/focus-visible:ring-brand-ring/)
   })
 
+  it('an unknown variant THROWS rather than quietly rendering the default one', () => {
+    // 🔴 THE REFACTOR PASS FOUND A REAL ONE WITH THIS. `VARIANTS[variant] ?? VARIANTS.default`
+    // meant `<Button variant="primry">` rendered a neutral button and nobody found out --
+    // the same silent degrade `fieldKinds.js` spends a paragraph refusing and `Table` throws
+    // over. Turning it on immediately surfaced `variant="secondary"` in `BankBranchModal`,
+    // a variant this component has never had, rendering as `default` since it was written.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(() => renderWithProviders(<Button variant="secondry">Oops</Button>)).toThrow(
+        /Unknown Button variant/,
+      )
+      expect(() => renderWithProviders(<Button size="enormous">Oops</Button>)).toThrow(
+        /Unknown Button size/,
+      )
+    } finally {
+      consoleError.mockRestore()
+    }
+  })
+
   it('a coarse pointer gets a 44px hit area without the control growing', () => {
     renderWithProviders(<Button size="sm">Tiny</Button>)
     // `touch-target` is the utility (index.css) that applies a 44px ::after only under

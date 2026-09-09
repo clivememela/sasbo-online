@@ -6,7 +6,7 @@ import { recruiterService } from "../../services/recruiterService.js";
 import { jobGradeService } from "../../services/jobGradeService.js";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, SearchableSelect, Button, DateField } from "../../components/form";
-import Modal, { ConfirmDialog } from "../../components/overlay/Modal.jsx";
+import Modal, { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
 import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, YES_NO_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
@@ -531,7 +531,7 @@ ${summary}`);
             {selectedMember && (
             <Modal
                 open
-                onOpenChange={(next) => { if (!next) setSelectedMember(null); }}
+                onOpenChange={closeOn(() => setSelectedMember(null))}
                 title="Member details"
                 description="Sasbo Member Dashboard Profile"
                 size="xl"
@@ -895,7 +895,7 @@ ${summary}`);
 
             <ConfirmDialog
                 open={Boolean(pendingSave)}
-                onOpenChange={(next) => { if (!next) setPendingSave(null); }}
+                onOpenChange={closeOn(() => setPendingSave(null))}
                 title="Save these changes?"
                 confirmLabel="Save changes"
                 cancelLabel="Keep editing"
@@ -904,12 +904,14 @@ ${summary}`);
             >
                 {/* 🔑 The changes are a LIST now, not a string of bullets concatenated into
                     a browser dialog. A long list scrolls inside the modal body rather than
-                    running off the bottom of an unscrollable native alert. */}
+                    running off the bottom of an unscrollable native alert.
+                    (`getChangedFields` emits plain `Label: a → b` strings — the leading-bullet
+                    strip this used to carry removed nothing, so it is gone.) */}
                 <ul className="space-y-1 text-sm text-ink">
                     {(pendingSave ?? []).map((change) => (
                         <li key={change} className="flex gap-2">
                             <span aria-hidden="true" className="text-ink-faint">•</span>
-                            <span>{String(change).replace(/^[\s••]+/, '')}</span>
+                            <span>{change}</span>
                         </li>
                     ))}
                 </ul>

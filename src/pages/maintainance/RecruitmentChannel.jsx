@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Pencil, Trash2, UserPlus, Check, X } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import { Button } from '../../components/form';
-import { ConfirmDialog } from '../../components/overlay/Modal.jsx';
+import { ConfirmDialog, closeOn } from '../../components/overlay/Modal.jsx';
 import { recruitmentChannelService } from '../../services/recruitmentChannelService.js';
 
 export default function RecruitmentChannel() {
@@ -100,7 +100,7 @@ export default function RecruitmentChannel() {
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder="Search Recruitment Channels…"
-                        className="flex-1 rounded-lg px-3 py-2 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                        className="flex-1 rounded-lg px-3 py-2 field-text border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                     />
                     <Button variant="primary" onClick={() => { setShowAdd(true); setNewName(''); }}>
                         <UserPlus size={14} /> Add
@@ -116,7 +116,7 @@ export default function RecruitmentChannel() {
                             onChange={e => setNewName(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleAdd()}
                             placeholder="Recruitment Channel name"
-                            className="flex-1 rounded-lg px-3 py-1.5 text-sm border bg-white border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                            className="flex-1 rounded-lg px-3 py-1.5 field-text border bg-white border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                         />
                         <button
                             onClick={handleAdd}
@@ -155,7 +155,7 @@ export default function RecruitmentChannel() {
                                         if (e.key === 'Enter') handleEdit(r);
                                         if (e.key === 'Escape') setEditingId(null);
                                     }}
-                                    className="rounded-lg px-3 py-1 text-sm border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    className="rounded-lg px-3 py-1 field-text border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                                 />
                             ) : (
                                 <span className={r.enabled ? '' : 'line-through text-gray-400 dark:text-gray-500'}>{r.name}</span>
@@ -212,7 +212,7 @@ export default function RecruitmentChannel() {
 
             <ConfirmDialog
                 open={Boolean(pendingDelete)}
-                onOpenChange={(next) => { if (!next) setPendingDelete(null); }}
+                onOpenChange={closeOn(() => setPendingDelete(null))}
                 title="Delete recruiter type"
                 description={pendingDelete ? `"${pendingDelete.name}" will be removed from the list of recruiter types.` : undefined}
                 confirmLabel="Delete recruiter type"

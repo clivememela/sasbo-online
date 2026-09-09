@@ -120,10 +120,12 @@ export default function SearchableSelect({
     listRef.current?.children?.[activeIndex]?.scrollIntoView?.({ block: 'nearest' });
   }, [open, activeIndex]);
 
+  const isDisabled = disabled || loading || isEmpty;
+
   const openList = useCallback(() => {
-    if (disabled || loading || isEmpty) return;
+    if (isDisabled) return;
     setOpen(true);
-  }, [disabled, loading, isEmpty]);
+  }, [isDisabled]);
 
   const move = useCallback(
     (delta) => {
@@ -201,7 +203,9 @@ export default function SearchableSelect({
   };
 
   const activeId = open && activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined;
-  const isDisabled = disabled || loading || isEmpty;
+  // Loop-invariant: the same for every option row. Computed once rather than twice per row,
+  // which on a several-hundred-entry bank list was 2N string coercions per render.
+  const currentValue = asOptionValue(value);
   const shownPlaceholder = loading ? 'Loading…' : isEmpty ? emptyLabel : placeholder;
 
   return (
@@ -300,7 +304,7 @@ export default function SearchableSelect({
                     key={entry.value}
                     id={`${listboxId}-option-${index}`}
                     role="option"
-                    aria-selected={entry.value === asOptionValue(value)}
+                    aria-selected={entry.value === currentValue}
                     aria-disabled={entry.disabled || undefined}
                     // `pointerdown`, not `click`: the outside-dismiss handler fires on
                     // pointerdown, so a click handler here would run after the list closed.
@@ -313,7 +317,7 @@ export default function SearchableSelect({
                       'field-text cursor-pointer px-3 py-2 text-ink',
                       entry.disabled && 'cursor-not-allowed opacity-50',
                       index === activeIndex && 'bg-brand-soft text-brand-ink',
-                      entry.value === asOptionValue(value) && 'font-medium text-brand-ink',
+                      entry.value === currentValue && 'font-medium text-brand-ink',
                     )}
                   >
                     {entry.label}

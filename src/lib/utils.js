@@ -15,3 +15,31 @@ import { twMerge } from 'tailwind-merge'
 export function cn(...inputs) {
   return twMerge(clsx(inputs))
 }
+
+/**
+ * Look a variant up in its map, and REFUSE an unknown key in development.
+ *
+ * 🔴 THE INCONSISTENCY THIS CLOSES. `fieldKinds.js` spends a paragraph on why an unknown
+ * field kind must throw rather than degrade -- *"a typo'd kind that silently behaves like
+ * plain text is the failure this whole module exists to stop, and it would never be
+ * noticed"* -- and `Table` throws the same way on an unknown column priority. Two files
+ * over, `SIZES[size] ?? SIZES.md` and `VARIANTS[variant] ?? VARIANTS.default` did exactly
+ * the silent degrade those paragraphs argue against: `<Button variant="primry">` rendered
+ * a neutral button and nobody found out.
+ *
+ * Guarded by DEV so a production render degrades rather than blanking a screen somebody is
+ * standing in front of -- the same trade `Table`'s `rowKey` guard makes.
+ */
+export function pick(map, key, what) {
+  const found = map[key]
+  if (found !== undefined) return found
+
+  const fallback = Object.values(map)[0]
+  if (import.meta.env?.DEV) {
+    throw new Error(
+      `Unknown ${what} "${key}". Known: ${Object.keys(map).join(', ')}. Falling back would ` +
+        `render something that looks deliberate and is not, which is how a typo ships.`,
+    )
+  }
+  return fallback
+}

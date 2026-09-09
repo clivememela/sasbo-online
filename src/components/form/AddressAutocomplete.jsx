@@ -49,6 +49,10 @@ export default function AddressAutocomplete({
 
   const placesLib = useMapsLibrary('places');
 
+  // Declared here, above the effects that read it: `const` is not hoisted, and the
+  // outside-dismiss effect below runs before the render body reaches the JSX.
+  const listOpen = isOpen && predictions.length > 0;
+
   useEffect(() => {
     if (!placesLib) return;
     sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
@@ -112,13 +116,19 @@ export default function AddressAutocomplete({
     return () => clearTimeout(timer);
   }, [query, fetchPredictions]);
 
+  // 🔑 `pointerdown`, and ONLY WHILE OPEN -- matching `SearchableSelect`, which documents
+  // why: `mousedown` alone misses touch on iOS. This file shipped the `mousedown` version in
+  // the same commit whose sibling explains that it is insufficient. The `open` guard is the
+  // other half: `Members.jsx` renders two of these, and an always-attached listener walks
+  // `contains()` on every pointer press anywhere in the application, open or shut.
   useEffect(() => {
+    if (!listOpen) return undefined;
     const handleClickOutside = (event) => {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) setIsOpen(false);
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('pointerdown', handleClickOutside);
+    return () => document.removeEventListener('pointerdown', handleClickOutside);
+  }, [listOpen]);
 
   const handleInputChange = (event) => {
     setQuery(event.target.value);
@@ -175,7 +185,6 @@ export default function AddressAutocomplete({
     }
   };
 
-  const listOpen = isOpen && predictions.length > 0;
   const activeId = listOpen && highlightIndex >= 0 ? `${listboxId}-option-${highlightIndex}` : undefined;
 
   return (

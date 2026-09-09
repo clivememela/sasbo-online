@@ -1,7 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 
-import { cn } from '../../lib/utils';
+import { cn, pick } from '../../lib/utils';
 import Button from '../form/Button';
 
 /**
@@ -35,12 +35,30 @@ import Button from '../form/Button';
  * "forgotten" their cap and fixed it by baking it into the primitive. This is that fix,
  * before the forgetting.
  *
+ * ⚠️ **THERE IS NO `className` PROP, AND THAT IS THE POINT.** It was there, and it made the
+ * paragraph above a lie: `cn` merges the caller's classes last, and `twMerge` resolves
+ * `max-h-*` last-wins, so `<Modal className="max-h-[90vh]">` silently restored the exact bug
+ * the height cap exists to prevent -- and `max-h-[90vh]` is literally what `Members.jsx`
+ * carried before this migration. No call site passed one, so removing it costs nothing and
+ * turns "not negotiable per call site" from a comment into a fact.
+ *
  * 🔴 **A TITLE IS REQUIRED.** Radix warns about a missing `Dialog.Title` and then renders
  * anyway; this throws in development. A dialog with no accessible name is announced as
  * "dialog" and nothing else, and the user has no idea what just took over the screen. Where
  * a design genuinely wants no visible heading, pass `titleHidden` — the name still exists,
  * it is just `sr-only`, which is a different thing from not having one.
  */
+
+/**
+ * `onOpenChange` from a plain close handler.
+ *
+ * Radix reports both directions; every dialog in this application only ever needs the
+ * closing one, so eleven call sites had written `(next) => { if (!next) close(); }` by hand.
+ * One adapter, so the shape is stated once and a call site reads as what it means.
+ */
+export const closeOn = (close) => (next) => {
+  if (!next) close();
+};
 
 const SIZES = {
   sm: 'max-w-sm',
@@ -58,7 +76,6 @@ export default function Modal({
   size = 'md',
   footer,
   children,
-  className,
   /** Escape and a click outside are ON by default. Off only for a step you must answer. */
   dismissible = true,
 }) {
@@ -70,6 +87,9 @@ export default function Modal({
         'has no visible heading, pass `titleHidden` and keep the name.',
     );
   }
+
+  // One blocker, passed three times, rather than the same arrow written three times.
+  const block = dismissible ? undefined : (event) => event.preventDefault();
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -99,9 +119,9 @@ export default function Modal({
           // it always passes the key, and would have silently broken the association on
           // every dialog that DOES have a description.
           {...(description ? {} : { 'aria-describedby': undefined })}
-          onEscapeKeyDown={dismissible ? undefined : (event) => event.preventDefault()}
-          onPointerDownOutside={dismissible ? undefined : (event) => event.preventDefault()}
-          onInteractOutside={dismissible ? undefined : (event) => event.preventDefault()}
+          onEscapeKeyDown={block}
+          onPointerDownOutside={block}
+          onInteractOutside={block}
           className={cn(
             'fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2',
             // 📱 `dvh`, never `vh`. The cap and the internal scroll are the primitive's, so
@@ -112,8 +132,7 @@ export default function Modal({
             'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
             'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
             'motion-reduce:animate-none',
-            SIZES[size] ?? SIZES.md,
-            className,
+            pick(SIZES, size, 'Modal size'),
           )}
         >
           <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
