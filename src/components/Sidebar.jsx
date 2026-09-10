@@ -108,15 +108,29 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
       <nav
         id={SIDEBAR_ID}
         aria-label="Main"
-        className={`fixed bg-bg-raised z-20 w-64 h-dvh shadow flex flex-col ${
+        className={`fixed bg-bg-raised z-20 w-64 h-dvh shadow flex flex-col border-r border-line ${
           sideBarOpen ? "translate-x-0" : "-translate-x-64"
-        } lg:translate-x-0 lg:static transition ease-in-out duration-300`}
+        } lg:translate-x-0 lg:static lg:shrink-0 lg:shadow-none transition ease-in-out duration-300`}
       >
-        <div className="p-4 flex justify-between items-center border-b border-line">
-          <div className="flex items-center gap-2 text-xl text-brand-ink">
-            <Logo className="h-12 w-auto" />
-            <span>Enquiry Navigation Menu</span>
-          </div>
+        {/* 🔴 THE WORDMARK, AND WHAT IT REPLACES: "Enquiry Navigation Menu" — a label
+            describing the furniture rather than naming the product. The mock puts SASBO
+            Online and "The Finance Union" here, which is also WHY the topbar no longer
+            carries a 160px application title: an application's name belongs in one place,
+            and the rail is the place that is on screen at every width. */}
+        <div className="flex items-center justify-between gap-2 border-b border-line p-4">
+          <a
+            href="/home"
+            aria-label="SASBO Online home"
+            className="flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+          >
+            <Logo className="h-9 w-auto shrink-0" />
+            <span className="grid min-w-0 leading-tight">
+              <span className="truncate text-[15px] font-semibold text-brand-ink">SASBO Online</span>
+              <small className="truncate text-[11px] uppercase tracking-[0.1em] text-ink-muted">
+                The Finance Union
+              </small>
+            </span>
+          </a>
           {/* Same defect as the hamburger it undoes: an icon-only raw <button> with no
               accessible name, announcing as "button". The primitive brings the name, the
               44px coarse-pointer hit area and the focus ring. */}

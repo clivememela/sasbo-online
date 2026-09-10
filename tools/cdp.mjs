@@ -49,6 +49,7 @@ const PORTS = Object.freeze({
   contrast: 9600,
   tokens: 9650,
   probe: 9700,
+  motion: 9750,
 });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

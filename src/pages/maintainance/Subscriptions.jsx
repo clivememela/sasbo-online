@@ -164,12 +164,16 @@ export default function Subscriptions() {
                     the list sits under the address bar and the scroller's own end is
                     unreachable. `dvh` tracks the chrome as it hides and shows. */}
                 <div className="relative overflow-hidden rounded-xl border border-line max-h-[60dvh] overflow-y-auto">
+                    {/* 🔑 THE THIRD HAND-ROLLED SPINNER, RETIRED. `06.2`.
+                        It was a bordered div with `animate-spin` and its own copy -- one of
+                        three separate spinners in the tree, none of which agreed about size,
+                        colour or wording, and this one had no `motion-reduce` handling at
+                        all. Through `DataState` it inherits the shared loading state AND the
+                        5s "taking longer than expected" notice (EH-D2), which a hand-rolled
+                        spinner can never grow. */}
                     {loading && (
                         <div className="absolute inset-0 bg-surface/60 z-20 flex items-center justify-center backdrop-blur-[1px]">
-                            <div className="flex flex-col items-center gap-2">
-                                <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin" />
-                                <p className="text-sm font-medium text-brand-ink">Retrieving subscriptions...</p>
-                            </div>
+                            <DataState state="loading" title="Retrieving subscriptions…" />
                         </div>
                     )}
 

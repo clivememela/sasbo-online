@@ -128,6 +128,23 @@
   --card-engrave-gold: oklch(88.8% 0.102 93);  /* engraved name */
   --card-chip-ink: oklch(88.8% 0.102 93);  /* status chip on the card */
   --card-chip-ring: rgba(241, 217, 138, 0.5);  /* its ring */
+  /* The card is the ONE place the palette is allowed to be material
+     (directionContract.md -> The world). These are the surface treatments that
+     make it read as metal rather than as a teal rectangle: `04.x` defined the
+     gradient and the engraving and stopped there, so the card had tokens and no
+     component. Added when the component was finally built. */
+  --card-gloss: rgba(255, 255, 255, 0.16);   /* the light coming over the top-left */
+  --card-shade: rgba(0, 0, 0, 0.22);         /* the shadow gathering bottom-right */
+  --card-edge-top: rgba(255, 255, 255, 0.2); /* the milled top edge */
+  --card-edge-bottom: rgba(0, 0, 0, 0.3);    /* and the bottom one */
+  --card-text-2: rgba(242, 250, 250, 0.66);  /* secondary engraving */
+  --card-chip-bg: rgba(255, 255, 255, 0.1);
+  --card-chip-suspended: #FFC4C4;
+  --card-chip-pending: #F5E2A8;
+  --card-chip-muted: rgba(242, 250, 250, 0.75);
+  --engrave-shadow: 0 1px 0 rgba(255, 255, 255, 0.12), 0 -1px 1px rgba(0, 0, 0, 0.5);
+  /* The crest's gold foil, as a gradient rather than five stops at the call site. */
+  --card-foil: linear-gradient(135deg, #8E7230 0%, #D4B86A 42%, #F3E4AE 50%, #C9A85A 58%, #7F6528 100%);
 
   /* Depth */
   --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.08), 0 2px 6px rgba(16, 24, 40, 0.08);  /* resting depth */
@@ -207,6 +224,19 @@
   --card-engrave-gold: oklch(89.7% 0.096 93);
   --card-chip-ink: oklch(89.7% 0.096 93);
   --card-chip-ring: rgba(243, 220, 146, 0.5);
+  /* The card's material treatments hold in dark: the mock's own dark theme keeps
+     them, because the card is lit by its own gradient rather than by the page. */
+  --card-gloss: rgba(255, 255, 255, 0.14);
+  --card-shade: rgba(0, 0, 0, 0.3);
+  --card-edge-top: rgba(255, 255, 255, 0.16);
+  --card-edge-bottom: rgba(0, 0, 0, 0.4);
+  --card-text-2: rgba(242, 250, 250, 0.66);
+  --card-chip-bg: rgba(255, 255, 255, 0.1);
+  --card-chip-suspended: #FFC4C4;
+  --card-chip-pending: #F5E2A8;
+  --card-chip-muted: rgba(242, 250, 250, 0.75);
+  --engrave-shadow: 0 1px 0 rgba(255, 255, 255, 0.1), 0 -1px 1px rgba(0, 0, 0, 0.6);
+  --card-foil: linear-gradient(135deg, #8E7230 0%, #D4B86A 42%, #F3E4AE 50%, #C9A85A 58%, #7F6528 100%);
 
   /* Depth */
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5);
@@ -341,6 +371,100 @@
    the print surface, forced-colors, utilities -- belong below, and survive a
    regeneration. Do not remove this line.
    ========================================================================== */
+
+/* ==========================================================================
+   THE AUTHORED MOMENT -- "the card is drawn from the wallet and laid on the desk".
+
+   directionContract.md -> Motion posture, and it is the ONE animation in this
+   application allowed past the 400ms budget: 580ms, a hinged tilt from below with
+   the perspective doing the work. There is exactly one of it and it is not on the
+   path a daily user walks forty times.
+
+   `motion-safe:` at the call site keeps it out of a reduced-motion render, and the
+   surface rule below stops it there too -- both, because this one is worth two
+   locks: a card that tilts is the exact motion a vestibular disorder cannot take.
+   ========================================================================== */
+@keyframes card-land {
+  from { opacity: 0; transform: perspective(1100px) rotateX(10deg) translateY(22px) scale(.982); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: perspective(1100px) rotateX(0) translateY(0) scale(1); }
+}
+
+/* The record's fields rise under the card as a capped stagger. */
+@keyframes record-rise {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ==========================================================================
+   REDUCED MOTION -- `06.2`, and it is a SURFACE rule rather than 60 utilities.
+
+   The ratified posture (directionContract.md -> Motion posture) is specific, and
+   the specificity is what makes a blanket rule wrong:
+
+       "`prefers-reduced-motion` keeps opacity and state and drops every
+        spatial move."
+
+   The reflex fix is the well-known snippet that sets every animation and
+   transition to 0.01ms. It would satisfy a checklist and it CONTRADICTS the
+   posture: it also kills the colour and opacity transitions, which are the part
+   the posture keeps -- and those are not decoration here. A button whose hover
+   and focus colours snap has lost the feedback that says a control responded,
+   and for a user who has asked for less motion, colour and opacity are the
+   channels they still have.
+
+   ⚠️ SO THE RULE IS TARGETED AT MOVEMENT, NOT AT DURATION.
+
+     - `transition-property` is narrowed to the non-spatial channels, so a
+       `transition-transform` simply has nothing to interpolate and the element
+       arrives instantly at its resting position. Colour still eases.
+     - `animation` is neutralised, because an animation cannot be narrowed the
+       same way -- its keyframes own every property.
+     - `scroll-behavior: auto` stops programmatic smooth scrolling, which is a
+       spatial move nobody thinks of as an animation.
+
+   🔑 WHY A GLOBAL RULE AND NOT `motion-reduce:` AT EACH SITE. There were 7
+   `motion-reduce` utilities in a tree with 45 transition and animation
+   utilities, and the 38 without one were not a decision -- they are what happens
+   when a rule has to be remembered at every call site (contract ⑮). A surface
+   rule cannot be forgotten by the next screen anybody adds. The per-site
+   utilities that remain are the ones that need to do something DIFFERENT from
+   this default, and they still win on specificity.
+
+   ⚠️ NOT `!important` ON `transition-property`. A component that must animate a
+   transform even under reduced motion -- none today -- can still say so, and
+   saying so would be a visible decision in a diff. `animation` IS `!important`,
+   because `animate-spin` and its family set it from a utility class of equal
+   specificity and would otherwise win by source order alone, which is not a
+   decision anybody made.
+
+   🔬 PROVEN BY TOGGLING IT, not by reading it: `tools/motion.mjs` drives the
+   emulation in a real browser, reads `transitionProperty` off every visible
+   element on all 25 routes, and requires the reduced pass to DIFFER from the
+   normal one -- so a rule that silently stopped applying cannot report clean.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* The channels the posture keeps. Anything not named here -- transform,
+       translate, rotate, scale, height, width, inset -- is no longer animated
+       and lands at its final value immediately. */
+    transition-property: opacity, color, background-color, border-color,
+      outline-color, text-decoration-color, fill, stroke, box-shadow;
+
+    /* Keyframe animations cannot be narrowed by property, so they are stopped.
+       `0.01ms` rather than `none` on purpose: an animation that never runs never
+       fires `animationend`, and a component waiting on that event would hang
+       forever -- a reduced-motion setting must not be able to break a state
+       machine. */
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+
+    scroll-behavior: auto !important;
+  }
+}
 
 /* ==========================================================================
    PRINT -- and print is LIVE, not decorative (the owner, 2026-09-09).

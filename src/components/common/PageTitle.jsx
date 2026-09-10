@@ -10,10 +10,25 @@
 // APPLICATION and an application name is not a page heading. `headingContract.test.jsx`
 // holds both halves together — it mounts every route and asserts no route renders two,
 // and that the routes rendering none are exactly P4's remaining schedule.
-export default function PageTitle({ title, subtitle }) {
+/*
+ * 📐 `align` — and the DEFAULT stays centred on purpose.
+ *
+ * The Card direction sets a page's title and its actions on one line, title left, actions
+ * right (directionContract.md — the mock's `.pagehead`). That is right for a register with
+ * an Export and a Capture button beside it, and wrong for the twenty-odd pages that have no
+ * page-level actions at all and would be left with a title hanging off the left edge of a
+ * wide empty row.
+ *
+ * So the arrangement is the CALLER's, and only the screens rebuilt into the Card layout ask
+ * for `left`. Flipping the default would have moved every heading in the application in a
+ * commit about one screen.
+ */
+export default function PageTitle({ title, subtitle, align = 'center' }) {
+  const left = align === 'left';
+
   return (
-    <div className="mb-8">
-      <h1 className="text-3xl text-center text-brand-ink">
+    <div className={left ? 'min-w-0' : 'mb-8'}>
+      <h1 className={left ? 'text-2xl text-brand-ink' : 'text-3xl text-center text-brand-ink'}>
         {title}
       </h1>
       {/* brand, not brand-ink -- the SUBTITLE is deliberately the quieter of the two.
@@ -32,7 +47,13 @@ export default function PageTitle({ title, subtitle }) {
           the shared component means the next page to be written gets it without anybody
           remembering. */}
       {subtitle && (
-        <p className="mx-auto mt-2 max-w-prose text-balance text-center text-xl text-brand">
+        <p
+          className={
+            left
+              ? 'mt-1 max-w-prose text-balance text-sm text-ink-muted'
+              : 'mx-auto mt-2 max-w-prose text-balance text-center text-xl text-brand'
+          }
+        >
           {subtitle}
         </p>
       )}

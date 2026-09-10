@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { LucideUserRoundPlus, AlertCircle, CheckCircle2, Printer } from "lucide-react";
+import { LucideUserRoundPlus, AlertCircle, CheckCircle2, Printer, SlidersHorizontal } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { recruiterService } from "../../services/recruiterService.js";
 import { jobGradeService } from "../../services/jobGradeService.js";
@@ -20,6 +20,8 @@ import {
 import PageTitle from "../../components/common/PageTitle.jsx";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState.jsx";
+import FigureStrip from "../../components/members/FigureStrip.jsx";
+import MemberPanel from "../../components/members/MemberPanel.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
 import { cn } from "../../lib/utils";
@@ -207,6 +209,8 @@ export default function Members() {
      * (`loading && error`) is what renders an error and a spinner at once.
      */
     const [listState, setListState] = useState("loading");
+    /* The twelve criteria the mock keeps behind "More criteria". Closed at rest. */
+    const [moreCriteria, setMoreCriteria] = useState(false);
 
     const loadMembers = useCallback(() => {
         setListState("loading");
@@ -514,6 +518,45 @@ export default function Members() {
         ));
     }, [deferredFilters, membersList]);
 
+    /*
+     * 📊 THE FIGURE STRIP'S NUMBERS, COUNTED FROM THE REGISTER THIS PAGE ALREADY HOLDS.
+     *
+     * 🔑 NOT FETCHED, AND THAT IS THE DECISION. A `/api/members/summary` endpoint would be
+     * one more thing to fail, one more empty state, and -- worse -- a number that can
+     * DISAGREE with the rows underneath it. A strip reading "1 902 active" over a register
+     * showing something else is a screen nobody can trust twice, and it is the failure mode
+     * the register would take longest to notice.
+     *
+     * ⚠️ COUNTED OVER `membersList`, NOT `filteredMembers`. The strip is a statement about
+     * the REGISTER, not about the current search: totals that move as you type are a
+     * different instrument, and the contract calls this the "register summary".
+     */
+    /*
+     * How many of the COLLAPSED criteria are actually filtering.
+     *
+     * 🔴 WITHOUT THIS THE DISCLOSURE IS A TRAP. Type a surname, collapse the panel, and the
+     * register goes on showing a filtered list with nothing on screen to say why -- which is
+     * the same class of defect as a failed fetch rendering as an empty state: the user reads
+     * a consequence as a fact. The count on the control is what makes a hidden criterion
+     * visible.
+     */
+    const activeExtraCriteria = useMemo(() => {
+        const shown = new Set(["bankName", "branch", "status"]);
+        return Object.entries(filters).filter(
+            ([key, value]) => !shown.has(key) && String(value ?? "").trim() !== "",
+        ).length;
+    }, [filters]);
+
+    const registerFigures = useMemo(() => {
+        const by = (status) => membersList.filter((m) => m?.status === status).length;
+        return {
+            total: membersList.length,
+            active: by("Active"),
+            pending: by("Pending"),
+            suspended: by("Suspended"),
+        };
+    }, [membersList]);
+
     const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE)), [filteredMembers]);
     useEffect(() => {
         setPage((currentPage) => Math.min(currentPage, totalPages));
@@ -604,10 +647,87 @@ export default function Members() {
     ], []);
 
     return (
-        <div className="p-6 text-ink">
-            <PageTitle title="Members" subtitle="Search and manage Sasbo member records across all major financial institutions" />
-            <div className="max-w-6xl mx-auto p-6 rounded-card border border-line bg-surface shadow-(--shadow-1)">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+        /* 📐 THE THIRD COLUMN. directionContract.md -> Density and layout: "three
+           columns -- the rail (256px), the register, the record panel". The rail is the
+           shell's; these two are the page's. Below `xl` the panel becomes an overlay and
+           this collapses to one column, which is the same rule stated once here rather than
+           at every child. */
+        <div className="flex min-h-0 items-start text-ink">
+            <div className="min-w-0 flex-1 p-6">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+                <PageTitle
+                    title="Members"
+                    subtitle="The membership register across every bank. Select a member to open their card."
+                    align="left"
+                />
+                <div className="flex items-center gap-2">
+                    <Button variant="primary" onClick={() => navigate("/members/capture")}>
+                        <LucideUserRoundPlus size={16} strokeWidth={2} aria-hidden="true" /> Capture Member
+                    </Button>
+                </div>
+            </div>
+
+            {/* 📊 THE RULED FIGURE STRIP -- "ledger line, not tiles", and the contract
+                refuses the alternative by name ("hero-metric tiles, dashboards of same-size
+                cards"). Counted from the register the page already holds, so it can never
+                disagree with the rows below it. */}
+            <FigureStrip className="mt-5" {...registerFigures} />
+
+            <div className="mt-5 rounded-card border border-line bg-surface p-5 shadow-(--shadow-1)">
+                {/* 🔍 THE CRITERIA ROW. The mock prints three labelled fields and hides the
+                    rest behind "More criteria"; this page had FIFTEEN in a grid, which is a
+                    search form rather than a register's criteria. The other twelve are all
+                    still here, one disclosure away -- nothing was removed. */}
+                <div className="flex flex-wrap items-end gap-4">
+                    <SearchableSelect
+                        className="min-w-[190px] flex-1"
+                        label="Bank"
+                        value={filters.bankName}
+                        onChange={handleInputChange("bankName")}
+                        placeholder="All banks"
+                        options={[{ value: '', label: 'All banks' }, ...bankOptions.map(b => ({ value: b, label: b }))]}
+                    />
+                    <TextInput
+                        className="min-w-[190px] flex-1"
+                        label="Branch"
+                        value={filters.branch}
+                        onChange={handleInputChange("branch")}
+                        placeholder="Any"
+                    />
+                    <SearchableSelect
+                        className="min-w-[190px] flex-1"
+                        label="Status"
+                        value={filters.status}
+                        onChange={handleInputChange("status")}
+                        placeholder="Any"
+                        options={[{ value: "", label: "Any" }, ...statusOptions.map(o => ({ value: o, label: o }))]}
+                    />
+                    <Button
+                        onClick={() => setMoreCriteria((open) => !open)}
+                        aria-expanded={moreCriteria}
+                        aria-controls="more-criteria"
+                    >
+                        <SlidersHorizontal size={16} aria-hidden="true" />
+                        More criteria
+                        {activeExtraCriteria > 0 && (
+                            <span className="ml-1 rounded-full bg-brand-soft px-1.5 text-xs font-semibold text-brand-ink tabular-nums">
+                                {activeExtraCriteria}
+                            </span>
+                        )}
+                    </Button>
+                    <Button variant="ghost" onClick={handleClear}>Clear</Button>
+                </div>
+
+                {/* ⚠️ THE OTHER TWELVE ARE ALL STILL HERE. The mock shows three criteria and a
+                    "More criteria" control; it does not show a register with twelve fewer
+                    ways to search it. Collapsing is a change to what is on screen at rest,
+                    never to what the register can do -- and the count on the control above is
+                    what stops a collapsed criterion filtering the list invisibly. */}
+                <div
+                    id="more-criteria"
+                    hidden={!moreCriteria}
+                    className="mt-4 grid grid-cols-1 items-end gap-4 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-4"
+                >
                     <SearchableSelect label="Title" value={filters.title} onChange={handleInputChange("title")} placeholder="All Titles" options={[{ value: "", label: "All Titles" }, ...titleOptions.map(o => ({ value: o, label: o }))]} />
                     <TextInput label="Employee Number" kind="identifier" value={filters.employeeNumber} onChange={handleInputChange("employeeNumber")} placeholder="Search by employee number" />
                     <TextInput label="Membership Number" kind="identifier" value={filters.membershipNumber} onChange={handleInputChange("membershipNumber")} placeholder="Search by membership number" />
@@ -629,22 +749,11 @@ export default function Members() {
                         options={[{ value: "", label: "All Types" }, ...idTypeOptions.map(o => ({ value: o, label: o }))]}
                     />
                     <TextInput label="Identity Number" kind="identifier" value={filters.identityNumber} onChange={handleInputChange("identityNumber")} placeholder="Search by identity number" />
-                    <SearchableSelect label="Bank Name" value={filters.bankName} onChange={handleInputChange("bankName")} placeholder="All Banks" options={[{ value: '', label: 'All BankBranch' }, ...bankOptions.map(b => ({ value: b, label: b }))]} />
-                    <TextInput label="Branch" value={filters.branch} onChange={handleInputChange("branch")} placeholder="Search by branch" />
                     <TextInput label="Bank Account Number" kind="identifier" value={filters.bankAccountNumber} onChange={handleInputChange("bankAccountNumber")} placeholder="Search by bank account number" />
                     <TextInput label="Cellphone Number" kind="tel" value={filters.phone} onChange={handleInputChange("phone")} placeholder="Search by cellphone number" />
                     <TextInput label="Personal Email" kind="email" value={filters.personalEmail} onChange={handleInputChange("personalEmail")} placeholder="Search by personal email" />
                     <TextInput label="Work Email" kind="email" value={filters.workEmail} onChange={handleInputChange("workEmail")} placeholder="Search by work email" />
-                    <SearchableSelect label="Status" value={filters.status} onChange={handleInputChange("status")} placeholder="All Statuses" options={[{ value: "", label: "All Statuses" }, ...statusOptions.map(o => ({ value: o, label: o }))]} />
                     <SearchableSelect label="Race" value={filters.race || ""} onChange={handleInputChange("race")} placeholder="All Races" options={[{ value: "", label: "All Races" }, ...raceOptions.map(o => ({ value: o, label: o }))]} />
-                    <div className="flex items-end">
-                        <Button onClick={handleClear}>Clear Filters</Button>
-                    </div>
-                </div>
-                <div className="flex items-end justify-end mt-4 gap-3">
-                    <Button variant="primary" onClick={() => navigate("/members/capture")}>
-                        <LucideUserRoundPlus size={16} strokeWidth={2} aria-hidden="true" /> Capture Member
-                    </Button>
                 </div>
 
                 {/* 🔴 A27, CLOSED. `Table` renders loading, error and empty as three separate
@@ -711,13 +820,26 @@ export default function Members() {
                 `open={Boolean(selectedMember)}` alone threw
                 `Cannot read properties of null (reading 'address')` the moment the page
                 mounted -- caught by the route smoke, not by reading. */}
-            {selectedMember && (
-            <Modal
-                open
-                onOpenChange={closeOn(() => setSelectedMember(null))}
-                title="Member details"
-                description="Sasbo Member Dashboard Profile"
-                size="xl"
+            {/* ✅ THE RECORD IS A DOCKED PANEL, NOT A MODAL.
+                directionContract.md refuses "a modal for tasks that need neither
+                interruption nor protected focus: the record edits in place", and this is the
+                surface it names. `03.4` had routed it through the shared Modal with the
+                other seven overlays -- correct for those, wrong for this one, because that
+                unit was scoped by "things that are dialogs today" rather than by "things the
+                design says should be dialogs".
+
+                ⚠️ STILL GUARDED BY `selectedMember &&`, and that is not belt-and-braces:
+                JSX children are CONSTRUCTED whether or not they render, so the body's
+                `selectedMember.address` runs on every render of this page. Passing only
+                `open={Boolean(selectedMember)}` threw `Cannot read properties of null` the
+                moment the page mounted -- caught by the route smoke, not by reading. */}
+            </div>
+
+            <MemberPanel
+                member={selectedMember}
+                open={Boolean(selectedMember)}
+                onClose={() => setSelectedMember(null)}
+                arriving={Boolean(selectedMember)}
                 footer={
                     isEditing ? (
                         <>
@@ -740,6 +862,14 @@ export default function Members() {
                     )
                 }
             >
+                {/* ⚠️ THE `selectedMember &&` GUARD IS LOAD-BEARING AND I REMOVED IT ONCE.
+                    JSX children are CONSTRUCTED whether or not the parent renders them, so
+                    the body's `selectedMember.address` runs on every render of this page.
+                    Swapping the Modal for the panel dropped this guard, and the register
+                    went to the error boundary with `Cannot read properties of null (reading
+                    'address')` the moment it mounted -- the same failure the Modal's own
+                    comment recorded, reintroduced by the commit that removed the Modal. */}
+                {selectedMember && (
                     <div className="relative member-record">
                         {showSavedNotification && (
                             <div role="status" className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-status-active-bg text-status-active border border-status-active-dot rounded-lg shadow-(--shadow-2) no-print">
@@ -1146,8 +1276,8 @@ export default function Members() {
                         </div>
 
                     </div>
-            </Modal>
-            )}
+                )}
+            </MemberPanel>
 
             <ConfirmDialog
                 open={Boolean(pendingSave)}

@@ -37,7 +37,11 @@ export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref 
 
        Swapping which element carries the class moves nothing on screen: `<main>` is now the
        content wrapper it always visually was, and the header and footer are its siblings. */
-    <div className="fixed top-40 bottom-0 left-0 right-0 flex-1 flex flex-col overflow-y-auto lg:left-64">
+    /* 📐 THE SHELL IS A COLUMN THAT SCROLLS, not a fixed box offset by a 160px header.
+       The header is `sticky` now and 60px tall, so nothing has to know its height -- the old
+       `top-40` was that number written down in a second place, and a header that changed
+       height left a 100px gap nobody could see in a diff. */
+    <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
       <Header sideBarOpen={sideBarOpen} setSideBarOpen={setSideBarOpen} />
       {/* `tabIndex={-1}` so the skip link has something it can actually move focus TO —
           a fragment link only moves the caret unless the target is focusable. */}
