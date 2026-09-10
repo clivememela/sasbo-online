@@ -1,6 +1,8 @@
 import { Download, FileText, ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useMemo } from "react";
 import PageTitle from '../../components/common/PageTitle';
+import Sheet from '../../components/common/Sheet.jsx';
+import DataState from '../../components/common/DataState.jsx';
 import { Button, TextInput } from '../../components/form';
 
 export default function AffiliationsOtherTradeUnions() {
@@ -159,11 +161,11 @@ export default function AffiliationsOtherTradeUnions() {
         title="Affiliations & Other Trade Unions"
         subtitle="COSATU congress documents, membership figures, trade union constitutions, and international affiliations"
       />
-      <p className="mb-6 text-ink-muted">
+      <p className="mt-3 mb-6 text-sm text-ink-muted">
         {totalFiles} documents in {Object.keys(fileStructure).length} categories
       </p>
 
-      <div className="mb-6 max-w-4xl">
+      <div className="mb-6 max-w-xl">
         {/* 🔴 THE CLEAR BUTTON HAD NO ACCESSIBLE NAME -- an `<X>` icon and
             nothing else. `TextInput kind="search"` also brings the search
             keyboard and the "Search" return key on a phone, and the 16px rule. */}
@@ -180,7 +182,7 @@ export default function AffiliationsOtherTradeUnions() {
             <Button variant="ghost" onClick={() => setSearchQuery("")}>Clear</Button>
           )}
         </div>
-        {searchQuery && (
+        {searchQuery && Object.keys(filteredStructure).length > 0 && (
           <p className="text-sm text-ink-muted mt-2">
             Found {Object.keys(filteredStructure).length} categories with {Object.values(filteredStructure).reduce((sum, files) => sum + files.length, 0)} matching documents
           </p>
@@ -188,13 +190,31 @@ export default function AffiliationsOtherTradeUnions() {
       </div>
 
       <div className="max-w-4xl">
-        {Object.entries(filteredStructure).map(([folder, files]) => (
-          <div key={folder} className="mb-2">
+        {/* 🔴 A SEARCH THAT MATCHED NOTHING LEFT THE PAGE BLANK. The list simply stopped
+            rendering, and the only signal was the "Found 0 …" line above -- which itself only
+            appears while a search is typed, and which reads as a fact about the archive rather
+            than about the query. A blank page with a filled search box is the shape a user
+            reads as "broken", and there was no way out of it but to clear the field by hand. */}
+        {Object.keys(filteredStructure).length === 0 ? (
+          <Sheet>
+            <DataState
+              state="empty"
+              title={searchQuery ? "Nothing matches that search." : "Nothing here yet."}
+              message={searchQuery ? "Try fewer words, or clear the search to see everything again." : null}
+              action={searchQuery
+                ? <Button variant="default" onClick={() => setSearchQuery("")}>Clear the search</Button>
+                : null}
+            />
+          </Sheet>
+        ) : (
+          <Sheet className="divide-y divide-line">
+            {Object.entries(filteredStructure).map(([folder, files]) => (
+          <div key={folder}>
             <button
               type="button"
               onClick={() => toggleFolder(folder)}
               aria-expanded={Boolean(expandedFolders[folder])}
-              className="touch-target w-full flex items-center gap-2 p-3 bg-surface rounded-lg shadow hover-hover:hover:shadow-md transition-shadow border border-line text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+              className="touch-target flex w-full items-center gap-2.5 px-5 py-3.5 text-left transition-colors duration-(--duration-instant) hover-hover:hover:bg-surface-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-ring"
             >
               {expandedFolders[folder] ? (
                 <ChevronDown size={18} className="text-brand-ink flex-shrink-0" />
@@ -206,11 +226,11 @@ export default function AffiliationsOtherTradeUnions() {
             </button>
 
             {expandedFolders[folder] && (
-              <div className="ml-2 mt-1 space-y-1 border-l border-line pl-3 sm:ml-4 sm:pl-4">
+              <div className="border-t border-line bg-surface-2/60 py-1.5 pl-[38px] pr-3 sm:pl-[46px]">
                 {files.map((file, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-2 bg-surface-2 rounded hover-hover:hover:bg-surface-2 transition-colors"
+                    className="flex items-center justify-between rounded-md px-3 py-1.5 transition-colors hover-hover:hover:bg-surface"
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <FileText size={16} className="text-brand-ink flex-shrink-0" />
@@ -224,7 +244,9 @@ export default function AffiliationsOtherTradeUnions() {
               </div>
             )}
           </div>
-        ))}
+            ))}
+          </Sheet>
+        )}
       </div>
     </div>
   );
