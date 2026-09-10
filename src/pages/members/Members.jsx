@@ -641,8 +641,8 @@ ${summary}`);
 
                             {activeTab === "representatives" && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
-                                    <Detail label="Assigned Lead Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={isEditing} options={roles.map(r => r.name)} onChange={handleEditChange("recruitmentRepresentativeName")} />
-                                    <Detail label="Regional Area Representative" value={editForm.areasRep} isEditing={isEditing} options={roles.map(r => r.name)} onChange={handleEditChange("areasRep")} />
+                                    <Detail label="Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={isEditing} options={roles.map(r => r.name)} onChange={handleEditChange("recruitmentRepresentativeName")} />
+                                    <Detail label="Area's Recruiter" value={editForm.areasRep} isEditing={isEditing} options={roles.map(r => r.name)} onChange={handleEditChange("areasRep")} />
                                 </div>
                             )}
 
