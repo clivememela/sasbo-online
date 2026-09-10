@@ -1,12 +1,30 @@
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Header from "./Header";
 import Footer from "./Footer";
 import ErrorBoundary from "./common/ErrorBoundary";
 import RoutePending from "./common/RoutePending";
 import { MAIN_CONTENT_ID } from "./shellIds";
+import OfflineBanner from "./common/OfflineBanner";
+import { getLastNetworkFailureAt, onNetworkFailure } from "../lib/reportError";
 
 export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref }) {
+  /*
+   * 🔑 OFFLINE IS ANNOUNCED ONCE, IN THE SHELL, AND NOT ONCE PER PANEL (EH-D11).
+   *
+   * It belongs here for the same reason the ErrorBoundary does: it is a fact about the
+   * APPLICATION, not about any one screen. A member in a lift whose every panel reports its
+   * own honest failure gets three true sentences and not the one that explains them -- and
+   * then retries each panel in turn, from a lift.
+   *
+   * ⚠️ IT DOES NOT SUPPRESS THE PANELS' OWN STATES. A panel that failed while online and a
+   * panel that failed because the connection went look alike for a moment and are not the
+   * same situation; hiding the first to tidy the second would lose a real failure.
+   */
+  const [lastNetworkFailureAt, setLastNetworkFailureAt] = useState(getLastNetworkFailureAt);
+
+  useEffect(() => onNetworkFailure(setLastNetworkFailureAt), []);
+
   return (
     /* 🔴 THE LANDMARKS WERE NESTED WRONG, AND THE COST WAS THAT THERE WERE NONE.
        `<main>` used to be this outer element, with `<Header>` and `<Footer>` inside it —
@@ -24,6 +42,19 @@ export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref 
       {/* `tabIndex={-1}` so the skip link has something it can actually move focus TO —
           a fragment link only moves the caret unless the target is focusable. */}
       <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 w-full flex flex-col pb-14">
+        {/* Above the boundary, so it survives a screen that threw -- an offline banner that
+            disappears with the screen it was explaining is the one moment it was for. */}
+        <div className="px-6 pt-6 empty:hidden">
+          <OfflineBanner
+            lastNetworkFailureAt={lastNetworkFailureAt}
+            // 🔴 A RELOAD, AND SAYING WHY IT IS NOT A CHEAT MATTERS. Every panel already
+            // owns its own retry; this one control stands for "everything that failed while
+            // I was offline", which no single panel can re-run. The shell has no handle on
+            // the route's fetches -- reaching for one would mean a global request registry,
+            // which is a large amount of machinery for a button pressed once a month.
+            onRetry={() => window.location.reload()}
+          />
+        </div>
         {/* 🔴 THE BOUNDARY IS HERE, INSIDE THE SHELL, and the position is the whole point.
             A11's standard-facing test says it in one line: "the shell must survive, and
             offer a way to recover". A boundary wrapped around <Routes> would catch the

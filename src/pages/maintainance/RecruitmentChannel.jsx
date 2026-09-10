@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { AlertCircle, Pencil, Trash2, UserPlus, Check, X } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import { Button } from '../../components/form';
 import { ConfirmDialog, closeOn } from '../../components/overlay/Modal.jsx';
 import { recruitmentChannelService } from '../../services/recruitmentChannelService.js';
+import DataState from '../../components/common/DataState.jsx';
+import reportError from '../../lib/reportError.js';
 
 export default function RecruitmentChannel() {
     const [notice, setNotice] = useState(null);
@@ -21,9 +23,44 @@ export default function RecruitmentChannel() {
     const [showAdd, setShowAdd] = useState(false);
     const [newName, setNewName] = useState('');
 
-    const refresh = () => recruitmentChannelService.getAll().then(setRecruipmentChannels);
+    /*
+     * 🔴 A LIVE A27 THE REGISTER NEVER NAMED, AND IT WAS THE WORST SHAPE OF IT: this
+     * `refresh` had NO `.catch` AT ALL.
+     *
+     * So a failed load was an unhandled promise rejection -- nothing on screen, nothing in
+     * any handler -- and `recruitmentChannels` simply stayed `[]`, which the list below
+     * rendered as *"No recruiter types found."* An administrator looking at a maintenance
+     * screen for recruiter types was told, in as many words, that the organisation has
+     * none. That is a fact about the SERVER stated as a fact about the DATA, which is A27's
+     * whole definition, on a screen whose own job is managing that data.
+     *
+     * ⚠️ AND IT WAS INVISIBLE TO EVERY UPSTREAM PASS, because a missing catch is not a
+     * wrong catch: there is no swallow to grep for, no `console.error` to find, and the
+     * happy path is perfectly correct. `06.1b` found it by walking the empty-state copies
+     * rather than the error handling.
+     */
+    const [listState, setListState] = useState('loading');
+    const [loadError, setLoadError] = useState(null);
 
-    useEffect(() => { refresh(); }, []);
+    // `useCallback` for the same reason every other list screen here uses one: it is the
+    // effect's dependency, and a fresh identity each render is a re-fetch each render --
+    // which on screen is indistinguishable from a slow backend.
+    const refresh = useCallback(() => {
+        setListState('loading');
+        setLoadError(null);
+        return recruitmentChannelService.getAll()
+            .then((data) => {
+                setRecruipmentChannels(Array.isArray(data) ? data : []);
+                setListState('ready');
+            })
+            .catch((error) => {
+                reportError('RecruitmentChannel.refresh', error);
+                setLoadError(error);
+                setListState('error');
+            });
+    }, []);
+
+    useEffect(() => { refresh(); }, [refresh]);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -171,9 +208,24 @@ export default function RecruitmentChannel() {
 
                 {/* Rows */}
                 <div className="divide-y divide-line border border-t-0 border-line rounded-b-xl">
-                    {filtered.length === 0 ? (
-                        <div className="px-4 py-6 text-sm text-ink-muted">No recruiter types found.</div>
-                    ) : filtered.map(r => (
+                    {/* 🔑 THE THREE STATES ARE SEPARATE BRANCHES, and `error` can no longer
+                        reach the empty copy -- which is the fix, not the states. The empty
+                        copy itself is unchanged wording, now rendered by the one component
+                        the whole application shares rather than as this file's own div. */}
+                    {listState === 'loading' && <DataState state="loading" />}
+
+                    {listState === 'error' && (
+                        <DataState
+                            state="error"
+                            error={loadError}
+                            onRetry={refresh}
+                            title="We could not load the recruiter types."
+                        />
+                    )}
+
+                    {listState === 'ready' && filtered.length === 0 ? (
+                        <DataState state="empty" title="No recruiter types found." />
+                    ) : listState !== 'ready' ? null : filtered.map(r => (
                         <div key={r.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-4 py-3 items-center text-sm hover-hover:hover:bg-surface-2/40 transition">
                             {editingId === r.id ? (
                                 <input

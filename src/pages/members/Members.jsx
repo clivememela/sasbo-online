@@ -20,6 +20,8 @@ import {
 import PageTitle from "../../components/common/PageTitle.jsx";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState.jsx";
+import useReferenceData from "../../hooks/useReferenceData.js";
+import reportError from "../../lib/reportError.js";
 import { cn } from "../../lib/utils";
 
 const PAGE_SIZE = memberService.getPageSize();
@@ -145,6 +147,24 @@ const getChangedFields = (draft, original) => Object.keys(draft)
     })
     .map((key) => `${MEMBER_FIELD_LABEL_MAP[key] || key}: ${original[key] || "-"} → ${draft[key] || "-"}`);
 
+
+/**
+ * THE TWO REFERENCE LISTS BEHIND THIS SCREEN'S EDIT PANEL. `06.1b`, EH-D9.
+ *
+ * 🔴 BOTH LOADED WITH `.catch(err => console.error(...))`. The member register itself has
+ * had a proper error state since `04.2` (that was A27), but the two lists that fill the edit
+ * panel's Bank and Lead Recruiter selectors did not -- so a half-down backend rendered a
+ * perfectly good register whose edit panel silently offered no banks. An administrator
+ * editing a member would conclude the bank list was empty, not that the server had failed.
+ *
+ * 🔑 At module scope because `useReferenceData` needs a stable object; rebuilt per render
+ * it re-fetches forever, which looks exactly like a slow backend.
+ */
+const REFERENCE_LOADERS = {
+    'lead recruiters': () => recruiterService.getRoles(),
+    banks: () => bankService.getBankNames(),
+};
+
 export default function Members() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -157,9 +177,19 @@ export default function Members() {
     const [showSavedNotification, setShowSavedNotification] = useState(false);
     const [fieldErrors, setFieldErrors] = useState({});
     const prevMemberIdRef = useRef(null);
-    const [roles, setRoles] = useState([]);
     const [membersList, setMembersList] = useState([]);
-    const [bankNames, setBankNames] = useState([]);
+
+    /*
+     * ✅ THE TWO SILENT `.catch(console.error)` LOADS, REPLACED BY ONE SET (EH-D9).
+     *
+     * Note what is NOT here: `membersList`. The register's own fetch keeps its own
+     * `listState`, because a register that failed IS this screen failing -- there is nothing
+     * left to look at. A missing bank list is not; the register still renders and the edit
+     * panel says which list is missing. That is the line between `error` and `partial`.
+     */
+    const refs = useReferenceData(REFERENCE_LOADERS);
+    const roles = refs.data['lead recruiters'];
+    const bankNames = refs.data.banks;
 
     /**
      * A27 — THE THREE STATES, AT LAST, AND THE DEFECT WAS THAT THERE WAS ONLY ONE.
@@ -187,15 +217,14 @@ export default function Members() {
         }).catch(err => {
             // Still logged — the log is what a developer reads. What changed is that the
             // SCREEN now knows too.
-            console.error("Failed fetching records array", err);
+            reportError("Members.loadMembers", err);
             setListState("error");
         });
     }, []);
 
+    // The two reference lists are `useReferenceData`'s now; this owns the register alone.
     useEffect(() => {
-        recruiterService.getRoles().then(setRoles).catch(err => console.error("Failed to load roles", err));
         loadMembers();
-        bankService.getBankNames().then(setBankNames).catch(err => console.error("Failed to load banks", err));
     }, [loadMembers]);
 
     const tabsWithErrors = useMemo(() => {
@@ -435,7 +464,7 @@ export default function Members() {
             setShowSavedNotification(true);
             window.setTimeout(() => setShowSavedNotification(false), 3000);
         } catch (error) {
-            console.error("Unable to save member changes", error);
+            reportError("Members.save", error);
             // 06.1 owns the shared error CONTRACT; what this wave owes the screen is that
             // a failed save is visible on the screen the member is looking at, rather than
             // in a dialog they dismiss and a console they never open.
@@ -623,6 +652,23 @@ export default function Members() {
                     defect: a backend that is down used to say "No Sasbo members match the
                     specified query definitions", and an administrator reads that as a fact
                     about the union. The retry re-runs the same fetch the mount effect does. */}
+                {/* ✅ THE FOURTH STATE (EH-D9). The register below has its own error state and
+                    its own retry; this is about the two lists that fill the EDIT panel. A
+                    missing bank list must not blank a register that loaded perfectly well,
+                    and it must not be silent either -- an administrator who opens the edit
+                    panel and finds no banks would otherwise conclude there are none. */}
+                {(refs.state === 'partial' || refs.state === 'error') && (
+                    <div className="mt-6 rounded-lg border border-line bg-surface-2 p-3">
+                        <DataState
+                            state={refs.state === 'error' ? 'error' : 'partial'}
+                            compact
+                            onRetry={refs.retry}
+                            title="Some option lists are missing."
+                            message={`${refs.failed.join(' and ')} did not load, so the edit panel cannot offer them. The register below is up to date.`}
+                        />
+                    </div>
+                )}
+
                 <div className="mt-6">
                     <Table
                         caption="Sasbo members matching the current search"

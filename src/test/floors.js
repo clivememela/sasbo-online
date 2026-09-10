@@ -138,10 +138,35 @@ export const FLOORS = {
   TEST_SOURCE_FILES: 8,
 
   /**
-   * Register rows declared in `knownDefects.js`. Actual on 2026-09-07: 16.
-   * Previously written as a bare `8` at its call site.
+   * Register rows declared in `knownDefects.js`. Actual on 2026-09-10: **15**
+   * (16 on 2026-09-07, less A25, closed by `06.1b`).
+   *
+   * 🔴 LOWERED TO 1 ON PURPOSE, AND IT IS THE ONLY FLOOR IN THIS FILE THAT SHOULD BE.
+   *
+   * Every other entry here guards a population that grows with the codebase: fewer
+   * routes than expected means the route walker broke, not that routes were deleted.
+   * This one guards a population that SHRINKS WHEN THE WORK SUCCEEDS. A floor of 8
+   * under a DEFECT register asserts, in effect, that we still have at least eight
+   * open defects -- so it goes red on the day the ninth is fixed, with the message
+   * "the scan found too few rows to be trusted", which would be false.
+   *
+   * 💥 IT IS NOT HYPOTHETICAL AND IT IS ALREADY SCHEDULED. Measured by the automation
+   * arc, 2026-09-10: this branch closes A11, A14, A25, A27 and A28; the capture-member
+   * branch closes A6, A7, A37 and A38. The merged intersection falls BELOW eight, so the
+   * merge commit would have met a red guard in the middle of a 29-file reconciliation and
+   * had to work out that the guard, not the merge, was wrong.
+   *
+   * 🔑 SO THE PREDICATE IS RE-AIMED AT THE FACT IT ACTUALLY CARES ABOUT: that the scan
+   * could READ ITS SOURCE. One row proves the module resolved, parsed and exported a
+   * populated register; the day that legitimately reaches zero, the correspondence tests
+   * either side of it are what carry the weight, and the right move is to delete this
+   * guard rather than to keep a row alive to satisfy it.
+   *
+   * ⚠️ A floor should guard that the scan can read its source, not that the source is
+   * still long. The automation arc's phrasing, adopted here verbatim because it is the
+   * general rule and not a note about this entry.
    */
-  DEFECT_ROWS: 8,
+  DEFECT_ROWS: 1,
 
   /**
    * Tests the suite must produce, counted from `reports/junit.xml` by

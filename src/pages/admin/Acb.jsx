@@ -61,7 +61,10 @@ const cards = [
         color: 'text-red-600 dark:text-red-400'
     },*/
 ];
-console.log("Rendering Acb");
+
+// 🔴 `console.log("Rendering Acb")` WAS HERE, AT MODULE SCOPE -- so it fired once per
+// import rather than per render, which is not what its own text claimed, and it fired in
+// production. Debug output that outlived the debugging session.
 export default function Acb() {
     return (
         <div className="p-6 text-ink">

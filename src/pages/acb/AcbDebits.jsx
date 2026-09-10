@@ -7,6 +7,7 @@ import { memberService } from "../../services/memberService.js";
 import { validateSAID } from "../../utils/validateSAID.js";
 import Table from '../../components/table/Table.jsx';
 import StatusChip from '../../components/common/StatusChip.jsx';
+import reportError from '../../lib/reportError.js';
 
 export default function AcbDebits() {
     const [membersList, setMembersList] = useState([]);
@@ -42,7 +43,7 @@ export default function AcbDebits() {
         setListState('loading');
         return memberService.getMembers()
             .then((data) => { setMembersList(data ?? []); setListState('ready'); })
-            .catch((err) => { console.error('Failed to load members', err); setListState('error'); });
+            .catch((err) => { reportError('AcbDebits.loadMembers', err); setListState('error'); });
     }, []);
 
     useEffect(() => { loadMembers(); }, [loadMembers]);
@@ -72,7 +73,7 @@ export default function AcbDebits() {
             setSelectedMember(updated);
             setEditing(false);
         } catch (err) {
-            console.error(err);
+            reportError('AcbDebits.updateBanking', err);
             // 🔴 A BANKING CHANGE THAT FAILED, ANNOUNCED IN A DIALOG THE USER DISMISSES.
             // This screen writes a member's debit-order details; "Failed to update banking
             // details" arriving as a native modal, and leaving no trace once dismissed, is

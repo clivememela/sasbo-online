@@ -89,9 +89,13 @@ describe('when a component throws while rendering', () => {
 
     // And there is an affordance that gets them moving again. A boundary with no exit
     // is a white page with text on it.
+    //
+    // 🔑 `getAllByRole` SINCE `06.1b`, AND THE PLURAL IS THE POINT. The designed fallback
+    // offers TWO recoveries because there are two failures behind this screen and one
+    // button cannot fix both -- see the "stale chunk" test below.
     expect(
-      screen.getByRole('button', { name: /try again|reload|go back|home/i }),
-    ).toBeInTheDocument()
+      screen.getAllByRole('button', { name: /try again|reload|go back|home/i }).length,
+    ).toBeGreaterThan(0)
   })
 
   it('does not let the throw escape the render', () => {
@@ -116,6 +120,91 @@ describe('when a component throws while rendering', () => {
     // Before the fix this was empty -- React unmounted everything it had committed.
     expect(container.innerHTML).not.toBe('')
     expect(document.body.textContent.trim()).not.toBe('')
+  })
+
+  /**
+   * ✅ THE DESIGNED FALLBACK. `06.1b` closed A11's remaining half, and these are its rules.
+   *
+   * 🗣️ THE AUTOMATION ARC'S CONSTRAINT, VERBATIM AND UNPROMPTED (2026-09-09): *"keep the
+   * sentence naming what failed and the one action that recovers it, and never a stack trace
+   * or a chunk name."* A message is not a deliverable, so it is asserted here.
+   */
+  describe('the designed fallback', () => {
+    /** What a stale deploy actually throws: the browser's own wording, hash and all. */
+    const StaleChunk = () => {
+      throw new Error(
+        'Failed to fetch dynamically imported module: /assets/Members-B7fQ2x.js',
+      )
+    }
+
+    it('never renders the chunk name or the stack, however loud the error is', () => {
+      // 🔴 THE MOST LIKELY THING TO REACH THIS BOUNDARY IS NOT A BUG IN A COMPONENT. `03.1`
+      // made every route lazy, so the common case is a user on a stale index.html asking for
+      // a hash a deploy replaced. Rendering the error's own message would show a member of a
+      // trade union a build artefact's content hash -- and the action that fixes their
+      // situation is not in that sentence anywhere.
+      render(
+        <Shell>
+          <StaleChunk />
+        </Shell>,
+      )
+
+      const panel = screen.getByTestId('route-error')
+      expect(panel.textContent).not.toMatch(/Members-B7fQ2x/)
+      expect(panel.textContent).not.toMatch(/\.js\b/)
+      expect(panel.textContent).not.toMatch(/dynamically imported module/i)
+      expect(panel.textContent).not.toMatch(/\bat\s+\w+\s+\(/)
+    })
+
+    it('offers BOTH recoveries, because one of them cannot fix a stale chunk', () => {
+      // "Try again" re-renders the subtree -- right for a transient failure, and it keeps
+      // what the user has typed elsewhere. On a stale chunk it simply throws again, which
+      // is a loop with no exit if it is the only button. "Reload" fetches a fresh index and
+      // is the ONLY thing that fixes that case.
+      render(
+        <Shell>
+          <StaleChunk />
+        </Shell>,
+      )
+
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /reload/i })).toBeInTheDocument()
+    })
+
+    it('promises nothing about what the user typed', () => {
+      // The plain fallback used to say "Nothing you entered has been sent". A boundary
+      // cannot know that: a render that threw AFTER a successful save is exactly as likely
+      // as one that threw before it, and a reassurance that is sometimes false is worse
+      // than none.
+      render(
+        <Shell>
+          <Exploding />
+        </Shell>,
+      )
+
+      expect(screen.getByTestId('route-error').textContent).not.toMatch(
+        /nothing you entered|nothing was (sent|saved)/i,
+      )
+    })
+
+    it('reports through the sink, and the sink does not carry the message', () => {
+      // EH-D10. The boundary used to report nothing at all, so the one failure class that
+      // blanks a whole screen was the only one leaving no trace. It says something now --
+      // and a render error's message interpolates the offending VALUE, which on these
+      // screens is a member, so what it says is the redacted line.
+      render(
+        <Shell>
+          <StaleChunk />
+        </Shell>,
+      )
+
+      const sunk = console.error.mock.calls.filter(([tag]) => tag === '[sasbo]')
+      expect(sunk.length).toBeGreaterThan(0)
+
+      const [, line] = sunk.at(-1)
+      expect(line).toMatchObject({ context: 'ErrorBoundary' })
+      expect(JSON.stringify(line)).not.toMatch(/Members-B7fQ2x/)
+    })
   })
 
   /**

@@ -4,6 +4,7 @@ import { MapPin, Search } from 'lucide-react';
 import { useMapsLibrary } from '@vis.gl/react-google-maps';
 
 import { cn } from '../../lib/utils';
+import reportError from '../../lib/reportError';
 import Field, { controlClasses } from './Field';
 
 /**
@@ -99,7 +100,7 @@ export default function AddressAutocomplete({
           setPredictions([]);
         }
       } catch (err) {
-        console.error('Autocomplete fetch failed:', err);
+        reportError('AddressAutocomplete.suggest', err);
         setPredictions([]);
       }
     },
@@ -158,7 +159,7 @@ export default function AddressAutocomplete({
           onChange({ target: { value: prediction.description } });
         }
       } catch (err) {
-        console.error('Place details fetch failed:', err);
+        reportError('AddressAutocomplete.details', err);
         onChange({ target: { value: prediction.description } });
       }
     } else {

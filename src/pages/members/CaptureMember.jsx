@@ -19,6 +19,7 @@ import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderF
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState";
 import { cn } from "../../lib/utils";
+import useReferenceData from "../../hooks/useReferenceData.js";
 
 // 44 Unique SASBO Branches for Primary Selection Dropdown
 const SASBO_BRANCHES = [
@@ -66,6 +67,28 @@ const FIELD_TO_TAB_MAP = {
     shopStewardElectionDate: "structures",
     becBranchName: "structures",
     becExecutivePosition: "structures"
+};
+
+
+/**
+ * THE FOUR REFERENCE LISTS THIS FORM LOADS ON MOUNT. `06.1b`, EH-D9.
+ *
+ * 🔴 ALL FOUR SWALLOWED THEIR FAILURES -- two as `.catch(err => console.error(...))`, two
+ * as `.catch(() => setThing([]))`. On a capture form that is the worst place in the
+ * application for a silent empty list: an administrator who cannot find the member's bank
+ * does not conclude the server is down, they pick the closest bank they can see. The failure
+ * does not stop the work, it corrupts the record -- and the record is a person's union
+ * membership.
+ *
+ * 🔑 THE FIFTH LIST, JOB GRADES, IS NOT HERE and that is not an oversight. It depends on
+ * the chosen bank, so it is not a mount fetch at all; it has its own effect, its own error
+ * state and its own retry, and it is where A25 was closed.
+ */
+const REFERENCE_LOADERS = {
+    recruiters: () => recruiterService.getAll(),
+    structures: () => recruiterService.getStructures(),
+    'bank branches': () => bankService.getBankListing(),
+    banks: () => bankService.getBankNames(),
 };
 
 export default function CaptureMember() {
@@ -141,17 +164,18 @@ export default function CaptureMember() {
 
     const [fieldErrors, setFieldErrors] = useState({});
     const [showSavedNotification, setShowSavedNotification] = useState(false);
-    const [reps, setReps] = useState([]);
-    const [structures, setStructures] = useState([]);
-
-    useEffect(() => {
-        recruiterService.getAll()
-            .then(data => setReps(data || []))
-            .catch(err => console.error('Failed to fetch recruiters:', err));
-        recruiterService.getStructures()
-            .then(data => setStructures(data || []))
-            .catch(err => console.error('Failed to fetch structures:', err));
-    }, []);
+    /*
+     * ✅ THE FOUR SILENT MOUNT LOADS, REPLACED BY ONE SET (EH-D9).
+     *
+     * They were two effects and four swallowing catches, in two separate places in this
+     * file. One call, and -- the part that could not be done with four `useState`s -- a
+     * `partial` state that knows THREE OF FOUR ANSWERED and can say which one did not.
+     */
+    const refs = useReferenceData(REFERENCE_LOADERS);
+    const reps = refs.data.recruiters;
+    const structures = refs.data.structures;
+    const bankListing = refs.data['bank branches'];
+    const bankNames = refs.data.banks;
 
     const tabsWithErrors = useMemo(() => {
         const errorTabs = new Set();
@@ -376,20 +400,6 @@ export default function CaptureMember() {
     // Bumped by the retry control. It is a dependency of the fetch effect, so "try again"
     // re-runs exactly the effect that failed rather than duplicating its body.
     const [jobGradeAttempt, setJobGradeAttempt] = useState(0);
-    const [bankListing, setBankListing] = useState([]);
-    const [bankNames, setBankNames] = useState([]);
-
-    // Load bank listing and bank names on mount so we can resolve a selected bank name to a bank code
-    useEffect(() => {
-        let mounted = true;
-        bankService.getBankListing()
-            .then(list => { if (mounted) setBankListing(list || []); })
-            .catch(() => { if (mounted) setBankListing([]); });
-        bankService.getBankNames()
-            .then(names => { if (mounted) setBankNames(names || []); })
-            .catch(() => { if (mounted) setBankNames([]); });
-        return () => { mounted = false; };
-    }, []);
 
     // Fetch job grades for the selected bank whenever bankName changes.
     useEffect(() => {
@@ -442,6 +452,37 @@ export default function CaptureMember() {
                 Securely capture a new Sasbo member. Ensure all required personal,
                 employment, and banking information is accurately entered to maintain the integrity of our member database.
             </p>
+            {/* ✅ THE FOURTH STATE, ABOVE THE FORM RATHER THAN INSIDE IT (EH-D9).
+
+                Four reference lists fill this form's selectors. When some of them fail this
+                says WHICH, before the member starts typing -- because the alternative is an
+                administrator who fills in six tabs, reaches the bank field, finds it empty,
+                and has no way to know whether that is a broken server or a real answer.
+
+                🔴 IT IS A NOTICE, NOT A BLOCK. Everything that DID load still works, and a
+                capture form is the last place to throw away a half-finished form over one
+                dead endpoint. The retry re-runs only the lists that were asked for; nothing
+                the member has typed is touched. */}
+            {(refs.state === 'partial' || refs.state === 'error') && (
+                <div className="max-w-6xl mx-auto mb-4 rounded-lg border border-line bg-surface-2 p-3">
+                    <DataState
+                        state={refs.state === 'error' ? 'error' : 'partial'}
+                        compact
+                        onRetry={refs.retry}
+                        title={
+                            refs.state === 'error'
+                                ? 'None of this form’s option lists could be loaded.'
+                                : 'Some option lists are missing.'
+                        }
+                        message={
+                            refs.state === 'error'
+                                ? 'The selectors below have nothing to offer until this succeeds. Anything you have already typed is kept.'
+                                : `${refs.failed.join(', ')} did not load. Every other field on this form is ready.`
+                        }
+                    />
+                </div>
+            )}
+
             <div className="max-w-6xl mx-auto rounded-card border border-line bg-surface shadow-(--shadow-1) relative">
                 {showSavedNotification && (
                     <div role="status" className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-lg border border-status-active-dot bg-status-active-bg px-4 py-2 text-status-active shadow-(--shadow-2)">

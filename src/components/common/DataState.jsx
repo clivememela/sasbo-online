@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import { AlertTriangle, Inbox, Loader2, WifiOff } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
+import { SLOW_NOTICE_MS } from '../../services/parseApiError';
 import Button from '../form/Button';
 
 /**
@@ -61,6 +63,23 @@ import Button from '../form/Button';
  */
 const DEFAULTS = {
   loading: { title: 'Loading…', message: null },
+  /*
+   * 🔑 THE SAME STATE, LATER, AND IT IS A DIFFERENT SENTENCE ON PURPOSE (EH-D2).
+   *
+   * A spinner communicates one thing for about two seconds and then stops communicating
+   * anything: after that it is indistinguishable from a hang, and the user's model quietly
+   * changes from "it is working" to "it is broken" with nothing on screen to justify either.
+   * A14 exists because that ambiguity has the longest time-to-detection in this application
+   * — an administrator reads a permanent spinner as "the system is slow" rather than "it is
+   * down", so nobody is called.
+   *
+   * The 5s copy is the honest middle: still working, longer than it should be, and the
+   * ceiling behind it means this cannot go on forever.
+   */
+  slow: {
+    title: 'This is taking longer than expected.',
+    message: 'Still waiting for the server. It will stop trying shortly.',
+  },
   empty: { title: 'Nothing here yet', message: null },
   error: { title: 'We could not load this.', message: null },
   partial: {
@@ -69,8 +88,16 @@ const DEFAULTS = {
   },
 };
 
+/**
+ * What a CALLER may ask for. `slow` is deliberately absent: it is `loading` after
+ * `SLOW_NOTICE_MS`, decided here, and a caller that could pass it would be able to claim a
+ * request is late without one being in flight.
+ */
+const PUBLIC_STATES = new Set(['loading', 'empty', 'error', 'partial']);
+
 const ICONS = {
   loading: Loader2,
+  slow: Loader2,
   empty: Inbox,
   error: AlertTriangle,
   partial: AlertTriangle,
@@ -115,26 +142,80 @@ export default function DataState({
   className,
   'data-testid': testId,
 }) {
-  if (!DEFAULTS[state]) {
+  /*
+   * ⚠️ VALIDATED AGAINST `PUBLIC_STATES`, NOT AGAINST `DEFAULTS`, and the difference is not
+   * cosmetic. `DEFAULTS` gained a `slow` entry when the 5s notice landed, and a check written
+   * as `if (!DEFAULTS[state])` would have quietly started ACCEPTING `state="slow"` from a
+   * caller -- a fifth value nobody documented, arriving through a guard that was supposed to
+   * be closing the vocabulary. `slow` is this component's own business: it is `loading`,
+   * later, and no caller should be able to assert it.
+   */
+  if (!PUBLIC_STATES.has(state)) {
     throw new Error(
-      `DataState was given state "${state}". Known states: loading, empty, error, ` +
-        `partial. A typo that fell back to a default would decide, silently, whether a ` +
-        `failed fetch renders as "nothing found" -- which is the whole of A27.`,
+      `DataState was given state "${state}". Known states: ${[...PUBLIC_STATES].join(', ')}. ` +
+        `A typo that fell back to a default would decide, silently, whether a failed fetch ` +
+        `renders as "nothing found" -- which is the whole of A27.`,
     );
   }
 
-  const isFailure = state === 'error' || state === 'partial';
+  /*
+   * 🔑 THE THRESHOLD IS `SLOW_NOTICE_MS`, IMPORTED, NOT A `5000` TYPED HERE.
+   *
+   * §16 puts the notice at 5s and the read ceiling at 10s, and the relationship between
+   * them is the point: the notice has to arrive BEFORE the deadline or it never renders at
+   * all. Two numbers in two files drift, and the way this one drifts is silent — a ceiling
+   * lowered to 4s would simply mean nobody ever sees the notice, and no test that checks
+   * either number alone would notice.
+   *
+   * ⚠️ THE TIMER IS ONLY ARMED WHILE LOADING. A component that armed it unconditionally
+   * would leave a pending timeout behind on every error and empty state — and under the
+   * suite's fake timers a stray deadline fires into whichever test runs next, which is the
+   * anti-flake rule's own worst case.
+   */
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    if (state !== 'loading') return undefined;
+
+    const timer = setTimeout(() => setSlow(true), SLOW_NOTICE_MS);
+
+    /*
+     * 🔑 THE RESET IS IN THE CLEANUP, NOT IN THE BODY, and it has to be somewhere: a
+     * `loading -> error -> loading` cycle with a stale `slow` would show "taking longer than
+     * expected" the INSTANT the second attempt began, which is a false statement about a
+     * request that is a few milliseconds old. Retry makes that cycle the common case rather
+     * than an edge one.
+     *
+     * Putting it here rather than in the body also keeps the effect from calling `setState`
+     * synchronously on every state change, which is a cascading render for a value that is
+     * false already almost every time.
+     */
+    return () => {
+      clearTimeout(timer);
+      setSlow(false);
+    };
+  }, [state]);
+
+  // Rendered as `slow` while the caller still legitimately says `loading` -- the fetch has
+  // not failed and nothing about the caller's state has changed, so this stays the
+  // component's business rather than becoming a fifth value every caller has to track.
+  const shown = state === 'loading' && slow ? 'slow' : state;
+
+  const isFailure = shown === 'error' || shown === 'partial';
   const offline = isFailure && isOffline(error);
-  const Icon = offline ? WifiOff : ICONS[state];
+  const Icon = offline ? WifiOff : ICONS[shown];
 
   // The server's own sentence beats ours: it is the one written about THIS failure. Ours
   // is the fallback for a rejection that carries nothing worth reading.
   const headline =
-    title ??
-    (state === 'error' && typeof error?.message === 'string' && error.message.trim()
+    // ⚠️ The caller's `title` is deliberately IGNORED once a load has gone slow: it says
+    // "Loading…" or names the panel, and the whole point of the 5s notice is that the
+    // original copy has stopped being true.
+    (shown === 'slow' ? DEFAULTS.slow.title : title) ??
+    (shown === 'error' && typeof error?.message === 'string' && error.message.trim()
       ? error.message
-      : DEFAULTS[state].title);
-  const body = message ?? DEFAULTS[state].message;
+      : DEFAULTS[shown].title);
+  const body = (shown === 'slow' ? DEFAULTS.slow.message : message) ?? DEFAULTS[shown].message;
 
   /*
    * 🔑 `status` VS `alert`, AND IT IS NOT INTERCHANGEABLE. A loading or empty state is a
@@ -160,7 +241,7 @@ export default function DataState({
       role={role}
       {...(role === 'status' && { 'aria-live': 'polite' })}
       data-testid={testId}
-      data-state={state}
+      data-state={shown}
       className={cn(
         'flex flex-col items-center text-center',
         compact ? 'gap-1.5 py-2' : 'gap-3 py-6',
@@ -171,10 +252,10 @@ export default function DataState({
         aria-hidden="true"
         className={cn(
           compact ? 'size-4' : 'size-6',
-          state === 'loading' && 'animate-spin motion-reduce:animate-none',
-          state === 'empty' && 'text-ink-faint',
+          (shown === 'loading' || shown === 'slow') && 'animate-spin motion-reduce:animate-none',
+          shown === 'empty' && 'text-ink-faint',
           isFailure && 'text-status-suspended',
-          state === 'loading' && 'text-ink-muted',
+          (shown === 'loading' || shown === 'slow') && 'text-ink-muted',
         )}
       />
 

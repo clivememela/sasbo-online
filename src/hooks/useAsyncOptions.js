@@ -86,9 +86,29 @@ export default function useAsyncOptions(fetcher, deps = [], { enabled = true } =
       })
       .catch((error) => {
         if (ticket !== ticketRef.current) return;
-        // An abort is the caller's own doing. Reporting it as a failure would put an
-        // error under a field the user is still happily typing into.
-        if (error?.name === 'AbortError') return;
+        /*
+         * An abort is the caller's own doing. Reporting it as a failure would put an
+         * error under a field the user is still happily typing into.
+         *
+         * 🔴 THIS TESTED `error.name === 'AbortError'` UNTIL `06.1b`, AND BY THEN THAT
+         * COULD NEVER BE TRUE. `06.1a` put every service on `requestJson`, which rejects
+         * with `Object.assign(new Error(message), { kind, ... })` -- an ordinary `Error`,
+         * whose `name` is `"Error"`. The DOM's `AbortError` never reaches a consumer any
+         * more; the helper translates it into `kind: 'abort'` at the boundary, which is
+         * exactly what EH-D3 asks for ("no consumer tests for AbortError").
+         *
+         * ⚠️ AND THE TEST DID NOT CATCH IT, which is the part worth remembering. It built
+         * its own rejection with `error.name = 'AbortError'` -- a shape no service in this
+         * application produces -- so it went on passing while the branch it guarded had
+         * become dead code. A test that constructs its subject's input from the old
+         * contract cannot notice the contract changing. It now rejects with the shape
+         * `parseApiError` actually builds.
+         *
+         * The consequence in the running app was not cosmetic: every superseded keystroke
+         * in a searchable field would have rendered "we could not load the banks" under a
+         * field the user was still typing into, and then cleared the options.
+         */
+        if (error?.kind === 'abort') return;
         setState({ options: [], loading: false, error });
       });
 

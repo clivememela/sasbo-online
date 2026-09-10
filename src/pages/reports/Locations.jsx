@@ -4,6 +4,7 @@ import LocationListing from "./LocationListing.jsx";
 import {locationService} from "../../services/locationService.js";
 import { TextInput, Button } from "../../components/form";
 import PageTitle from '../../components/common/PageTitle';
+import reportError from '../../lib/reportError.js';
 
 export function Locations() {
     const [filters, setFilters] = useState({
@@ -41,7 +42,7 @@ export function Locations() {
                 setSearchState('ready');
             })
             .catch((err) => {
-                console.error('Location search failed', err);
+                reportError('Locations.search', err);
                 setSearched(true);
                 setSearchState('error');
             });

@@ -55,13 +55,30 @@ describe('Table — the four data states', () => {
     expect(onRetry).toHaveBeenCalled()
   })
 
-  it('empty: the empty copy, and no error affordance', () => {
+  it('empty: the empty copy, announced politely and with no error affordance', () => {
     renderWithProviders(
       <Table columns={COLUMNS} rows={[]} rowKey="id" caption="Members" emptyMessage={EMPTY_COPY} />,
     )
     expect(screen.getByText(EMPTY_COPY)).toBeInTheDocument()
+
+    // The half that carries the rule: an empty list is NEVER an alert. conventions §8 --
+    // "no members match this search" is an answer, not a failure, and announcing it as one
+    // is the same category error as A27 pointing the other way.
     expect(screen.queryByRole('alert')).toBeNull()
-    expect(screen.queryByRole('status')).toBeNull()
+
+    /*
+     * ⚠️ THIS USED TO REQUIRE `role="status"` TO BE ABSENT TOO, AND `06.1b` CHANGED IT
+     * DELIBERATELY -- so it is worth saying why rather than letting it read as a test
+     * loosened to fit an implementation.
+     *
+     * The empty state renders through `DataState` now, which announces it politely. The old
+     * branch had no role at all, and the consequence was silence at the one moment it
+     * mattered: a screen-reader user narrows a filter, forty rows become none, and NOTHING
+     * is announced -- the table simply goes quiet and they have no way to know whether it
+     * answered. EH-D6 draws the line at result versus refusal, and an empty result is still
+     * a result.
+     */
+    expect(screen.getByRole('status')).toHaveTextContent(EMPTY_COPY)
   })
 
   it('loaded: renders every essential and secondary column as a real th/td', () => {

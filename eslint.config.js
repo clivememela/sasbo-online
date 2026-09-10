@@ -102,6 +102,31 @@ export default defineConfig([
       // No `varsIgnorePattern`. With JSX references visible the rule no longer needs one, and
       // the exemption was the half that hid dead component imports -- see above.
       'no-unused-vars': 'warn',
+      /*
+       * 🔴 `no-console` AT `error`, AND IT IS A PRIVACY GATE RATHER THAN A TIDINESS ONE.
+       * EH-D10, design arc `06.1b`.
+       *
+       * This application had fourteen bare console calls outside the suite when the rule went
+       * in. Two of them were not diagnostics at all: `OrganizerReport.jsx` logged the WHOLE
+       * submitted form on every submit, and `Acb.jsx` logged at module scope, in production,
+       * on every import. The rest were `console.error(err)` with the whole rejection -- and
+       * `06.1a` had just made every rejection carry `body`, the server's parsed envelope, so
+       * a failed member save now printed the member: names, identity number, bank account.
+       *
+       * A browser console is not a private place. It survives in a saved HAR, in a screen
+       * share, in a support-ticket screenshot, and in any extension the user has installed.
+       * `Auth.jsx` is this repository's own lesson -- it logged `{ email, password }` on
+       * every login attempt.
+       *
+       * 🔑 `error`, NOT `warn`, WHILE THE REST OF THE A11Y BACKLOG IS STILL AT `warn`, and
+       * the asymmetry is deliberate. `warn` is right for a pre-existing backlog being worked
+       * down phase by phase. There is no backlog here: the count is ZERO as of this commit,
+       * so the rule can only ever fire on something newly written, and the cost of letting
+       * one through is a member's identity number in somebody's console. The one permitted
+       * call is `src/lib/reportError.js`, which disables the rule on its own line -- so a
+       * second disable comment anywhere is a visible decision rather than a habit.
+       */
+      'no-console': 'error',
       // ── jsx-a11y, at `warn` and DELIBERATELY NOT `error` (design arc, 00.5) ───────────
       //
       // 🔴 THE LEVEL IS THE WHOLE POINT. MobiZone turned this on at `error` mid-arc, could
@@ -155,5 +180,35 @@ export default defineConfig([
       'react-hooks/static-components': 'warn',
       'react-refresh/only-export-components': 'off',
     },
+  },
+  {
+    /*
+     * WHERE `no-console` DOES NOT APPLY, AND WHY EACH ONE IS EXEMPT.
+     *
+     * 🔑 THE RULE IS ABOUT WHAT SHIPS TO A BROWSER, so the exemption is drawn around what
+     * does not. It is deliberately NARROW: each path is named, rather than a wildcard
+     * config-file glob that would also exempt anything a future author calls a config.
+     * (Written without that glob on purpose -- its closing characters would end this comment,
+     * which is how the first version of this block became a syntax error.)
+     *
+     *   the suite            a test's console output is read by whoever ran it, on a machine
+     *                        with synthetic fixtures. `Auth.test.jsx` prints there ON PURPOSE:
+     *                        it is the test that proves credentials are NOT logged, so it has
+     *                        to be able to say what it saw.
+     *   build + tool scripts `vite.config.js`, `tools/`, `scripts/` -- they run in node, on a
+     *                        developer's machine, and printing is how they report.
+     *
+     * ⚠️ `src/**` IS NOT EXEMPT ANYWHERE, including its non-test files that "only run in
+     * development". `import.meta.env.DEV` is a runtime check, not a bundling one, and a
+     * console call behind it still ships.
+     */
+    files: [
+      '**/*.test.{js,jsx}',
+      'src/test/**',
+      'vite.config.js',
+      'tools/**',
+      'scripts/**',
+    ],
+    rules: { 'no-console': 'off' },
   },
 ])

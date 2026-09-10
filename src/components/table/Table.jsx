@@ -1,8 +1,8 @@
 import { Fragment, useMemo, useState } from 'react';
-import { AlertTriangle, ChevronDown, Inbox, Loader2 } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
-import Button from '../form/Button';
+import DataState from '../common/DataState';
 import TableScroller from './TableScroller';
 
 /**
@@ -207,46 +207,34 @@ export default function Table({
           </thead>
 
           <tbody className="divide-y divide-line">
-            {state === 'loading' &&
-              stateRow(
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className="flex items-center justify-center gap-2 text-sm text-ink-muted"
-                >
-                  <Loader2
-                    aria-hidden="true"
-                    className="size-4 animate-spin motion-reduce:animate-none"
-                  />
-                  Loading…
-                </div>,
-              )}
+            {/* 🔑 THE THREE STATE BRANCHES RENDER THROUGH `DataState` SINCE `06.1b`, and the
+                extraction is the DRY rule's own condition rather than a tidy-up: `06.1b`
+                needed the same four states OUTSIDE a table -- for the reference-list panels
+                and the per-field failures -- which is the second consumer that conventions
+                §11 requires before anything is extracted.
+
+                What was here was correct and is unchanged in behaviour: a live `status` while
+                loading, an `alert` with a retry on failure, the empty copy on neither. What
+                changes is that those rules now have ONE implementation for the whole
+                application instead of one inside `Table` and another wherever a panel needed
+                them -- which is how the eight separate empty-state copies happened. */}
+            {state === 'loading' && stateRow(<DataState state="loading" />)}
 
             {state === 'error' &&
               stateRow(
-                <div role="alert" className="flex flex-col items-center gap-3 text-center">
-                  <AlertTriangle aria-hidden="true" className="size-6 text-status-suspended" />
-                  <p className="text-sm font-medium text-ink">
-                    {typeof error === 'string' ? error : 'We could not load this list.'}
-                  </p>
-                  {/* The empty copy must NOT appear here. A27 is exactly this branch
-                      rendering as "no records found". */}
-                  {onRetry && (
-                    <Button variant="default" size="sm" onClick={onRetry}>
-                      Try again
-                    </Button>
-                  )}
-                </div>,
+                <DataState
+                  state="error"
+                  // A caller may pass a sentence (most do) or the rejection itself. A string
+                  // has no `retryable`, so `DataState` treats it as retryable -- which is the
+                  // behaviour this component always had.
+                  title={typeof error === 'string' ? error : undefined}
+                  error={typeof error === 'string' ? null : error}
+                  onRetry={onRetry}
+                />,
               )}
 
             {state === 'empty' &&
-              stateRow(
-                <div className="flex flex-col items-center gap-2 text-center">
-                  <Inbox aria-hidden="true" className="size-6 text-ink-faint" />
-                  <p className="text-sm font-medium text-ink">{emptyTitle}</p>
-                  {emptyMessage && <p className="text-sm text-ink-muted">{emptyMessage}</p>}
-                </div>,
-              )}
+              stateRow(<DataState state="empty" title={emptyTitle} message={emptyMessage} />)}
 
             {state === 'rows' &&
               rows.map((row, index) => {

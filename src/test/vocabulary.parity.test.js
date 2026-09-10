@@ -207,6 +207,22 @@ const EXPECTED = {
       '"Payroll Deduction" row really can reach the browser. This is the client-side twin ' +
       'of the server PAYROLL_DEDUCTION shim in PaymentType.fromString.',
   },
+  // ⚖️ THE ENTRY BELOW WAS SPECIFIED BY THE AUTOMATION ARC, NOT BY THE DESIGN ARC, and the
+  // attribution is part of the record. This file is a guard and guards belong to that arc;
+  // `06.1b` raised the match, proposed an entry, and asked. They did the reasoning, declined
+  // the alternative and wrote the text. Transcribed here, unchanged.
+  'src/hooks/useReferenceData.js :: result.status === "fulfilled"': {
+    verdict: 'ACCEPTED',
+    why:
+      'not a vocabulary comparison at all. `result` is a PromiseSettledResult from ' +
+      'Promise.allSettled and `status` is the language\'s own field on it, whose only ' +
+      'values are "fulfilled" and "rejected". Same shape as the removed Subscriptions ' +
+      'entries: a field name shared with the MEMBER vocabulary, not a member field. ' +
+      'NOT narrowed away in the predicate: this scan sees a receiver, a field and a ' +
+      'literal, never a type, so excluding it would mean excluding the literals ' +
+      '"fulfilled"/"rejected" -- and a literal-keyed blind spot is how this walker went ' +
+      'blind once already, when literals became constants.',
+  },
   // 🔑 TWO ACCEPTED SITES WERE HERE AND `04.3` REMOVED THEM -- not because they were
   // wrong, but because the code that held them went. They were
   // `Subscriptions.jsx :: sub.status === "ACTIVE"` and `=== "PENDING"`, a presentational

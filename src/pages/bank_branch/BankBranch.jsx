@@ -5,6 +5,7 @@ import { TextInput, SearchableSelect, Button } from "../../components/form";
 import BankBranchModal from "./BankBranchModal.jsx";
 import PageTitle from '../../components/common/PageTitle';
 import Table from '../../components/table/Table.jsx';
+import reportError from '../../lib/reportError.js';
 
 const PAGE_SIZE = bankService.getPageSize();
 
@@ -24,7 +25,7 @@ export default function BankBranch() {
     setListState('loading');
     return bankService.getBanks()
       .then((data) => { setBanks(data ?? []); setListState('ready'); })
-      .catch((err) => { console.error('Failed to load bank branches', err); setListState('error'); });
+      .catch((err) => { reportError('BankBranch.load', err); setListState('error'); });
   }, []);
 
   useEffect(() => { loadBanks(); }, [loadBanks]);

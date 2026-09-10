@@ -4,6 +4,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 
 import useAsyncOptions from './useAsyncOptions'
+import { networkError } from '../services/parseApiError'
 
 /** A promise whose settlement this test controls, so "out of order" is arranged, not raced. */
 function deferred() {
@@ -116,8 +117,32 @@ describe('useAsyncOptions — the out-of-order guarantee', () => {
 
 describe('useAsyncOptions — the four states, kept apart', () => {
   it('an abort is NOT reported as a failure', async () => {
-    const error = new Error('The user stopped typing')
-    error.name = 'AbortError'
+    /*
+     * 🔴 THIS TEST USED TO BUILD ITS OWN ABORT -- `new Error(...)` with `name` set to
+     * `'AbortError'` -- AND THAT IS WHY IT WENT ON PASSING OVER A DEAD BRANCH.
+     *
+     * `06.1a` put every service on `requestJson`, which catches the DOM's `AbortError` at
+     * the boundary and rejects with an ordinary `Error` carrying `kind: 'abort'`. Its
+     * `name` is `"Error"`. So from that commit the hook's `error.name === 'AbortError'`
+     * guard could never fire, every superseded keystroke would have rendered "we could
+     * not load the banks" under a field the user was still typing into -- and this test
+     * stayed green, because it was feeding the hook a shape the application had stopped
+     * producing.
+     *
+     * ⚠️ SO IT IS BUILT BY THE HELPER NOW, not by hand. A test that constructs its
+     * subject's input from a remembered contract cannot notice the contract changing;
+     * one that constructs it from the code that defines the contract goes red the day
+     * the vocabulary moves. This is the same class as the vacuous-scan rule and it is
+     * why `06.1b` found it at all: the hook had zero consumers, so nothing else could.
+     */
+    const error = networkError(new DOMException('superseded', 'AbortError'))
+    expect(error.kind, 'the helper no longer produces `abort`; this test is now vacuous').toBe(
+      'abort',
+    )
+    expect(error.name, 'if this is AbortError again, the old guard is live and this is moot').toBe(
+      'Error',
+    )
+
     const fetcher = vi.fn().mockRejectedValue(error)
 
     render(<Probe fetcher={fetcher} query="x" enabled />)

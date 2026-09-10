@@ -185,12 +185,26 @@ describe('the Members list', () => {
       const { retry } = await expectErrorState({ emptyText: EMPTY_TEXT })
       expect(retry).not.toBeNull()
 
-      await waitFor(() =>
-        expect(consoleError).toHaveBeenCalledWith(
-          expect.stringContaining('Failed fetching records array'),
-          expect.anything(),
-        ),
-      )
+      /*
+       * 🔑 THE ASSERTION CHANGED SHAPE IN `06.1b`, AND IT GOT STRICTER RATHER THAN LOOSER.
+       *
+       * It used to require `console.error('Failed fetching records array', err)` -- a bare
+       * call with the whole rejection as its second argument. EH-D10 replaced every such
+       * call with one sink, because `06.1a` had just made every rejection carry `body`, the
+       * server's parsed envelope: on a member endpoint, that is the member. So a test
+       * demanding the old call was requiring the leak.
+       *
+       * What is asserted now is BOTH halves -- that the failure is still reported at all,
+       * which is what the old test was for, and that what is reported is the redacted line.
+       */
+      await waitFor(() => expect(consoleError).toHaveBeenCalled())
+
+      const [tag, line] = consoleError.mock.calls.at(-1)
+      expect(tag).toBe('[sasbo]')
+      expect(line).toMatchObject({ context: 'Members.loadMembers', kind: 'network' })
+      // The whole emitted line, not field by field: a sink that copied `body` wholesale
+      // under a key this test did not think to check would pass a narrower assertion.
+      expect(JSON.stringify(line)).not.toMatch(/membershipNumber|identityNumber|surname/i)
     })
   })
 })

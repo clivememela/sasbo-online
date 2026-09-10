@@ -37,7 +37,19 @@ export const OrganizerReport = ({ filters }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        console.log('Form submitted:', formData);
+        /*
+         * 🔴 IT WAS `console.log('Form submitted:', formData)`, AND THAT IS THE `Auth.jsx`
+         * DEFECT AGAIN ON A DIFFERENT SCREEN. Auth logged `{ email, password }` on every
+         * login attempt; this logged the WHOLE organiser report payload -- every field the
+         * user had filled in -- on every submit, to a console that survives in a saved HAR,
+         * in a screen share and in any extension the user has installed.
+         *
+         * ⚠️ THE LINE IS DELETED RATHER THAN ROUTED THROUGH `reportError`. The sink exists
+         * for FAILURES and emits `kind`/`status`/`retryable` only; a successful submit has
+         * no failure to report, so there is nothing here it should be saying. This form has
+         * no backend yet (`04.3` left it as a shape), and when it gets one the write goes
+         * through a service and its failure through the sink like every other.
+         */
     };
 
     /**

@@ -11,14 +11,40 @@ import { recruitmentChannelService } from '../../services/recruitmentChannelServ
 import { bankService } from '../../services/bankService.js';
 import { locationService } from '../../services/locationService.js';
 import { validateEmail } from '../../utils/validateSAID.js';
+import DataState from '../../components/common/DataState.jsx';
+import useReferenceData from '../../hooks/useReferenceData.js';
+import reportError from '../../lib/reportError.js';
 
 const PAGE_SIZE = 20;
+
+/**
+ * THE FIVE REFERENCE LISTS THIS SCREEN NEEDS, AND WHAT EACH ONE FEEDS. `06.1b`, EH-D9.
+ *
+ * 🔴 ALL FIVE USED TO LOAD WITH `.catch(err => console.error(err))`. A bad deploy could
+ * empty the bank, province, area, branch, structure, role and channel selectors at once and
+ * the screen would say NOTHING -- the dropdowns would simply be empty, which an administrator
+ * reads as "this data does not exist" rather than "the server did not answer". Worse, it does
+ * not block them: they pick the closest option they can see, and the silent failure becomes a
+ * wrong record rather than a stopped task.
+ *
+ * 🔑 AT MODULE SCOPE BECAUSE `useReferenceData` REQUIRES A STABLE OBJECT. Rebuilt each
+ * render, it would re-fetch forever -- which on screen is indistinguishable from a slow
+ * backend, and is the failure this codebase already met once in `useAsyncOptions`.
+ *
+ * ⚠️ The KEYS are user-facing: they are what the partial banner names when a list is
+ * missing. "roles" is what an administrator would call it; the service method is not.
+ */
+const REFERENCE_LOADERS = {
+    banks: () => bankService.getBanks(),
+    provinces: () => locationService.getProvinces(),
+    structures: () => recruiterService.getStructures(),
+    roles: () => recruiterService.getRoles(),
+    'recruitment channels': () => recruitmentChannelService.getAll(),
+};
 
 export function Recruiters() {
     const [members, setMembers] = useState([]);
     const [reps, setReps] = useState([]);
-    const [banksData, setBanksData] = useState([]);
-    const [provincesData, setProvincesData] = useState([]);
     const [filters, setFilters] = useState({ repName: '', bankName: '', branch: '', province: '', area: '' });
     const [page, setPage] = useState(1);
     const [selectedRep, setSelectedRep] = useState(null);
@@ -34,10 +60,23 @@ export function Recruiters() {
     const [editRepFields, setEditRepFields] = useState({ name: '', email: '', phone: '' });
     const [editRepErrors, setEditRepErrors] = useState({});
     const [repSearch, setRepSearch] = useState({ membershipNumber: '', name: '', bank: '', branch: '', status: '' });
-    const [structures, setStructures] = useState([]);
-    const [roles, setRoles] = useState([]);
-    const [recruitmentChannels, setRecruitmentChannels] = useState([]);
     const [listState, setListState] = useState('loading');
+
+    /*
+     * ✅ THE FIVE SILENT `.catch(console.error)` LOADS, REPLACED BY ONE SET (EH-D9).
+     *
+     * `banksData`, `provincesData`, `structures`, `roles` and `recruitmentChannels` were five
+     * separate `useState([])`s filled by five separate swallowing catches. They are one call
+     * now, and the reason is the fourth state: "three of five answered" is not a fact any
+     * individual fetch knows, so five booleans have nowhere to put it. `refs.state` is
+     * `partial` when some arrived and `error` only when none did.
+     */
+    const refs = useReferenceData(REFERENCE_LOADERS);
+    const banksData = refs.data.banks;
+    const provincesData = refs.data.provinces;
+    const structures = refs.data.structures;
+    const roles = refs.data.roles;
+    const recruitmentChannels = refs.data['recruitment channels'];
 
     /**
      * What the last action said, when it did not simply work.
@@ -73,18 +112,15 @@ export function Recruiters() {
             setReps(r);
             setListState('ready');
         }).catch(err => {
-            console.error("Error fetching dependencies:", err);
+            reportError('Recruiters.refreshAll', err);
             setListState('error');
         });
     }, []);
 
+    // The reference lists are `useReferenceData`'s now; this effect owns only the two lists
+    // the TABLE renders, whose failure is already a first-class `listState`.
     useEffect(() => {
         refreshAll();
-        bankService.getBanks().then(setBanksData).catch(err => console.error(err));
-        locationService.getProvinces().then(setProvincesData).catch(err => console.error(err));
-        recruiterService.getStructures().then(setStructures).catch(err => console.error(err));
-        recruiterService.getRoles().then(setRoles).catch(err => console.error(err));
-        recruitmentChannelService.getAll().then(setRecruitmentChannels).catch(err => console.error(err));
     }, [refreshAll]);
 
     const BANK_NAMES = useMemo(() => [...new Set(banksData.map(b => b?.bankName).filter(Boolean))].sort(), [banksData]);
@@ -325,9 +361,54 @@ export function Recruiters() {
             joinDate: member.joinDate || '',
             status: member.status || 'Active',
             monthlySubscription: member.monthlySubscription || 0,
+            /*
+             * 🔴 ONE LINE IS DELIBERATELY ABSENT HERE, AND TWO ARE DELIBERATELY STILL PRESENT.
+             *
+             * GONE: `recruitmentRep: member.recruitmentRep || ''`.
+             *
+             * ⚠️ `recruitmentRep` IS NOT A FIELD ON THE MEMBER DTO -- its wire name is
+             * `recruitmentRepresentativeName`. So `member.recruitmentRep` was ALWAYS
+             * undefined, the `|| ''` always fired, and the PUT always carried an empty
+             * recruiter name. Where the server reads that key, a blank name means CLEAR:
+             * every assign, every remove and every bulk deactivation on this screen wiped
+             * the member's captured recruiter -- the exact field this screen exists to
+             * manage. Reported by the Capture Member arc (findings.md R7-F1, hardening.md
+             * H8), who own the DTO and could see the name mismatch from the other side.
+             *
+             * It survived this arc's own P4 rewrite because nothing here is wrong to READ:
+             * every line looks like careful defensive defaulting, and a field that does not
+             * exist looks exactly like the fields that do.
+             *
+             * 🔴 STILL PRESENT, AND ON PURPOSE: `currentBalance` and `arrearsBalance`.
+             *
+             * The same report flagged their `|| 0` -- correctly: it cannot tell "no balance
+             * recorded" from "a balance of zero", so a member who had never been billed is
+             * written back with a real zero. The obvious fix is to drop them the way
+             * `recruitmentRep` was dropped, AND THAT WOULD BE WORSE. `MemberMapper` has no
+             * `nullValuePropertyMappingStrategy`, so `updateFromMember` copies nulls: a PUT
+             * that OMITS a field ERASES it. Dropping two real DTO fields would trade a
+             * wrong zero for a null.
+             *
+             * 🔑 WHICH IS WHY `recruitmentRep` COULD GO AND THESE CANNOT. It is not a
+             * property on the DTO at all, so its absence cannot null anything; these two
+             * are, so their absence would. The standing rule: THIS BUILDER SENDS THE WHOLE
+             * DTO. A key that is not on the DTO is removed; a key that is on it stays, even
+             * when its default is imperfect.
+             *
+             * ✅ AND THE HOLD NOW HAS AN EXPIRY. The owner took decision ⑤ on 2026-09-10 as
+             * ABSENT-KEEPS / BLANK-CLEARS: `updateFromMember` gets
+             * `NullValuePropertyMappingStrategy.IGNORE`, so an omitted key keeps the stored
+             * value and an explicit `''` clears it. Once that is COMMITTED on
+             * `phase/capture-member`, these two lines should be deleted rather than fixed --
+             * omitting them will then preserve whatever the member actually has, which is
+             * the honest answer that neither `|| 0` nor a null can give.
+             *
+             * ⚠️ NOT YET. The decision is taken and the mapper change has not landed; until
+             * it does, the current behaviour still erases an omitted field. The Capture
+             * Member arc will say when it is committed.
+             */
             currentBalance: member.currentBalance || 0,
             arrearsBalance: member.arrearsBalance || 0,
-            recruitmentRep: member.recruitmentRep || '',
             electedRep: member.electedRep || '',
             repElectionDay: member.repElectionDay || '',
             repElectionMonth: member.repElectionMonth || '',
@@ -614,6 +695,39 @@ export function Recruiters() {
                     <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
                     <p id="recruiters-notice-title" className="flex-1">{notice.message}</p>
                     <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dismiss</Button>
+                </div>
+            )}
+
+            {/* ✅ THE FOURTH STATE, ON THE SCREEN THAT NEEDED IT MOST (EH-D9).
+
+                Five reference lists feed the filters, the assign dialog and the recruiter
+                form. When some of them fail this says WHICH -- because "some options are
+                missing" that does not name them leaves an administrator checking every
+                dropdown, and because the ones that DID arrive are still correct and still
+                worth using.
+
+                🔴 IT IS NOT AN ERROR STATE AND IT DOES NOT BLANK THE PAGE. The recruiter
+                table below is fed by `listState`, which is a different fetch with its own
+                error state. A missing province list must not hide a recruiter list that
+                loaded perfectly well -- that over-correction is the reason this unit
+                distinguishes `partial` from `error` at all. */}
+            {(refs.state === 'partial' || refs.state === 'error') && (
+                <div className="mx-auto mb-4 max-w-6xl rounded-lg border border-line bg-surface-2 p-3">
+                    <DataState
+                        state={refs.state === 'error' ? 'error' : 'partial'}
+                        compact
+                        onRetry={refs.retry}
+                        title={
+                            refs.state === 'error'
+                                ? 'None of this page’s reference lists could be loaded.'
+                                : 'Some option lists are missing.'
+                        }
+                        message={
+                            refs.state === 'error'
+                                ? 'The filters and forms below have no options to offer until this succeeds.'
+                                : `${refs.failed.join(', ')} did not load. Everything else on this page is up to date.`
+                        }
+                    />
                 </div>
             )}
             <div className="max-w-6xl mx-auto p-6 rounded-card border border-line bg-surface shadow-(--shadow-1)">
