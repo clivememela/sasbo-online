@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Search } from "lucide-react";
 import PageTitle from "../../components/common/PageTitle.jsx";
+import Criteria, { CRITERION, CRITERION_WIDE } from "../../components/common/Criteria.jsx";
 import { TextInput, Button } from "../../components/form";
 import Modal from "../../components/overlay/Modal.jsx";
 import { memberService } from "../../services/memberService.js";
@@ -186,23 +187,17 @@ export default function AcbDebits() {
                 </div>
             )}
 
-            <div className="max-w-4xl mx-auto">
-                {/* Search */}
-                <div className="rounded-lg bg-surface p-5 shadow-(--shadow-1)">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-ink-muted mb-4">Member Search</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                        <TextInput label="Surname" value={filters.surname} onChange={handleChange("surname")} placeholder="Search by surname" />
-                        <TextInput label="Membership Number" value={filters.membershipNumber} onChange={handleChange("membershipNumber")} placeholder="Search by membership number" />
-                        <div className="flex flex-col gap-1">
-                            <TextInput label="Identity Number" value={filters.identityNumber} onChange={handleChange("identityNumber")} placeholder="Search by ID number" />
-                            {idError && <p className="text-xs text-status-suspended">{idError}</p>}
-                        </div>
-                    </div>
-                    <div className="flex gap-2 mt-4">
-                        <Button variant="primary" onClick={handleSearch}>Search</Button>
-                        <Button onClick={handleClear}>Clear</Button>
-                    </div>
-                </div>
+            <div className="mt-5 max-w-4xl">
+                {/* The member search -- card.html's criteria row, printed on the page. */}
+                <Criteria label="Member search">
+                    <TextInput className={CRITERION_WIDE} label="Surname" kind="name" value={filters.surname} onChange={handleChange("surname")} placeholder="Any" />
+                    <TextInput className={CRITERION} label="Membership number" kind="identifier" value={filters.membershipNumber} onChange={handleChange("membershipNumber")} placeholder="Any" />
+                    <TextInput className={CRITERION_WIDE} label="Identity number" kind="identifier" value={filters.identityNumber} onChange={handleChange("identityNumber")} placeholder="Any" error={idError || undefined} />
+                    <Button variant="primary" onClick={handleSearch}>
+                        <Search size={16} strokeWidth={1.75} aria-hidden="true" /> Search
+                    </Button>
+                    <Button variant="ghost" onClick={handleClear}>Clear</Button>
+                </Criteria>
 
                 {/* Results */}
                 {searched && (

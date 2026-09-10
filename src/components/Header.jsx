@@ -86,7 +86,12 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
   return (
     <header
       className={cn(
-        "sticky top-0 z-10 grid h-15 items-center gap-3 border-b border-line bg-surface px-4 text-ink",
+        // `shrink-0`: the topbar is a flex child of a column whose content overflows on
+        // every long register, and a flex column squashes its children to their content
+        // before it scrolls -- measured at 39px instead of 60 on Members, exactly the
+        // rows of the search pill the reviewer found cut off. The height is the mock's
+        // and it does not negotiate.
+        "sticky top-0 z-10 grid h-15 shrink-0 items-center gap-3 border-b border-line bg-surface px-4 text-ink",
         "grid-cols-[auto_minmax(0,1fr)_auto]",
         "lg:grid-cols-[auto_minmax(220px,520px)_1fr] lg:gap-5 lg:px-7",
       )}

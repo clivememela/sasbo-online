@@ -56,30 +56,30 @@ export function Forms(){
             <PageTitle title="Forms" subtitle="Search and complete Forms" />
             <FilterForm onSubmit={handleSubmit}>
                 <TextInput
-                    label="Bank Name"
+                    label="Bank"
                     value={filters.bankName}
                     onChange={handleInputChange("bankName")}
-                    placeholder="Search bank name"
+                    placeholder="Any"
                 />
                 <TextInput
                     label="Branch"
                     value={filters.branch}
                     onChange={handleInputChange("branch")}
-                    placeholder="Search branch"
+                    placeholder="Any"
                 />
                 <TextInput
                     label="Area"
                     value={filters.area}
                     onChange={handleInputChange("area")}
-                    placeholder="Search area"
+                    placeholder="Any"
                 />
                 <TextInput
-                    label="Random Access Number"
+                    label="Random access number"
                     value={filters.randomAccessNumber}
                     onChange={handleInputChange("randomAccessNumber")}
-                    placeholder="Search RAN"
+                    placeholder="Any"
                 />
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-2 basis-[220px]!">
                     <SearchableSelect
                         label="Form Type"
                         value={filters.formType}
@@ -87,8 +87,8 @@ export function Forms(){
                         options={formTypeOptions}
                     />
                 </div>
-                <div className="lg:col-span-1"></div>
-                <div className="flex items-end justify-end">
+
+                <div className="flex items-end basis-auto!">
                     <Button type="submit" variant="primary">
                         <FileSearch size={16} strokeWidth={2} />
                         Search Form

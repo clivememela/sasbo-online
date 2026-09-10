@@ -159,11 +159,11 @@ export default function AffiliationsOtherTradeUnions() {
         title="Affiliations & Other Trade Unions"
         subtitle="COSATU congress documents, membership figures, trade union constitutions, and international affiliations"
       />
-      <p className="text-center text-ink-muted mb-8">
+      <p className="mb-6 text-ink-muted">
         {totalFiles} documents in {Object.keys(fileStructure).length} categories
       </p>
 
-      <div className="max-w-4xl mx-auto mb-6">
+      <div className="mb-6 max-w-4xl">
         {/* 🔴 THE CLEAR BUTTON HAD NO ACCESSIBLE NAME -- an `<X>` icon and
             nothing else. `TextInput kind="search"` also brings the search
             keyboard and the "Search" return key on a phone, and the 16px rule. */}
@@ -187,7 +187,7 @@ export default function AffiliationsOtherTradeUnions() {
         )}
       </div>
 
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl">
         {Object.entries(filteredStructure).map(([folder, files]) => (
           <div key={folder} className="mb-2">
             <button

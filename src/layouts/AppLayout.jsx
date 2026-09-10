@@ -24,7 +24,11 @@ export default function AppLayout() {
        60px topbar. The header, main and footer used to be `position: fixed` and offset by
        hard-coded numbers in three files that could not see each other; the columns are
        real now, so the layout cannot disagree with itself. */
-    <div className="bg-bg flex h-dvh overflow-hidden">
+    /* `overflow-clip`, NOT `overflow-hidden`. A hidden overflow can still be scrolled by
+       script -- `focus()` and `scrollIntoView()` on anything below the fold shift the whole
+       shell by whatever the inner scroller could not absorb, and the topbar slides under
+       the top edge. `clip` has no scroll position at all; only the main column scrolls. */
+    <div className="bg-bg flex h-dvh overflow-clip">
       {/* 🔑 THE SKIP LINK, AND IT IS THE FIRST FOCUSABLE THING IN THE DOCUMENT — which is
           the entire requirement. This application puts a full navigation tree ahead of the
           content, so without it a keyboard user tabs through every menu item on every

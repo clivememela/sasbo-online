@@ -268,11 +268,11 @@ export default function ResearchInformation() {
         title="Information & Research"
         subtitle="Research publications, circulars, legislation, and labour articles"
       />
-      <p className="text-center text-ink-muted mb-8">
+      <p className="mb-6 text-ink-muted">
         {totalFiles} documents across {Object.keys(fileStructure).length} categories
       </p>
 
-      <div className="max-w-4xl mx-auto mb-6">
+      <div className="mb-6 max-w-4xl">
         {/* 🔴 THE CLEAR BUTTON HAD NO ACCESSIBLE NAME -- an `<X>` icon and
             nothing else. `TextInput kind="search"` also brings the search
             keyboard and the "Search" return key on a phone, and the 16px rule. */}
@@ -296,7 +296,7 @@ export default function ResearchInformation() {
         )}
       </div>
 
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl">
         {Object.entries(filteredStructure).map(([category, subcategories]) => (
           <div key={category} className="mb-2">
             <button
