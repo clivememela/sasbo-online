@@ -124,7 +124,19 @@ export default function MembershipCard({ name, membershipNumber, status = 'Activ
         {name}
       </p>
 
-      <div className="flex items-end gap-[22px]">
+      {/* 🔴 `items-start`, NOT `items-end`. The mock holds all three labels on ONE baseline
+          (y=269 in mock-light.png) with the values beneath them. Aligned to their BOTTOMS,
+          a two- or three-line employer pushed its own label up and out of that line, so the
+          card's foot read as three groups at three heights -- on the thesis element, with
+          real data, every time an employer had a long name. The row is bottom-anchored by
+          the card's own grid, so the group still sits at the foot. */}
+      {/* 🔴 IT WRAPS, because the mock's data never made it. Three groups on one line is the
+          mock's foot and it holds wherever there is room — but its employer is "Standard
+          Bank" and this register's is "The Standard Bank of South Africa Limited". At 390 the
+          two figures take 284 of the card's 354, leaving 70px for a label that is 85px wide,
+          and the group ran off the card's own edge. Wrapping puts the employer on a full
+          line of its own exactly when it cannot share one, and never before. */}
+      <div className="flex flex-wrap items-start gap-x-[22px] gap-y-2.5">
         <span className="grid shrink-0 gap-[3px] leading-[1.1]">
           <small className={LABEL}>Membership no.</small>
           {/* Tabular numerals, spaced like a number pressed into metal. */}
@@ -151,7 +163,10 @@ export default function MembershipCard({ name, membershipNumber, status = 'Activ
         )}
 
         {employer && (
-          <span className="ml-auto grid min-w-0 max-w-[48%] gap-[3px] text-right leading-[1.15] max-sm:max-w-[54%]">
+          <span className="ml-auto grid min-w-[9rem] max-w-[48%] gap-[3px] text-right leading-[1.15] max-sm:max-w-full">
+            {/* A floor of 9rem is what makes the wrap decide itself: the group either has
+                room for its own label or it takes a line. Without one, flex shrinks it below
+                the width of the word "EMPLOYER" and the text overhangs the card. */}
             <small className={LABEL}>Employer</small>
             {/* Whole, never an ellipsis: an engraved fact on the thesis element must read
                 entire, and real employers run to "The Standard Bank of South Africa Limited".

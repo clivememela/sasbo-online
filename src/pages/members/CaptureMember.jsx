@@ -483,7 +483,7 @@ export default function CaptureMember() {
                 </div>
             )}
 
-            <div className="relative mt-2 rounded-lg bg-surface shadow-(--shadow-1)">
+            <div className="relative mt-2 max-w-4xl rounded-lg bg-surface shadow-(--shadow-1)">
                 {showSavedNotification && (
                     <div role="status" className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-lg border border-status-active-dot bg-status-active-bg px-4 py-2 text-status-active shadow-(--shadow-2)">
                         <CheckCircle2 size={18} aria-hidden="true" />
@@ -903,34 +903,40 @@ function toggleWorkPreferred(setForm) {
  * rule that the hand-rolled `fieldCls` did not.
  */
 function EmailFields({ form, setForm, handleChange, fieldErrors }) {
+    /*
+     * 🔴 THE CHECKBOX SITS UNDER THE FIELD, NOT BESIDE IT. Outboard, it took its width out
+     * of the input: measured against the mock's strict two-column grid, PERSONAL EMAIL was
+     * 447px where SURNAME in the same column was 524, and WORK EMAIL 446 against FIRST
+     * NAME(S)' 525 -- three different widths down one column, which is the one thing a
+     * grid exists to prevent. Under the field it reads as what it is: a note about the
+     * value above it, in the same place `Field` puts a hint.
+     */
     const preferred = (label, checked, onChange) => (
-        <label className="touch-target flex cursor-pointer items-center gap-1 whitespace-nowrap text-xs text-ink-muted">
-            <input type="checkbox" checked={checked} onChange={onChange} className="size-4 accent-brand" />
+        <label className="touch-target -mt-0.5 flex w-fit cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs text-ink-muted">
+            <input type="checkbox" checked={checked} onChange={onChange} className="size-3.5 accent-brand" />
             {label}
         </label>
     );
 
     return (
         <>
-            <div className="flex items-end gap-2">
+            <div className="flex flex-col gap-1.5">
                 <TextInput
                     label="Personal Email"
                     kind="email"
                     value={form.personalEmail || ""}
                     onChange={handleChange("personalEmail")}
                     error={fieldErrors.personalEmail || undefined}
-                    className="flex-1"
                 />
                 {preferred("Preferred", form.preferredEmail === "personal" || form.preferredEmail === "both", () => togglePersonalPreferred(setForm))}
             </div>
-            <div className="flex items-end gap-2">
+            <div className="flex flex-col gap-1.5">
                 <TextInput
                     label="Work Email"
                     kind="email"
                     value={form.workEmail || ""}
                     onChange={handleChange("workEmail")}
                     error={fieldErrors.workEmail || undefined}
-                    className="flex-1"
                 />
                 {preferred("Preferred", form.preferredEmail === "work" || form.preferredEmail === "both", () => toggleWorkPreferred(setForm))}
             </div>

@@ -33,8 +33,14 @@ export default function PageTitle({ title, subtitle, actions, className }) {
             characters — and with nothing constraining them they set as ONE line across a
             1440px window. `max-w-prose` is ~65ch, and putting it in the shared component
             means the next page to be written gets it without anybody remembering. */}
+        {/* 🔴 `text-pretty`, NOT `text-balance` — and the difference showed on the page head
+            of every route with a sentence under the title. `balance` equalises the lines of
+            a block, which is what you want for a two-line HEADING; applied to a 100-character
+            sentence it splits it into two SHORT centred-looking lines of ~320px under a 924px
+            title, leaving a hole between the description and the page's actions. `pretty` is
+            the body-copy rule: fill the measure, and only protect the last line from a widow. */}
         {subtitle && (
-          <p className="mt-1.5 max-w-prose text-balance text-base text-ink-muted">{subtitle}</p>
+          <p className="mt-1.5 max-w-prose text-pretty text-base text-ink-muted">{subtitle}</p>
         )}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}

@@ -36,11 +36,17 @@ export function Forms(){
 
     const renderForm = () => {
         switch (filters.formType) {
+            // 🔴 `embedded`, BECAUSE THIS PICKER RENDERS WHOLE PAGES INSIDE A PAGE.
+            // Both of these are also routes of their own, so each brought its own page gutter
+            // and its own <h1> in here -- two <h1>s on `/reports/forms` the moment a form type
+            // was chosen, and 28px of padding inside 28px of padding. Embedded they are only
+            // their sheet, captioned by an <h2>, which is what `GeneralForm` and
+            // `LocationListing` in the same switch already were.
             case "Membership Application Form":
-                return <MembershipApplication />;
+                return <MembershipApplication embedded />;
             case "Branch Form (online)":
             case "Branch Form (offline)":
-                return <OrganizerReport />;
+                return <OrganizerReport embedded />;
             case "Location Listing":
             case "Bulk Listing":
                 return <LocationListing />;

@@ -194,10 +194,24 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
           </Button>
         </div>
 
-        {/* card.css `.nav { display: grid; gap: 2px; flex: 1 }`: the rows STRETCH to the rail's
-            height, so the menu reads down the whole rail rather than stopping a third of the
-            way with a hole under it. The 36px pill sits at the top of each stretched track. */}
-        <div className="scroll-quiet grid flex-1 gap-0.5 overflow-y-auto">
+        {/* 📐 THE RAIL'S RHYTHM, AND THE ONE PLACE THIS BUILD DEPARTS FROM THE MOCK'S CSS
+            ON PURPOSE.
+
+            card.css:135 is `.nav { display: grid; gap: 2px; flex: 1 }` — the rows stretch to
+            fill the rail. In a MOCK that is a constant, because the mock is one page with
+            eleven rows; measured on `mock-light.png` the pitch is 66px. In an APPLICATION the
+            row count changes with the route — a section expands, another collapses — so the
+            same rule gave 66px on Members, 81px on Home and 62px on the Organizer report, and
+            the whole menu re-spaced itself under the pointer on every navigation. A rail that
+            moves when you navigate is the opposite of premium.
+
+            So the TRACK is fixed at the mock's own 66px and the slack falls at the foot: the
+            pitch is identical on every route and identical to the mock on the screen the mock
+            actually draws. `self-start` keeps the 36px pill at the top of its track rather
+            than stretching it — the pill's height is the mock's too.
+
+            64 + the 2px gap = the mock's 66px pitch, measured rather than assumed. */}
+        <div className="scroll-quiet grid auto-rows-[64px] content-start gap-0.5 overflow-y-auto [&>*]:self-start">
           {navItems.map((item) => (
             <SidebarItem
               key={item.href}

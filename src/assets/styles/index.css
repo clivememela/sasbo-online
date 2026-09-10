@@ -627,6 +627,27 @@ body { transition: background-color .25s ease, color .25s ease; }
   scrollbar-color: var(--color-line-strong) transparent;
 }
 
+/* ── The one control the design system does not draw ────────────────────────────
+   There is no time picker in card.html, so `<input type="time">` stays native — a
+   real control every member already knows, and the only one that offers a keyboard
+   entry mode on a phone. What it must not do is arrive in the browser's own colours
+   beside fields that are all in ours: the picker indicator is tinted to `ink-faint`,
+   the same weight as every other trailing glyph in a control. (The date field has its
+   own picker and hides the native one entirely.) */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 0.55;
+  cursor: pointer;
+}
+input[type="time"]:hover::-webkit-calendar-picker-indicator,
+input[type="time"]:focus::-webkit-calendar-picker-indicator {
+  opacity: 0.9;
+}
+.dark input[type="time"]::-webkit-calendar-picker-indicator {
+  /* The UA draws it near-black; in the dark theme that is a hole rather than an icon. */
+  filter: invert(1);
+  opacity: 0.5;
+}
+
 /* The global search is 14px on a desk and 16px wherever iOS would zoom it (card.css:453). */
 @utility search-text {
   font-size: var(--text-base);

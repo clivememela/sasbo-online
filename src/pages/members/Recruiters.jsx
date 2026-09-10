@@ -17,6 +17,7 @@ import { validateEmail } from '../../utils/validateSAID.js';
 import DataState from '../../components/common/DataState.jsx';
 import useReferenceData from '../../hooks/useReferenceData.js';
 import reportError from '../../lib/reportError.js';
+import { cn } from '../../lib/utils';
 
 const PAGE_SIZE = 20;
 
@@ -552,17 +553,18 @@ export function Recruiters() {
                 </button>
             ),
         },
-        { key: 'banks', header: 'Bank(s)', priority: 'secondary', truncate: true, cell: (r) => r.banks || '—' },
-        { key: 'branches', header: 'Branch(es)', priority: 'secondary', truncate: true, cell: (r) => r.branches || '—' },
-        { key: 'provinces', header: 'Province', priority: 'secondary', truncate: true, cell: (r) => r.provinces || '—' },
-        { key: 'areas', header: 'Area', priority: 'secondary', truncate: true, cell: (r) => r.areas || '—' },
+        { key: 'banks', header: 'Bank(s)', priority: 'secondary', truncate: true, cell: (r) => r.banks || <span className="text-ink-muted">—</span> },
+        { key: 'branches', header: 'Branch(es)', priority: 'secondary', truncate: true, cell: (r) => r.branches || <span className="text-ink-muted">—</span> },
+        { key: 'provinces', header: 'Province', priority: 'secondary', truncate: true, cell: (r) => r.provinces || <span className="text-ink-muted">—</span> },
+        { key: 'areas', header: 'Area', priority: 'secondary', truncate: true, cell: (r) => r.areas || <span className="text-ink-muted">—</span> },
         {
             key: 'count',
             header: 'Members',
             priority: 'essential',
+            align: 'right',
             cell: (rep) => (
-                <span className="inline-block rounded-full bg-brand-soft px-2 py-0.5 text-xs font-semibold text-brand-ink">
-                    {rep.count}
+                <span className={cn('tabular-nums', rep.count ? 'font-semibold text-ink' : 'text-ink-muted')}>
+                    {rep.count ?? 0}
                 </span>
             ),
         },
@@ -781,7 +783,17 @@ export function Recruiters() {
                 />
             </Sheet>
 
-            {/* Rep Members Modal */}
+            {/* THE RECRUITER'S RECORD IS A DIALOG, AND THAT IS A DECISION, NOT AN OVERSIGHT.
+                🗣️ The direction contract refuses "a modal for tasks that need neither
+                interruption nor protected focus: the record edits in place", and the member
+                record obeys it — it is the docked third column. This surface is a different
+                shape: it is not a record you read and edit in place, it is a LIST you work
+                on — filter this channel's members, add one, remove one — and the panel it
+                would dock into is `clamp(360px, 32vw, 448px)`. A five-column members table
+                with its own criteria row does not fit in 448px; forcing it there would
+                trade a correct pattern for a cramped one and lose the task.
+                The dialog is the world's own surface: same radius, same shadow-2, same
+                buttons, same chips, the primary action last and the destructive one apart. */}
             {selectedRep && !selectedMember && (
                 <Modal
                     open
@@ -834,7 +846,6 @@ export function Recruiters() {
                                     </Button>
                                 </div>
                             </div>
-                            <span className="text-sm text-ink-muted">{repMembers.length} member{repMembers.length !== 1 ? 's' : ''}</span>
                         </div>
                         <div>
                             {/* A section head in this world is small capitals in muted ink,
@@ -849,14 +860,23 @@ export function Recruiters() {
                                 the intent -- but a placeholder is not a label: it vanishes
                                 the moment anything is typed, so a member who looks away
                                 has no way to tell which column each box filters.
-                                `TextInput` carries a real one. */}
-                            <div className="grid grid-cols-1 gap-2 py-3 sm:grid-cols-2 lg:grid-cols-5">
-                                <TextInput label="Membership No." kind="search" value={repSearch.membershipNumber || ''} onChange={handleRepSearchChange('membershipNumber')} placeholder="Filter…" />
-                                <TextInput label="Name" kind="search" value={repSearch.name || ''} onChange={handleRepSearchChange('name')} placeholder="Filter…" />
-                                <TextInput label="Bank" kind="search" value={repSearch.bank || ''} onChange={handleRepSearchChange('bank')} placeholder="Filter…" />
-                                <TextInput label="Branch" kind="search" value={repSearch.branch || ''} onChange={handleRepSearchChange('branch')} placeholder="Filter…" />
-                                <TextInput label="Status" kind="search" value={repSearch.status || ''} onChange={handleRepSearchChange('status')} placeholder="Filter…" />
-                            </div>
+                                `TextInput` carries a real one.
+
+                                🔴 AND THEY ARE NO LONGER COLUMN-ALIGNED. Five labelled
+                                fields in a five-column grid, sitting directly on a
+                                six-column table head, rendered as TWO header rows that did
+                                not line up: NAME at x=534 against the head's 611. They are
+                                the register's criteria, so they read as criteria -- on the
+                                dialog's own ground, above a table that carries its own
+                                head inside a hairline. */}
+                            <Criteria label="Filter this recruiter's members" className="py-3">
+                                <TextInput className={CRITERION} label="Membership no." kind="search" value={repSearch.membershipNumber || ''} onChange={handleRepSearchChange('membershipNumber')} placeholder="Any" />
+                                <TextInput className={CRITERION} label="Name" kind="search" value={repSearch.name || ''} onChange={handleRepSearchChange('name')} placeholder="Any" />
+                                <TextInput className={CRITERION} label="Bank" kind="search" value={repSearch.bank || ''} onChange={handleRepSearchChange('bank')} placeholder="Any" />
+                                <TextInput className={CRITERION} label="Branch" kind="search" value={repSearch.branch || ''} onChange={handleRepSearchChange('branch')} placeholder="Any" />
+                                <TextInput className={CRITERION} label="Status" kind="search" value={repSearch.status || ''} onChange={handleRepSearchChange('status')} placeholder="Any" />
+                            </Criteria>
+                            <div className="overflow-hidden rounded-lg border border-line">
                             <Table
                                 caption={`Members recruited by ${selectedRep.name}`}
                                 columns={repMemberColumns}
@@ -866,6 +886,7 @@ export function Recruiters() {
                                 emptyMessage="No member on this recruiter's list matches those filters."
                                 dense
                             />
+                            </div>
                         </div>
                 </Modal>
             )}

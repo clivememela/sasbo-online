@@ -84,9 +84,23 @@ const SIZES = {
   icon: 'min-h-(--size-control) min-w-(--size-control) justify-center p-2',
 };
 
+/**
+ * 🔗 `href` MAKES IT A LINK, AND THAT IS THE POINT RATHER THAN A CONVENIENCE.
+ *
+ * A control that navigates or downloads is an `<a>`: it belongs in the link rota of a
+ * screen reader, it opens in a new tab on the modifier the user already knows, and it
+ * carries a destination the browser can show in the status bar. Rendered as a `<button>`
+ * with an `onClick` that sets `location`, none of that is true — and the alternative,
+ * hand-styling an anchor to look like this control, is how a design system grows a second
+ * button that drifts from the first (BR-4's whole story, one element down).
+ *
+ * `type`, `disabled` and `loading` are a button's properties and do not apply; a link that
+ * must be unavailable is not rendered, or is rendered without an `href`.
+ */
 export default function Button({
   children,
   onClick,
+  href,
   type = 'button',
   variant = 'default',
   size = 'md',
@@ -97,12 +111,14 @@ export default function Button({
 }) {
   const isDisabled = disabled || loading;
 
+  const Tag = href ? 'a' : 'button';
+  const tagProps = href
+    ? { href, onClick }
+    : { type, onClick, disabled: isDisabled, 'aria-busy': loading || undefined };
+
   return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={isDisabled}
-      aria-busy={loading || undefined}
+    <Tag
+      {...tagProps}
       {...rest}
       className={cn(
         'touch-target inline-flex items-center whitespace-nowrap rounded-lg border font-medium',
@@ -123,7 +139,7 @@ export default function Button({
         />
       )}
       {children}
-    </button>
+    </Tag>
   );
 }
 
