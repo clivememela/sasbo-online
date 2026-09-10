@@ -14,9 +14,9 @@ const cards = [
 export default function Home() {
   const { setSelectedCardHref } = useOutletContext() || {};
   return (
-    <div className="p-6 text-ink">
-      <PageTitle title="Welcome to the SASBO" subtitle="Select options below" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto text-center">
+    <div className="px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+      <PageTitle title="Welcome to SASBO Online" subtitle="Select an area to begin." />
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (
           <NavigationCard
             key={card.href}

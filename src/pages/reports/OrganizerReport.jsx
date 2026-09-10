@@ -108,12 +108,12 @@ export const OrganizerReport = ({ filters }) => {
     );
 
     return (
-        <div className="p-6 text-ink">
+        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
             <PageTitle
                 title="Organizer Report"
                 subtitle="Streamline and record organizer site visits, branch engagements, and membership recruitment across all financial institutions."
             />
-            <div className="max-w-4xl mx-auto bg-surface rounded-2xl shadow-lg p-8">
+            <div className="mt-5 max-w-4xl rounded-lg bg-surface p-6 shadow-(--shadow-1)">
                 <div className="text-center mb-6 pb-4 border-b-2 border-brand">
                     {/* 🔴 THIS WAS AN <h1>, AND IT IS THE SUBTLER HALF OF N8. The page's
                         actual title was an <h2> above it while this line of form chrome --

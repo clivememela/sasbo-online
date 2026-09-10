@@ -134,7 +134,7 @@ export default function RecruitmentChannel() {
     };
 
     return (
-        <div className="p-6 text-ink">
+        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
             <PageTitle title="Recruitment Channel Maintenance" />
 
             {/* 🔴 WHAT FOUR `alert(err)` CALLS BECAME. Each passed a raw Error object, which
@@ -145,7 +145,7 @@ export default function RecruitmentChannel() {
                     ref={noticeRef}
                     tabIndex={-1}
                     aria-labelledby="channel-notice-title"
-                    className="mx-auto mb-4 flex max-w-4xl items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                    className="mt-4 flex items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
                 >
                     <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
                     <p id="channel-notice-title" className="flex-1">{notice}</p>
@@ -153,7 +153,7 @@ export default function RecruitmentChannel() {
                 </div>
             )}
 
-            <div className="max-w-2xl mx-auto mt-4 rounded-2xl shadow-lg bg-surface p-6">
+            <div className="mt-5 max-w-2xl rounded-lg bg-surface p-5 shadow-(--shadow-1)">
                 {/* Toolbar */}
                 <div className="flex items-center gap-3 mb-4">
                     <input

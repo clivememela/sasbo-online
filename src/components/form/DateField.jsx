@@ -182,7 +182,7 @@ export default function DateField({
   required,
   disabled,
   className,
-  placeholder = 'yyyy/mm/dd',
+  placeholder = 'Choose a date',
   ...rest
 }) {
   const popoverId = useId();
@@ -241,21 +241,6 @@ export default function DateField({
     [bounds],
   );
 
-  const refusalFor = useCallback(
-    (which) => {
-      const now = todayDate();
-      if (which === 'after') {
-        return sameDate(bounds.max, now)
-          ? 'Can’t be after today.'
-          : `Can’t be after ${formatDate(bounds.max)}.`;
-      }
-      return sameDate(bounds.min, now)
-        ? 'Can’t be before today.'
-        : `Can’t be before ${formatDate(bounds.min)}.`;
-    },
-    [bounds],
-  );
-
   const emit = useCallback(
     (date) => {
       // 🔑 NATIVE-SHAPED, so `handleChange("joinDate")` keeps working unchanged, and the
@@ -277,34 +262,6 @@ export default function DateField({
     },
     [emit, outOfRange],
   );
-
-  /** Read the field whole. Called when it is left, and on Enter. */
-  const validate = useCallback(() => {
-    const raw = text.trim();
-    if (!raw) {
-      setRefusal(null);
-      if (value) emit(null);
-      return;
-    }
-
-    const parsed = parseDate(raw);
-    if (!parsed) {
-      // ⚠️ The text STAYS. A field that reverts what you typed gives you nothing to correct.
-      setRefusal('Not a date — type it as yyyy/mm/dd, like 1988/06/15.');
-      return;
-    }
-
-    const which = outOfRange(parsed);
-    if (which) {
-      setRefusal(refusalFor(which));
-      return;
-    }
-
-    setRefusal(null);
-    setText(formatDate(parsed));
-    setCursor(parsed);
-    if (!sameDate(parsed, selected)) emit(parsed);
-  }, [text, value, selected, emit, outOfRange, refusalFor]);
 
   const openPicker = useCallback(() => {
     if (disabled) return;
@@ -434,17 +391,18 @@ export default function DateField({
     // Escape is NOT handled here: the document-level listener above owns it, and owns it
     // from anywhere inside the panel. Two handlers for one key is the "one dismissal path"
     // argument losing to itself.
-    if (event.key === 'Enter') {
-      // The field is read whole, and the form is NOT submitted from inside an open picker.
+    if (event.key === 'Enter' || event.key === ' ') {
+      // The field is a chooser: Enter and Space toggle the calendar, and the form is NOT
+      // submitted from a field that has nothing typed in it to submit.
       event.preventDefault();
-      validate();
       if (open) closePicker(true);
+      else openPicker();
     }
   };
 
   const readout = (() => {
     const shown = parseDate(text) ?? selected;
-    if (!shown) return { title: 'No date yet', detail: 'Choose a day, or type one.' };
+    if (!shown) return { title: 'No date yet', detail: 'Choose a day.' };
     const meaning =
       hintKind === 'age' ? ageInWords(shown) : hintKind === 'ago' ? timeAgo(shown) : '';
     return { title: formatDateLong(shown), detail: meaning };
@@ -768,13 +726,20 @@ export default function DateField({
     <Field label={label} required={required} error={message} hint={helpText} className={className}>
       {({ id, describedBy, invalid }) => (
         <div className="relative" data-date-field>
+          {/* 🔴 CHOOSE-ONLY (the owner, 2026-09-10): "I don't really want to allow dates to be
+              typed in manually. Clicking on the field either opens or closes the datepicker."
+              The box is read-only -- it shows the chosen date in the app's own form and
+              nothing can be typed into it -- and the WHOLE FIELD toggles the calendar, which
+              was the owner's original complaint about the control this replaced (only the
+              icon opened it). Enter, Space and ArrowDown are the keyboard's way in, Escape
+              and Done the way out, and Clear in the calendar's foot is how a date is removed. */}
           <input
             {...rest}
             ref={inputRef}
             id={id}
             name={name}
             type="text"
-            inputMode="numeric"
+            readOnly
             autoComplete="off"
             spellCheck={false}
             role="combobox"
@@ -787,27 +752,17 @@ export default function DateField({
             aria-haspopup="dialog"
             aria-invalid={invalid}
             aria-describedby={describedBy}
-            onChange={(event) => {
-              setText(event.target.value);
-              setRefusal(null);
-              const parsed = parseDate(event.target.value);
-              if (parsed && !outOfRange(parsed)) {
-                setCursor(parsed);
-                emit(parsed);
-              }
-            }}
             onKeyDown={onInputKeyDown}
-            onBlur={(event) => {
-              // Still inside the field or its calendar: not a departure.
-              if (popoverRef.current?.contains(event.relatedTarget)) return;
-              validate();
+            onMouseDown={(event) => {
+              // A read-only box has no caret to place; the press is the toggle. Focus is
+              // moved by hand because the default that would have moved it is prevented.
+              event.preventDefault();
+              if (disabled) return;
+              inputRef.current?.focus({ preventScroll: true });
+              if (open) closePicker(true);
+              else openPicker();
             }}
-            // 🔴 THE WHOLE FIELD IS THE TRIGGER — the owner's original complaint about the
-            // control this replaces was that only the icon opened it.
-            onMouseDown={() => {
-              if (!open) openPicker();
-            }}
-            className={controlClasses({ invalid, className: 'touch-target pr-10' })}
+            className={controlClasses({ invalid, className: 'touch-target cursor-pointer pr-10' })}
           />
 
           <button

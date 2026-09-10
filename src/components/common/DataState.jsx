@@ -128,9 +128,16 @@ export const isOffline = (error) => error?.kind === 'network';
  *   error?: unknown,
  *   onRetry?: () => void,
  *   compact?: boolean,
+ *   layout?: 'column'|'row',
+ *   action?: React.ReactNode,
  *   className?: string,
  *   'data-testid'?: string,
  * }} props
+ *
+ * `layout="row"` is card.html's `.state`: the icon on the left, the sentence beside it,
+ * the one action on the right -- the shape a register's state takes inside its sheet.
+ * The centred column stays for panels and fields. `action` is a caller's own control for
+ * the empty state (the register's "Clear"); the retry is still this component's.
  */
 export default function DataState({
   state,
@@ -139,6 +146,8 @@ export default function DataState({
   error = null,
   onRetry,
   compact = false,
+  layout = 'column',
+  action,
   className,
   'data-testid': testId,
 }) {
@@ -236,6 +245,69 @@ export default function DataState({
     .filter(Boolean)
     .join(' · ');
 
+  const row = layout === 'row';
+  const busy = shown === 'loading' || shown === 'slow';
+
+  const icon = (
+    <Icon
+      aria-hidden="true"
+      className={cn(
+        compact && !row ? 'size-4' : 'size-6',
+        busy && 'animate-spin motion-reduce:animate-none',
+        shown === 'empty' && 'text-ink-faint',
+        isFailure && 'text-status-suspended',
+        busy && 'text-ink-muted',
+      )}
+    />
+  );
+
+  const details = isFailure && detail && (
+    <details className="text-xs text-ink-muted">
+      <summary className="cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring">
+        Details
+      </summary>
+      <p className="mt-1">{detail}</p>
+    </details>
+  );
+
+  const retry = showRetry && (
+    <Button variant="default" size={row ? 'md' : 'sm'} onClick={onRetry}>
+      Try again
+    </Button>
+  );
+
+  if (row) {
+    return (
+      <div
+        role={role}
+        {...(role === 'status' && { 'aria-live': 'polite' })}
+        data-testid={testId}
+        data-state={shown}
+        className={cn(
+          'grid items-center gap-4 text-left',
+          compact ? 'px-4 py-3' : 'px-6 py-7',
+          busy ? 'grid-cols-[auto_auto] justify-start text-ink-muted' : 'grid-cols-[auto_1fr_auto]',
+          className,
+        )}
+      >
+        {icon}
+        <div className="grid gap-0.5">
+          <p className={cn('text-ink', busy ? 'text-base font-medium text-ink-muted' : 'text-md font-semibold')}>
+            {headline}
+          </p>
+          {body && <p className="max-w-[60ch] text-base text-ink-muted">{body}</p>}
+          {details}
+        </div>
+        {!busy && (retry || action) && (
+          <div className="flex items-center gap-2">
+            {retry}
+            {action}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       role={role}
@@ -248,35 +320,16 @@ export default function DataState({
         className,
       )}
     >
-      <Icon
-        aria-hidden="true"
-        className={cn(
-          compact ? 'size-4' : 'size-6',
-          (shown === 'loading' || shown === 'slow') && 'animate-spin motion-reduce:animate-none',
-          shown === 'empty' && 'text-ink-faint',
-          isFailure && 'text-status-suspended',
-          (shown === 'loading' || shown === 'slow') && 'text-ink-muted',
-        )}
-      />
+      {icon}
 
       <p className={cn('font-medium text-ink', compact ? 'text-xs' : 'text-sm')}>{headline}</p>
 
       {body && <p className={cn('text-ink-muted', compact ? 'text-xs' : 'text-sm')}>{body}</p>}
 
-      {showRetry && (
-        <Button variant="default" size="sm" onClick={onRetry}>
-          Try again
-        </Button>
-      )}
+      {retry}
+      {action}
 
-      {isFailure && detail && (
-        <details className="text-xs text-ink-muted">
-          <summary className="cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring">
-            Details
-          </summary>
-          <p className="mt-1">{detail}</p>
-        </details>
-      )}
+      {details}
     </div>
   );
 }

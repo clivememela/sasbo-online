@@ -50,7 +50,7 @@ const SOCIAL_CHANNELS = [
  */
 export default function About() {
   return (
-    <div className="p-6 text-ink">
+    <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
       <PageTitle title="About Us" subtitle="SASBO — The Finance Union" />
 
       {/* 📱 R-RESP-O: a readable measure. `max-w-4xl` at this type size runs to roughly

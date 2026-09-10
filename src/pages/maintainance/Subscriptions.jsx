@@ -1,4 +1,6 @@
 import PageTitle from '../../components/common/PageTitle';
+import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
+import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import { SearchableSelect, SelectInput } from '../../components/form';
 import { subscriptionsService } from '../../services/subscriptionsService';
 import { bankService } from '../../services/bankService.js';
@@ -110,32 +112,35 @@ export default function Subscriptions() {
     const handleField = (field, value) => setEditData(prev => ({ ...prev, [field]: value }));
 
     return (
-        <div className="p-6 text-ink">
-            <PageTitle title="Subscriptions" subtitle="Manage subscriptions" />
+        <Page>
+            <PageTitle title="Subscriptions" subtitle="Each bank's subscription: the debit day, the amount, and whether it runs through core banking." />
 
-            <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-surface">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end mb-4">
-                    <SearchableSelect
-                        label="Bank Name"
-                        value={filters.bankName}
-                        onChange={(v) => setFilters(prev => ({ ...prev, bankName: v }))}
-                        placeholder="Select/search"
-                        options={[{ value: '', label: 'All Banks' }, ...bankNames.map(b => ({ value: b, label: b }))]}
-                    />
-                    <SelectInput
-                        label="Core Banking (Y/N)"
-                        value={filters.isCoreBanking}
-                        onChange={(v) => setFilters(prev => ({ ...prev, isCoreBanking: v }))}
-                        options={[{ value: '', label: 'All' }, { value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]}
-                    />
-                </div>
+            <Criteria className="mt-5">
+                <SearchableSelect
+                    className={CRITERION_WIDE}
+                    label="Bank"
+                    value={filters.bankName}
+                    onChange={(v) => setFilters(prev => ({ ...prev, bankName: v }))}
+                    placeholder="All banks"
+                    options={[{ value: '', label: 'All banks' }, ...bankNames.map(b => ({ value: b, label: b }))]}
+                />
+                <SelectInput
+                    className={CRITERION}
+                    label="Core banking"
+                    value={filters.isCoreBanking}
+                    onChange={(v) => setFilters(prev => ({ ...prev, isCoreBanking: v }))}
+                    options={[{ value: '', label: 'Any' }, { value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]}
+                />
+            </Criteria>
+
+            <Sheet grow className="mt-4">
 
                 {/* 🔴 IT WAS A BARE `Error: {String(err)}` BANNER WITH NO WAY OUT. Two things
                     changed: the sentence is the server's own rather than a stringified
                     Error, and there is a retry -- an error state whose only affordance is
                     reloading the page is a dead end (EH-D4). */}
                 {error && (
-                    <div className="mb-4 rounded-lg border border-line bg-surface-2 p-3">
+                    <div className="mx-5 mt-4 rounded-lg bg-surface-2 p-3">
                         <DataState
                             state="error"
                             error={error}
@@ -147,7 +152,7 @@ export default function Subscriptions() {
 
                 {/* The fourth state: the list loaded, its filter's options did not. */}
                 {!error && refs.state !== 'loading' && refs.state !== 'ready' && (
-                    <div className="mb-4 rounded-lg border border-line bg-surface-2 p-3">
+                    <div className="mx-5 mt-4 rounded-lg bg-surface-2 p-3">
                         <DataState
                             state="partial"
                             compact
@@ -163,7 +168,7 @@ export default function Subscriptions() {
                     covering it, so `60vh` is 60% of a taller box than exists -- the bottom of
                     the list sits under the address bar and the scroller's own end is
                     unreachable. `dvh` tracks the chrome as it hides and shows. */}
-                <div className="relative overflow-hidden rounded-xl border border-line max-h-[60dvh] overflow-y-auto">
+                <div className="scroll-quiet relative max-h-[60dvh] overflow-y-auto">
                     {/* 🔑 THE THIRD HAND-ROLLED SPINNER, RETIRED. `06.2`.
                         It was a bordered div with `animate-spin` and its own copy -- one of
                         three separate spinners in the tree, none of which agreed about size,
@@ -187,13 +192,13 @@ export default function Subscriptions() {
                         <caption className="sr-only">Bank subscriptions and their debit details</caption>
                         <thead className="sticky top-0 bg-surface-2 z-10">
                             <tr>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">Bank Name</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">ACB Debit Day</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">Amount</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">Core Banking</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">Status</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">Registration Date</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-ink-muted">Actions</th>
+                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Bank Name</th>
+                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">ACB Debit Day</th>
+                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Amount</th>
+                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Core Banking</th>
+                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Status</th>
+                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Registration Date</th>
+                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-center text-xs font-semibold uppercase tracking-[0.08em] text-head-ink">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-line">
@@ -219,20 +224,20 @@ export default function Subscriptions() {
                                 >
                                     {editingId === sub.id ? (
                                         <>
-                                            <td className="px-4 py-2 text-ink">{editData.bankName}</td>
-                                            <td className="px-4 py-2">
+                                            <td className="px-3.5 py-[11px] first:pl-5 text-ink">{editData.bankName}</td>
+                                            <td className="px-3.5 py-[11px] first:pl-5">
                                                 <input type="number" aria-label={`ACB debit day for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.acbDebitDay ?? ''} onChange={(e) => handleField('acbDebitDay', parseInt(e.target.value))} onClick={e => e.stopPropagation()} />
                                             </td>
-                                            <td className="px-4 py-2">
+                                            <td className="px-3.5 py-[11px] first:pl-5">
                                                 <input type="number" step="0.01" aria-label={`Subscription amount for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.subscriptionAmount ?? ''} onChange={(e) => handleField('subscriptionAmount', parseFloat(e.target.value))} onClick={e => e.stopPropagation()} />
                                             </td>
-                                            <td className="px-4 py-2">
+                                            <td className="px-3.5 py-[11px] first:pl-5">
                                                 <select aria-label={`Core banking for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.isCoreBanking === true ? 'true' : 'false'} onChange={(e) => handleField('isCoreBanking', e.target.value === 'true')} onClick={e => e.stopPropagation()}>
                                                     <option value="true">Yes</option>
                                                     <option value="false">No</option>
                                                 </select>
                                             </td>
-                                            <td className="px-4 py-2">
+                                            <td className="px-3.5 py-[11px] first:pl-5">
                                                 <select aria-label={`Status for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.status || ''} onChange={(e) => handleField('status', e.target.value)} onClick={e => e.stopPropagation()}>
                                                     <option value="ACTIVE">ACTIVE</option>
                                                     <option value="PENDING">PENDING</option>
@@ -240,19 +245,19 @@ export default function Subscriptions() {
                                                     <option value="INACTIVE">INACTIVE</option>
                                                 </select>
                                             </td>
-                                            <td className="px-4 py-2 text-ink-muted">{formatDate(sub.registrationDate)}</td>
-                                            <td className="px-4 py-2 text-center whitespace-nowrap">
+                                            <td className="px-3.5 py-[11px] first:pl-5 text-ink-muted">{formatDate(sub.registrationDate)}</td>
+                                            <td className="px-3.5 py-[11px] first:pl-5 text-center whitespace-nowrap">
                                                 <button type="button" onClick={handleSave} aria-label={`Save changes to ${editData.bankName || 'this subscription'}`} className="touch-target bg-brand hover-hover:hover:bg-brand-hover text-on-brand px-3 py-1 rounded text-xs mr-2">Save</button>
                                                 <button type="button" onClick={handleCancel} aria-label="Discard these changes" className="touch-target border border-line-strong bg-surface hover-hover:hover:bg-surface-2 text-ink px-3 py-1 rounded text-xs">Cancel</button>
                                             </td>
                                         </>
                                     ) : (
                                         <>
-                                            <td className="px-4 py-2">{sub.bankName}</td>
-                                            <td className="px-4 py-2">{sub.acbDebitDay}</td>
-                                            <td className="px-4 py-2">R {parseFloat(sub.subscriptionAmount).toFixed(2)}</td>
-                                            <td className="px-4 py-2">{sub.isCoreBanking ? 'Yes' : 'No'}</td>
-                                            <td className="px-4 py-2">
+                                            <td className="px-3.5 py-[11px] first:pl-5">{sub.bankName}</td>
+                                            <td className="px-3.5 py-[11px] first:pl-5">{sub.acbDebitDay}</td>
+                                            <td className="px-3.5 py-[11px] first:pl-5">R {parseFloat(sub.subscriptionAmount).toFixed(2)}</td>
+                                            <td className="px-3.5 py-[11px] first:pl-5">{sub.isCoreBanking ? 'Yes' : 'No'}</td>
+                                            <td className="px-3.5 py-[11px] first:pl-5">
                                                 {/* ♻️ THE FOURTH COPY OF THE STATUS CHIP, and the one
                                                     that was wrong in the most damaging direction: it knew
                                                     ACTIVE and PENDING and painted EVERYTHING ELSE with the
@@ -267,8 +272,8 @@ export default function Subscriptions() {
                                                     is on the wire, not ours to change here. */}
                                                 <StatusChip status={sub.status} />
                                             </td>
-                                            <td className="px-4 py-2">{formatDate(sub.registrationDate)}</td>
-                                            <td className="px-4 py-2 text-center text-xs text-ink-muted">click to edit</td>
+                                            <td className="px-3.5 py-[11px] first:pl-5">{formatDate(sub.registrationDate)}</td>
+                                            <td className="px-3.5 py-[11px] first:pl-5 text-center text-xs text-ink-muted">click to edit</td>
                                         </>
                                     )}
                                 </tr>
@@ -277,7 +282,7 @@ export default function Subscriptions() {
                     </table>
                     </TableScroller>
                 </div>
-            </div>
-        </div>
+            </Sheet>
+        </Page>
     );
 }

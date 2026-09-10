@@ -64,7 +64,8 @@ export default function Field({
       {label && (
         <label
           htmlFor={id}
-          className={cn('text-xs font-semibold uppercase tracking-wide text-ink-muted', labelClassName)}
+          // card.css `.field__label` / `.crit__label`: 11.5px, 600, tracked .08em, muted.
+          className={cn('text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted', labelClassName)}
         >
           {labelText}
         </label>

@@ -443,7 +443,7 @@ export default function FinanceHouses() {
   }, [fileStructure, searchQuery]);
 
   return (
-    <div className="p-6 text-ink">
+    <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
       <PageTitle
         title="Finance Houses"
         subtitle="Access official policies, salary agreements, and collective bargaining documents from South African financial institutions"

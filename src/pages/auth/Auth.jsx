@@ -116,10 +116,10 @@ export default function Auth() {
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-card border border-line bg-surface p-8 shadow-(--shadow-2)">
+      <div className="w-full max-w-md rounded-card bg-surface p-8 shadow-(--shadow-2)">
         <div className="mb-8 flex flex-col items-center text-center">
           <Logo className="mb-4 h-24 w-auto" alt="SASBO - The Finance Union" />
-          <h1 className="text-3xl text-brand-ink">{isLogin ? 'Welcome Back' : 'Join SASBO'}</h1>
+          <h1 className="text-3xl font-semibold tracking-[-0.02em] text-ink">{isLogin ? 'Welcome Back' : 'Join SASBO'}</h1>
           <p className="text-ink-muted">
             {isLogin ? 'Log in to your account' : 'Create your account'}
           </p>

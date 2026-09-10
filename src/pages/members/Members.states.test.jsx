@@ -38,7 +38,9 @@ import { setupUser } from '../../test/user'
  */
 
 /** The empty state's own words. The whole defect turned on this string. */
-const EMPTY_TEXT = /No Sasbo members match the specified query definitions/i
+// card.html's own sentence for the empty register; the search-shaped variant reads
+// "No member matches “…”" and is not this test's subject.
+const EMPTY_TEXT = /No members match these criteria/i
 
 const MEMBERS = [
   {

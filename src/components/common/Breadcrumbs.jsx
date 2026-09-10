@@ -2,6 +2,9 @@ import { Link, useLocation } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { navItems } from "../../config/navigation";
 
+/**
+ * The trail in the topbar -- card.html's `.crumbs`: 13px, muted, the current page in ink.
+ */
 export default function Breadcrumbs() {
   const location = useLocation();
   const pathnames = location.pathname.split("/").filter((x) => x);
@@ -20,48 +23,48 @@ export default function Breadcrumbs() {
     // Special cases or formatting for segments not explicitly in navItems
     const lastSegment = path.split('/').pop();
     if (!lastSegment) return "Home";
-    
-    if (lastSegment.toLowerCase() === "banks") return "BankBranch";
+
+    if (lastSegment.toLowerCase() === "banks") return "Bank / Branch";
     if (lastSegment.toLowerCase() === "apply") return "Member Application";
     if (lastSegment.toLowerCase() === "organizer-report") return "Organizer's Report";
     if (lastSegment.toLowerCase() === "daily-menu") return "Daily Menu";
     if (lastSegment.toLowerCase() === "miscellaneous") return "Admin Menu";
-    
+
     // Fallback: capitalize and replace hyphens
     return lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1).replace(/-/g, ' ');
   };
 
+  const link = "rounded-sm transition-colors duration-(--duration-instant) hover-hover:hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring";
+
   if (location.pathname === "/home") {
     return (
-      <nav className="flex items-center text-sm font-medium mt-4">
-        <span className="text-ink-muted">Home</span>
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-ink-muted">
+        <span aria-current="page" className="font-medium text-ink">Home</span>
       </nav>
     );
   }
 
   return (
-    <nav className="flex items-center text-sm font-medium mt-4">
-      <Link to="/home" className="hover-hover:hover:underline text-brand-ink">Home</Link>
+    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 whitespace-nowrap text-sm text-ink-muted">
+      <Link to="/home" className={link}>Home</Link>
       {pathnames.map((name, index) => {
         const routeTo = `/${pathnames.slice(0, index + 1).join("/")}`;
         const isLast = index === pathnames.length - 1;
         const displayName = getTitle(routeTo);
 
         return (
-          <div key={routeTo} className="flex items-center">
-            {/* ink-faint, and the spans above are ink-muted, DELIBERATELY. card.css calls
-                --ink-3 "icons, dividers; never body text" -- 01.2 first mapped both roles
-                onto it, which failed AA at 3.89:1 and was also darker than the gray-400
-                these labels had before the migration. An icon is what the token is for. */}
-            <ChevronRight size={16} strokeWidth={1.5} className="mx-2 text-ink-faint" />
+          <span key={routeTo} className="flex items-center gap-1.5">
+            {/* ink-faint on the chevron only: card.css calls --ink-3 "icons, dividers;
+                never body text", and the labels beside it are ink-muted for that reason. */}
+            <ChevronRight size={14} strokeWidth={1.75} aria-hidden="true" className="text-ink-faint" />
             {isLast ? (
-              <span className="text-ink-muted">{displayName}</span>
+              <span aria-current="page" className="font-medium text-ink">{displayName}</span>
             ) : (
-              <Link to={routeTo} className="hover-hover:hover:underline text-brand-ink">
+              <Link to={routeTo} className={link}>
                 {displayName}
               </Link>
             )}
-          </div>
+          </span>
         );
       })}
     </nav>

@@ -32,7 +32,7 @@ export default function GeneralForm({ filters }) {
     };
 
     return (
-        <div className="max-w-6xl mx-auto p-8 bg-surface shadow-lg rounded-xl border border-line text-ink">
+        <div className="mt-5 rounded-lg bg-surface p-6 text-ink shadow-(--shadow-1)">
             <div className="text-center mb-8 border-b-2 border-brand pb-4">
                 {/* 🔴 An <h1> used as a `text-sm` caption -- N8's other half, and the
                     same shape as `OrganizerReport`. This component renders INSIDE a page

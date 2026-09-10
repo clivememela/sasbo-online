@@ -85,7 +85,7 @@ const LocationListing = ({ data, filters }) => {
     const members = Array.isArray(listingData.members) ? listingData.members : [];
 
     return (
-        <div className="print-area bg-surface p-6 rounded-lg shadow-md max-w-6xl mx-auto my-6 font-sans border border-line">
+        <div className="print-area mx-7 my-6 rounded-lg bg-surface p-6 shadow-(--shadow-1) max-lg:mx-4">
 
             {/* Title */}
             <div className="text-center font-bold text-base tracking-wide mb-5 pb-3 border-b border-line-strong text-ink uppercase">

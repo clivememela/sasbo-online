@@ -1,97 +1,76 @@
 import logo from '../../assets/images/logo.png';
+import { yearsBetween } from '../../lib/format';
 import { cn } from '../../lib/utils';
 
 /**
- * THE MEMBERSHIP CARD. The thesis of the whole design, and until now the one part of it
- * that was never built.
+ * THE MEMBERSHIP CARD. The thesis of the whole design -- card.html's `.mcard`, transcribed
+ * measurement for measurement.
  *
  * 🗣️ [`directionContract.md`](../../../../planning/branches/design/directionContract.md):
  * *"Every member is a card; the register is the wallet that hands you that card."* The
  * contract's palette table has a row for it — *"the metal card … component tokens, not page
- * tokens — **the one place the palette is allowed to be material**"* — and `01.1` duly
- * created `--card-metal-a/-b/-c`, `--card-engrave`, `--card-engrave-gold` and `--shadow-card`
- * in both themes.
+ * tokens — **the one place the palette is allowed to be material**"*.
  *
- * 🔴 **AND THEN NOTHING RENDERED THEM.** A grep for those tokens across `src/` returned
- * ZERO consumers until this file. P4 rebuilt every screen on the primitives, converted 93
- * raw controls to 35, migrated 1,413 colour literals and closed its phase green — and its
- * Definition of Done never asked whether the register had a card in it, because every box in
- * it was about plumbing. The design's central object had a complete token spec and no
- * component. **That is what a gate measuring the easy half looks like.**
- *
- * ---
- *
- * 🔑 **IT IS A CARD, NOT A TEAL RECTANGLE**, and the difference is four surface treatments
+ * 🔑 **IT IS A CARD, NOT A TEAL RECTANGLE**, and the difference is the surface treatments
  * that all have to be there at once:
  *
  *   ① the **gradient** across the diagonal — `metal-a → metal-b → metal-c` at 135°
  *   ② the **gloss** — a radial highlight from the top-left, as if lit from above
  *   ③ the **shade** — a radial darkening into the bottom-right corner
  *   ④ the **milled edges** — a light inset line on top, a dark one underneath
- *
- * Any three of those and it reads as a gradient panel. All four and it reads as something
- * pressed out of metal, which is the entire point of the direction the owner picked.
+ *   ⑤ the **satin** — a faint diagonal sheen laid over the whole face
+ *   ⑥ the **sweep** — a band of light that crosses the metal as the card lands
  *
  * 📐 **`aspect-ratio: 1.586` IS THE ISO/IEC 7810 ID-1 RATIO** — the shape of every bank card
- * in the member's wallet already. It is not a design flourish and it is not negotiable: a
- * card at 1.4 or 1.7 reads as *a rectangle with a name on it*.
+ * in the member's wallet already. A card at 1.4 or 1.7 reads as *a rectangle with a name on
+ * it*.
  *
- * ✍️ **MARCELLUS APPEARS EXACTLY HERE AND NOWHERE ELSE.** The contract is explicit —
- * *"only where the card is engraved: the member's name and the union's name. It never sets
- * UI text."* `--font-engrave` exists for this one component.
+ * ✍️ **MARCELLUS APPEARS EXACTLY HERE AND NOWHERE ELSE**, on the engraved name — in small
+ * capitals, tracked, in gold, with the engraving's shadow. The union's own name on the card
+ * is Schibsted, as the mock sets it.
  */
 
-/** The status vocabulary, engraved rather than chipped. */
+/** The status vocabulary, engraved rather than chipped (card.css `.status--engraved`). */
 const ENGRAVED_STATUS = {
-  Active: 'text-(--card-chip-ink)',
-  Pending: 'text-(--card-chip-pending)',
-  Suspended: 'text-(--card-chip-suspended)',
-  Resigned: 'text-(--card-chip-muted)',
-  Retired: 'text-(--card-chip-muted)',
+  Active: 'text-(--card-chip-ink) shadow-[inset_0_0_0_1px_var(--card-chip-ring)]',
+  Pending: 'text-(--card-chip-pending) shadow-[inset_0_0_0_1px_currentColor]',
+  Suspended: 'text-(--card-chip-suspended) shadow-[inset_0_0_0_1px_currentColor]',
+  Resigned: 'text-(--card-chip-muted) shadow-[inset_0_0_0_1px_currentColor]',
+  Retired: 'text-(--card-chip-muted) shadow-[inset_0_0_0_1px_currentColor]',
 };
 
-/** Years between a join date and today, in the reading voice. */
+/** Years since the join date, in the reading voice -- card.js `tenure()`. */
 function tenure(since) {
-  if (!since) return '';
-  const year = Number(String(since).slice(0, 4));
-  if (!Number.isFinite(year)) return '';
-  const years = new Date().getFullYear() - year;
-  if (years <= 0) return 'this year';
-  return `${years} yr${years === 1 ? '' : 's'}`;
+  const years = yearsBetween(since);
+  if (years === null) return '';
+  if (years < 1) return 'joined this year';
+  return years === 1 ? '1 yr' : `${years} yrs`;
 }
+
+const LABEL = 'whitespace-nowrap text-[10.5px] font-semibold uppercase tracking-[0.14em] text-(--card-text-2)';
 
 /**
  * @param {{
  *   name: string, membershipNumber: string, status?: string,
- *   since?: string, employer?: string, arriving?: boolean,
+ *   since?: string, employer?: string,
  * }} props
  */
-export default function MembershipCard({
-  name,
-  membershipNumber,
-  status = 'Active',
-  since,
-  employer,
-  arriving = false,
-}) {
+export default function MembershipCard({ name, membershipNumber, status = 'Active', since, employer }) {
   const years = tenure(since);
+  const year = since ? String(since).slice(0, 4) : '';
+  const statusKey = Object.keys(ENGRAVED_STATUS).find((key) => key.toLowerCase() === String(status).toLowerCase());
 
   return (
     <div
       aria-label="Membership card"
       data-testid="membership-card"
       className={cn(
-        'relative isolate overflow-hidden rounded-card p-5 text-(--card-engrave)',
+        'mcard relative isolate overflow-hidden rounded-card px-[22px] py-5 text-(--card-engrave)',
         'grid grid-rows-[auto_1fr_auto] gap-2',
         // ISO ID-1. `min-h-max` so a long name can push it taller rather than clipping --
         // a member whose name does not fit is a member whose card is wrong.
         'aspect-[1.586] min-h-max',
-        'shadow-(--shadow-card)',
-        // 🔑 THE AUTHORED MOMENT (directionContract.md -> Motion posture): "the card is
-        // drawn from the wallet and laid on the desk", 580ms, a hinged tilt from below.
-        // It is allowed to exceed the 400ms budget because there is exactly one of it and
-        // it is not on the path a daily user walks forty times.
-        arriving && 'motion-safe:animate-[card-land_580ms_cubic-bezier(.16,1,.3,1)_both]',
+        'max-sm:rounded-lg max-sm:px-[18px] max-sm:py-4',
       )}
       style={{
         backgroundImage: [
@@ -107,89 +86,97 @@ export default function MembershipCard({
       <div className="flex items-start gap-3">
         {/* The crest sits on milled gold foil -- the one gold surface in the design that is
             a material rather than an accent. */}
-        <span
-          className="relative grid size-11 flex-none place-items-center rounded-full"
-          aria-hidden="true"
-        >
-          <span
-            className="absolute inset-0 rounded-full"
-            style={{ backgroundImage: 'var(--card-foil)' }}
-          />
+        <span className="relative grid size-11 flex-none place-items-center rounded-full" aria-hidden="true">
+          <span className="absolute inset-0 rounded-full" style={{ backgroundImage: 'var(--card-foil)' }} />
           <img
             src={logo}
             width="38"
             height="38"
             alt=""
-            className="relative size-[38px] rounded-full bg-white object-contain p-[3px]"
+            className="relative size-[38px] rounded-full bg-(--card-engrave) object-contain p-[3px]"
           />
         </span>
 
         <span className="grid leading-[1.1]">
-          <span
-            className="text-[13px] font-semibold uppercase tracking-[0.12em]"
-            style={{ fontFamily: 'var(--font-engrave)' }}
-          >
-            SASBO
-          </span>
-          <small className="mt-[3px] text-[10.5px] uppercase tracking-[0.14em] text-(--card-text-2)">
+          <span className="text-[13px] font-semibold uppercase tracking-[0.12em] text-(--card-engrave)">SASBO</span>
+          <small className="mt-[3px] text-[10.5px] font-semibold uppercase tracking-[0.14em] text-(--card-text-2)">
             The Finance Union
           </small>
         </span>
 
         <span
           className={cn(
-            'ml-auto inline-flex items-center gap-1.5 rounded-full px-2.5 py-1',
-            'text-[10.5px] font-semibold uppercase tracking-[0.08em]',
-            'bg-(--card-chip-bg) ring-1 ring-inset ring-current',
-            ENGRAVED_STATUS[status] ?? ENGRAVED_STATUS.Active,
+            'ml-auto inline-flex h-6 items-center gap-[7px] whitespace-nowrap rounded-full bg-(--card-chip-bg) pl-2 pr-2.5',
+            'text-xs font-semibold uppercase tracking-[0.08em]',
+            ENGRAVED_STATUS[statusKey] ?? ENGRAVED_STATUS.Active,
           )}
         >
-          <i className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+          <i className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden="true" />
           {status}
         </span>
       </div>
 
-      {/* ✍️ THE ENGRAVING. Marcellus, gold, and the only place either appears. */}
+      {/* ✍️ THE ENGRAVING. Marcellus, gold, small capitals, and the only place either appears. */}
       <p
-        className="self-end text-[26px] leading-[1.12] text-(--card-engrave-gold)"
-        style={{ fontFamily: 'var(--font-engrave)', textShadow: 'var(--engrave-shadow)' }}
+        className="mcard-name self-end text-balance font-engrave text-2xl uppercase leading-[1.12] tracking-[0.05em] text-(--card-engrave-gold) max-sm:text-xl"
+        style={{ textShadow: 'var(--engrave-shadow)' }}
       >
         {name}
       </p>
 
-      <div className="flex items-end gap-5">
-        <span className="grid gap-0.5">
-          <small className="text-[10px] uppercase tracking-[0.1em] text-(--card-text-2)">
-            Membership no.
-          </small>
-          {/* Tabular numerals: a register of membership numbers that do not align in the
-              same column is a register you cannot scan. */}
-          <b className="text-[15px] font-semibold tabular-nums tracking-[0.02em]">
+      <div className="flex items-end gap-[22px]">
+        <span className="grid shrink-0 gap-[3px] leading-[1.1]">
+          <small className={LABEL}>Membership no.</small>
+          {/* Tabular numerals, spaced like a number pressed into metal. */}
+          <b
+            className="whitespace-nowrap text-md font-semibold tabular-nums tracking-[0.18em] text-(--card-engrave)"
+            style={{ textShadow: 'var(--engrave-shadow)' }}
+          >
             {membershipNumber || '—'}
           </b>
         </span>
 
-        {since && (
-          <span className="grid gap-0.5">
-            <small className="text-[10px] uppercase tracking-[0.1em] text-(--card-text-2)">
-              Member since
-            </small>
-            <b className="text-[15px] font-semibold tabular-nums">
-              {String(since).slice(0, 4)}
-              {years && <span className="ml-1.5 font-normal text-(--card-text-2)">{years}</span>}
+        {year && (
+          <span className="grid shrink-0 gap-[3px] leading-[1.1]">
+            <small className={LABEL}>Member since</small>
+            <b className="whitespace-nowrap text-[13px] font-medium text-(--card-engrave)">
+              {year}
+              {years && (
+                <span className="ml-[7px] border-l border-(--card-text-2) pl-[7px] font-medium text-(--card-text-2)">
+                  {years}
+                </span>
+              )}
             </b>
           </span>
         )}
 
         {employer && (
-          <span className="ml-auto grid gap-0.5 text-right">
-            <small className="text-[10px] uppercase tracking-[0.1em] text-(--card-text-2)">
-              Employer
-            </small>
-            <b className="text-[15px] font-semibold">{employer}</b>
+          <span className="ml-auto grid min-w-0 max-w-[42%] gap-[3px] text-right leading-[1.1]">
+            <small className={LABEL}>Employer</small>
+            <b className="truncate text-[13px] font-medium text-(--card-engrave)">{employer}</b>
           </span>
         )}
       </div>
+
+      {/* the satin: a faint diagonal sheen over the whole face */}
+      <i
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'linear-gradient(112deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.02) 30%, rgba(255,255,255,0) 45%, rgba(255,255,255,0.04) 70%, rgba(255,255,255,0) 100%)',
+        }}
+      />
+      {/* the sweep: the band of light that crosses the metal as the card lands (index.css) */}
+      <i
+        aria-hidden="true"
+        className="mcard-sweep pointer-events-none absolute -inset-y-[20%] -inset-x-[40%] opacity-0"
+        style={{
+          background:
+            'linear-gradient(100deg, transparent 40%, rgba(255,255,255,0.16) 49%, rgba(255,255,255,0.04) 53%, transparent 62%)',
+          transform: 'translateX(-70%)',
+        }}
+      />
     </div>
   );
 }

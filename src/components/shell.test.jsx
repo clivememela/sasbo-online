@@ -93,8 +93,8 @@ describe('the shell — one theme control, not two', () => {
 
     // N7: this was a `<div onClick>`, so the only way to change theme was a mouse — no
     // tab stop, no Enter, no Space, nothing announced. Asking for a BUTTON by role is
-    // what says so.
-    const toggles = await screen.findAllByRole('button', { name: /switch to (dark|light) mode/i })
+    // what says so. Its name is card.html's: "Appearance · Light", in the rail's foot.
+    const toggles = await screen.findAllByRole('button', { name: /appearance · (light|dark)/i })
     expect(toggles).toHaveLength(1)
     expect(toggles[0]).toHaveAttribute('aria-pressed', 'false')
   })
@@ -105,7 +105,7 @@ describe('the shell — one theme control, not two', () => {
     // 🔴 THE MERGE, AND THE ASSERTION IS `1` RATHER THAN `>= 1` ON PURPOSE. Before
     // `04.1` this route had its own hand-rolled copy; a subset check would have been
     // green throughout and would stay green if a third were added tomorrow.
-    const toggles = await screen.findAllByRole('button', { name: /switch to (dark|light) mode/i })
+    const toggles = await screen.findAllByRole('button', { name: /appearance · (light|dark)/i })
     expect(
       toggles,
       'The auth screens have their own theme button again. Two implementations of one ' +
@@ -117,15 +117,15 @@ describe('the shell — one theme control, not two', () => {
     const user = setupUser()
     appRoute('/login')
 
-    const toggle = await screen.findByRole('button', { name: /switch to dark mode/i })
+    const toggle = await screen.findByRole('button', { name: /appearance · light/i })
 
     toggle.focus()
     await user.keyboard('{Enter}')
 
     expect(document.documentElement).toHaveClass('dark')
-    // The name changes with the state, which is how `aria-pressed` and a visible label
-    // stay in agreement instead of drifting apart.
-    expect(screen.getByRole('button', { name: /switch to light mode/i })).toHaveAttribute(
+    // The name carries the current value, which is how `aria-pressed` and the visible
+    // label stay in agreement instead of drifting apart.
+    expect(screen.getByRole('button', { name: /appearance · dark/i })).toHaveAttribute(
       'aria-pressed',
       'true',
     )
@@ -137,19 +137,19 @@ describe('the shell — landmarks and the skip link, `05.3`', () => {
     server.use(...smokeHandlers)
   })
 
-  it('offers one banner, one main, one contentinfo and a NAMED main navigation', async () => {
+  it('offers one banner, one main and a NAMED main navigation', async () => {
     appRoute()
     await screen.findByRole('button', { name: /open navigation menu/i })
 
-    // 🔴 THE ELEMENTS WERE ALL PRESENT BEFORE AND TWO OF THEM WERE NOT LANDMARKS.
-    // `<main>` used to be the outer wrapper with `<header>` and `<footer>` inside it, and
-    // HTML maps `<header>` to `banner` ONLY when it is not a descendant of `<main>`,
-    // `<article>`, `<aside>`, `<nav>` or `<section>` — the same rule strips `contentinfo`
-    // from `<footer>`. The page therefore rendered a header and a footer that announced
-    // as nothing at all.
+    // 🔴 THE ELEMENTS WERE ALL PRESENT BEFORE AND ONE OF THEM WAS NOT A LANDMARK.
+    // `<main>` used to be the outer wrapper with `<header>` inside it, and HTML maps
+    // `<header>` to `banner` ONLY when it is not a descendant of `<main>`, `<article>`,
+    // `<aside>`, `<nav>` or `<section>`. The page therefore rendered a topbar that
+    // announced as nothing at all. (The footer band went with card.html's shell on
+    // 2026-09-10: the mock has none, and the union's name lives in the rail's wordmark.)
     expect(screen.getAllByRole('banner')).toHaveLength(1)
     expect(screen.getAllByRole('main')).toHaveLength(1)
-    expect(screen.getAllByRole('contentinfo')).toHaveLength(1)
+    expect(screen.queryAllByRole('contentinfo')).toHaveLength(0)
 
     // 🔑 AND THE NAVIGATION IS NAMED, because there are two. The menu tree and the
     // breadcrumb trail are both `navigation` landmarks, and two unlabelled ones are
@@ -309,20 +309,24 @@ describe('the shell — BR-18, the banner is not the page heading', () => {
     server.use(...smokeHandlers)
   })
 
-  it('the application name is present, and is not a heading', async () => {
+  it('the application name is present in the rail, and the shell has no heading', async () => {
     appRoute()
     await screen.findByRole('button', { name: /open navigation menu/i })
 
     const banner = screen.getByRole('banner')
+    const rail = screen.getByRole('navigation', { name: /main/i })
 
     // It still says what the application is — losing the name would be a regression of
-    // its own. What changed is that it is no longer the page's <h1>.
-    expect(within(banner).getByText('Membership Administration System')).toBeInTheDocument()
+    // its own. card.html puts the wordmark in the rail, and the topbar carries the
+    // crumbs, the search and the tools; neither contributes an <h1>.
+    expect(within(rail).getByText('SASBO Online')).toBeInTheDocument()
+    expect(within(rail).getByText(/the finance union/i)).toBeInTheDocument()
     expect(
       within(banner).queryByRole('heading'),
       'The shell contributes a heading again. It is the same string on every route, so ' +
         'it tells a screen-reader user nothing about where they are — and it gives every ' +
         'page that uses PageTitle a second <h1>.',
     ).not.toBeInTheDocument()
+    expect(within(rail).queryByRole('heading')).not.toBeInTheDocument()
   })
 })

@@ -1,12 +1,16 @@
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { IdCard, X } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
+import { formatDateLong } from '../../lib/format';
 import Button from '../form/Button';
 import MembershipCard from './MembershipCard';
+import { PANEL_SLOT_ID } from '../shellIds';
 
 /**
  * THE RECORD PANEL — the third column, and the thing the contract was written around.
+ * card.html's `.panel`, transcribed.
  *
  * 🗣️ [`directionContract.md`](../../../../planning/branches/design/directionContract.md):
  *
@@ -15,68 +19,96 @@ import MembershipCard from './MembershipCard';
  *               beneath it, not to show a dashboard."
  *     REFUSES  "A modal for tasks that need neither interruption nor protected focus:
  *               the record edits in place."
- *     LAYOUT   "Desktop >= 1361px: three columns — the rail (256px), the register, the
- *               record panel; the panel opens as a drawer below that, and everything is one
- *               column with the drawer at <= 760px."
  *
- * 🔴 **THE BUILD HAD A MODAL.** `03.4` routed all eight of this application's overlays
- * through one Radix dialog — correct work, and it gave them the portal, focus trap, Escape
- * and scroll lock none of them had. But the member record was **never supposed to be one of
- * the eight.** It is the surface the contract singles out by name, and it went through the
- * modal layer with the others because the unit was scoped by *"things that are dialogs
- * today"* rather than by *"things the design says should be dialogs"*.
+ * 📐 **IT IS A COLUMN OF THE SHELL, NOT OF THE PAGE.** The mock's `.app` grid is
+ * rail | main | panel, so the panel stands beside the topbar rather than under it. The
+ * page renders this component where it likes; the component portals itself into the
+ * shell's slot (`PANEL_SLOT_ID`) when the shell is there, and renders in place when it is
+ * not -- the tests mount pages without the shell, and a panel that disappeared in a test
+ * would be a panel nobody could assert on.
  *
- * ---
+ * 📐 **THREE CONTAINERS, ONE SET OF FIELDS** *(R-RESP-M)*:
  *
- * 📐 **THREE CONTAINERS, ONE SET OF FIELDS** *(R-RESP-M)*, and the panel keeps its member
- * across every change:
+ *   `xl` and up  a real third column, `clamp(360px, 32vw, 448px)`, full height, own scroll.
+ *   below `xl`   a drawer from the right, `min(448px, 100vw)`, with a scrim; hidden at rest.
  *
- *   `xl` and up  a real third column. `sticky`, full height, its own scroll.
- *   761–1279px   an overlay from the right, `min(448px, 100vw)`, with a scrim.
- *   ≤ 760px      a full-height sheet.
+ * ⚠️ **THE DOCKING EDGE IS `xl` (1280px), NOT THE MOCK'S ORIGINAL 1361** — R-RESP-D, a
+ * measured correction: the commonest Windows laptop is 1366 with a 17px scrollbar showing,
+ * which is **1349** — under the old edge, so the panel would have overlaid the register on
+ * the exact machine most of this union's staff use. card.css carries the same 1280 now.
  *
- * ⚠️ **THE DOCKING EDGE IS `xl` (1280px), NOT THE MOCK'S 1361** — R-RESP-D, and it is a
- * measured correction rather than a preference: the commonest Windows laptop is 1366 with a
- * 17px scrollbar showing, which is **1349** — under the mock's edge, so the panel would have
- * overlaid the register on the exact machine most of this union's staff use. `xl` is a
- * Tailwind stop, so it is a token and not a magic number (conventions §2).
+ * 🔑 **THE EMPTY STATE IS THE WALLET'S EMPTY SLOT, NOT A BLANK COLUMN.** A ghost card in
+ * the card's own proportion, what will appear here, how to make it appear, and the keys.
  *
- * 🔑 **THE EMPTY STATE IS THE WALLET'S EMPTY SLOT, NOT A BLANK COLUMN.** A third of the
- * screen showing nothing is a layout that looks broken until you happen to click a row. It
- * says what will appear here and how to make it appear, and it carries the keyboard hints —
- * which is also the only place in the design that teaches them.
+ * 🎬 **THE ARRIVAL.** When a member is chosen the card is drawn from the wallet and laid on
+ * the desk (580ms, the one animation allowed past the 400ms budget), a band of light sweeps
+ * the metal, and the record's fields rise under it in a capped stagger. It plays once per
+ * member, never on re-render, and reduced motion collapses it to a fade (index.css).
  */
+
+const ARRIVAL_MS = 900;
 
 /**
  * @param {{
  *   member: object|null,
  *   open: boolean,
  *   onClose: () => void,
- *   arriving?: boolean,
  *   children?: React.ReactNode,
  *   footer?: React.ReactNode,
+ *   remarks?: string,
  * }} props
  */
-export default function MemberPanel({ member, open, onClose, arriving = false, children, footer }) {
+export default function MemberPanel({ member, open, onClose, children, footer }) {
   const scrollRef = useRef(null);
+  const asideRef = useRef(null);
+  const memberKey = member?.id ?? member?.membershipNumber ?? null;
 
   /*
-   * Scroll the record back to the top when the member changes.
+   * The arrival plays when the MEMBER changes, and the record scrolls back to the top.
    *
-   * Without it, opening a second member from halfway down the first one's record drops you
-   * into the middle of a stranger's employment details -- the panel is a sticky column, so
-   * nothing else resets it.
+   * Without the scroll reset, opening a second member from halfway down the first one's
+   * record drops you into the middle of a stranger's employment details -- the panel is a
+   * sticky column, so nothing else resets it. Without the key, every keystroke in the edit
+   * form would re-land the card.
+   *
+   * The class is set on the element rather than held in state, exactly as the mock's
+   * `arrive()` does it: the animation is a fact about this DOM node for 900ms, and a
+   * re-render in that window must neither restart it nor be caused by it.
    */
   useEffect(() => {
-    if (member) scrollRef.current?.scrollTo({ top: 0 });
-  }, [member]);
+    if (memberKey === null) return undefined;
+    // `scrollTop`, not `scrollTo()`: the property exists on every element in every
+    // environment this renders in, and the method does not (jsdom has no `scrollTo`).
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    const aside = asideRef.current;
+    if (!aside) return undefined;
+    aside.classList.remove('panel-arriving');
+    void aside.offsetWidth;
+    aside.classList.add('panel-arriving');
+    const timer = setTimeout(() => aside.classList.remove('panel-arriving'), ARRIVAL_MS);
+    return () => {
+      clearTimeout(timer);
+      aside.classList.remove('panel-arriving');
+    };
+  }, [memberKey]);
 
-  return (
+  const updated = member?.dateLastChanged ?? member?.updatedAt ?? null;
+  const meta = member
+    ? [
+        member.branch,
+        member.employeeNumber && (
+          <span key="emp">
+            Employee no. <span className="font-medium tabular-nums text-ink">{member.employeeNumber}</span>
+          </span>
+        ),
+        member.joinDate && `joined ${formatDateLong(member.joinDate)}`,
+      ].filter(Boolean)
+    : [];
+
+  const panel = (
     <>
-      {/*
-        The scrim, and it exists ONLY below the docking edge. Docked, the panel is a column
-        of the page and a scrim over the register would be a lie about what is interactive.
-      */}
+      {/* The scrim exists ONLY below the docking edge. Docked, the panel is a column of the
+          page and a scrim over the register would be a lie about what is interactive. */}
       {open && (
         <button
           type="button"
@@ -87,45 +119,52 @@ export default function MemberPanel({ member, open, onClose, arriving = false, c
       )}
 
       <aside
+        ref={asideRef}
         aria-label="Member details"
         data-testid="member-panel"
         data-open={open ? 'true' : undefined}
         className={cn(
           'flex min-w-0 flex-col border-line bg-surface',
           // ── docked: a real third column ────────────────────────────────────
-          'xl:sticky xl:top-0 xl:h-dvh xl:w-[clamp(360px,28vw,448px)] xl:border-l xl:shadow-none',
-          // ── overlay / sheet: everything below xl ───────────────────────────
+          'xl:sticky xl:top-0 xl:h-dvh xl:w-[clamp(360px,32vw,448px)] xl:shrink-0 xl:border-l xl:shadow-none',
+          // ── drawer: everything below xl, hidden at rest as the mock has it ──
           'max-xl:fixed max-xl:inset-y-0 max-xl:right-0 max-xl:z-40 max-xl:w-[min(448px,100vw)]',
           'max-xl:border-l max-xl:shadow-(--shadow-2)',
-          'max-xl:transition-transform max-xl:duration-(--duration-fast) max-xl:ease-(--ease-out)',
-          !open && 'max-xl:translate-x-full max-xl:pointer-events-none',
+          !open && 'max-xl:hidden',
         )}
       >
         {!open ? (
-          /* The wallet's empty slot. Docked only — as an overlay there is nothing to rest. */
-          <div className="hidden h-full place-content-center justify-items-center gap-3 px-8 text-center xl:grid">
+          /* The wallet's empty slot. Docked only — as a drawer there is nothing to rest. */
+          <div className="panel-empty-in hidden h-full place-content-center justify-items-center gap-2.5 px-8 py-12 text-center xl:grid">
             <div
               aria-hidden="true"
-              className="grid size-14 place-items-center rounded-full bg-surface-2 text-ink-faint"
+              className="mb-2.5 grid aspect-[1.586] w-full max-w-[300px] place-items-center rounded-card border-[1.5px] border-dashed border-line-strong text-ink-faint"
+              style={{ backgroundImage: 'linear-gradient(135deg, var(--color-surface-2), transparent)' }}
             >
-              <IdCard className="size-7" strokeWidth={1.5} />
+              <IdCard className="size-[34px]" strokeWidth={1.5} />
             </div>
-            <h2 className="text-base font-medium text-ink">Select a member to open their card</h2>
-            <p className="max-w-[34ch] text-sm text-ink-muted">
+            <h2 className="text-md font-semibold text-ink">Select a member to open their card</h2>
+            <p className="max-w-[34ch] text-[13.5px] text-ink-muted">
               Their record, subscriptions and structures open here, beside the register.
             </p>
-            <p className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-ink-faint">
+            <p className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-[12.5px] text-ink-muted">
               {[
-                ['↑↓', 'move'],
-                ['Enter', 'open'],
-                ['Esc', 'close'],
-              ].map(([key, what], index) => (
-                <span key={key} className="flex items-center gap-2">
-                  {index > 0 && <span aria-hidden="true">·</span>}
-                  <b className="flex items-center gap-1 font-medium text-ink-muted">
-                    <kbd className="rounded border border-line bg-surface-2 px-1.5 py-0.5 font-sans text-[11px]">
-                      {key}
-                    </kbd>
+                [['↑', '↓'], 'move'],
+                [['Enter'], 'open'],
+                [['⌘K'], 'search'],
+                [['Esc'], 'close'],
+              ].map(([keys, what], index) => (
+                <span key={what} className="flex items-center gap-1.5">
+                  {index > 0 && <span aria-hidden="true" className="text-ink-faint">·</span>}
+                  <b className="flex items-center gap-1.5 whitespace-nowrap font-medium">
+                    {keys.map((key) => (
+                      <kbd
+                        key={key}
+                        className="rounded-[5px] border border-line-strong border-b-2 bg-surface-2 px-1.5 py-[3px] font-sans text-[11px] font-medium leading-none text-ink-muted"
+                      >
+                        {key}
+                      </kbd>
+                    ))}
                     {what}
                   </b>
                 </span>
@@ -134,21 +173,14 @@ export default function MemberPanel({ member, open, onClose, arriving = false, c
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between gap-2 border-b border-line px-5 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-                Member record
-              </p>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                aria-label="Close member details"
-              >
-                <X className="size-4" aria-hidden="true" />
-              </Button>
-            </div>
+            <div ref={scrollRef} className="scroll-quiet min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-3.5">
+              <div className="mb-3 flex h-9 items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Member record</p>
+                <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close member details">
+                  <X size={18} strokeWidth={1.75} aria-hidden="true" />
+                </Button>
+              </div>
 
-            <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-5">
               {member && (
                 <MembershipCard
                   name={[member.firstNames, member.surname].filter(Boolean).join(' ') || '—'}
@@ -156,33 +188,35 @@ export default function MemberPanel({ member, open, onClose, arriving = false, c
                   status={member.status}
                   since={member.joinDate}
                   employer={member.bankName}
-                  arriving={arriving}
                 />
               )}
 
-              {member && (
-                <p className="mt-3 text-xs text-ink-muted">
-                  {[
-                    member.branch,
-                    member.employeeNumber && `Employee no. ${member.employeeNumber}`,
-                    member.joinDate && `joined ${member.joinDate}`,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
+              {meta.length > 0 && (
+                <p className="record-rise mx-0.5 mt-3.5 text-sm text-ink-muted">
+                  {meta.map((part, index) => (
+                    <span key={index}>
+                      {index > 0 && ' · '}
+                      {part}
+                    </span>
+                  ))}
                 </p>
               )}
 
-              <div className="mt-4">{children}</div>
+              {children}
             </div>
 
-            {footer && (
-              <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3">
-                {footer}
-              </footer>
-            )}
+            <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface px-6 py-3">
+              <p className="text-[12.5px] text-ink-muted">
+                {updated ? `Updated ${formatDateLong(updated)}` : member?.membershipNumber ? `Membership no. ${member.membershipNumber}` : ''}
+              </p>
+              {footer && <div className="flex flex-wrap items-center gap-2">{footer}</div>}
+            </footer>
           </>
         )}
       </aside>
     </>
   );
+
+  const slot = typeof document !== 'undefined' ? document.getElementById(PANEL_SLOT_ID) : null;
+  return slot ? createPortal(panel, slot) : panel;
 }

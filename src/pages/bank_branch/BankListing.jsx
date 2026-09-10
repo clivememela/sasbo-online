@@ -3,6 +3,9 @@ import { Printer } from "lucide-react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, Button } from "../../components/form";
 import PageTitle from '../../components/common/PageTitle';
+import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
+import Pager from '../../components/common/Pager.jsx';
+import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import Table from "../../components/table/Table.jsx";
 
 const PAGE_SIZE = bankService.getPageSize();
@@ -98,75 +101,43 @@ export default function BankListing() {
   ], []);
 
   return (
-    <div className="p-6 text-ink">
+    <Page>
       <PageTitle
         title="Bank Listing"
-        subtitle="Comprehensive listing of all banks with abbreviations and universal branch codes for reference."
+        subtitle="Every bank, with its abbreviation and universal branch code, for reference."
+        actions={
+          <Button onClick={() => globalThis.print()} title="Print the listing, or save it as a PDF">
+            <Printer size={16} strokeWidth={1.75} aria-hidden="true" /> Export
+          </Button>
+        }
       />
 
-      <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-surface">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end no-print">
-          <TextInput
-            label="Bank Name"
-            value={filters.bankName}
-            onChange={handleInputChange("bankName")}
-            placeholder="Search bank name"
-          />
-          <TextInput
-            label="Abbreviation"
-            value={filters.abbreviation}
-            onChange={handleInputChange("abbreviation")}
-            placeholder="Search abbreviation"
-          />
-          <TextInput
-            label="Universal Branch Code"
-            value={filters.universalBranchCode}
-            onChange={handleInputChange("universalBranchCode")}
-            placeholder="Search branch code"
-          />
-        </div>
+      <Criteria className="mt-5">
+        <TextInput
+          className={CRITERION_WIDE}
+          label="Bank"
+          value={filters.bankName}
+          onChange={handleInputChange("bankName")}
+          placeholder="Any"
+        />
+        <TextInput
+          className={CRITERION}
+          label="Abbreviation"
+          value={filters.abbreviation}
+          onChange={handleInputChange("abbreviation")}
+          placeholder="Any"
+        />
+        <TextInput
+          className={CRITERION}
+          label="Universal branch code"
+          kind="identifier"
+          value={filters.universalBranchCode}
+          onChange={handleInputChange("universalBranchCode")}
+          placeholder="Any"
+        />
+      </Criteria>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm no-print">
-          <div className="flex items-center gap-2 text-ink-muted">
-            Showing {filteredRows.length === 0 ? 0 : startIndex + 1}-{endIndex} of {filteredRows.length} banks
-            {/* `title` is not an accessible name a keyboard user can reach, and an
-                icon-only button has none of its own. */}
-            {filteredRows.length > 0 && (
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label="Print this bank listing"
-                onClick={() => globalThis.print()}
-              >
-                <Printer size={16} aria-hidden="true" />
-              </Button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              disabled={safePage === 1 || isLoading || filteredRows.length === 0}
-              variant="pagination"
-              className="rounded-full"
-            >
-              Prev
-            </Button>
-            <span className="text-ink-muted">
-              Page {safePage} of {totalPages}
-            </span>
-            <Button
-              type="button"
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={safePage === totalPages || isLoading || filteredRows.length === 0}
-              variant="pagination"
-              className="rounded-full"
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-
+      <Sheet grow className="mt-4">
         {/* 🔴 A `grid-cols-3` PSEUDO-TABLE, AND THE LAST OF THE SEVEN run 7 counted.
             Its header was three `<div>`s with no relationship to the cells beneath, so a
             screen-reader user met a stream of values with no column names -- and this is a
@@ -178,7 +149,7 @@ export default function BankListing() {
             getting it wrong), so this is not a fix, it is the same three states expressed
             through the primitive that now owns them. The retry is new: the hand-rolled
             error branch printed the message and offered no way out. */}
-        <div className="mt-4 print-area">
+        <div className="print-area">
           <Table
             caption="Banks, with their abbreviations and universal branch codes"
             columns={bankColumns}
@@ -187,11 +158,21 @@ export default function BankListing() {
             loading={isLoading}
             error={error || null}
             onRetry={loadBanks}
-            emptyTitle="No banks found."
+            emptyTitle="No banks match these criteria"
             emptyMessage="Try a different bank name, abbreviation or branch code."
           />
         </div>
-      </div>
-    </div>
+        <Pager
+          page={safePage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          count={filteredRows.length}
+          start={startIndex + 1}
+          end={endIndex}
+          noun="banks"
+          loading={isLoading}
+        />
+      </Sheet>
+    </Page>
   );
 }

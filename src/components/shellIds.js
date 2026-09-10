@@ -29,3 +29,14 @@ export const MENU_BUTTON_ID = 'app-navigation-trigger'
 
 /** The main region -- the skip link's target, and focusable so the jump moves focus. */
 export const MAIN_CONTENT_ID = 'main-content'
+
+/**
+ * The shell's third column -- where a page docks its record panel.
+ *
+ * card.html lays the page out as ONE grid: rail | main | panel, and the panel is a sibling of
+ * the topbar, not a child of the page under it. A panel rendered inside the scrolling page
+ * slides under the sticky topbar the moment the register scrolls; a panel portalled into this
+ * slot is a real column, full height, with its own scroll. `MemberPanel` portals here when
+ * the slot exists and renders in place when it does not (tests mount pages without the shell).
+ */
+export const PANEL_SLOT_ID = 'app-panel'

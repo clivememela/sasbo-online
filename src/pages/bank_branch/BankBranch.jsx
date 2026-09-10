@@ -1,9 +1,12 @@
 import { useCallback, useMemo, useState, useEffect } from "react";
-import { Printer } from "lucide-react";
+import { Plus, Printer } from "lucide-react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, SearchableSelect, Button } from "../../components/form";
 import BankBranchModal from "./BankBranchModal.jsx";
 import PageTitle from '../../components/common/PageTitle';
+import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
+import Pager from '../../components/common/Pager.jsx';
+import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import Table from '../../components/table/Table.jsx';
 import reportError from '../../lib/reportError.js';
 
@@ -100,82 +103,57 @@ export default function BankBranch() {
   ], []);
 
   return (
-    <div className="p-6 text-ink">
+    <Page>
       <PageTitle
-        title="Bank/Branch"
-        subtitle="Access, manage, and track Sasbo member records across South Africa's leading financial institutions and branch networks."
+        title="Bank / Branch"
+        subtitle="Every bank branch Sasbo members work from, with its area and random access number."
+        actions={
+          <>
+            <Button onClick={() => globalThis.print()} title="Print the listing, or save it as a PDF">
+              <Printer size={16} strokeWidth={1.75} aria-hidden="true" /> Export
+            </Button>
+            <Button variant="primary" onClick={() => setShowAddBank(true)}>
+              <Plus size={16} strokeWidth={1.75} aria-hidden="true" /> Add Bank / Branch
+            </Button>
+          </>
+        }
       />
 
-      <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-surface">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-          <SearchableSelect
-            label="Bank Name"
-            value={filters.bankName}
-            onChange={handleInputChange("bankName")}
-            placeholder="All Banks"
-            options={[{ value: '', label: 'All Bank Branch' }, ...([...new Set(banks.map(b => b.bankName).filter(Boolean))].sort().map(b => ({ value: b, label: b })))]}
-          />
-          <TextInput
-            label="Branch"
-            value={filters.branch}
-            onChange={handleInputChange("branch")}
-            placeholder="Search branch"
-          />
-          <TextInput
-            label="Area"
-            value={filters.area}
-            onChange={handleInputChange("area")}
-            placeholder="Search area"
-          />
-          <TextInput
-            label="Random Access Number"
-            value={filters.randomAccessNumber}
-            onChange={handleInputChange("randomAccessNumber")}
-            placeholder="Search RAN"
-          />
-        </div>
+      <Criteria className="mt-5">
+        <SearchableSelect
+          className={CRITERION_WIDE}
+          label="Bank"
+          value={filters.bankName}
+          onChange={handleInputChange("bankName")}
+          placeholder="All banks"
+          options={[{ value: '', label: 'All banks' }, ...([...new Set(banks.map(b => b.bankName).filter(Boolean))].sort().map(b => ({ value: b, label: b })))]}
+        />
+        <TextInput
+          className={CRITERION}
+          label="Branch"
+          value={filters.branch}
+          onChange={handleInputChange("branch")}
+          placeholder="Any"
+        />
+        <TextInput
+          className={CRITERION}
+          label="Area"
+          value={filters.area}
+          onChange={handleInputChange("area")}
+          placeholder="Any"
+        />
+        <TextInput
+          className={CRITERION}
+          label="Random access number"
+          kind="identifier"
+          value={filters.randomAccessNumber}
+          onChange={handleInputChange("randomAccessNumber")}
+          placeholder="Any"
+        />
+      </Criteria>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm no-print">
-          <div className="flex items-center gap-2 text-ink-muted">
-            Showing {filteredBanks.length === 0 ? 0 : startIndex + 1}-{endIndex} of {filteredBanks.length} banks
-            {filteredBanks.length > 0 && (
-              <button
-                type="button"
-                onClick={() => globalThis.print()}
-                aria-label="Print this bank branch listing"
-                className="touch-target p-1 rounded hover-hover:hover:bg-surface-2 text-ink-muted transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
-              >
-                <Printer size={16} />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="primary" onClick={() => setShowAddBank(true)}>+ Add Bank/Branch</Button>
-            <Button
-              type="button"
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              disabled={page === 1}
-              variant="pagination"
-              className="rounded-full"
-            >
-              Prev
-            </Button>
-            <span className="text-ink-muted">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              type="button"
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={page === totalPages}
-              variant="pagination"
-              className="rounded-full"
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-
-        <div className="mt-4 overflow-hidden rounded-xl border border-transparent print-area">
+      <Sheet grow className="mt-4">
+        <div className="print-area">
           <Table
             caption="Bank branches"
             columns={bankColumns}
@@ -184,12 +162,22 @@ export default function BankBranch() {
             loading={listState === 'loading'}
             error={listState === 'error' ? 'We could not load the bank branches.' : null}
             onRetry={loadBanks}
-            emptyTitle="No banks match your search."
-            emptyMessage="Try a different bank name, branch or area."
+            emptyTitle="No branches match these criteria"
+            emptyMessage="Try a different bank, branch or area."
             dense
           />
         </div>
-      </div>
+        <Pager
+          page={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          count={filteredBanks.length}
+          start={startIndex + 1}
+          end={endIndex}
+          noun="branches"
+          loading={listState === 'loading'}
+        />
+      </Sheet>
 
       {selectedBank && (
         <BankBranchModal
@@ -209,6 +197,6 @@ export default function BankBranch() {
         />
       )}
 
-    </div>
+    </Page>
   );
 }

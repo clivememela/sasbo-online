@@ -65,31 +65,48 @@ describe('DateField — "the whole field is the trigger" (the owner\'s original 
     expect(screen.getByRole('dialog', { name: /choose date of birth/i })).toBeInTheDocument()
   })
 
-  it('typing keeps working while it is open', async () => {
+  it('clicking the field AGAIN closes it: the whole field is a toggle', async () => {
+    const user = setupUser()
+    renderWithProviders(<DateField label="Date of Birth" value="" onChange={() => {}} />)
+
+    const field = screen.getByRole('combobox', { name: /date of birth/i })
+    await user.click(field)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await user.click(field)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(field).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('nothing can be typed into it: the date is chosen, never keyed in', async () => {
+    // 🗣️ The owner, 2026-09-10: "I don't really want to allow dates to be typed in
+    // manually … You have to choose the date from the picker and not type it in."
     const user = setupUser()
     const onChange = vi.fn()
     renderWithProviders(<DateField label="Date of Birth" value="" onChange={onChange} />)
 
     const field = screen.getByRole('combobox', { name: /date of birth/i })
+    expect(field).toHaveAttribute('readonly')
+
     await user.click(field)
     await user.keyboard('1988/06/15')
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
-    expect(field).toHaveValue('1988/06/15')
+    expect(field).toHaveValue('')
+    expect(onChange).not.toHaveBeenCalled()
   })
 })
 
 describe('DateField — "it does not change what is submitted"', () => {
-  it('emits yyyy-mm-dd in a NATIVE-SHAPED event, while showing yyyy/mm/dd', async () => {
+  it('emits yyyy-mm-dd in a NATIVE-SHAPED event when a day is chosen, while showing yyyy/mm/dd', async () => {
     const user = setupUser()
     const onChange = vi.fn()
-    renderWithProviders(<DateField label="Date Joined" name="joinDate" value="" onChange={onChange} />)
+    renderWithProviders(
+      <DateField label="Date Joined" name="joinDate" value="1988-06-01" onChange={onChange} />,
+    )
 
     const field = screen.getByRole('combobox', { name: /date joined/i })
     await user.click(field)
-    await user.keyboard('15/06/1988')
-    await user.keyboard('{Escape}')
-    await user.tab()
+    await user.click(screen.getByRole('gridcell', { name: '15 Jun 1988' }))
 
     // 🔴 The ten native `<input type="date">` this replaces hand their callers
     // `yyyy-mm-dd` through `e.target.value`. A call site written as
@@ -99,8 +116,9 @@ describe('DateField — "it does not change what is submitted"', () => {
     expect(last.target.value).toBe('1988-06-15')
     expect(last.target.name).toBe('joinDate')
 
-    // And what the user reads is the app's own form.
+    // And what the user reads is the app's own form; choosing closes the calendar.
     expect(field).toHaveValue('1988/06/15')
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('clearing emits an empty string, exactly as a native date input does', async () => {
@@ -115,79 +133,29 @@ describe('DateField — "it does not change what is submitted"', () => {
   })
 })
 
-describe('DateField — the four typed forms the mock names', () => {
-  it.each([
-    ['15 Jun 1988', '1988/06/15'],
-    ['15/06/1988', '1988/06/15'],
-    ['1988-06-15', '1988/06/15'],
-    ['19880615', '1988/06/15'],
-  ])('accepts %s and normalises it to %s', async (typed, shown) => {
+describe('DateField — the bounds are enforced in the calendar itself', () => {
+  // The four typed forms the mock names are `parseDate`'s, and `format.test.js` holds
+  // them; since the field became choose-only (2026-09-10) nothing typed ever reaches it,
+  // so a refusal sentence under the field has nothing to refuse. What remains of the
+  // clause is the bound: a day outside `min`/`max` is a day that cannot be chosen.
+  it('a day past the bound is disabled, and clicking it chooses nothing', async () => {
     const user = setupUser()
     const onChange = vi.fn()
-    const { unmount } = renderWithProviders(
-      <DateField label="Date of Birth" value="" onChange={onChange} />,
-    )
-
-    const field = screen.getByRole('combobox', { name: /date of birth/i })
-    await user.click(field)
-    await user.keyboard(typed)
-    await user.keyboard('{Escape}')
-    await user.tab()
-
-    expect(field).toHaveValue(shown)
-    expect(onChange.mock.calls.at(-1)[0].target.value).toBe('1988-06-15')
-    unmount()
-  })
-})
-
-describe('DateField — "refusals in plain words under the field, never a silent revert"', () => {
-  it('keeps what you typed and says why it was refused', async () => {
-    const user = setupUser()
-    renderWithProviders(<DateField label="Date of Birth" value="" onChange={() => {}} />)
-
-    const field = screen.getByRole('combobox', { name: /date of birth/i })
-    await user.click(field)
-    await user.keyboard('the fifteenth')
-    await user.keyboard('{Escape}')
-    await user.tab()
-
-    // 🔴 BOTH HALVES. A field that erases what you typed leaves you nothing to correct,
-    // and a field that refuses silently leaves you nothing to correct either.
-    expect(field).toHaveValue('the fifteenth')
-    expect(screen.getByRole('alert')).toHaveTextContent(/not a date/i)
-    expect(field).toHaveAttribute('aria-invalid', 'true')
-  })
-
-  it('names the bound in words when a date is out of range', async () => {
-    const user = setupUser()
     renderWithProviders(
-      <DateField label="Date of Birth" value="" onChange={() => {}} max="today" hint="age" />,
+      <DateField label="Date of Birth" value="1988-06-01" onChange={onChange} max="1988-06-10" hint="age" />,
     )
 
-    const field = screen.getByRole('combobox', { name: /date of birth/i })
-    await user.click(field)
-    await user.keyboard('2099/01/01')
-    await user.keyboard('{Escape}')
-    await user.tab()
+    await user.click(screen.getByRole('combobox', { name: /date of birth/i }))
+    const late = screen.getByRole('gridcell', { name: '15 Jun 1988' })
+    expect(late).toHaveAttribute('aria-disabled', 'true')
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/can.t be after today/i)
-  })
-
-  it('an impossible date is refused rather than rolled over to the next month', async () => {
-    const user = setupUser()
-    const onChange = vi.fn()
-    renderWithProviders(<DateField label="Date of Birth" value="" onChange={onChange} />)
-
-    const field = screen.getByRole('combobox', { name: /date of birth/i })
-    await user.click(field)
-    await user.keyboard('31/02/1988')
-    await user.keyboard('{Escape}')
-    await user.tab()
-
-    // `new Date(1988, 1, 31)` is 2 March. A birth date that quietly moves is worse than
-    // one that is refused.
-    expect(screen.getByRole('alert')).toHaveTextContent(/not a date/i)
+    await user.click(late)
     expect(onChange).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    // ...and a day inside it still can be. (The cell's name is the long form, day padded.)
+    await user.click(screen.getByRole('gridcell', { name: '08 Jun 1988' }))
+    expect(onChange.mock.calls.at(-1)[0].target.value).toBe('1988-06-08')
   })
 })
 
@@ -314,7 +282,7 @@ describe('DateField — the keyboard', () => {
     ).toHaveFocus()
   })
 
-  it('Enter reads the field whole and does NOT submit the form from inside the picker', async () => {
+  it('Enter toggles the calendar and does NOT submit the form', async () => {
     const user = setupUser()
     const onSubmit = vi.fn((event) => event.preventDefault())
     const onChange = vi.fn()
@@ -325,13 +293,18 @@ describe('DateField — the keyboard', () => {
       </form>,
     )
 
+    await user.keyboard('{Escape}')
+    await user.tab()
     const field = screen.getByRole('combobox', { name: /date of birth/i })
-    await user.click(field)
-    await user.keyboard('19880615{Enter}')
+    expect(field).toHaveFocus()
 
-    expect(field).toHaveValue('1988/06/15')
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await user.keyboard('{Enter}')
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(onSubmit).not.toHaveBeenCalled()
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('is an ARIA grid with exactly ONE tab stop, not 42', async () => {
@@ -543,8 +516,11 @@ describe('DateField — the 16px rule, mutation-checked', () => {
     renderWithProviders(<DateField label="Date of Birth" value="" onChange={() => {}} />)
     const field = screen.getByRole('combobox', { name: /date of birth/i })
     // 🔴 `type="date"` renders the platform's own picker, which is the control the owner
-    // complained about and which cannot carry the mock's typed entry, readout or grids.
+    // complained about and which cannot carry the mock's readout or grids. Since the field
+    // became choose-only it is a read-only text box: no keyboard hint, because nothing is
+    // ever typed into it.
     expect(field).toHaveAttribute('type', 'text')
-    expect(field).toHaveAttribute('inputmode', 'numeric')
+    expect(field).toHaveAttribute('readonly')
+    expect(field).not.toHaveAttribute('inputmode')
   })
 })

@@ -18,6 +18,16 @@
          browser paints its own canvas, form controls and scrollbars in the right one from
          the first frame instead of assuming light. index.css narrows it per theme. -->
     <meta name="color-scheme" content="light dark" />
+    <!-- The two faces the Card direction sets: Schibsted Grotesk is the interface, Marcellus
+         engraves the membership card's name and nothing else. index.css declared both on
+         2026-09-09 and nothing ever fetched them, so every screen rendered in Segoe UI -- the
+         single largest reason the build did not look like mockups/design/card.html. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Marcellus&display=swap"
+      rel="stylesheet"
+    />
     <title>Sasbo - Membership Administration System</title>
     <script>
       /* R-ROB-E. Set the theme class BEFORE first paint.

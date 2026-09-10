@@ -6,7 +6,9 @@ import DataState from '../common/DataState';
 import TableScroller from './TableScroller';
 
 /**
- * THE TABLE SHELL. `03.2a`.
+ * THE TABLE SHELL. `03.2a`, and since 2026-09-10 card.html's `.table` in every measurement:
+ * small-capital heads on the quiet surface, 11px rows, hairlines between them, the first
+ * column indented to 20px, the selected row on the brand's soft fill.
  *
  * This application has **three real `<table>`s and seven `grid-cols-N` pseudo-tables** --
  * ten tabular surfaces, each with its own answer to headers, empty states, overflow and
@@ -40,10 +42,12 @@ import TableScroller from './TableScroller';
  *   `secondary`  visible from `md` up; below that it moves INTO the row's detail panel.
  *   `detail`     never a column; only ever in the detail panel.
  *
- * A phone then shows two or three real columns instead of nine crushed ones, and nothing is
- * lost -- which is the difference between this and hiding columns, where the data simply
- * goes away. If a table declares no secondary or detail columns there is no expander and no
- * panel: the affordance appears only when it leads somewhere.
+ * 📐 **AND THE COLUMN LADDER (card.css R-RESP-L).** A column may also declare `fit` --
+ * `wide`, `medium` or `narrow` -- the register width below which it yields. Docking the
+ * record panel from 1280px narrows the register to 560-740px, so the VIEWPORT stopped
+ * predicting how much room the table has; the container query in `index.css` reads the
+ * register's own width instead. Employee number goes first, then Branch (a lookup you do
+ * once you have found the row), then Bank; Status is the scanning column and never yields.
  *
  * 📱 **TRUNCATION IS ONLY EVER IN THE CELL (R-RESP-I).** A column may set `truncate` and the
  * full value is then in the detail panel and in the cell's `title`. A truncated name with no
@@ -52,29 +56,32 @@ import TableScroller from './TableScroller';
  *
  * ---
  *
- * 🔴 **NO ROW IS A `<div onClick>`.** Run 7 found six controls in this application that only
- * a mouse can reach, and click-only table rows are four of them. A row's action is a `<a>`
- * or a `<button>` INSIDE the row, rendered by the column that owns it -- so it is in the tab
- * order, has an accessible name, and works with Enter. The primitive offers no `onRowClick`
- * at all, because an escape hatch that is easier than the correct thing is the thing that
- * gets used.
+ * 🔴 **A ROW'S ACTION IS A CONTROL INSIDE THE ROW.** Run 7 found six controls in this
+ * application that only a mouse can reach, and click-only table rows were four of them. The
+ * row's action is a `<button>` rendered by the column that owns it -- in the tab order, with
+ * an accessible name, working with Enter -- and that is still true. What `onRowSelect` adds
+ * is card.html's pointer convenience on top: the WHOLE row is a target for a mouse or a
+ * finger, exactly as the drawer's scrim is, while the keyboard keeps the real control.
+ * ↑ and ↓ move between rows' controls, as the empty panel's hints promise.
  *
  * ---
  *
  * 🔑 **THE FOUR DATA STATES, NOT THREE** (conventions §8, and A27 one layer down). `loading`,
  * `error`, `empty` and loaded are separate branches and `error` NEVER renders as `empty`: a
  * backend that is down must not tell an administrator there are no members. `error` also
- * carries a retry, because an error state with no way out is a dead end.
+ * carries a retry, because an error state with no way out is a dead end. Loading is the
+ * mock's: skeleton rows under the head, and a live status line saying so.
  *
  * 🔧 **`total` MAKES SERVER PAGING A DROP-IN (R-SCALE-D).** `rows` is what is on screen;
  * `total` is how many exist. When they differ and no pager is wired, the table says *"showing
- * the first N of M -- refine your search"* rather than implying the list is complete. That is
- * what the two `slice(0, 50)` caps in `Recruiters.jsx` silently do today.
+ * the first N of M -- refine your search"* rather than implying the list is complete.
  */
 
 /** @typedef {'essential'|'secondary'|'detail'} ColumnPriority */
 
 const PRIORITIES = new Set(['essential', 'secondary', 'detail']);
+const FITS = new Set(['wide', 'medium', 'narrow']);
+const SKELETON_ROWS = 8;
 
 function resolveRowKey(rowKey, row, index) {
   if (typeof rowKey === 'function') return rowKey(row, index);
@@ -86,6 +93,8 @@ function cellValue(column, row, index) {
   return typeof column.cell === 'function' ? column.cell(row, index) : row?.[column.key];
 }
 
+const INTERACTIVE = 'a, button, input, select, textarea, summary, [role="button"], [contenteditable]';
+
 export default function Table({
   columns = [],
   rows = [],
@@ -93,12 +102,17 @@ export default function Table({
   caption,
   loading = false,
   error = null,
+  errorMessage,
   onRetry,
   emptyTitle = 'Nothing here yet',
   emptyMessage,
+  emptyAction,
   total,
   className,
   dense = false,
+  selectedKey,
+  onRowSelect,
+  enterKey,
 }) {
   const [expanded, setExpanded] = useState(() => new Set());
 
@@ -112,11 +126,14 @@ export default function Table({
     );
   }
 
+  // card.css `.table th`: 11.5px, 600, tracked .08em, on the quiet surface, head ink.
   const headCell = cn(
-    'whitespace-nowrap px-3 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted',
-    dense ? 'py-2' : 'py-3',
+    'whitespace-nowrap px-3.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink',
+    'first:pl-5',
+    dense ? 'py-2' : 'pb-[11px] pt-[13px]',
   );
-  const bodyCell = cn('px-3 align-middle text-sm text-ink', dense ? 'py-2' : 'py-3');
+  // card.css `.table td`: 11px 14px, hairline under, the first column at 20px.
+  const bodyCell = cn('px-3.5 align-middle text-base text-ink first:pl-5', dense ? 'py-2' : 'py-[11px]');
 
   const { visible, collapsed } = useMemo(() => {
     const known = columns.map((column) => {
@@ -126,6 +143,13 @@ export default function Table({
           `Table column "${column.key}" has priority "${priority}". Known priorities: ` +
             `essential, secondary, detail. A typo that fell back to a default would ` +
             `decide, silently, what a phone shows.`,
+        );
+      }
+      if (column.fit !== undefined && !FITS.has(column.fit)) {
+        throw new Error(
+          `Table column "${column.key}" has fit "${column.fit}". Known fits: wide, medium, ` +
+            `narrow -- the register width below which the column yields (index.css, ` +
+            `"The register is a CONTAINER").`,
         );
       }
       // 🔑 THE CELL CLASSES ARE COMPUTED PER COLUMN, ONCE -- not per cell. They depend only
@@ -138,9 +162,16 @@ export default function Table({
       return {
         ...column,
         priority,
-        headClass: cn(headCell, alignment, hideBelowMd),
+        headClass: cn(headCell, alignment, hideBelowMd, column.headClassName),
         // R-RESP-I: truncate ONLY here; the full value is in the panel.
-        bodyClass: cn(bodyCell, alignment, hideBelowMd, column.truncate && 'max-w-[16rem] truncate'),
+        bodyClass: cn(
+          bodyCell,
+          alignment,
+          hideBelowMd,
+          column.truncate && 'max-w-[16rem] truncate',
+          column.nowrap !== false && 'whitespace-nowrap',
+          column.className,
+        ),
       };
     });
     return {
@@ -160,6 +191,31 @@ export default function Table({
       return next;
     });
 
+  /*
+   * The whole row as a pointer target. A click that began on a control inside the row --
+   * the row's own action, an expander, a link -- belongs to that control and is left alone;
+   * everything else on the row selects it. Text selection is not a click.
+   */
+  const selectFromRow = (row) => (event) => {
+    if (event.target.closest(INTERACTIVE)) return;
+    if (window.getSelection?.()?.toString()) return;
+    onRowSelect(row);
+  };
+
+  /* ↑ ↓ move between the rows' first controls -- the empty panel's hint, honoured. */
+  const onKeyDown = (event) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const current = event.target.closest('tr[data-row]');
+    if (!current) return;
+    const tbody = current.parentElement;
+    const all = [...tbody.querySelectorAll('tr[data-row]')];
+    const index = all.indexOf(current);
+    const next = all[index + (event.key === 'ArrowDown' ? 1 : -1)];
+    if (!next) return;
+    event.preventDefault();
+    (next.querySelector('[data-row-action]') ?? next.querySelector(INTERACTIVE))?.focus();
+  };
+
   // 🔑 ONE NAMED STATE, not four growing negation chains (`!loading && !error && rows.length
   // === 0` and so on). conventions §8 says a failed query must NEVER render as an empty
   // state; with the branches mutually exclusive by construction that is structural rather
@@ -169,7 +225,7 @@ export default function Table({
   /** One full-width row carrying a state, so the header stays put while it changes. */
   const stateRow = (content) => (
     <tr>
-      <td colSpan={columnCount || 1} className="px-3 py-10">
+      <td colSpan={columnCount || 1} className="p-0">
         {content}
       </td>
     </tr>
@@ -186,10 +242,10 @@ export default function Table({
               where the header has left the screen by the time the interesting row arrives,
               and "which column is this" then costs a scroll back up and a scroll back
               down. `z-10` keeps it above the rows it is scrolling over. */}
-          <thead className="sticky top-0 z-10 border-b border-line bg-surface-2">
+          <thead className="sticky top-0 z-10 border-b border-line-strong bg-surface-2">
             <tr>
               {expandable && (
-                <th scope="col" className={cn(headCell, 'w-10 md:hidden')}>
+                <th scope="col" data-expander="" className={cn(headCell, 'w-10 md:hidden')}>
                   <span className="sr-only">Expand row</span>
                 </th>
               )}
@@ -197,6 +253,8 @@ export default function Table({
                 <th
                   key={column.key}
                   scope="col"
+                  data-col={column.key}
+                  data-fit={column.fit}
                   style={column.width ? { width: column.width } : undefined}
                   className={column.headClass}
                 >
@@ -206,7 +264,17 @@ export default function Table({
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-line">
+          {/* The arrow keys are handled on the body rather than on each row's control, so
+              a row action added by any column inherits them. The body is a listener, not a
+              control: it has no role of its own, no tab stop, and the linter's objection is
+              to exactly that shape, which is the shape intended here. */}
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- ↑/↓ delegate to the rows' own controls; the tbody itself is never a target */}
+          <tbody
+            key={enterKey}
+            onKeyDown={onRowSelect ? onKeyDown : undefined}
+            className={cn('divide-y divide-line', enterKey !== undefined && state === 'rows' && 'rows-enter')}
+            aria-busy={state === 'loading' || undefined}
+          >
             {/* 🔑 THE THREE STATE BRANCHES RENDER THROUGH `DataState` SINCE `06.1b`, and the
                 extraction is the DRY rule's own condition rather than a tidy-up: `06.1b`
                 needed the same four states OUTSIDE a table -- for the reference-list panels
@@ -218,28 +286,60 @@ export default function Table({
                 changes is that those rules now have ONE implementation for the whole
                 application instead of one inside `Table` and another wherever a panel needed
                 them -- which is how the eight separate empty-state copies happened. */}
-            {state === 'loading' && stateRow(<DataState state="loading" />)}
+            {state === 'loading' && (
+              <>
+                {/* card.html's skeleton: the shape of the rows that are coming, so the
+                    register does not collapse to a spinner and jump when they land. */}
+                {Array.from({ length: SKELETON_ROWS }, (_, index) => (
+                  <tr key={`skeleton-${index}`} data-row="" aria-hidden="true">
+                    {expandable && <td data-expander="" className={cn(bodyCell, 'w-10 md:hidden')} />}
+                    {visible.map((column, columnIndex) => (
+                      <td key={column.key} data-col={column.key} data-fit={column.fit} className={cn(column.bodyClass, 'py-[15px]')}>
+                        <span
+                          className={cn(
+                            'skeleton',
+                            columnIndex === visible.length - 1 && 'h-[22px] w-[72px] rounded-full',
+                          )}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                {stateRow(<DataState state="loading" layout="row" title="Loading…" />)}
+              </>
+            )}
 
             {state === 'error' &&
               stateRow(
                 <DataState
                   state="error"
+                  layout="row"
                   // A caller may pass a sentence (most do) or the rejection itself. A string
                   // has no `retryable`, so `DataState` treats it as retryable -- which is the
                   // behaviour this component always had.
                   title={typeof error === 'string' ? error : undefined}
+                  message={errorMessage}
                   error={typeof error === 'string' ? null : error}
                   onRetry={onRetry}
                 />,
               )}
 
             {state === 'empty' &&
-              stateRow(<DataState state="empty" title={emptyTitle} message={emptyMessage} />)}
+              stateRow(
+                <DataState
+                  state="empty"
+                  layout="row"
+                  title={emptyTitle}
+                  message={emptyMessage}
+                  action={emptyAction}
+                />,
+              )}
 
             {state === 'rows' &&
               rows.map((row, index) => {
                 const key = resolveRowKey(rowKey, row, index) ?? index;
                 const isOpen = expanded.has(key);
+                const isSelected = selectedKey !== undefined && selectedKey !== null && key === selectedKey;
 
                 return (
                   <Fragment key={key}>
@@ -249,9 +349,23 @@ export default function Table({
                         size hint the browser treats a skipped row as zero-height and the
                         page shortens as you scroll. One rule in the primitive, so every
                         table gets it and none of them has to remember. */}
-                    <tr className="[content-visibility:auto] [contain-intrinsic-size:auto_var(--size-row)] hover-hover:hover:bg-surface-2">
+                    {/* The row is a pointer target and nothing else: no role, no tabindex,
+                        no key handler of its own. Its keyboard action is the control inside
+                        it, and ↑/↓ live on the body above. */}
+                    <tr
+                      data-row=""
+                      aria-current={isSelected ? 'true' : undefined}
+                      onClick={onRowSelect ? selectFromRow(row) : undefined}
+                      style={enterKey !== undefined ? { '--i': Math.min(index, 10) } : undefined}
+                      className={cn(
+                        '[content-visibility:auto] [contain-intrinsic-size:auto_var(--size-row)]',
+                        'transition-colors duration-(--duration-instant)',
+                        onRowSelect && 'cursor-pointer',
+                        isSelected ? 'bg-brand-soft' : 'hover-hover:hover:bg-surface-2',
+                      )}
+                    >
                       {expandable && (
-                        <td className={cn(bodyCell, 'w-10 md:hidden')}>
+                        <td data-expander="" className={cn(bodyCell, 'w-10 md:hidden')}>
                           <button
                             type="button"
                             onClick={() => toggle(key)}
@@ -278,6 +392,8 @@ export default function Table({
                         return (
                           <td
                             key={column.key}
+                            data-col={column.key}
+                            data-fit={column.fit}
                             className={column.bodyClass}
                             title={
                               column.truncate && typeof content === 'string' ? content : undefined
@@ -290,12 +406,12 @@ export default function Table({
                     </tr>
 
                     {expandable && isOpen && (
-                      <tr className="md:hidden">
-                        <td colSpan={columnCount} className="bg-surface-2 px-3 py-3">
+                      <tr data-detail="" className="md:hidden">
+                        <td colSpan={columnCount} className="bg-surface-2 px-5 py-3">
                           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
                             {collapsed.map((column) => (
                               <Fragment key={column.key}>
-                                <dt className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                                <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">
                                   {column.header}
                                 </dt>
                                 <dd className="min-w-0 break-words text-sm text-ink">
@@ -316,7 +432,7 @@ export default function Table({
 
       {/* R-SCALE-D. Only when the list on screen is genuinely a prefix of a longer one. */}
       {!loading && !error && typeof total === 'number' && total > rows.length && (
-        <p className="text-sm text-ink-muted">
+        <p className="px-5 pb-3 text-sm text-ink-muted">
           Showing the first <strong className="font-medium text-ink">{rows.length}</strong> of{' '}
           <strong className="font-medium text-ink">{total}</strong> — refine your search to narrow
           it down.

@@ -1,3 +1,5 @@
+import { cn } from '../../lib/utils';
+
 // 🔴 BR-18 LANDED HERE IN 04.1, AS ONE CHANGE IN TWO PLACES.
 //
 // P0's baseline measured the rendered DOM on all 27 routes: 23 already contained exactly
@@ -6,57 +8,36 @@
 // promoting this component ALONE would have given those 23 routes TWO <h1>s, which is
 // precisely the shape /reports/organizer-report had and which P0 filed as F-D03.
 //
-// The other half is in `Header.jsx`: the banner there is now a <p>, because it names the
+// The other half is in `Header.jsx`: the topbar carries no heading, because it names the
 // APPLICATION and an application name is not a page heading. `headingContract.test.jsx`
-// holds both halves together — it mounts every route and asserts no route renders two,
-// and that the routes rendering none are exactly P4's remaining schedule.
+// holds both halves together — it mounts every route and asserts no route renders two.
 /*
- * 📐 `align` — and the DEFAULT stays centred on purpose.
+ * 📐 card.html's `.pagehead`, and it is the page head of EVERY route since 2026-09-10.
  *
- * The Card direction sets a page's title and its actions on one line, title left, actions
- * right (directionContract.md — the mock's `.pagehead`). That is right for a register with
- * an Export and a Capture button beside it, and wrong for the twenty-odd pages that have no
- * page-level actions at all and would be left with a title hanging off the left edge of a
- * wide empty row.
- *
- * So the arrangement is the CALLER's, and only the screens rebuilt into the Card layout ask
- * for `left`. Flipping the default would have moved every heading in the application in a
- * commit about one screen.
+ * Title left, one line of description under it, the page's actions on the same baseline
+ * to the right. The centred variant this component used to default to was the old shell's
+ * arrangement, and the owner's instruction is that the whole application takes the mock's;
+ * a page with no actions simply has nothing on the right.
  */
-export default function PageTitle({ title, subtitle, align = 'center' }) {
-  const left = align === 'left';
-
+export default function PageTitle({ title, subtitle, actions, className }) {
   return (
-    <div className={left ? 'min-w-0' : 'mb-8'}>
-      <h1 className={left ? 'text-2xl text-brand-ink' : 'text-3xl text-center text-brand-ink'}>
-        {title}
-      </h1>
-      {/* brand, not brand-ink -- the SUBTITLE is deliberately the quieter of the two.
-          01.2 first migrated both onto brand-ink and flattened a step the shell had:
-          the title was cyan-700 and the subtitle cyan-600 in light, cyan-400 and
-          cyan-500 in dark, so the subtitle was the lower-contrast one in BOTH themes.
-          --color-brand sits exactly there against --color-brand-ink (light 5.47 vs
-          8.26 on surface; dark 7.98 vs 11.17), so the pair needs no new token -- and
-          "the shell should look approximately the same" is the invariant this
-          restores, not a preference. */}
-      {/* 📱 R-RESP-O: A READABLE MEASURE, AND IT BELONGS HERE RATHER THAN ON EACH PAGE.
-          Several of these subtitles are full sentences — Finance Houses' runs to 140
-          characters — and with nothing constraining them they set as ONE line across a
-          1440px window, which is roughly 200 characters and about three times the span an
-          eye tracks without losing its place. `max-w-prose` is ~65ch, and putting it in
-          the shared component means the next page to be written gets it without anybody
-          remembering. */}
-      {subtitle && (
-        <p
-          className={
-            left
-              ? 'mt-1 max-w-prose text-balance text-sm text-ink-muted'
-              : 'mx-auto mt-2 max-w-prose text-balance text-center text-xl text-brand'
-          }
-        >
-          {subtitle}
-        </p>
-      )}
+    <div className={cn('flex flex-wrap items-end justify-between gap-x-6 gap-y-3', className)}>
+      {/* The text block yields before the actions do: on a 680px register the description
+          wraps to two lines under the title, and Export and Capture stay on its baseline. */}
+      <div className="min-w-0 flex-1 basis-60">
+        <h1 className="text-balance text-3xl font-semibold leading-[1.15] tracking-[-0.02em] text-ink">
+          {title}
+        </h1>
+        {/* 📱 R-RESP-O: A READABLE MEASURE, AND IT BELONGS HERE RATHER THAN ON EACH PAGE.
+            Several of these subtitles are full sentences — Finance Houses' runs to 140
+            characters — and with nothing constraining them they set as ONE line across a
+            1440px window. `max-w-prose` is ~65ch, and putting it in the shared component
+            means the next page to be written gets it without anybody remembering. */}
+        {subtitle && (
+          <p className="mt-1.5 max-w-prose text-balance text-base text-ink-muted">{subtitle}</p>
+        )}
+      </div>
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }

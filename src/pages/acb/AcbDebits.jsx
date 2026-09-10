@@ -167,7 +167,7 @@ export default function AcbDebits() {
     ], [loadingId, selectedMember, handleSelectMember]);
 
     return (
-        <div className="p-6 text-ink">
+        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
             <PageTitle title="Manage Debits" subtitle="Capture Resubmission Debits" />
 
             {/* 🔴 WHAT THE `alert()` BECAME. Focused rather than `role="alert"`: the
@@ -178,7 +178,7 @@ export default function AcbDebits() {
                     ref={noticeRef}
                     tabIndex={-1}
                     aria-labelledby="acb-notice-title"
-                    className="mx-auto mb-4 flex max-w-4xl items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                    className="mt-4 flex items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
                 >
                     <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
                     <p id="acb-notice-title" className="flex-1">{notice}</p>
@@ -188,7 +188,7 @@ export default function AcbDebits() {
 
             <div className="max-w-4xl mx-auto">
                 {/* Search */}
-                <div className="p-6 rounded-2xl shadow-lg bg-surface">
+                <div className="rounded-lg bg-surface p-5 shadow-(--shadow-1)">
                     <h3 className="text-sm font-semibold uppercase tracking-wide text-ink-muted mb-4">Member Search</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                         <TextInput label="Surname" value={filters.surname} onChange={handleChange("surname")} placeholder="Search by surname" />
@@ -206,7 +206,7 @@ export default function AcbDebits() {
 
                 {/* Results */}
                 {searched && (
-                    <div className="mt-6 rounded-2xl shadow-lg bg-surface overflow-hidden">
+                    <div className="mt-6 overflow-hidden rounded-lg bg-surface shadow-(--shadow-1)">
                         <div className="px-6 py-3 border-b border-line text-sm text-ink-muted">
                             {results.length} member{results.length !== 1 ? "s" : ""} found
                         </div>
@@ -227,7 +227,7 @@ export default function AcbDebits() {
 
                 {/* Banking Details & Confirmation */}
                 {selectedMember && (
-                    <div className="mt-4 rounded-2xl shadow-lg bg-surface overflow-hidden">
+                    <div className="mt-4 overflow-hidden rounded-lg bg-surface shadow-(--shadow-1)">
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-line flex items-center justify-between">
                             <div>

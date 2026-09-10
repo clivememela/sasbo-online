@@ -1,14 +1,17 @@
 import { useDeferredValue, useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { LucideUserRoundPlus, AlertCircle, CheckCircle2, Printer, SlidersHorizontal } from "lucide-react";
+import { useNavigate, useLocation, useOutletContext } from "react-router-dom";
+import {
+    LucideUserRoundPlus, AlertCircle, CircleCheck, Printer, SlidersHorizontal,
+    Download, Pencil, Check,
+} from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { recruiterService } from "../../services/recruiterService.js";
 import { jobGradeService } from "../../services/jobGradeService.js";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, SearchableSelect, SelectInput, Button, CheckboxGroup, DateField, Field, controlClasses } from "../../components/form";
-import StatusChip from "../../components/common/StatusChip.jsx";
+import StatusChip, { CANCELLED_STATUSES } from "../../components/common/StatusChip.jsx";
 import Table from "../../components/table/Table.jsx";
-import Modal, { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
+import { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
 import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
@@ -22,11 +25,22 @@ import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState.jsx";
 import FigureStrip from "../../components/members/FigureStrip.jsx";
 import MemberPanel from "../../components/members/MemberPanel.jsx";
+import Criteria, { CRITERION } from "../../components/common/Criteria.jsx";
+import Pager from "../../components/common/Pager.jsx";
+import Sheet from "../../components/common/Sheet.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
+import { parseDate, sameDate, today } from "../../lib/format.js";
 import { cn } from "../../lib/utils";
 
 const PAGE_SIZE = memberService.getPageSize();
+
+/** The fields the topbar's search reads -- card.js `visible()`, plus the wire's own names. */
+const SEARCH_FIELDS = [
+    "membershipNumber", "employeeNumber", "surname", "firstNames", "initials", "bankName",
+    "branch", "status", "identityNumber", "workEmail", "personalEmail", "email", "phone",
+];
+
 const EMPTY_FILTERS = {
     title: "",
     employeeNumber: "",
@@ -212,6 +226,25 @@ export default function Members() {
     /* The twelve criteria the mock keeps behind "More criteria". Closed at rest. */
     const [moreCriteria, setMoreCriteria] = useState(false);
 
+    /*
+     * The topbar's search is the SHELL's (card.html's `.search`); this page reads it
+     * through the outlet context and applies it across every field the register shows.
+     * Mounted without the shell -- every test does -- there is no context and no query.
+     */
+    const { search = "", setSearch } = useOutletContext() || {};
+    const deferredSearch = useDeferredValue(search);
+    const query = deferredSearch.trim().toLowerCase();
+
+    /* Tab changes move in the direction of travel (card.js `enterTab`). */
+    const [tabDirection, setTabDirection] = useState("fwd");
+    const changeTab = (next) => {
+        setTabDirection((TABS.findIndex(t => t.id === next) > TABS.findIndex(t => t.id === activeTab)) ? "fwd" : "back");
+        setActiveTab(next);
+    };
+
+    /* The name the toast says, captured at the save so it survives the panel closing. */
+    const [savedName, setSavedName] = useState("");
+
     const loadMembers = useCallback(() => {
         setListState("loading");
         return memberService.getMembers().then(res => {
@@ -261,10 +294,13 @@ export default function Members() {
 
     useEffect(() => {
         const onKeyDown = (e) => {
-            if (e.key === "Escape") {
-                setSelectedMember(null);
-                setIsEditing(false);
-            }
+            if (e.key !== "Escape") return;
+            // An Escape something nearer has already answered -- the date picker, a
+            // dialog, a listbox -- is not a request to close the whole record. Without this
+            // guard, Escape in the calendar of the edit form threw the member away.
+            if (e.defaultPrevented || e.target?.closest?.('[role="dialog"], [role="listbox"]')) return;
+            setSelectedMember(null);
+            setIsEditing(false);
         };
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);
@@ -465,8 +501,9 @@ export default function Members() {
             setMembersList(list);
             setSelectedMember({ ...editForm });
             setIsEditing(false);
+            setSavedName([editForm.firstNames, editForm.surname].filter(Boolean).join(" "));
             setShowSavedNotification(true);
-            window.setTimeout(() => setShowSavedNotification(false), 3000);
+            window.setTimeout(() => setShowSavedNotification(false), 2600);
         } catch (error) {
             reportError("Members.save", error);
             // 06.1 owns the shared error CONTRACT; what this wave owes the screen is that
@@ -513,10 +550,19 @@ export default function Members() {
         const activeFilters = FILTER_FIELDS
             .map((field) => [field, deferredFilters[field] ? String(deferredFilters[field]).trim().toLowerCase() : ""])
             .filter(([, value]) => value);
-        return membersList.filter((member) => activeFilters.every(([field, value]) =>
-            String(member[field] ?? "").trim().toLowerCase().includes(value)
-        ));
-    }, [deferredFilters, membersList]);
+        return membersList.filter((member) =>
+            activeFilters.every(([field, value]) =>
+                String(member[field] ?? "").trim().toLowerCase().includes(value)
+            ) &&
+            (!query || SEARCH_FIELDS.some((field) => String(member[field] ?? "").toLowerCase().includes(query)))
+        );
+    }, [deferredFilters, membersList, query]);
+
+    /* The rows re-enter when the question changes: a new query, a new criterion, a new page. */
+    const enterKey = useMemo(
+        () => JSON.stringify([deferredFilters, query, page]),
+        [deferredFilters, query, page],
+    );
 
     /*
      * 📊 THE FIGURE STRIP'S NUMBERS, COUNTED FROM THE REGISTER THIS PAGE ALREADY HOLDS.
@@ -549,11 +595,17 @@ export default function Members() {
 
     const registerFigures = useMemo(() => {
         const by = (status) => membersList.filter((m) => m?.status === status).length;
+        const now = today();
         return {
             total: membersList.length,
             active: by("Active"),
             pending: by("Pending"),
             suspended: by("Suspended"),
+            // card.html's fifth, quiet figure. `dateLastChanged` is the wire's name for the
+            // record's last edit; a register that carries none simply reads 0.
+            updatedToday: membersList.filter((m) =>
+                sameDate(parseDate(m?.dateLastChanged ?? m?.updatedAt), now),
+            ).length,
         };
     }, [membersList]);
 
@@ -568,6 +620,7 @@ export default function Members() {
 
     const handleClear = () => {
         setFilters({ ...EMPTY_FILTERS });
+        setSearch?.("");
         setPage(1);
     };
 
@@ -590,17 +643,22 @@ export default function Members() {
      * the action is a real `<button>` in the row: the membership number itself, which is
      * the thing a user is looking at when they decide to open it.
      */
+    /* card.html's six columns, in its order and its words, with its column ladder: the
+       employee number yields first, then the branch, then the bank; the number, the member
+       and the status never do. */
     const columns = useMemo(() => [
         {
             key: "membershipNumber",
-            header: "Membership No",
+            header: "Membership no.",
             priority: "essential",
             cell: (member) => {
-                const number = member.membershipNumber || "-";
+                const number = member.membershipNumber || "—";
                 const who = [member.title, member.initials, member.surname].filter(Boolean).join(" ");
+                const cancelled = CANCELLED_STATUSES.some((s) => s.toLowerCase() === String(member.status ?? "").toLowerCase());
                 return (
                     <button
                         type="button"
+                        data-row-action=""
                         onClick={() => setSelectedMember(member)}
                         // The number alone is not a name a screen-reader user can act on:
                         // "1002" says nothing about what pressing it does, and every row
@@ -618,26 +676,61 @@ export default function Members() {
                         // accessible name that does not contain the visible label breaks
                         // speech control ("press 1002").
                         aria-label={who ? `${number} — open the record for ${who}` : `${number} — open this member's record`}
-                        className="touch-target rounded-sm font-semibold text-brand-ink underline-offset-2 hover-hover:hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+                        className={cn(
+                            "touch-target rounded-sm tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
+                            // card.css: "nothing disappears, it cancels" -- a resigned or retired
+                            // member's number is struck through, not hidden.
+                            cancelled
+                                ? "font-medium text-ink-muted line-through decoration-status-resigned-dot decoration-[1.5px]"
+                                : "font-semibold tracking-[0.06em] text-brand-ink",
+                        )}
                     >
                         {number}
                     </button>
                 );
             },
         },
-        { key: "employeeNumber", header: "Employee No", priority: "secondary", cell: (m) => m.employeeNumber || "-" },
         {
-            key: "fullName",
-            header: "Full Names & Surname",
-            priority: "essential",
-            // R-RESP-I: `truncate` is safe ONLY because Table puts the full value in the
-            // detail panel and in the cell's `title`. A truncated name with no way to read
-            // it is a register that cannot do its job.
-            truncate: true,
-            cell: (m) => [m.title, m.initials, m.surname].filter(Boolean).join(" ") || "-",
+            key: "employeeNumber",
+            header: "Employee no.",
+            priority: "secondary",
+            fit: "wide",
+            cell: (m) => <span className="tabular-nums text-ink-muted">{m.employeeNumber || "—"}</span>,
         },
-        { key: "bankName", header: "Bank Institution", priority: "secondary", cell: (m) => m.bankName || "-" },
-        { key: "branch", header: "Branch Location", priority: "secondary", cell: (m) => m.branch || "-" },
+        {
+            key: "member",
+            header: "Member",
+            priority: "essential",
+            // The two-line member cell -- `Ms NT Mokoena` over `Nomvula Thandeka`. Both lines
+            // truncate at the same width, and the full names are one click away on the card.
+            cell: (m) => (
+                <span className="block max-w-[14rem]">
+                    <span className="block truncate text-base font-semibold leading-tight text-ink">
+                        {[m.title, m.initials, m.surname].filter(Boolean).join(" ") || "—"}
+                    </span>
+                    {m.firstNames && <span className="block truncate text-xs text-ink-muted">{m.firstNames}</span>}
+                </span>
+            ),
+        },
+        {
+            key: "bankName",
+            header: "Bank",
+            priority: "secondary",
+            fit: "narrow",
+            // Real bank names run to "The Standard Bank of South Africa Limited"; the mock's
+            // fit with "Standard Bank". Truncated here, whole in the cell's title, the
+            // detail panel and the card.
+            truncate: true,
+            className: "max-w-[11rem]",
+            cell: (m) => m.bankName || "—",
+        },
+        {
+            key: "branch",
+            header: "Branch",
+            priority: "secondary",
+            fit: "medium",
+            cell: (m) => <span className="text-ink-muted">{m.branch || "—"}</span>,
+        },
         {
             key: "status",
             header: "Status",
@@ -647,40 +740,47 @@ export default function Members() {
     ], []);
 
     return (
-        /* 📐 THE THIRD COLUMN. directionContract.md -> Density and layout: "three
-           columns -- the rail (256px), the register, the record panel". The rail is the
-           shell's; these two are the page's. Below `xl` the panel becomes an overlay and
-           this collapses to one column, which is the same rule stated once here rather than
-           at every child. */
-        <div className="flex min-h-0 items-start text-ink">
-            <div className="min-w-0 flex-1 p-6">
-            <div className="flex flex-wrap items-end justify-between gap-4">
+        /* 📐 card.html's `.main`, section by section: the page head, the ruled figure strip,
+           the criteria row, and the register as a sheet that fills whatever height is left so
+           its pager sits at the foot. Each carries the mock's 28px gutter. The record panel
+           is the SHELL's third column -- `MemberPanel` portals into it -- so nothing here has
+           to make room for it, and below `xl` it is a drawer over this. */
+        <div className="flex min-h-0 flex-1 flex-col text-ink">
+            <div className="px-7 pt-[26px] max-lg:px-4">
                 <PageTitle
                     title="Members"
                     subtitle="The membership register across every bank. Select a member to open their card."
-                    align="left"
+                    actions={
+                        <>
+                            {/* 🖨️ Export prints the register -- and the print dialog is where a
+                                PDF comes from. Print is live (the owner, 2026-09-09); an
+                                endpoint that writes a spreadsheet does not exist yet, and a
+                                control that promised one would be a lie in a primary position. */}
+                            <Button onClick={() => window.print()} title="Print the register, or save it as a PDF">
+                                <Download size={16} strokeWidth={1.75} aria-hidden="true" /> Export
+                            </Button>
+                            <Button variant="primary" onClick={() => navigate("/members/capture")}>
+                                <LucideUserRoundPlus size={16} strokeWidth={1.75} aria-hidden="true" /> Capture Member
+                            </Button>
+                        </>
+                    }
                 />
-                <div className="flex items-center gap-2">
-                    <Button variant="primary" onClick={() => navigate("/members/capture")}>
-                        <LucideUserRoundPlus size={16} strokeWidth={2} aria-hidden="true" /> Capture Member
-                    </Button>
-                </div>
             </div>
 
             {/* 📊 THE RULED FIGURE STRIP -- "ledger line, not tiles", and the contract
                 refuses the alternative by name ("hero-metric tiles, dashboards of same-size
                 cards"). Counted from the register the page already holds, so it can never
                 disagree with the rows below it. */}
-            <FigureStrip className="mt-5" {...registerFigures} />
+            <FigureStrip className="mx-7 mt-5 max-lg:mx-4" {...registerFigures} />
 
-            <div className="mt-5 rounded-card border border-line bg-surface p-5 shadow-(--shadow-1)">
-                {/* 🔍 THE CRITERIA ROW. The mock prints three labelled fields and hides the
-                    rest behind "More criteria"; this page had FIFTEEN in a grid, which is a
-                    search form rather than a register's criteria. The other twelve are all
-                    still here, one disclosure away -- nothing was removed. */}
-                <div className="flex flex-wrap items-end gap-4">
+            {/* 🔍 THE CRITERIA ROW -- card.css `.criteria`. Three labelled fields printed on
+                the page, "More criteria" beside them, Clear at the end. This page had FIFTEEN
+                in a grid, which is a search form rather than a register's criteria. The other
+                twelve are all still here, one disclosure away -- nothing was removed. */}
+            <div className="no-print px-7 pt-4 max-lg:px-4">
+                <Criteria>
                     <SearchableSelect
-                        className="min-w-[190px] flex-1"
+                        className={CRITERION}
                         label="Bank"
                         value={filters.bankName}
                         onChange={handleInputChange("bankName")}
@@ -688,14 +788,14 @@ export default function Members() {
                         options={[{ value: '', label: 'All banks' }, ...bankOptions.map(b => ({ value: b, label: b }))]}
                     />
                     <TextInput
-                        className="min-w-[190px] flex-1"
+                        className={CRITERION}
                         label="Branch"
                         value={filters.branch}
                         onChange={handleInputChange("branch")}
                         placeholder="Any"
                     />
                     <SearchableSelect
-                        className="min-w-[190px] flex-1"
+                        className={CRITERION}
                         label="Status"
                         value={filters.status}
                         onChange={handleInputChange("status")}
@@ -703,20 +803,22 @@ export default function Members() {
                         options={[{ value: "", label: "Any" }, ...statusOptions.map(o => ({ value: o, label: o }))]}
                     />
                     <Button
+                        variant="ghost"
                         onClick={() => setMoreCriteria((open) => !open)}
                         aria-expanded={moreCriteria}
                         aria-controls="more-criteria"
+                        className="pl-1.5"
                     >
-                        <SlidersHorizontal size={16} aria-hidden="true" />
+                        <SlidersHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />
                         More criteria
                         {activeExtraCriteria > 0 && (
-                            <span className="ml-1 rounded-full bg-brand-soft px-1.5 text-xs font-semibold text-brand-ink tabular-nums">
+                            <span className="ml-0.5 rounded-full bg-brand-soft px-1.5 text-xs font-semibold tabular-nums text-brand-ink">
                                 {activeExtraCriteria}
                             </span>
                         )}
                     </Button>
                     <Button variant="ghost" onClick={handleClear}>Clear</Button>
-                </div>
+                </Criteria>
 
                 {/* ⚠️ THE OTHER TWELVE ARE ALL STILL HERE. The mock shows three criteria and a
                     "More criteria" control; it does not show a register with twelve fewer
@@ -726,7 +828,7 @@ export default function Members() {
                 <div
                     id="more-criteria"
                     hidden={!moreCriteria}
-                    className="mt-4 grid grid-cols-1 items-end gap-4 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-4"
+                    className="mt-3 grid grid-cols-1 items-end gap-x-3 gap-y-3 rounded-lg bg-surface p-4 shadow-(--shadow-1) sm:grid-cols-2 lg:grid-cols-4"
                 >
                     <SearchableSelect label="Title" value={filters.title} onChange={handleInputChange("title")} placeholder="All Titles" options={[{ value: "", label: "All Titles" }, ...titleOptions.map(o => ({ value: o, label: o }))]} />
                     <TextInput label="Employee Number" kind="identifier" value={filters.employeeNumber} onChange={handleInputChange("employeeNumber")} placeholder="Search by employee number" />
@@ -755,71 +857,82 @@ export default function Members() {
                     <TextInput label="Work Email" kind="email" value={filters.workEmail} onChange={handleInputChange("workEmail")} placeholder="Search by work email" />
                     <SearchableSelect label="Race" value={filters.race || ""} onChange={handleInputChange("race")} placeholder="All Races" options={[{ value: "", label: "All Races" }, ...raceOptions.map(o => ({ value: o, label: o }))]} />
                 </div>
+            </div>
 
-                {/* 🔴 A27, CLOSED. `Table` renders loading, error and empty as three separate
-                    branches, and `error` NEVER renders as `empty` — which is the whole
-                    defect: a backend that is down used to say "No Sasbo members match the
-                    specified query definitions", and an administrator reads that as a fact
-                    about the union. The retry re-runs the same fetch the mount effect does. */}
-                {/* ✅ THE FOURTH STATE (EH-D9). The register below has its own error state and
-                    its own retry; this is about the two lists that fill the EDIT panel. A
-                    missing bank list must not blank a register that loaded perfectly well,
-                    and it must not be silent either -- an administrator who opens the edit
-                    panel and finds no banks would otherwise conclude there are none. */}
-                {(refs.state === 'partial' || refs.state === 'error') && (
-                    <div className="mt-6 rounded-lg border border-line bg-surface-2 p-3">
-                        <DataState
-                            state={refs.state === 'error' ? 'error' : 'partial'}
-                            compact
-                            onRetry={refs.retry}
-                            title="Some option lists are missing."
-                            message={`${refs.failed.join(' and ')} did not load, so the edit panel cannot offer them. The register below is up to date.`}
-                        />
-                    </div>
-                )}
+            {/* ✅ THE FOURTH STATE (EH-D9). The register below has its own error state and
+                its own retry; this is about the two lists that fill the EDIT panel. A
+                missing bank list must not blank a register that loaded perfectly well,
+                and it must not be silent either -- an administrator who opens the edit
+                panel and finds no banks would otherwise conclude there are none. */}
+            {(refs.state === 'partial' || refs.state === 'error') && (
+                <div className="mx-7 mt-4 rounded-lg bg-surface shadow-(--shadow-1) max-lg:mx-4">
+                    <DataState
+                        state={refs.state === 'error' ? 'error' : 'partial'}
+                        layout="row"
+                        compact
+                        onRetry={refs.retry}
+                        title="Some option lists are missing."
+                        message={`${refs.failed.join(' and ')} did not load, so the edit panel cannot offer them. The register below is up to date.`}
+                    />
+                </div>
+            )}
 
-                <div className="mt-6">
+            {/* 🔴 A27, CLOSED. `Table` renders loading, error and empty as three separate
+                branches, and `error` NEVER renders as `empty` — which is the whole
+                defect: a backend that is down used to say "no members match", and an
+                administrator reads that as a fact about the union. The retry re-runs the
+                same fetch the mount effect does. The copy is card.html's own. */}
+            {/* 📐 card.css `.register` + `.card-surface`: the sheet fills the remaining
+                height, and the pager is its foot. The `register` class is the container the
+                column ladder measures (index.css). */}
+            <section aria-label="Member register" className="register flex flex-1 flex-col px-7 pb-7 pt-4 max-lg:px-4">
+                <Sheet grow>
                     <Table
                         caption="Sasbo members matching the current search"
                         columns={columns}
                         rows={visibleMembers}
                         rowKey="id"
+                        selectedKey={selectedMember?.id}
+                        onRowSelect={setSelectedMember}
+                        enterKey={enterKey}
                         loading={listState === "loading"}
-                        error={listState === "error" ? "We could not load the member register." : null}
+                        error={listState === "error" ? "The register could not be reached" : null}
+                        errorMessage="The server did not answer, so this is not an empty result. Nothing you typed has been lost."
                         onRetry={loadMembers}
-                        emptyTitle="No Sasbo members match the specified query definitions."
-                        emptyMessage="Try widening or clearing the filters above."
+                        emptyTitle={query ? `No member matches “${deferredSearch.trim()}”` : "No members match these criteria"}
+                        emptyMessage={
+                            query
+                                ? "Try the membership number, which is unique, or clear the search to see the whole register."
+                                : "Clear the criteria to see the whole register, or capture a new member."
+                        }
+                        emptyAction={<Button onClick={handleClear}>Clear</Button>}
                     />
-                </div>
 
-                <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm no-print">
-                    <div className="flex items-center gap-2 text-ink-muted font-medium">
-                        Showing {filteredMembers.length === 0 ? 0 : startIndex + 1}-{endIndex} of {filteredMembers.length} members
-                        {filteredMembers.length > 0 && (
-                            <Button size="icon" variant="ghost" onClick={() => window.print()} aria-label="Print these results">
-                                <Printer size={16} aria-hidden="true" />
-                            </Button>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="pagination" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
-                        <span className="text-ink-muted text-sm font-semibold">Page {page} of {totalPages}</span>
-                        <Button variant="pagination" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
-                        <Button onClick={handleClear}>Clear</Button>
-                    </div>
-                </div>
-            </div>
+                    {/* card.css `.pager`: "Showing 1–14 of 2 418 · Page 1 of 173", Previous and Next. */}
+                    <Pager
+                        page={page}
+                        totalPages={totalPages}
+                        onPageChange={setPage}
+                        count={filteredMembers.length}
+                        start={startIndex + 1}
+                        end={endIndex}
+                        noun="members"
+                        loading={listState === "loading"}
+                    />
+                </Sheet>
+            </section>
 
-            {/* 🔴 `03.4`: was a bare `fixed inset-0` div with `aria-modal="true"` ASSERTED
-                rather than implemented -- no portal, no focus trap, no Escape, and a
-                `<div onClick>` backdrop only a mouse could dismiss. It also capped at
-                `max-h-[90vh]`, a `vh` value (conventions §6). `Modal` supplies all of it. */}
-            {/* ⚠️ STILL GUARDED BY `selectedMember &&`, and that is not belt-and-braces.
-                JSX children are CONSTRUCTED whether or not the dialog renders them, so the
-                body's `selectedMember.address` runs on every render of this page. Passing
-                `open={Boolean(selectedMember)}` alone threw
-                `Cannot read properties of null (reading 'address')` the moment the page
-                mounted -- caught by the route smoke, not by reading. */}
+            {/* card.css `.toast`: the save's confirmation, low and centred, gone in 2.6s. */}
+            {showSavedNotification && (
+                <div
+                    role="status"
+                    className="kind-in fixed bottom-[84px] left-1/2 z-50 flex -translate-x-1/2 items-center gap-2.5 rounded-[10px] bg-ink px-3.5 py-2.5 text-[13.5px] font-medium text-bg shadow-(--shadow-2)"
+                >
+                    <CircleCheck size={16} strokeWidth={2} aria-hidden="true" className="text-brand" />
+                    <span>{savedName ? `${savedName}’s record saved` : "Changes saved"}</span>
+                </div>
+            )}
+
             {/* ✅ THE RECORD IS A DOCKED PANEL, NOT A MODAL.
                 directionContract.md refuses "a modal for tasks that need neither
                 interruption nor protected focus: the record edits in place", and this is the
@@ -833,31 +946,32 @@ export default function Members() {
                 `selectedMember.address` runs on every render of this page. Passing only
                 `open={Boolean(selectedMember)}` threw `Cannot read properties of null` the
                 moment the page mounted -- caught by the route smoke, not by reading. */}
-            </div>
-
             <MemberPanel
                 member={selectedMember}
                 open={Boolean(selectedMember)}
                 onClose={() => setSelectedMember(null)}
-                arriving={Boolean(selectedMember)}
                 footer={
                     isEditing ? (
                         <>
                             <Button onClick={handleEditToggle}>Cancel</Button>
-                            <Button variant="primary" onClick={handleSaveChanges}>Save Changes</Button>
+                            <Button variant="primary" onClick={handleSaveChanges}>
+                                <Check size={16} strokeWidth={2} aria-hidden="true" /> Save changes
+                            </Button>
                         </>
                     ) : (
                         <>
-                            <Button onClick={() => setSelectedMember(null)}>Close</Button>
                             {/* 🗣️ PRINT IS LIVE (the owner, 2026-09-09) and the member record is
-                                the first thing to get a real print layout: `print.css` hides
-                                the shell, the dialog chrome and every control, drops the
-                                record to a single column, and forces the light theme so a
-                                dark-mode user does not print a black page. */}
-                            <Button onClick={() => window.print()}>
-                                <Printer size={16} aria-hidden="true" /> Print
+                                the first thing to get a real print layout: index.css hides the
+                                shell and every control, drops the record to a single column, and
+                                forces the light theme so a dark-mode user does not print a black
+                                page. The mock's foot has Edit alone; print earns the one quiet
+                                control beside it. */}
+                            <Button size="icon" onClick={() => window.print()} aria-label="Print this member's record">
+                                <Printer size={16} strokeWidth={1.75} aria-hidden="true" />
                             </Button>
-                            <Button variant="primary" onClick={handleEditToggle}>Edit Member</Button>
+                            <Button variant="primary" onClick={handleEditToggle}>
+                                <Pencil size={16} strokeWidth={1.75} aria-hidden="true" /> Edit Member
+                            </Button>
                         </>
                     )
                 }
@@ -870,14 +984,7 @@ export default function Members() {
                     'address')` the moment it mounted -- the same failure the Modal's own
                     comment recorded, reintroduced by the commit that removed the Modal. */}
                 {selectedMember && (
-                    <div className="relative member-record">
-                        {showSavedNotification && (
-                            <div role="status" className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-status-active-bg text-status-active border border-status-active-dot rounded-lg shadow-(--shadow-2) no-print">
-                                <CheckCircle2 size={18} aria-hidden="true" />
-                                <span className="text-sm font-medium">Changes saved successfully!</span>
-                            </div>
-                        )}
-
+                    <div className="member-record">
                         {/* THE ERROR SUMMARY that replaced three `alert()` calls. Focused
                             rather than `role="alert"`: `Field` already gives every inline
                             message that role, so a form failing four validations would
@@ -887,7 +994,7 @@ export default function Members() {
                                 ref={errorSummaryRef}
                                 tabIndex={-1}
                                 aria-labelledby="member-save-notice-title"
-                                className={`mb-4 rounded-lg border p-3 text-sm no-print focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring ${
+                                className={`mt-4 rounded-lg border p-3 text-sm no-print focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring ${
                                     saveNotice.kind === "unchanged"
                                         ? "border-line-strong bg-surface-2 text-ink-muted"
                                         : "border-status-suspended-dot bg-status-suspended-bg text-status-suspended"
@@ -907,20 +1014,8 @@ export default function Members() {
                             </div>
                         )}
 
-                        <div className="flex items-start justify-between gap-4 pb-4">
-                            <div>
-                                <div className="mt-1 flex flex-wrap items-center gap-2 text-base font-bold text-ink">
-                                    <span>{`${editForm.title ? editForm.title + " " : ""}${[editForm.initials, editForm.surname].filter(Boolean).join(" ") || "-"}`}</span>
-                                    <span aria-hidden="true" className="text-ink-faint">•</span>
-                                    <span className="text-ink-muted text-sm font-semibold">{editForm.membershipNumber || "No Account ID"}</span>
-                                    <span aria-hidden="true" className="text-ink-faint">•</span>
-                                    <StatusChip status={editForm.status} />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 📱 A SCROLLABLE STRIP. Five sections at 390px do not fit; before
-                            this they wrapped into two crushed rows.
+                        {/* card.css `.tabs`: a wrapping strip under a hairline, the current
+                            section underlined in the brand's teal.
 
                             ⚠️ NOT `role="tab"`, AND THAT IS DELIBERATE. It looks like a tab
                             strip and the first draft said so — but the ARIA tabs pattern is
@@ -934,36 +1029,51 @@ export default function Members() {
 
                             ⏳ The full pattern needs roving focus, and a shared
                             `useRovingFocus` is already on RF's list precisely because this
-                            application has three places that want it. `05.3` (keyboard and
-                            focus) is where it lands. */}
-                        <div className="border-b border-line no-print">
-                            <div className="flex -mb-px overflow-x-auto whitespace-nowrap">
-                                {TABS.map((tab) => (
-                                    <button
-                                        key={tab.id}
-                                        type="button"
-                                        aria-current={activeTab === tab.id ? "true" : undefined}
-                                        onClick={() => setActiveTab(tab.id)}
-                                        className={`touch-target mr-4 inline-flex items-center gap-1 p-4 border-b-2 font-bold text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring ${activeTab === tab.id ? "border-brand text-brand-ink" : "border-transparent text-ink-muted hover-hover:hover:text-ink"}`}
-                                    >
-                                        <span>{tab.label}</span>
-                                        {isEditing && tabsWithErrors.has(tab.id) && (
-                                            <>
-                                                <span aria-hidden="true" className="text-status-suspended font-extrabold text-sm">*</span>
-                                                {/* The asterisk was the only signal, and it is
-                                                    invisible to a screen reader and to anyone
-                                                    who cannot distinguish the colour. */}
-                                                <span className="sr-only">(has errors)</span>
-                                            </>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
+                            application has three places that want it. */}
+                        <div className="no-print mt-4 flex flex-wrap gap-x-0.5 border-b border-line">
+                            {TABS.map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    type="button"
+                                    aria-current={activeTab === tab.id ? "true" : undefined}
+                                    onClick={() => changeTab(tab.id)}
+                                    className={cn(
+                                        "touch-target inline-flex items-center gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-sm font-medium",
+                                        "transition-[color,box-shadow] duration-(--duration-instant) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
+                                        activeTab === tab.id
+                                            ? "font-semibold text-brand-ink shadow-[inset_0_-2px_0_var(--color-brand)]"
+                                            : "text-ink-muted shadow-[inset_0_-2px_0_transparent] hover-hover:hover:text-ink",
+                                    )}
+                                >
+                                    <span>{tab.label}</span>
+                                    {isEditing && tabsWithErrors.has(tab.id) && (
+                                        <>
+                                            <span aria-hidden="true" className="text-status-suspended font-extrabold text-sm">*</span>
+                                            {/* The asterisk was the only signal, and it is
+                                                invisible to a screen reader and to anyone
+                                                who cannot distinguish the colour. */}
+                                            <span className="sr-only">(has errors)</span>
+                                        </>
+                                    )}
+                                </button>
+                            ))}
                         </div>
 
-                        <div className="text-sm">
+                        {/* card.css `.remarks`: the slip of gold paper under the tabs, only when
+                            the record carries a remark. */}
+                        {selectedMember.remarks && !isEditing && (
+                            <p className="record-rise mt-[18px] rounded-lg bg-accent-soft px-3 py-2.5 text-sm text-ink">
+                                <span className="mb-0.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-ink">Remarks</span>
+                                {selectedMember.remarks}
+                            </p>
+                        )}
+
+                        <div
+                            key={activeTab}
+                            className={cn("pt-[18px] text-sm", tabDirection === "fwd" ? "tab-enter-fwd" : "tab-enter-back")}
+                        >
                             {activeTab === "personal" && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-surface p-6 rounded-lg border border-line">
+                                <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
                                     <Detail label="Title" value={editForm.title} isEditing={isEditing} options={titleOptions} onChange={handleEditChange("title")} />
                                     <Detail label="Initials" value={editForm.initials} isEditing={isEditing} onChange={handleEditChange("initials")} />
                                     <Detail label="First Name(s)" value={editForm.firstNames} isEditing={isEditing} onChange={handleEditChange("firstNames")} error={fieldErrors.firstNames} required kind="name" />
@@ -1003,7 +1113,7 @@ export default function Members() {
                                     <Detail label="Cellphone Number" value={editForm.phone} isEditing={isEditing} onChange={handleEditChange("phone")} kind="tel" />
                                     <Detail label="Work Tel" value={editForm.workTel} isEditing={isEditing} onChange={handleEditChange("workTel")} kind="tel" />
                                     <Detail label="Home Tel" value={editForm.homeTel} isEditing={isEditing} onChange={handleEditChange("homeTel")} kind="tel" />
-                                    <div className="md:col-span-2">
+                                    <div className="col-span-full">
                                         {isEditing ? (
                                             <AddressAutocomplete label="Residential Address" value={editForm.address} onChange={handleEditChange("address")} placeholder="Update residential location address strings..." />
                                         ) : (
@@ -1014,7 +1124,7 @@ export default function Members() {
                             )}
 
                             {activeTab === "employment" && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-surface p-6 rounded-lg border border-line">
+                                <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
                                     <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="identifier" />
                                     <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
                                     <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
@@ -1036,7 +1146,7 @@ export default function Members() {
                                         </>
                                     )}
                                     <Detail label="IBT No." value={editForm.ibtNo} isEditing={isEditing} onChange={handleEditChange("ibtNo")} kind="identifier" />
-                                    <div className="md:col-span-2">
+                                    <div className="col-span-full">
                                         {isEditing ? (
                                             <AddressAutocomplete label="Bank Work Address" value={editForm.bankAddress} onChange={handleEditChange("bankAddress")} placeholder="Search coordinates..." />
                                         ) : (
@@ -1047,26 +1157,26 @@ export default function Members() {
                             )}
 
                             {activeTab === "membership" && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-surface p-6 rounded-lg border border-line">
+                                <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
                                     <Detail label="Date Joined Sasbo" value={formatBackendDate(selectedMember.joinDate)} isEditing={false} />
                                     <Detail label="Account Membership Status" value={editForm.status} isEditing={isEditing} options={statusOptions} onChange={handleEditChange("status")} />
-                                    <div className="md:col-span-2 border-t border-line pt-3 font-semibold text-brand-ink">Sasbo Subscription Fee Details</div>
+                                    <h4 className="col-span-full mt-1.5 border-t border-line pt-[18px] text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Sasbo Subscription Fee Details</h4>
                                     <Detail label="Monthly Subscription (ZAR)" value={selectedMember.monthlySubscription || "182.77"} isEditing={false} />
                                     <Detail label="Billing Frequency" value={selectedMember.subscriptionFrequency || "Monthly"} isEditing={false} />
                                 </div>
                             )}
 
                             {activeTab === "representatives" && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-surface p-6 rounded-lg border border-line">
+                                <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
                                     <Detail label="Assigned Lead Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={isEditing} options={roles.map(r => r.name)} onChange={handleEditChange("recruitmentRepresentativeName")} />
                                     <Detail label="Regional Area Representative" value={editForm.areasRep} isEditing={isEditing} options={roles.map(r => r.name)} onChange={handleEditChange("areasRep")} />
                                 </div>
                             )}
 
                             {activeTab === "structures" && (
-                                <div className="space-y-6 bg-surface p-6 rounded-lg border border-line">
-                                    <div className="pb-4 border-b border-line">
-                                        <h3 className="text-sm font-bold uppercase tracking-wide text-brand-ink">SASBO Structural Configuration Matrix</h3>
+                                <div className="space-y-5">
+                                    <div className="border-b border-line pb-3">
+                                        <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">SASBO structures</h3>
                                     </div>
 
                                     {isEditing ? (
@@ -1321,10 +1431,12 @@ export default function Members() {
  */
 function Detail({ label, value, isEditing, onChange, className = "", options = null, kind = "text", error = null, disabled = false, required = false, loadError = null, onRetryLoad }) {
     if (!isEditing) {
+        /* card.css `.field`: the label in small capitals, the value in ink, no box around
+           either -- a record reads as a record, not as a form with its inputs disabled. */
         return (
-            <div className={className}>
-                <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{label}</p>
-                <p className="mt-0.5 rounded-lg border border-line bg-surface-2 p-2 text-sm font-semibold text-ink">{value || "-"}</p>
+            <div className={cn("field record-rise min-w-0", className)}>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">{label}</p>
+                <p className="min-h-[21px] text-base font-medium text-ink [overflow-wrap:anywhere]">{value || "—"}</p>
             </div>
         );
     }

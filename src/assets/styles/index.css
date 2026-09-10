@@ -592,3 +592,200 @@
   /* A link's destination is invisible on paper unless it is written out. */
   .member-record a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; }
 }
+
+/* ==========================================================================
+   THE CARD WORLD, HAND-AUTHORED -- everything mockups/design/card.css carries
+   that is not a colour token: the two tokens the generator has no name for, the
+   register's column ladder, the skeleton, the row and card motion, and the theme
+   switch's pour. 2026-09-10: the owner's instruction is that the application IS
+   card.html -- not its palette, the whole arrangement -- so each block below
+   names the card.css rule it transcribes.
+   ========================================================================== */
+
+@theme {
+  /* card.css `.table th` is --ink in light and --ink-2 in dark: the one place the
+     mock swaps a ROLE between themes rather than a value, so it needs its own name. */
+  --color-head-ink: oklch(17.9% 0.020 252);
+  /* `.nav__item:hover` -- a wash over the rail rather than a surface. */
+  --color-nav-hover: rgba(14, 22, 32, 0.05);
+  /* `.nav__item svg` -- nav-ink in light, ink-3 in dark. */
+  --color-nav-icon: oklch(33.2% 0.027 253);
+}
+.dark {
+  --color-head-ink: oklch(74.0% 0.027 256);
+  --color-nav-hover: rgba(255, 255, 255, 0.05);
+  --color-nav-icon: oklch(56.6% 0.033 260);
+}
+
+/* card.css base: the theme eases when no view transition is running, selection is
+   brand-soft, and every scroller inside a surface uses the quiet thin bar. */
+body { transition: background-color .25s ease, color .25s ease; }
+::selection { background: var(--color-brand-soft); color: var(--color-ink); }
+
+@utility scroll-quiet {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+/* The global search is 14px on a desk and 16px wherever iOS would zoom it (card.css:453). */
+@utility search-text {
+  font-size: var(--text-base);
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .search-text { font-size: 16px; }
+}
+
+/* ── The register is a CONTAINER (card.css R-RESP-L) ──────────────────────────
+   Docking the panel from 1280 narrows the register to ~560-740px, so the viewport
+   stopped predicting how much room the table has. Columns respond to the register,
+   not the window: each step is the width at which the NEXT column stops fitting. */
+.register { container-type: inline-size; container-name: register; }
+@container register (max-width: 900px) { .register [data-fit="wide"] { display: none; } }
+@container register (max-width: 740px) { .register [data-fit="medium"] { display: none; } }
+@container register (max-width: 600px) { .register [data-fit="narrow"] { display: none; } }
+
+/* ── The register on a phone (card.css `@media (max-width: 760px)`) ──────────────
+   The head goes to screen readers only and every row becomes a small card of its own:
+   the member over their number, the status at the top right, the bank and the branch
+   beneath. Nothing is hidden and nothing scrolls sideways -- the six columns the ladder
+   dropped are all back, in the row, where a thumb can read them. `!important` because
+   the ladder above and the primitive's own `hidden md:table-cell` both say `none`, and
+   on a phone this arrangement is the one that wins. */
+@media (max-width: 760px) {
+  .register thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .register table, .register tbody { display: block; }
+  .register tr[data-row] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "member status" "number employee" "bank branch";
+    gap: 1px 12px;
+    padding: 12px 16px;
+  }
+  .register tr[data-row] > td { display: block !important; border: 0; padding: 1px 0; white-space: normal; font-size: var(--text-sm); }
+  .register tr[data-row] > td[data-expander], .register tr[data-detail] { display: none !important; }
+  .register td[data-col="member"] { grid-area: member; max-width: none; }
+  .register td[data-col="member"] > span { max-width: none; }
+  .register td[data-col="status"] { grid-area: status; justify-self: end; }
+  .register td[data-col="membershipNumber"] { grid-area: number; }
+  .register td[data-col="employeeNumber"] { grid-area: employee; justify-self: end; }
+  .register td[data-col="bankName"] { grid-area: bank; max-width: none; }
+  .register td[data-col="branch"] { grid-area: branch; justify-self: end; }
+  .register tr[data-row] > td:first-child { padding-left: 0; }
+}
+
+/* ── Rows arrive as a capped stagger when the query changes (card.css `.rows--enter`) ── */
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: none; }
+}
+.rows-enter > tr {
+  animation: row-in var(--duration-base) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 14ms);
+}
+
+/* ── The skeleton row (card.css `.sk`) ──────────────────────────────────────── */
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton {
+  display: block;
+  height: 12px;
+  width: 70%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--color-line) 25%, var(--color-line-strong) 50%, var(--color-line) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+/* ── The card is drawn from the wallet and laid on the desk (card.css `.is-arriving`) ──
+   `card-land` and `record-rise` are declared above; the sweep of light across the
+   metal and the stagger ladder for the record's fields complete the moment. */
+@keyframes card-sweep {
+  0%   { transform: translateX(-70%); opacity: 0; }
+  12%  { opacity: 1; }
+  100% { transform: translateX(70%); opacity: 0; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.panel-arriving .mcard {
+  animation: card-land var(--duration-slow) var(--ease-out) both;
+  will-change: transform, opacity;
+}
+.panel-arriving .mcard-sweep {
+  animation: card-sweep 1.05s .3s cubic-bezier(.2, .7, .2, 1) both;
+}
+.panel-arriving .record-rise {
+  animation: record-rise 360ms var(--ease-out) both;
+  animation-delay: calc(120ms + var(--i, 0) * 18ms);
+}
+/* the ladder: each field in a group rises 18ms after the one before it, capped at ten */
+.fieldgroup > :nth-child(2)  { --i: 1; }
+.fieldgroup > :nth-child(3)  { --i: 2; }
+.fieldgroup > :nth-child(4)  { --i: 3; }
+.fieldgroup > :nth-child(5)  { --i: 4; }
+.fieldgroup > :nth-child(6)  { --i: 5; }
+.fieldgroup > :nth-child(7)  { --i: 6; }
+.fieldgroup > :nth-child(8)  { --i: 7; }
+.fieldgroup > :nth-child(9)  { --i: 8; }
+.fieldgroup > :nth-child(n+10) { --i: 9; }
+.panel-empty-in { animation: fade-in var(--duration-base) ease-out both; }
+
+/* ── Tab changes move in the direction of travel (card.css `.is-enter-fwd/back`) ── */
+@keyframes tab-enter-fwd {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes tab-enter-back {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: none; }
+}
+.tab-enter-fwd  { animation: tab-enter-fwd 240ms var(--ease-out) both; }
+.tab-enter-back { animation: tab-enter-back 240ms var(--ease-out) both; }
+
+/* the search's "what you typed is a…" chip (card.css `.search__kind`) */
+@keyframes kind-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: none; }
+}
+.kind-in { animation: kind-in 180ms ease-out both; }
+
+/* ── The theme switch: the new appearance pours out from the control that changed it ──
+   card.css, transcribed whole. A soft-edged iris: a radial mask whose progress is an
+   animatable registered number. `themePour.js` scales it to the distance from the
+   control to the farthest corner, feather included, so the pour completes exactly as
+   the last corner turns. Exposure follows the direction: the outgoing light page dims
+   like dusk ahead of the dark; the incoming light page rises from under-exposed like
+   dawn. The hard clip-path iris remains as the fallback where registered properties
+   cannot animate. */
+:root { --vt-dur: var(--duration-pour); --vt-ease: var(--ease-pour); }
+@property --vt-p { syntax: "<number>"; inherits: false; initial-value: 0; }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-new(root) { animation: iris-hard var(--vt-dur) var(--vt-ease) both; }
+@keyframes iris-hard {
+  from { clip-path: circle(0 at var(--vt-x, 50%) var(--vt-y, 50%)); }
+  to   { clip-path: circle(165% at var(--vt-x, 50%) var(--vt-y, 50%)); }
+}
+:root.vt-soft::view-transition-new(root) {
+  clip-path: none;
+  -webkit-mask-image: radial-gradient(circle at var(--vt-x, 50%) var(--vt-y, 50%), #000 calc(var(--vt-p) * var(--vt-end, 170vmax) - var(--vt-feather, 30vmax)), transparent calc(var(--vt-p) * var(--vt-end, 170vmax)));
+  mask-image: radial-gradient(circle at var(--vt-x, 50%) var(--vt-y, 50%), #000 calc(var(--vt-p) * var(--vt-end, 170vmax) - var(--vt-feather, 30vmax)), transparent calc(var(--vt-p) * var(--vt-end, 170vmax)));
+  animation: iris-soft var(--vt-dur) var(--vt-ease) both;
+}
+:root.vt-soft.vt-to-light::view-transition-new(root) {
+  animation: iris-soft var(--vt-dur) var(--vt-ease) both, dawn var(--vt-dur) var(--vt-ease) both;
+}
+:root.vt-to-dark::view-transition-old(root) { animation: dusk var(--vt-dur) var(--vt-ease) both; }
+@keyframes iris-soft { from { --vt-p: 0; } to { --vt-p: 1; } }
+@keyframes dawn { from { filter: brightness(.86); } to { filter: brightness(1); } }
+@keyframes dusk { from { filter: brightness(1); } to { filter: brightness(.82); } }
+/* while the new layer opens, its colours must already be settled: no in-page transitions mid-pour */
+:root.vt-theming *, :root.vt-theming *::before, :root.vt-theming *::after { transition: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
+  :root.vt-soft::view-transition-new(root) { mask-image: none; -webkit-mask-image: none; }
+  .mcard-sweep { display: none; }
+}

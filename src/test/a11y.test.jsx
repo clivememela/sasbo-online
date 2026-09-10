@@ -37,7 +37,7 @@ beforeEach(() => {
 describe('accessibility', () => {
   it('the Members list has no violations', async () => {
     const { container } = renderWithProviders(<MembersPage />)
-    await screen.findByText(/No Sasbo members match/i)
+    await screen.findByText(/No members match these criteria/i)
     await expectNoA11yViolations(container)
   })
 

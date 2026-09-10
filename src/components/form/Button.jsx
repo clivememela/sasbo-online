@@ -31,26 +31,29 @@ import { cn, pick } from '../../lib/utils';
  * visible control, so desktop density is provably untouched (conventions §4, T6).
  */
 
+/* card.css `.btn`: 38px, 14px medium, radius 8, and the resting shadow on anything that
+   sits on the page as a control -- the primary and the secondary carry `--shadow-1`, the
+   ghost carries nothing until hovered. */
 const VARIANTS = {
-  /** The neutral control. The old `default`, kept under its name so no call site moves. */
+  /** The neutral control -- card.css `.btn--secondary`. Kept under its old name so no call site moves. */
   default: cn(
-    'border-line-strong bg-surface text-ink',
+    'border-line-strong bg-surface text-ink shadow-(--shadow-1)',
     'hover-hover:hover:bg-surface-2',
     'active:bg-surface-2',
   ),
 
-  /** The one action a surface wants you to take. */
+  /** The one action a surface wants you to take -- card.css `.btn--primary`. */
   primary: cn(
-    'border-brand bg-brand text-on-brand',
+    'border-brand bg-brand text-on-brand shadow-(--shadow-1)',
     'hover-hover:hover:border-brand-hover hover-hover:hover:bg-brand-hover',
     'active:border-brand-hover active:bg-brand-hover',
   ),
 
-  /** Quiet, for a control that must not compete -- toolbars, row actions. */
+  /** Quiet, for a control that must not compete -- card.css `.btn--ghost`. */
   ghost: cn(
     'border-transparent bg-transparent text-ink-muted',
-    'hover-hover:hover:bg-surface-2 hover-hover:hover:text-ink',
-    'active:bg-surface-2 active:text-ink',
+    'hover-hover:hover:bg-surface hover-hover:hover:text-ink',
+    'active:bg-surface active:text-ink',
   ),
 
   /**
@@ -66,16 +69,18 @@ const VARIANTS = {
 
   /** Pager controls. Same skin as `default`; a separate name so P5's Table can retune it alone. */
   pagination: cn(
-    'border-line-strong bg-surface text-ink',
+    'border-line-strong bg-surface text-ink shadow-(--shadow-1)',
     'hover-hover:hover:bg-surface-2',
     'active:bg-surface-2',
   ),
 };
 
 const SIZES = {
-  sm: 'min-h-(--size-control-sm) gap-1.5 px-3 py-1 text-xs',
-  md: 'min-h-(--size-control) gap-2 px-4 py-2 text-sm',
-  /** Square, for an icon with no label. `aria-label` is then the caller's obligation. */
+  /** card.css `.btn--sm`: 32px, 13px. */
+  sm: 'min-h-(--size-control-sm) gap-1.5 px-2.5 py-1 text-sm',
+  /** card.css `.btn`: 38px, 14px, 14px of side padding. */
+  md: 'min-h-(--size-control) gap-2 px-3.5 py-2 text-base',
+  /** Square, for an icon with no label -- card.css `.iconbtn`. `aria-label` is then the caller's obligation. */
   icon: 'min-h-(--size-control) min-w-(--size-control) justify-center p-2',
 };
 
@@ -100,10 +105,12 @@ export default function Button({
       aria-busy={loading || undefined}
       {...rest}
       className={cn(
-        'touch-target inline-flex items-center rounded-lg border font-medium',
-        'transition-colors duration-(--duration-instant) ease-(--ease-out)',
+        'touch-target inline-flex items-center whitespace-nowrap rounded-lg border font-medium',
+        'transition-[color,background-color,border-color,box-shadow] duration-(--duration-instant) ease-(--ease-out)',
+        // card.css `.btn:active { transform: translateY(1px) }` -- the press you can feel.
+        'active:translate-y-px',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring',
-        'disabled:cursor-not-allowed disabled:opacity-50',
+        'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:active:translate-y-0',
         pick(SIZES, size, 'Button size'),
         pick(VARIANTS, variant, 'Button variant'),
         className,

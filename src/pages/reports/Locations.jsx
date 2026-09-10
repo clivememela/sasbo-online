@@ -56,12 +56,12 @@ export function Locations() {
     };
 
     return (
-        <div className="p-6 text-ink">
+        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
             <PageTitle
                 title="Location Listings"
                 subtitle="View and manage branch location records, member listings, and contact details across all financial institutions."
             />
-            <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-surface mb-8">
+            <div className="mt-5 rounded-lg bg-surface p-5 shadow-(--shadow-1)">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                     <TextInput label="Bank Name" value={filters.bankName} onChange={handleInputChange("bankName")} placeholder="Search bank name" />
                     <TextInput label="Branch" value={filters.branch} onChange={handleInputChange("branch")} placeholder="Search branch" />

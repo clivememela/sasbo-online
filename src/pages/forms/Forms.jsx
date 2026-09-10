@@ -52,7 +52,7 @@ export function Forms(){
     };
 
     return (
-        <div className="p-6 text-ink">
+        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
             <PageTitle title="Forms" subtitle="Search and complete Forms" />
             <FilterForm onSubmit={handleSubmit}>
                 <TextInput

@@ -97,7 +97,12 @@ const CEILINGS = {
   // actual, for the reason the header gives -- a limit equal to the measurement
   // reddens for things nobody caused.
   js: 640 * KB,
-  css: 70 * KB,
+  // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
+  // switch's pour, the register's container ladder and phone rows, the card's landing and
+  // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
+  // raising: nothing from src/test/ is in the product; the growth is the design. 80 keeps
+  // the same headroom over the measured figure that 70 kept over 60.
+  css: 80 * KB,
   total: 900 * KB,
 }
 

@@ -392,5 +392,5 @@ export const navItems = [
 ];
 
 export const authItems = [
-  { title: "Logout", icon: LogOutIcon, href: "/login" },
+  { title: "Log out", icon: LogOutIcon, href: "/login" },
 ];

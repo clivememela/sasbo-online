@@ -1,14 +1,13 @@
 import { Suspense, useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Header from "./Header";
-import Footer from "./Footer";
 import ErrorBoundary from "./common/ErrorBoundary";
 import RoutePending from "./common/RoutePending";
 import { MAIN_CONTENT_ID } from "./shellIds";
 import OfflineBanner from "./common/OfflineBanner";
 import { getLastNetworkFailureAt, onNetworkFailure } from "../lib/reportError";
 
-export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref }) {
+export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref, search, setSearch }) {
   /*
    * 🔑 OFFLINE IS ANNOUNCED ONCE, IN THE SHELL, AND NOT ONCE PER PANEL (EH-D11).
    *
@@ -27,28 +26,28 @@ export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref 
 
   return (
     /* 🔴 THE LANDMARKS WERE NESTED WRONG, AND THE COST WAS THAT THERE WERE NONE.
-       `<main>` used to be this outer element, with `<Header>` and `<Footer>` inside it —
-       and HTML says a `<header>` maps to the `banner` role ONLY when it is not a descendant
-       of `<main>`, `<article>`, `<aside>`, `<nav>` or `<section>`. The same rule strips
-       `contentinfo` from `<footer>`. So the application rendered a header, a footer and a
-       main region, and a screen reader was offered exactly ONE landmark: nothing to jump
-       to, nothing to skip. The elements were right and the nesting silently voided two of
-       them.
+       `<main>` used to be this outer element, with `<Header>` inside it — and HTML says a
+       `<header>` maps to the `banner` role ONLY when it is not a descendant of `<main>`,
+       `<article>`, `<aside>`, `<nav>` or `<section>`. So the application rendered a header
+       and a main region, and a screen reader was offered exactly ONE landmark. The elements
+       were right and the nesting silently voided one of them.
 
-       Swapping which element carries the class moves nothing on screen: `<main>` is now the
-       content wrapper it always visually was, and the header and footer are its siblings. */
-    /* 📐 THE SHELL IS A COLUMN THAT SCROLLS, not a fixed box offset by a 160px header.
-       The header is `sticky` now and 60px tall, so nothing has to know its height -- the old
-       `top-40` was that number written down in a second place, and a header that changed
-       height left a 100px gap nobody could see in a diff. */
-    <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-      <Header sideBarOpen={sideBarOpen} setSideBarOpen={setSideBarOpen} />
+       📐 card.html's `.main`: a column that scrolls under a sticky 60px topbar, and it ends
+       where the page ends. The footer band that used to sit under every route is gone with
+       the mock -- the application's name and the union's are in the rail's wordmark. */
+    <div className="flex min-w-0 flex-1 flex-col overflow-y-auto scroll-quiet">
+      <Header
+        sideBarOpen={sideBarOpen}
+        setSideBarOpen={setSideBarOpen}
+        search={search}
+        setSearch={setSearch}
+      />
       {/* `tabIndex={-1}` so the skip link has something it can actually move focus TO —
           a fragment link only moves the caret unless the target is focusable. */}
-      <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 w-full flex flex-col pb-14">
+      <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex w-full flex-1 flex-col">
         {/* Above the boundary, so it survives a screen that threw -- an offline banner that
             disappears with the screen it was explaining is the one moment it was for. */}
-        <div className="px-6 pt-6 empty:hidden">
+        <div className="px-7 pt-5 empty:hidden max-lg:px-4">
           <OfflineBanner
             lastNetworkFailureAt={lastNetworkFailureAt}
             // 🔴 A RELOAD, AND SAYING WHY IT IS NOT A CHEAT MATTERS. Every panel already
@@ -62,20 +61,18 @@ export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref 
         {/* 🔴 THE BOUNDARY IS HERE, INSIDE THE SHELL, and the position is the whole point.
             A11's standard-facing test says it in one line: "the shell must survive, and
             offer a way to recover". A boundary wrapped around <Routes> would catch the
-            same errors and still blank the header, the navigation and the footer, because
-            the layout renders INSIDE the routes. One broken panel has to stay one broken
-            panel.
+            same errors and still blank the header and the navigation, because the layout
+            renders INSIDE the routes. One broken panel has to stay one broken panel.
 
             Suspense sits inside it for the same reason: `03.1` made every route lazy, so
             the outlet is where a chunk arrives -- and where a chunk that fails to arrive
             throws. A boundary above the Suspense would never see it. */}
         <ErrorBoundary>
           <Suspense fallback={<RoutePending />}>
-            <Outlet context={{ setSelectedCardHref, setSideBarOpen }} />
+            <Outlet context={{ setSelectedCardHref, setSideBarOpen, search, setSearch }} />
           </Suspense>
         </ErrorBoundary>
       </main>
-      <Footer />
     </div>
   );
 }

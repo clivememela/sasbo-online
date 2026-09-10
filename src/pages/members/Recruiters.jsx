@@ -1,6 +1,9 @@
 import { useDeferredValue, useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { AlertCircle, ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
+import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
+import Pager from '../../components/common/Pager.jsx';
+import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import { TextInput, SearchableSelect, SelectInput, Button, PositionTreeSelect, DateField } from '../../components/form';
 import Table from '../../components/table/Table.jsx';
 import StatusChip from '../../components/common/StatusChip.jsx';
@@ -328,8 +331,6 @@ export function Recruiters() {
         setNewRepMember(null);
     }, []);
 
-    const handlePrevPage = useCallback(() => setPage(p => Math.max(1, p - 1)), []);
-    const handleNextPage = useCallback(() => setPage(p => Math.min(totalPages, p + 1)), [totalPages]);
 
 
     const sanitizeMemberPayload = (member, updateFields) => {
@@ -407,6 +408,12 @@ export function Recruiters() {
              * it does, the current behaviour still erases an omitted field. The Capture
              * Member arc will say when it is committed.
              */
+            // 📨 2026-09-10, from the server arc: decision ⑨ (absent keeps, blank clears) is on
+            // the server at 0cf00e1 -- but the stack THIS branch runs against is the
+            // phase-07-orchestration jar, whose mapper still copies nulls. These two lines
+            // become removable when the server this client is pointed at carries 0cf00e1,
+            // not because the decision exists. Delete them on the strength of the decision
+            // alone and every recruiter action erases both balances again.
             currentBalance: member.currentBalance || 0,
             arrearsBalance: member.arrearsBalance || 0,
             electedRep: member.electedRep || '',
@@ -674,11 +681,16 @@ export function Recruiters() {
     ], [newRepMember]);
 
     return (
-        <div className="p-6 text-ink">
-            <PageTitle title="Recruiters" />
-            <p className="text-center text-ink-muted mb-4">
-                Browse Sasbo recruiters and the members they recruit
-            </p>
+        <Page>
+            <PageTitle
+                title="Recruiters"
+                subtitle="Browse Sasbo recruiters and the members they recruit."
+                actions={
+                    <Button variant="primary" onClick={handleOpenAddRep}>
+                        <UserPlus size={16} strokeWidth={1.75} aria-hidden="true" /> Add Recruiter
+                    </Button>
+                }
+            />
 
             {/* 🔴 WHAT SIX `alert()` CALLS BECAME. Focused rather than `role="alert"`:
                 the primitives already give inline field errors that role, and stacking a
@@ -690,7 +702,7 @@ export function Recruiters() {
                     ref={noticeRef}
                     tabIndex={-1}
                     aria-labelledby="recruiters-notice-title"
-                    className="mx-auto mb-4 flex max-w-6xl items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                    className="mt-4 flex items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
                 >
                     <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
                     <p id="recruiters-notice-title" className="flex-1">{notice.message}</p>
@@ -712,9 +724,10 @@ export function Recruiters() {
                 loaded perfectly well -- that over-correction is the reason this unit
                 distinguishes `partial` from `error` at all. */}
             {(refs.state === 'partial' || refs.state === 'error') && (
-                <div className="mx-auto mb-4 max-w-6xl rounded-lg border border-line bg-surface-2 p-3">
+                <div className="mt-4 rounded-lg bg-surface shadow-(--shadow-1)">
                     <DataState
                         state={refs.state === 'error' ? 'error' : 'partial'}
+                        layout="row"
                         compact
                         onRetry={refs.retry}
                         title={
@@ -730,38 +743,28 @@ export function Recruiters() {
                     />
                 </div>
             )}
-            <div className="max-w-6xl mx-auto p-6 rounded-card border border-line bg-surface shadow-(--shadow-1)">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-                    <TextInput label="Recruiter Name" value={filters.repName} onChange={handleFilter('repName')} placeholder="Search recruiter name" />
-                    <SearchableSelect label="Bank Name" value={filters.bankName} onChange={handleFilter('bankName')} placeholder="All Banks"
-                                      options={[{ value: '', label: 'All Banks' }, ...BANK_NAMES.map(b => ({ value: b, label: b }))]} />
-                    <SearchableSelect label="Branch" value={filters.branch} onChange={handleFilter('branch')}
-                                      options={[{ value: '', label: 'All Branches' }, ...BRANCHES.map(b => ({ value: b, label: b }))]} />
-                    <SearchableSelect label="Province" value={filters.province} onChange={handleFilter('province')}
-                                      options={[{ value: '', label: 'All Provinces' }, ...PROVINCES.map(p => ({ value: p, label: p }))]} />
-                    <SearchableSelect label="Area" value={filters.area} onChange={handleFilter('area')}
-                                      options={[{ value: '', label: 'All Areas' }, ...AREAS.map(a => ({ value: a, label: a }))]} />
-                </div>
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-          <span className="text-ink-muted">
-            {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} recruiters
-          </span>
-                    <div className="flex items-center gap-2">
-                        <Button variant="pagination" onClick={handlePrevPage} disabled={page === 1}>Prev</Button>
-                        <span className="text-ink-muted">Page {page} of {totalPages}</span>
-                        <Button variant="pagination" onClick={handleNextPage} disabled={page === totalPages}>Next</Button>
-                        <Button onClick={handleClear}>Clear</Button>
-                        <Button variant="primary" onClick={handleOpenAddRep}>
-                            <UserPlus size={14} /> Add Recruiter
-                        </Button>
-                    </div>
-                </div>
+            {/* card.html's arrangement, applied by rule: the criteria printed on the page,
+                the register as the sheet beneath them with its pager at the foot. */}
+            <Criteria className="mt-5">
+                <TextInput className={CRITERION_WIDE} label="Recruiter Name" value={filters.repName} onChange={handleFilter('repName')} placeholder="Any" />
+                <SearchableSelect className={CRITERION} label="Bank" value={filters.bankName} onChange={handleFilter('bankName')} placeholder="All banks"
+                                  options={[{ value: '', label: 'All banks' }, ...BANK_NAMES.map(b => ({ value: b, label: b }))]} />
+                <SearchableSelect className={CRITERION} label="Branch" value={filters.branch} onChange={handleFilter('branch')} placeholder="Any"
+                                  options={[{ value: '', label: 'All branches' }, ...BRANCHES.map(b => ({ value: b, label: b }))]} />
+                <SearchableSelect className={CRITERION} label="Province" value={filters.province} onChange={handleFilter('province')} placeholder="Any"
+                                  options={[{ value: '', label: 'All provinces' }, ...PROVINCES.map(p => ({ value: p, label: p }))]} />
+                <SearchableSelect className={CRITERION} label="Area" value={filters.area} onChange={handleFilter('area')} placeholder="Any"
+                                  options={[{ value: '', label: 'All areas' }, ...AREAS.map(a => ({ value: a, label: a }))]} />
+                <Button variant="ghost" onClick={handleClear}>Clear</Button>
+            </Criteria>
+
+            <Sheet grow className="mt-4">
                 {/* 🔴 WAS A `grid-cols-7` PSEUDO-TABLE WITH `<div onClick>` ROWS. No header
                     relationship for a screen reader, no tab stop on the row, and the
                     "Remove" control lived inside a clickable row with
                     `onClick={e => e.stopPropagation()}` wrapped around it -- which works
                     for a mouse and does nothing for a keyboard. */}
-                <div className="mt-4">
+                <div>
                     <Table
                         caption="Recruitment channels and the members they recruit"
                         columns={recruiterColumns}
@@ -770,11 +773,22 @@ export function Recruiters() {
                         loading={listState === 'loading'}
                         error={listState === 'error' ? 'We could not load the recruiters.' : null}
                         onRetry={refreshAll}
-                        emptyTitle="No recruiters match your search."
-                        emptyMessage="Try clearing the filters above."
+                        emptyTitle="No recruiters match these criteria"
+                        emptyMessage="Clear the criteria to see every recruiter, or add a new one."
+                        emptyAction={<Button onClick={handleClear}>Clear</Button>}
                     />
                 </div>
-            </div>
+                <Pager
+                    page={page}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                    count={filtered.length}
+                    start={(page - 1) * PAGE_SIZE + 1}
+                    end={Math.min(page * PAGE_SIZE, filtered.length)}
+                    noun="recruiters"
+                    loading={listState === 'loading'}
+                />
+            </Sheet>
 
             {/* Rep Members Modal */}
             {selectedRep && !selectedMember && (
@@ -1241,7 +1255,7 @@ export function Recruiters() {
                     </p>
                 )}
             </ConfirmDialog>
-        </div>
+        </Page>
     );
 }
 

@@ -93,6 +93,13 @@ export function today(now = new Date()) {
  */
 export function parseDate(input) {
   if (input == null) return null;
+  // The API serialises a LocalDate as `[y, m, d]` (Jackson, no timestamp module), so every
+  // date on a member arrives as an array. Read it as the calendar day it is.
+  if (Array.isArray(input)) {
+    if (input.length < 3) return null;
+    const date = { y: Number(input[0]), m: Number(input[1]), d: Number(input[2]) };
+    return isValidDate(date) ? date : null;
+  }
   if (typeof input === 'object') return isValidDate(input) ? input : null;
 
   const text = String(input).trim();

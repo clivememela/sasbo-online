@@ -444,14 +444,14 @@ export default function CaptureMember() {
     }, [form.bankName, bankListing, jobGradeAttempt]);
 
     return (
-        <div className="p-6 text-ink">
+        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
             {/* BR-18: the page's only <h1>, from the shared component, so this route stops
                 being one of the nine with no heading of its own. */}
-            <PageTitle title="Capture Member" />
-            <p className="max-w-3xl mx-auto text-center text-ink-muted mb-8 leading-relaxed">
-                Securely capture a new Sasbo member. Ensure all required personal,
-                employment, and banking information is accurately entered to maintain the integrity of our member database.
-            </p>
+            <PageTitle
+                title="Capture Member"
+                subtitle="Capture a new Sasbo member. Every required personal, employment and banking detail is checked before the record is saved."
+                className="mb-5"
+            />
             {/* ✅ THE FOURTH STATE, ABOVE THE FORM RATHER THAN INSIDE IT (EH-D9).
 
                 Four reference lists fill this form's selectors. When some of them fail this
@@ -464,7 +464,7 @@ export default function CaptureMember() {
                 dead endpoint. The retry re-runs only the lists that were asked for; nothing
                 the member has typed is touched. */}
             {(refs.state === 'partial' || refs.state === 'error') && (
-                <div className="max-w-6xl mx-auto mb-4 rounded-lg border border-line bg-surface-2 p-3">
+                <div className="mb-4 rounded-lg bg-surface p-3 shadow-(--shadow-1)">
                     <DataState
                         state={refs.state === 'error' ? 'error' : 'partial'}
                         compact
@@ -483,7 +483,7 @@ export default function CaptureMember() {
                 </div>
             )}
 
-            <div className="max-w-6xl mx-auto rounded-card border border-line bg-surface shadow-(--shadow-1) relative">
+            <div className="relative mt-2 rounded-lg bg-surface shadow-(--shadow-1)">
                 {showSavedNotification && (
                     <div role="status" className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-lg border border-status-active-dot bg-status-active-bg px-4 py-2 text-status-active shadow-(--shadow-2)">
                         <CheckCircle2 size={18} aria-hidden="true" />
