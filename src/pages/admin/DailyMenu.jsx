@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import NavigationCard from '../../components/common/NavigationCard.jsx';
+import Sheet from '../../components/common/Sheet.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
 
 const cards = [
@@ -75,7 +76,7 @@ const { setSelectedCardHref, setSideBarOpen } = useOutletContext() || {};
 return (
     <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
         <PageTitle title="Daily Menu" subtitle="Select options below" />
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <Sheet className="mt-6 max-w-4xl divide-y divide-line">
             {cards.map((card) => (
                 <NavigationCard
                     key={`${card.href}-${card.title}`}
@@ -86,7 +87,7 @@ return (
                     }}
                 />
             ))}
-        </div>
+        </Sheet>
     </div>
 );
 }

@@ -4,6 +4,7 @@
 // dead. eslint was right. Anyone restoring one of those cards restores its icon import with it.
 import { Landmark, LucideCopyCheck, LucideMails } from "lucide-react";
 import NavigationCard from '../../components/common/NavigationCard.jsx';
+import Sheet from '../../components/common/Sheet.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
 import {useOutletContext} from "react-router-dom";
 
@@ -100,7 +101,7 @@ export default function Maintenance() {
 
         <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
             <PageTitle title="Maintenance" subtitle="Select a function to maintain" />
-            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Sheet className="mt-6 max-w-4xl divide-y divide-line">
                 {maintenance_cards.map((card) => (
                     <NavigationCard
                         key={`${card.href}-${card.title}`}
@@ -111,7 +112,7 @@ export default function Maintenance() {
                         }}
                     />
                 ))}
-            </div>
+            </Sheet>
         </div>
     );
 }

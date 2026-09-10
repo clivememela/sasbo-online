@@ -642,6 +642,10 @@ body { transition: background-color .25s ease, color .25s ease; }
 .register { container-type: inline-size; container-name: register; }
 @container register (max-width: 900px) { .register [data-fit="wide"] { display: none; } }
 @container register (max-width: 740px) { .register [data-fit="medium"] { display: none; } }
+/* The mock's 600 holds, and it was measured rather than trusted: at 1349 (the common laptop
+   with the panel docked) the register is 605px, and the four remaining columns need 598 with
+   the Bank column truncated at 10rem (Members.jsx) -- at 11rem they needed 614 and the Status
+   chip scrolled off the right edge on exactly the machine most of the union's staff use. */
 @container register (max-width: 600px) { .register [data-fit="narrow"] { display: none; } }
 
 /* ── The register on a phone (card.css `@media (max-width: 760px)`) ──────────────

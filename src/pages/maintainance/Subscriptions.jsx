@@ -133,7 +133,7 @@ export default function Subscriptions() {
                 />
             </Criteria>
 
-            <Sheet grow className="mt-4">
+            <Sheet className="mt-4">
 
                 {/* 🔴 IT WAS A BARE `Error: {String(err)}` BANNER WITH NO WAY OUT. Two things
                     changed: the sentence is the server's own rather than a stringified

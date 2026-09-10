@@ -593,6 +593,12 @@ export default function Members() {
         ).length;
     }, [filters]);
 
+    /* The Branch criterion's choices: every branch the register holds, once, in order. */
+    const registerBranches = useMemo(
+        () => [...new Set(membersList.map((m) => m?.branch).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+        [membersList],
+    );
+
     const registerFigures = useMemo(() => {
         const by = (status) => membersList.filter((m) => m?.status === status).length;
         const now = today();
@@ -721,7 +727,9 @@ export default function Members() {
             // fit with "Standard Bank". Truncated here, whole in the cell's title, the
             // detail panel and the card.
             truncate: true,
-            className: "max-w-[11rem]",
+            // 10rem, measured at 1349px with the panel docked: the register is 605 wide and the
+            // four columns fit at 598; at 11rem they ran to 614 and Status scrolled off.
+            className: "max-w-[10rem]",
             cell: (m) => m.bankName || "—",
         },
         {
@@ -787,12 +795,15 @@ export default function Members() {
                         placeholder="All banks"
                         options={[{ value: '', label: 'All banks' }, ...bankOptions.map(b => ({ value: b, label: b }))]}
                     />
-                    <TextInput
+                    {/* A picker, as the mock's `.crit` is -- fed by the branches the register
+                        actually holds, so the list can never offer a branch with no members. */}
+                    <SearchableSelect
                         className={CRITERION}
                         label="Branch"
                         value={filters.branch}
                         onChange={handleInputChange("branch")}
                         placeholder="Any"
+                        options={[{ value: "", label: "Any" }, ...registerBranches.map(b => ({ value: b, label: b }))]}
                     />
                     <SearchableSelect
                         className={CRITERION}
@@ -802,22 +813,26 @@ export default function Members() {
                         placeholder="Any"
                         options={[{ value: "", label: "Any" }, ...statusOptions.map(o => ({ value: o, label: o }))]}
                     />
-                    <Button
-                        variant="ghost"
-                        onClick={() => setMoreCriteria((open) => !open)}
-                        aria-expanded={moreCriteria}
-                        aria-controls="more-criteria"
-                        className="pl-1.5"
-                    >
-                        <SlidersHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />
-                        More criteria
-                        {activeExtraCriteria > 0 && (
-                            <span className="ml-0.5 rounded-full bg-brand-soft px-1.5 text-xs font-semibold tabular-nums text-brand-ink">
-                                {activeExtraCriteria}
-                            </span>
-                        )}
-                    </Button>
-                    <Button variant="ghost" onClick={handleClear}>Clear</Button>
+                    {/* One flex item, so the two controls share a baseline on a phone instead
+                        of Clear orphaning onto a line of its own. */}
+                    <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            onClick={() => setMoreCriteria((open) => !open)}
+                            aria-expanded={moreCriteria}
+                            aria-controls="more-criteria"
+                            className="pl-1.5"
+                        >
+                            <SlidersHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />
+                            More criteria
+                            {activeExtraCriteria > 0 && (
+                                <span className="ml-0.5 rounded-full bg-brand-soft px-1.5 text-xs font-semibold tabular-nums text-brand-ink">
+                                    {activeExtraCriteria}
+                                </span>
+                            )}
+                        </Button>
+                        <Button variant="ghost" onClick={handleClear}>Clear</Button>
+                    </div>
                 </Criteria>
 
                 {/* ⚠️ THE OTHER TWELVE ARE ALL STILL HERE. The mock shows three criteria and a
@@ -886,7 +901,7 @@ export default function Members() {
                 height, and the pager is its foot. The `register` class is the container the
                 column ladder measures (index.css). */}
             <section aria-label="Member register" className="register flex flex-1 flex-col px-7 pb-7 pt-4 max-lg:px-4">
-                <Sheet grow>
+                <Sheet>
                     <Table
                         caption="Sasbo members matching the current search"
                         columns={columns}

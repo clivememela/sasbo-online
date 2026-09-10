@@ -173,7 +173,9 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
           <span className="grid size-7 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-ink">
             SA
           </span>
-          <span className="hidden whitespace-nowrap text-[13.5px] font-medium text-ink md:inline">Administrator</span>
+          {/* The name yields before the crumbs do: with the panel docked at 1349 the main
+              column is 645px, and the name's width came straight out of the breadcrumb. */}
+          <span className="hidden whitespace-nowrap text-[13.5px] font-medium text-ink min-[1440px]:inline">Administrator</span>
         </p>
       </div>
     </header>

@@ -160,7 +160,7 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
             Online and the union's strapline here, in the brand's gold, which is also WHY
             the topbar carries no application title: an application's name belongs in one
             place, and the rail is the place that is on screen at every width. */}
-        <div className="flex items-center justify-between gap-2 px-2 pb-4 pt-1.5">
+        <div className="relative flex items-center gap-2 px-2 pb-4 pt-1.5">
           <a
             href="/home"
             aria-label="SASBO Online home"
@@ -169,18 +169,21 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
             <Logo className="size-10 shrink-0 object-contain" />
             <span className="grid min-w-0 leading-[1.15]">
               <span className="truncate text-md font-semibold tracking-[-0.01em] text-ink">SASBO Online</span>
-              <small className="mt-[3px] truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-ink">
+              {/* The strapline keeps the mock's tracking on the desk; in the drawer, where the
+                  close control shares the row, it tightens a step rather than truncating. */}
+              <small className="mt-[3px] whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-ink max-lg:tracking-[0.1em]">
                 The Finance Union
               </small>
             </span>
           </a>
           {/* Same defect as the hamburger it undoes: an icon-only raw <button> with no
               accessible name, announcing as "button". The primitive brings the name, the
-              44px coarse-pointer hit area and the focus ring. */}
+              44px coarse-pointer hit area and the focus ring. Positioned over the row's
+              corner so the wordmark keeps its full width beside it. */}
           <Button
             size="icon"
             variant="ghost"
-            className="lg:hidden"
+            className="absolute -top-1 right-0 lg:hidden"
             aria-label="Close navigation menu"
             onClick={() => setSideBarOpen(false)}
           >
@@ -188,7 +191,10 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
           </Button>
         </div>
 
-        <div className="scroll-quiet grid flex-1 content-start gap-0.5 overflow-y-auto">
+        {/* card.css `.nav { display: grid; gap: 2px; flex: 1 }`: the rows STRETCH to the rail's
+            height, so the menu reads down the whole rail rather than stopping a third of the
+            way with a hole under it. The 36px pill sits at the top of each stretched track. */}
+        <div className="scroll-quiet grid flex-1 gap-0.5 overflow-y-auto">
           {navItems.map((item) => (
             <SidebarItem
               key={item.href}

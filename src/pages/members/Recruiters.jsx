@@ -566,24 +566,10 @@ export function Recruiters() {
                 </span>
             ),
         },
-        {
-            key: 'remove',
-            header: 'Remove',
-            priority: 'essential',
-            align: 'right',
-            cell: (rep) => (
-                <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setPendingRemoveRep(rep)}
-                    disabled={saving}
-                    aria-label={`Remove recruiter ${rep.name}`}
-                    className="text-status-suspended"
-                >
-                    <UserMinus size={14} aria-hidden="true" />
-                </Button>
-            ),
-        },
+        // Removal lives in the recruiter's record (the modal's foot), not in the register:
+        // the world holds actions in the record, and status red is a status colour, not
+        // an action colour. The finish review of 2026-09-10 named the red column in every
+        // row as the one thing on this screen the Card world does not do.
     ], [saving]);
 
     /** A member as it appears on a recruiter's list. */
@@ -623,7 +609,9 @@ export function Recruiters() {
                     onClick={() => setPendingRemoveMember(m)}
                     disabled={saving}
                     aria-label={`Remove ${fullName(m)} from this recruiter`}
-                    className="text-status-suspended"
+                    // Quiet until meant: the red is a status colour in this world, so it
+                    // appears only under the pointer that is about to act.
+                    className="text-ink-muted hover-hover:hover:text-status-suspended"
                 >
                     <Trash2 size={14} aria-hidden="true" />
                 </Button>
@@ -758,7 +746,7 @@ export function Recruiters() {
                 <Button variant="ghost" onClick={handleClear}>Clear</Button>
             </Criteria>
 
-            <Sheet grow className="mt-4">
+            <Sheet className="mt-4">
                 {/* 🔴 WAS A `grid-cols-7` PSEUDO-TABLE WITH `<div onClick>` ROWS. No header
                     relationship for a screen reader, no tab stop on the row, and the
                     "Remove" control lived inside a clickable row with
@@ -800,9 +788,17 @@ export function Recruiters() {
                     size="lg"
                     footer={
                         <>
+                            <Button
+                                variant="danger"
+                                onClick={() => setPendingRemoveRep(selectedRep)}
+                                disabled={saving}
+                                className="mr-auto"
+                            >
+                                <UserMinus size={16} strokeWidth={1.75} aria-hidden="true" /> Remove recruiter
+                            </Button>
                             <Button onClick={handleCloseRepModal}>Close</Button>
                             <Button variant="primary" onClick={handleOpenAddMember}>
-                                <UserPlus size={14} /> Add Member
+                                <UserPlus size={16} strokeWidth={1.75} aria-hidden="true" /> Add Member
                             </Button>
                         </>
                     }

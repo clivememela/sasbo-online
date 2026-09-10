@@ -152,7 +152,7 @@ export default function BankBranch() {
         />
       </Criteria>
 
-      <Sheet grow className="mt-4">
+      <Sheet className="mt-4">
         <div className="print-area">
           <Table
             caption="Bank branches"

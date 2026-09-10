@@ -137,7 +137,7 @@ export default function BankListing() {
         />
       </Criteria>
 
-      <Sheet grow className="mt-4">
+      <Sheet className="mt-4">
         {/* 🔴 A `grid-cols-3` PSEUDO-TABLE, AND THE LAST OF THE SEVEN run 7 counted.
             Its header was three `<div>`s with no relationship to the cells beneath, so a
             screen-reader user met a stream of values with no column names -- and this is a

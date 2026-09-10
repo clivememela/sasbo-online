@@ -3,6 +3,7 @@ import {
 } from 'lucide-react';
 import PageTitle from "../../components/common/PageTitle.jsx";
 import NavigationCard from "../../components/common/NavigationCard.jsx";
+import Sheet from '../../components/common/Sheet.jsx';
 
 const cards = [
     {
@@ -69,9 +70,9 @@ export default function Acb() {
     return (
         <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
             <PageTitle title="A.C.B Menu" subtitle="Select options below" />
-            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Sheet className="mt-6 max-w-4xl divide-y divide-line">
                 {cards.map((card) => <NavigationCard key={card.href} {...card} />)}
-            </div>
+            </Sheet>
         </div>
     );
 }

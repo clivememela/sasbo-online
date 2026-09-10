@@ -151,9 +151,12 @@ export default function MembershipCard({ name, membershipNumber, status = 'Activ
         )}
 
         {employer && (
-          <span className="ml-auto grid min-w-0 max-w-[42%] gap-[3px] text-right leading-[1.1]">
+          <span className="ml-auto grid min-w-0 max-w-[48%] gap-[3px] text-right leading-[1.15] max-sm:max-w-[54%]">
             <small className={LABEL}>Employer</small>
-            <b className="truncate text-[13px] font-medium text-(--card-engrave)">{employer}</b>
+            {/* Whole, never an ellipsis: an engraved fact on the thesis element must read
+                entire, and real employers run to "The Standard Bank of South Africa Limited".
+                Two lines on the desk, three on the narrower phone card. */}
+            <b className="line-clamp-2 text-[13px] font-medium text-(--card-engrave) [overflow-wrap:anywhere] max-sm:line-clamp-3 max-sm:text-xs">{employer}</b>
           </span>
         )}
       </div>
