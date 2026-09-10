@@ -124,7 +124,7 @@ async function chooseBank(user) {
  * being true.
  */
 async function openEmploymentTab(user) {
-  await user.click(screen.getByRole('button', { name: /^Employment & Bank/ }))
+  await user.click(screen.getByRole('button', { name: /^Employment/ }))
 }
 
 describe('the job-grade dropdown', () => {
@@ -244,7 +244,7 @@ describe("when the job grades cannot be fetched -- A25’s second clause", () =>
 
     // The bank the user chose is still chosen, and the tabs still navigate.
     expect(screen.getByDisplayValue(BANK.bankName)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /^Personal Information/ }))
+    await user.click(screen.getByRole('button', { name: /^Personal/ }))
     expect(await screen.findByText(/^Surname/)).toBeInTheDocument()
   })
 

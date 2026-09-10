@@ -38,13 +38,28 @@ export const REP_OPTIONS = [
   'Viviana van Agtmaal', 'Yatin Narsai', 'Yongzhi Ban', 'Yvonne Holenstein',
 ];
 
+/*
+ * THE FIVE SECTIONS OF A MEMBER'S RECORD, and the words for them.
+ *
+ * 🔴 THE LABELS ARE SHORT BECAUSE ONE OF THE TWO SCREENS THAT SHOWS THEM IS A 400px COLUMN.
+ * Docked, the record panel is at most 448px wide, and "Personal Information · Employment &
+ * Bank · Membership & Subscriptions · Recruitment Channel · Sasbo Structures" is 762px of
+ * tabs -- so the strip wrapped to three rows, and when it was made to scroll instead it cut
+ * a word in half, which the owner saw and called wrong (2026-09-10). Each label is now the
+ * noun that matters; the qualifier was doing no work the fields under the tab do not do.
+ * `full` keeps the long form as the control's `title`.
+ *
+ * 🔑 AND THERE IS ONE LIST, NOT TWO. `Members.jsx` carried its own copy of this array, so
+ * the register's record and the capture form could name the same five sections differently
+ * and nothing would notice. They read the same list now.
+ */
 export const MEMBER_TABS = [
-  { id: 'personal', label: 'Personal Information' },
-  { id: 'employment', label: 'Employment & Bank' },
-  { id: 'membership', label: 'Membership & Subscriptions' },
-  { id: 'representatives', label: 'Recruitment Channel' },
-  { id: 'structures', label: 'Sasbo Structures' },
-  // { id: 'history', label: 'History & Remarks' },
+  { id: 'personal', label: 'Personal', full: 'Personal Information' },
+  { id: 'employment', label: 'Employment', full: 'Employment & Bank' },
+  { id: 'membership', label: 'Membership', full: 'Membership & Subscriptions' },
+  { id: 'representatives', label: 'Recruitment', full: 'Recruitment Channel' },
+  { id: 'structures', label: 'Structures', full: 'Sasbo Structures' },
+  // { id: 'history', label: 'History', full: 'History & Remarks' },
 ];
 
 export const DEBIT_DAY_OPTIONS = ['20', '25', '31'];

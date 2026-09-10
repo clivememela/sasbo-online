@@ -17,6 +17,7 @@ import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS,
+  MEMBER_TABS,
 } from "../../config/memberConstants.js";
 import {
     validateSAID, validateEmail, formatDate, extractDateOfBirthFromSAID, extractGenderFromSAID
@@ -77,13 +78,8 @@ const FILTER_FIELDS = [
     "phone", "personalEmail", "workEmail", "status", "race",
 ];
 
-const TABS = [
-    { id: "personal", label: "Personal Information" },
-    { id: "employment", label: "Employment & Bank" },
-    { id: "membership", label: "Membership & Subscriptions" },
-    { id: "representatives", label: "Recruitment Channel" },
-    { id: "structures", label: "Sasbo Structures" },
-];
+// The five sections of a member's record, named once in `memberConstants.js`.
+const TABS = MEMBER_TABS;
 
 const FIELD_TO_TAB_MAP = {
     title: "personal",
@@ -1153,22 +1149,57 @@ export default function Members() {
                             which laid a second horizontal line directly on top of the strip's
                             own rule. The tabs are their own affordance — the cut-off edge of
                             the next label is what says there is more. */}
-                        <div className="no-print mt-4 flex gap-x-0.5 overflow-x-auto border-b border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                            {TABS.map((tab) => (
+                        <div className="no-print mt-4 border-b border-line">
+                        {/* 🔑 IT WRAPS. IT DOES NOT SCROLL — AND THE MOCK SETTLED THAT.
+                            `card.css:357` is `.tabs { display: flex; flex-wrap: wrap; }` at
+                            13px: every section is on screen, always, and nothing is reached by
+                            swiping. This build had it scrolling for one round, and the owner
+                            put it plainly — *"I didn't even know they were there until I opened
+                            up the console. There mustn't be any trickyness to it."* A tab you
+                            cannot see is a tab that does not exist, and a fading edge is a hint,
+                            not a control.
+
+                            What made wrapping look wrong before was not the wrap. It was FIVE
+                            LONG LABELS breaking into three ragged rows, with the rule under only
+                            the last of them. Short labels at the mock's own 13px fit two, and the
+                            rule sits on the wrapper so it runs under the whole block the way
+                            `.tabs`'s `border-bottom` does.
+
+                            📐 THREE COLUMNS, NOT `flex-wrap` — AND THE DIFFERENCE IS THAT THIS
+                            ONE IS THE SAME EVERY TIME. Left to wrap, the strip broke 4+1 on a
+                            448px panel and 3+2 on the owner's own window, because the split was
+                            whatever the labels happened to measure at that width. A grid gives
+                            the five sections three fixed columns, so they line up under each
+                            other in both rows and the arrangement does not change with the
+                            window. `justify-self-start` keeps each button its own width, so the
+                            active underline stays under the LABEL and not under the column.
+
+                            🗣️ The last tab is placed in the third column rather than the second,
+                            at the owner's instruction: *"Make structures aligned under Membership
+                            so that there's a gap in the middle between Recruitment and
+                            Structures."* The gap is the point -- it reads as a deliberate
+                            arrangement rather than as a row that ran out. */}
+                        <div className="grid grid-cols-3 gap-x-0.5">
+                            {TABS.map((tab, index) => (
                                 <button
                                     key={tab.id}
                                     type="button"
                                     aria-current={activeTab === tab.id ? "true" : undefined}
                                     onClick={() => changeTab(tab.id)}
                                     className={cn(
-                                        "touch-target inline-flex items-center gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-sm font-medium",
+                                        // card.css:358 -- 13px, not 14: the strip is a quiet index of the record, not a
+                                        // second row of headings, and the extra pixel is what pushed it to three rows.
+                                        "touch-target inline-flex items-center justify-self-start gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-[13px] font-medium",
+                                        // A final row holding one tab puts it in the LAST column, under the
+                                        // third of the row above, so the empty cell falls in the middle.
+                                        index === TABS.length - 1 && TABS.length % 3 === 2 && "col-start-3",
                                         "transition-[color,box-shadow] duration-(--duration-instant) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
                                         activeTab === tab.id
                                             ? "font-semibold text-brand-ink shadow-[inset_0_-2px_0_var(--color-brand)]"
                                             : "text-ink-muted shadow-[inset_0_-2px_0_transparent] hover-hover:hover:text-ink",
                                     )}
                                 >
-                                    <span>{tab.label}</span>
+                                    <span title={tab.full}>{tab.label}</span>
                                     {isEditing && tabsWithErrors.has(tab.id) && (
                                         <>
                                             <span aria-hidden="true" className="text-status-suspended font-extrabold text-sm">*</span>
@@ -1180,6 +1211,7 @@ export default function Members() {
                                     )}
                                 </button>
                             ))}
+                        </div>
                         </div>
 
                         {/* card.css `.remarks`: the slip of gold paper under the tabs, only when

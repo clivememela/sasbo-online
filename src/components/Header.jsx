@@ -116,8 +116,9 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
         // rows of the search pill the reviewer found cut off. The height is the mock's
         // and it does not negotiate.
         "sticky top-0 z-10 grid h-15 shrink-0 items-center gap-3 border-b border-line bg-surface px-4 text-ink",
+        "topbar",
         "grid-cols-[auto_minmax(0,1fr)_auto]",
-        "lg:grid-cols-[auto_minmax(220px,520px)_1fr] lg:gap-5 lg:px-7",
+        "lg:grid-cols-[auto_minmax(220px,440px)_1fr] lg:gap-5 lg:px-7",
       )}
     >
       <div className="flex min-w-0 items-center gap-2">
@@ -142,12 +143,26 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
         {/* The mock drops the crumbs at 1100px: on a narrow window, where you are matters
             less than getting somewhere, and two competing rows would wrap.
 
-            ⚠️ NO `min-w-0` HERE, and the reason is worth a line. This is the grid's `auto`
-            track, so its width is its own min-content; `min-w-0` makes that zero, and the
-            search's flexible track then takes everything and squeezes the trail to
-            "Membe…" at 1440, where there was room for all three. The trail sizes itself;
-            what yields under pressure is the search, between its 220 and 520. */}
-        <div className="hidden min-[1101px]:block">
+            ⚠️ `min-w-0` IS HERE NOW, AND THIS COMMENT USED TO REFUSE IT. The reason it gave
+            was true at the time: this is the grid's `auto` track, `min-w-0` makes its
+            min-content zero, and the search then took everything and squeezed the trail to
+            "Membe…" at 1440 where there was room for all three.
+
+            🔴 BUT REFUSING IT COST MORE. Without `min-w-0` the trail cannot shrink, so it
+            OVERFLOWED its track instead -- and the search field, which has a solid ground,
+            drew straight over the top of it. Measured with the record panel open: 62px of
+            "Members" under the search at 1280, 33px at 1366. The owner saw it and it looked
+            like a rendering fault. Worse, the half it left showing was the CURRENT PAGE,
+            which is the one crumb worth reading.
+
+            What makes `min-w-0` safe now is that the shrinking has an ORDER. `Breadcrumbs`
+            gives every crumb ahead of the current page `shrink` and no floor, and gives the
+            current page a `7ch` floor, so the trail loses "Home" and the sections before it
+            gives up a single character of where you are. The old squeeze cannot come back
+            because the thing it squeezed is the thing that now yields last. The search's
+            ceiling comes down 520 → 440 in the same breath: at 1280, on the deepest route in
+            the application, the difference is exactly what the trail needed. */}
+        <div className="hidden min-w-0 min-[1101px]:block">
           <Breadcrumbs />
         </div>
       </div>

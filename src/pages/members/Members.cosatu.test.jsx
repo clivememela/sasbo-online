@@ -97,7 +97,7 @@ const membersRespond = (body) => http.get('*/api/members', () => HttpResponse.js
  */
 async function openStructuresTab(user) {
   await user.click(await screen.findByRole('button', { name: /open the record for/i }))
-  await user.click(await screen.findByRole('button', { name: /Sasbo Structures/i }))
+  await user.click(await screen.findByRole('button', { name: /Structures/i }))
 }
 
 describe('a member whose COSATU positions arrive as a delimited string', () => {

@@ -113,9 +113,9 @@ const openTab = async (user, label) => {
 }
 
 const choosePayroll = async (user) => {
-  await openTab(user, /Employment & Bank/i)
+  await openTab(user, /Employment/i)
   await user.selectOptions(labelled('Payment Type'), 'Payroll')
-  await openTab(user, /Personal Information/i)
+  await openTab(user, /Personal/i)
 }
 
 describe('CaptureMember round-trips its fields', () => {
@@ -320,12 +320,12 @@ describe('the identity-type vocabulary', () => {
     await fill(user, 'I.D. Number', '9001010000080')
 
     // The COSATU panel is gated on the Y/N above it, so the flag is set first.
-    await openTab(user, /Sasbo Structures/i)
+    await openTab(user, /Structures/i)
     await user.selectOptions(labelled('COSATU Member?'), 'Y')
     await user.selectOptions(labelled('Local?'), 'Y')
     await user.selectOptions(labelled('Regional?'), 'Y')
 
-    await openTab(user, /Personal Information/i)
+    await openTab(user, /Personal/i)
     await save(user)
 
     await waitFor(() => expect(posted).toBeDefined())

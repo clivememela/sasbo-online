@@ -198,11 +198,17 @@ export default function MemberPanel({ member, open, onClose, children, footer })
               )}
 
               {meta.length > 0 && (
+                // 🔴 EACH FRAGMENT IS UNBREAKABLE, and the line breaks BETWEEN them. In a
+                // 400px column this used to wrap wherever the words ran out, so the record
+                // opened with "joined 04 Jan" on one line and "2022" alone on the next --
+                // a date cut in half under the member's own card. `text-pretty` only moved
+                // the break by a word; a branch name, an employee number and a date are each
+                // one fact, and a fact does not wrap in the middle.
                 <p className="record-rise mx-0.5 mt-3.5 text-sm text-ink-muted">
                   {meta.map((part, index) => (
                     <span key={index}>
                       {index > 0 && ' · '}
-                      {part}
+                      <span className="whitespace-nowrap">{part}</span>
                     </span>
                   ))}
                 </p>

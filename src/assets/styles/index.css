@@ -686,6 +686,37 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
    chip scrolled off the right edge on exactly the machine most of the union's staff use. */
 @container register (max-width: 600px) { .register [data-fit="narrow"] { display: none; } }
 
+/* ── The topbar is a CONTAINER too, and for the same reason the register is ──────
+   🔴 THE CURRENT PAGE'S CRUMB WAS PAINTING UNDERNEATH THE SEARCH BOX. The topbar is
+   `auto | minmax(220px,520px) | 1fr`, and its first item carries `min-w-0` so the trail can
+   give way -- but nothing told it what to do when it did, so the crumb simply overflowed its
+   track and the search field, which has a solid ground, drew straight over it. Measured with
+   the record panel open: at 1280 the track is 58px and the trail wants 120, so 62px of
+   "Members" sat under the search; at 1366, 33px. It looked like a rendering fault, and the
+   half-word it left showing was the CURRENT PAGE -- the one crumb worth reading.
+
+   🔑 IT HAS TO BE A CONTAINER QUERY. The panel now opens and closes at a fixed viewport, and
+   that changes the topbar's width by 448px without the window moving a pixel -- so no media
+   query can see the thing that causes this. 660px is where the trail stops fitting, and it
+   was measured with the panel open rather than guessed. ⚠️ A CONTAINER QUERY MEASURES THE
+   CONTENT BOX, so these are the topbar's width less its own 28px gutters -- 680 at 1440,
+   where the trail clears the search by 19px; 617 at 1366, where 33px of the current page is
+   under it; 558 at 1280, where 62px is. The threshold sits between the width that works and
+   the widest one that does not, not on the round number nearest either.
+
+   ⚠️ AND THE TRAIL MUST NOT BE `overflow-hidden`. It is the content of an `auto` track, and
+   a clipped box has an automatic minimum size of zero -- so hiding its overflow collapsed
+   the track to 58px at every width and clipped the crumb even when there was room for it.
+   The container query is what keeps the trail inside its track; the last crumb's `22ch` cap
+   is what keeps a single long route name from running away with the row.
+
+   Under it, the trail keeps the CURRENT PAGE and drops what leads to it. That is the right
+   half to keep: "Home" is one click away in the rail, and the page you are on is the thing a
+   crumb is for. `overflow-hidden` on the trail is the floor under all of it -- whatever else
+   happens, nothing in the topbar may paint over its neighbour. */
+.topbar { container-type: inline-size; container-name: topbar; }
+@container topbar (max-width: 660px) { .crumb-lead { display: none; } }
+
 /* ── The register on a phone (card.css `@media (max-width: 760px)`) ──────────────
    The head goes to screen readers only and every row becomes a small card of its own:
    the member over their number, the status at the top right, the bank and the branch

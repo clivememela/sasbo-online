@@ -531,7 +531,7 @@ export default function CaptureMember() {
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`touch-target inline-flex items-center gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-sm font-medium transition-[color,box-shadow] duration-(--duration-instant) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring ${activeTab === tab.id ? "font-semibold text-brand-ink shadow-[inset_0_-2px_0_var(--color-brand)]" : "text-ink-muted shadow-[inset_0_-2px_0_transparent] hover-hover:hover:text-ink"}`}
                             >
-                                <span>{tab.label}</span>
+                                <span title={tab.full}>{tab.label}</span>
                                 {tabsWithErrors.has(tab.id) && (
                                     <>
                                         {/* The asterisk was the ONLY signal that a tab held
