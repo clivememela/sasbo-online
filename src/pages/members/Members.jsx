@@ -1190,9 +1190,25 @@ export default function Members() {
                                         // card.css:358 -- 13px, not 14: the strip is a quiet index of the record, not a
                                         // second row of headings, and the extra pixel is what pushed it to three rows.
                                         "touch-target inline-flex items-center justify-self-start gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-[13px] font-medium",
-                                        // A final row holding one tab puts it in the LAST column, under the
-                                        // third of the row above, so the empty cell falls in the middle.
-                                        index === TABS.length - 1 && TABS.length % 3 === 2 && "col-start-3",
+                                        // 🗣️ THE ARRANGEMENT, IN TWO RULES, BOTH THE OWNER'S (2026-09-10).
+                                        //
+                                        // ① The final row holds one tab, and it goes in the LAST column, under
+                                        //    the third of the row above -- *"so that there's a gap in the middle
+                                        //    between Recruitment and Structures."* The empty cell falls in the
+                                        //    middle, and the block reads as an arrangement rather than as a row
+                                        //    that ran out.
+                                        //
+                                        // ② That leaves the MIDDLE COLUMN holding one tab where the outer two
+                                        //    hold two each, so it spans both rows and centres in them --
+                                        //    *"move Employment down a few pixels so that it can be right in the
+                                        //    center, relative to all the other panel tabs."* The five sections
+                                        //    settle into a balance rather than a ragged second line.
+                                        //
+                                        // Both are guarded on there being exactly five sections, because that
+                                        // is the shape they describe: `MEMBER_TABS` has a sixth commented out,
+                                        // and six would fill a 3x2 grid with nothing to balance.
+                                        TABS.length === 5 && index === TABS.length - 1 && "col-start-3",
+                                        TABS.length === 5 && index === 1 && "row-span-2 self-center",
                                         "transition-[color,box-shadow] duration-(--duration-instant) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
                                         activeTab === tab.id
                                             ? "font-semibold text-brand-ink shadow-[inset_0_-2px_0_var(--color-brand)]"
