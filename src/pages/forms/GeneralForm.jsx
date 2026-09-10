@@ -46,8 +46,10 @@ export default function GeneralForm({ filters }) {
             <div className="mb-6 rounded-lg bg-accent-soft px-3 py-2.5 text-sm leading-relaxed text-ink">
                 <span className="mb-0.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-ink">How to complete this form</span>
                 Please indicate below the title, initials and surname of every non-member of SASBO at the branch / department, as well as, after attempting to recruit the individual, provide one of the following indicators in the application column:{' '}
-                <span className="font-bold not-italic text-brand-ink">
-                    'J' = Joined, 'NI' = Not Interested, 'NA' = Not Available, 'NT' = No Time to See.
+                {/* `not-italic` went with the italics it was undoing, and the emphasis is
+                    the world's semibold rather than bold. */}
+                <span className="font-semibold text-accent-ink">
+                    &lsquo;J&rsquo; = Joined, &lsquo;NI&rsquo; = Not Interested, &lsquo;NA&rsquo; = Not Available, &lsquo;NT&rsquo; = No Time to See.
                 </span>
             </div>
 
