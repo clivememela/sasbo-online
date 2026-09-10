@@ -103,7 +103,6 @@ export default function CaptureMember() {
         repElectionDay: "",
         repElectionMonth: "",
         repElectionYear: "",
-        electedRep: "N",
         remarks: "",
         remarks2: "",
         remarks3: "",
@@ -674,15 +673,7 @@ export default function CaptureMember() {
                             <>
                                 <Field label="Recruiter" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} options={reps.map(r => r.name).filter(Boolean)} searchable />
                                 <Field label="Area's Recruiter" value={form.areasRep} onChange={handleChange("areasRep")} options={reps.map(r => r.name).filter(Boolean)} searchable />
-                                <SectionTitle title="Elected Recruiter" />
-                                <Field label="Elected Recruiter (Y/N)" value={form.electedRep} onChange={(e) => {
-                                    const val = e.target.value;
-                                    setForm(prev => ({
-                                        ...prev,
-                                        electedRep: val,
-                                        ...(val === 'N' ? { repElectionDay: '', repElectionMonth: '', repElectionYear: '', structureIds: [] } : {})
-                                    }));
-                                }} options={yesNoOptions} />
+
                                 {form.electedRep === 'Y' && (
                                     <>
                                         <RepElectionDatePicker form={form} setForm={setForm} />
@@ -697,19 +688,6 @@ export default function CaptureMember() {
                                         </div>
                                     </>
                                 )}
-                            </>
-                        )}
-                        {activeTab === "history" && (
-                            <>
-                                <Field label="Remarks / Comments" value={form.remarks} onChange={handleChange("remarks")} className="md:col-span-2" />
-                                <Field label="2nd Remarks Field" value={form.remarks2} onChange={handleChange("remarks2")} className="md:col-span-2" />
-                                <Field label="MEMNET Member (Y/N)" value={form.memnetMember} onChange={handleChange("memnetMember")} options={yesNoOptions} />
-                                <Field label="Print Label for Postage (Y/N)" value={form.printLabelForPostage} onChange={handleChange("printLabelForPostage")} options={yesNoOptions} />
-                                <Field label="Suspension Code" value={form.suspensionCode} onChange={handleChange("suspensionCode")} options={suspensionCodeOptions} />
-                                <Field label="Use Alternate Address (Y/N)" value={form.useAltAddress} onChange={handleChange("useAltAddress")} options={yesNoOptions} />
-                                <Field label="Deduct Subscriptions through ACB (Y/N)" value={form.deductACB} onChange={handleChange("deductACB")} options={yesNoOptions} />
-                                <Field label="Print Membership Cards (Y/N)" value={form.printMembershipCards} onChange={handleChange("printMembershipCards")} options={yesNoOptions} />
-                                <Field label="Home Loan Reduced Rate (Y/N)" value={form.homeLoanReducedRateOption} onChange={handleChange("homeLoanReducedRateOption")} options={yesNoOptions} />
                             </>
                         )}
                     </div>
