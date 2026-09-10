@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { flushSync } from "react-dom";
 import { useNavigate, useLocation, useOutletContext } from "react-router-dom";
 import {
     LucideUserRoundPlus, AlertCircle, CircleCheck, Printer, SlidersHorizontal,
@@ -244,6 +245,27 @@ export default function Members() {
 
     /* The name the toast says, captured at the save so it survives the panel closing. */
     const [savedName, setSavedName] = useState("");
+
+    /*
+     * 🖨️ WHICH OF THE TWO THINGS ON THIS SCREEN IS BEING PRINTED.
+     *
+     * Print is live (the owner, 2026-09-09) and this page carries two printable surfaces at
+     * once: the register, from Export, and the open member's record, from the panel's Print.
+     * `index.css`'s print rules keep everything inside `.print-area` and remove the rest --
+     * so exactly one of them may wear the class, and which one depends on the button that
+     * was pressed. Without this the register printed the record beside it and the record
+     * printed the register behind it.
+     *
+     * 🔑 `flushSync` BECAUSE `window.print()` DOES NOT WAIT FOR REACT. The dialog opens on
+     * the DOM as it is at the moment of the call; a state change scheduled normally lands
+     * after the snapshot, so the class would arrive one print too late, every time.
+     */
+    const [printScope, setPrintScope] = useState(null);
+    const printWith = useCallback((scope) => {
+        flushSync(() => setPrintScope(scope));
+        window.print();
+        setPrintScope(null);
+    }, []);
 
     const loadMembers = useCallback(() => {
         setListState("loading");
@@ -727,9 +749,13 @@ export default function Members() {
             // fit with "Standard Bank". Truncated here, whole in the cell's title, the
             // detail panel and the card.
             truncate: true,
-            // 10rem, measured at 1349px with the panel docked: the register is 605 wide and the
-            // four columns fit at 598; at 11rem they ran to 614 and Status scrolled off.
-            className: "max-w-[10rem]",
+            // 🔴 THE CAP IS FLUID, IN THE REGISTER'S OWN UNITS. A fixed 10rem was measured at
+            // 1349 (the register 605px, four columns fitting in 598) and then conceded that
+            // width everywhere else: at 1440 the register is 680 and four names still
+            // truncated with ~20px going spare. `cqw` reads the `.register` container the
+            // column ladder already measures, so the cap grows with the space and the floor
+            // is the measurement that made Status fit on the laptop.
+            className: "max-w-[clamp(10rem,26cqw,18rem)]",
             cell: (m) => m.bankName || "—",
         },
         {
@@ -764,7 +790,7 @@ export default function Members() {
                                 PDF comes from. Print is live (the owner, 2026-09-09); an
                                 endpoint that writes a spreadsheet does not exist yet, and a
                                 control that promised one would be a lie in a primary position. */}
-                            <Button onClick={() => window.print()} title="Print the register, or save it as a PDF">
+                            <Button onClick={() => printWith("register")} title="Print the register, or save it as a PDF">
                                 <Download size={16} strokeWidth={1.75} aria-hidden="true" /> Export
                             </Button>
                             <Button variant="primary" onClick={() => navigate("/members/capture")}>
@@ -900,7 +926,13 @@ export default function Members() {
             {/* 📐 card.css `.register` + `.card-surface`: the sheet fills the remaining
                 height, and the pager is its foot. The `register` class is the container the
                 column ladder measures (index.css). */}
-            <section aria-label="Member register" className="register flex flex-1 flex-col px-7 pb-7 pt-4 max-lg:px-4">
+            <section
+                aria-label="Member register"
+                className={cn(
+                    "register flex flex-1 flex-col px-7 pb-7 pt-4 max-lg:px-4",
+                    printScope === "register" && "print-area",
+                )}
+            >
                 <Sheet>
                     <Table
                         caption="Sasbo members matching the current search"
@@ -981,7 +1013,7 @@ export default function Members() {
                                 forces the light theme so a dark-mode user does not print a black
                                 page. The mock's foot has Edit alone; print earns the one quiet
                                 control beside it. */}
-                            <Button size="icon" onClick={() => window.print()} aria-label="Print this member's record">
+                            <Button size="icon" onClick={() => printWith("record")} aria-label="Print this member's record">
                                 <Printer size={16} strokeWidth={1.75} aria-hidden="true" />
                             </Button>
                             <Button variant="primary" onClick={handleEditToggle}>
@@ -999,7 +1031,7 @@ export default function Members() {
                     'address')` the moment it mounted -- the same failure the Modal's own
                     comment recorded, reintroduced by the commit that removed the Modal. */}
                 {selectedMember && (
-                    <div className="member-record">
+                    <div className={cn("member-record", printScope === "record" && "print-area")}>
                         {/* THE ERROR SUMMARY that replaced three `alert()` calls. Focused
                             rather than `role="alert"`: `Field` already gives every inline
                             message that role, so a form failing four validations would
@@ -1231,7 +1263,7 @@ export default function Members() {
                                             </div>
 
                                             {editForm.isBec && (
-                                                <div className="pl-4 border-l-2 border-brand space-y-6 mt-4 animate-slideDown">
+                                                <div className="mt-4 space-y-6 border-l border-line pl-4">
                                                     {/* 🔴 THE COMMITTEE SELECT HAD NO ACCESSIBLE NAME EITHER — the
                                                         same defect as A28, one dialog over, and invisible to the
                                                         a11y gate because that scans the LIST page. The <label> above
@@ -1330,7 +1362,7 @@ export default function Members() {
                                                     }));
                                                 }} />
                                                 {(editForm.isCosatu === "Y" || editForm.isCosatu === true) && (
-                                                    <div className="mt-4 pl-4 border-l-2 border-accent space-y-4 animate-slideDown">
+                                                    <div className="mt-4 space-y-4 border-l border-line pl-4">
                                                         <p className="text-xs font-bold uppercase tracking-wide text-accent-ink">COSATU structure</p>
                                                         {/* 🔴 BR-14 — THE TWO UNLABELLED CHECKBOXES ARE GONE, replaced
                                                             by the two labelled free-text fields `V19` actually

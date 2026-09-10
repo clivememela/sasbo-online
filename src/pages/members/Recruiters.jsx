@@ -570,7 +570,10 @@ export function Recruiters() {
         // the world holds actions in the record, and status red is a status colour, not
         // an action colour. The finish review of 2026-09-10 named the red column in every
         // row as the one thing on this screen the Card world does not do.
-    ], [saving]);
+        //
+        // ♻️ `saving` left this memo with that column: no cell reads it any more, and a
+        // dependency nothing depends on is a re-render nobody asked for.
+    ], []);
 
     /** A member as it appears on a recruiter's list. */
     const memberColumn = useCallback((onOpen) => ({
@@ -834,7 +837,11 @@ export function Recruiters() {
                             <span className="text-sm text-ink-muted">{repMembers.length} member{repMembers.length !== 1 ? 's' : ''}</span>
                         </div>
                         <div>
-                            <h3 className="border-b border-line py-3 text-center text-sm font-semibold text-brand-ink">
+                            {/* A section head in this world is small capitals in muted ink,
+                                left, over a hairline -- card.css `.fieldgroup__title`. It was
+                                centred and set in the brand's ink, which is the one weight
+                                nothing but a page title and a primary action carries. */}
+                            <h3 className="border-b border-line pb-2.5 pt-4 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">
                                 Members ({repMembers.length})
                             </h3>
                             {/* 🔴 FIVE RAW `<input>` TAGS WITH `aria-label` AND NO VISIBLE

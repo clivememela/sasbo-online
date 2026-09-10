@@ -529,7 +529,7 @@ export default function CaptureMember() {
                                 type="button"
                                 aria-current={activeTab === tab.id ? "true" : undefined}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`touch-target mr-4 inline-flex items-center gap-1 p-4 border-b-2 font-bold text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring ${activeTab === tab.id ? "border-brand text-brand-ink" : "border-transparent text-ink-muted hover-hover:hover:text-ink"}`}
+                                className={`touch-target inline-flex items-center gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-sm font-medium transition-[color,box-shadow] duration-(--duration-instant) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring ${activeTab === tab.id ? "font-semibold text-brand-ink shadow-[inset_0_-2px_0_var(--color-brand)]" : "text-ink-muted shadow-[inset_0_-2px_0_transparent] hover-hover:hover:text-ink"}`}
                             >
                                 <span>{tab.label}</span>
                                 {tabsWithErrors.has(tab.id) && (
@@ -555,8 +555,16 @@ export default function CaptureMember() {
                                 <Field label="First Name(s)" value={form.firstNames} onChange={handleChange("firstNames")} error={fieldErrors.firstNames} required />
                                 <Field label="Surname" value={form.surname} onChange={handleChange("surname")} error={fieldErrors.surname} required />
                                 <Field label="Identity Type" value={form.identityType} onChange={handleChange("identityType")} options={identityTypeOptions} error={fieldErrors.identityType} required />
+                                {/* 🔴 THE LABEL WAS AN INSTRUCTION: "Select Identity Type before
+                                    entering", set in the small capitals every label wears, so
+                                    the form appeared to shout a sentence at a field. A label
+                                    names the field; the instruction is a hint under it, and it
+                                    is only there while the field is actually shut. The name
+                                    becomes the chosen type once there is one, which is what the
+                                    member register does one screen over. */}
                                 <Field
-                                    label={form.identityType || "Select Identity Type before entering"}
+                                    label={form.identityType || "Identity Number"}
+                                    note={form.identityType ? null : "Choose an identity type first."}
                                     value={form.identityNumber}
                                     onChange={handleChange("identityNumber")}
                                     error={fieldErrors.identityNumber}
@@ -655,7 +663,7 @@ export default function CaptureMember() {
                                 />
 
                                 {form.isCosatu === "Y" && (
-                                    <div className="md:col-span-2 space-y-4 border-l-2 border-accent pl-4 mt-2">
+                                    <div className="md:col-span-2 mt-2 space-y-4 border-l border-line pl-4">
                                         <p className="text-xs font-bold uppercase tracking-wide text-accent-ink">COSATU Structure</p>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <Field
@@ -699,7 +707,7 @@ export default function CaptureMember() {
                                 />
 
                                 {form.isBecMember === "Y" && (
-                                    <div className="md:col-span-2 space-y-6 border-l-2 border-brand pl-4 mt-2">
+                                    <div className="md:col-span-2 mt-2 space-y-6 border-l border-line pl-4">
 
                                         {/* Flow node 3: 44 BEC Committees (Single Selection branch selector) */}
                                         <Field

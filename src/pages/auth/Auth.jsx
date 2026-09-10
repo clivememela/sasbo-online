@@ -117,11 +117,25 @@ export default function Auth() {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center p-4">
       <div className="w-full max-w-md rounded-card bg-surface p-8 shadow-(--shadow-2)">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <Logo className="mb-4 h-24 w-auto" alt="SASBO - The Finance Union" />
-          <h1 className="text-3xl font-semibold tracking-[-0.02em] text-ink">{isLogin ? 'Welcome Back' : 'Join SASBO'}</h1>
-          <p className="text-ink-muted">
-            {isLogin ? 'Log in to your account' : 'Create your account'}
+        {/* 🔑 THE RAIL'S OWN WORDMARK, because this is the first surface anybody sees and
+            it should introduce the same product the shell does: the mark, SASBO Online, and
+            the union's line in the brand's gold. The 96px logo floating over a centred
+            heading was the old shell's idea of a login and belonged to no world. */}
+        <div className="mb-7">
+          <span className="flex items-center gap-3">
+            <Logo className="size-11 shrink-0 object-contain" alt="" />
+            <span className="grid min-w-0 leading-[1.15]">
+              <span className="truncate text-md font-semibold tracking-[-0.01em] text-ink">SASBO Online</span>
+              <small className="mt-[3px] truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-ink">
+                The Finance Union
+              </small>
+            </span>
+          </span>
+          <h1 className="mt-6 text-3xl font-semibold leading-[1.15] tracking-[-0.02em] text-ink">
+            {isLogin ? 'Welcome back' : 'Join SASBO'}
+          </h1>
+          <p className="mt-1.5 text-base text-ink-muted">
+            {isLogin ? 'Log in to the membership administration system.' : 'Create your account.'}
           </p>
         </div>
 

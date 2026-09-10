@@ -314,7 +314,7 @@ export default function ResearchInformation() {
             </button>
 
             {expandedFolders[category] && (
-              <div className="ml-2 mt-1 sm:ml-4 space-y-1 border-l-2 border-line-strong pl-2 sm:pl-4">
+              <div className="ml-2 mt-1 space-y-1 border-l border-line pl-3 sm:ml-4 sm:pl-4">
                 {Array.isArray(subcategories) ? (
                   subcategories.map((file, idx) => (
                     <div

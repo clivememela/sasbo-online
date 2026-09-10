@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { navItems } from "../../config/navigation";
+import { cn } from "../../lib/utils";
 
 /**
  * The trail in the topbar -- card.html's `.crumbs`: 13px, muted, the current page in ink.
@@ -46,7 +47,7 @@ export default function Breadcrumbs() {
 
   return (
     <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 whitespace-nowrap text-sm text-ink-muted">
-      <Link to="/home" className={link}>Home</Link>
+      <Link to="/home" className={cn(link, "shrink-0")}>Home</Link>
       {pathnames.map((name, index) => {
         const routeTo = `/${pathnames.slice(0, index + 1).join("/")}`;
         const isLast = index === pathnames.length - 1;
@@ -56,11 +57,17 @@ export default function Breadcrumbs() {
           <span key={routeTo} className="flex items-center gap-1.5">
             {/* ink-faint on the chevron only: card.css calls --ink-3 "icons, dividers;
                 never body text", and the labels beside it are ink-muted for that reason. */}
-            <ChevronRight size={14} strokeWidth={1.75} aria-hidden="true" className="text-ink-faint" />
+            <ChevronRight size={14} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-ink-faint" />
+            {/* A CEILING, NOT A SHRINK. The trail keeps its natural width -- it is the
+                topbar's `auto` track -- but no single crumb may run away with the row:
+                "Affiliations/Other Trade Unions" is a real route name, and at full length
+                it would push the search under its own minimum. 22ch clears every ordinary
+                name and clips only the outliers, which the page's own heading repeats
+                anyway. */}
             {isLast ? (
-              <span aria-current="page" className="font-medium text-ink">{displayName}</span>
+              <span aria-current="page" className="max-w-[22ch] truncate font-medium text-ink" title={displayName}>{displayName}</span>
             ) : (
-              <Link to={routeTo} className={link}>
+              <Link to={routeTo} className={cn(link, "max-w-[18ch] truncate")} title={displayName}>
                 {displayName}
               </Link>
             )}

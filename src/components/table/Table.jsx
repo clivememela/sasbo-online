@@ -289,9 +289,18 @@ export default function Table({
             {state === 'loading' && (
               <>
                 {/* card.html's skeleton: the shape of the rows that are coming, so the
-                    register does not collapse to a spinner and jump when they land. */}
+                    register does not collapse to a spinner and jump when they land.
+
+                    ⚠️ THE ROW IS `data-skeleton`, NOT `data-row`. `data-row` means "a row a
+                    person can act on" -- ↑/↓ walk it, the pointer handler reads it, and any
+                    measurement that counts it is counting the register's contents. A
+                    skeleton is the shape of a row that has not arrived; marking it as one
+                    makes the loading state indistinguishable from the loaded one to
+                    everything that asks, which is this arc's oldest defect wearing a new
+                    hat. (Found by a capture that waited for `tr[data-row]`, matched a
+                    skeleton, and then found no control inside it.) */}
                 {Array.from({ length: SKELETON_ROWS }, (_, index) => (
-                  <tr key={`skeleton-${index}`} data-row="" aria-hidden="true">
+                  <tr key={`skeleton-${index}`} data-skeleton="" aria-hidden="true">
                     {expandable && <td data-expander="" className={cn(bodyCell, 'w-10 md:hidden')} />}
                     {visible.map((column, columnIndex) => (
                       <td key={column.key} data-col={column.key} data-fit={column.fit} className={cn(column.bodyClass, 'py-[15px]')}>

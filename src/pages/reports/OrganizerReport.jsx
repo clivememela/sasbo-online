@@ -93,9 +93,17 @@ export const OrganizerReport = ({ filters }) => {
                 </div>
             );
 
+    /*
+     * 🔴 THE SOLID TEAL BAND IS GONE. Each section used to be announced by a filled
+     * `bg-brand-hover` bar with white small capitals across it -- three of them down the
+     * form. The Card world has exactly one filled brand surface, the primary button, and
+     * one place the palette is allowed to be material, the membership card; a form's
+     * section head is neither. card.css's `.fieldgroup__title` is what this is: small
+     * capitals in muted ink, with a hairline separating one group from the next.
+     */
     const Section = ({ title, children }) => (
-        <div className="mb-6">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-on-brand bg-brand-hover px-4 py-2 rounded-md mb-4">{title}</h3>
+        <div className="mt-5 border-t border-line pt-[18px] first:mt-0 first:border-t-0 first:pt-0">
+            <h3 className="mb-3.5 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">{title}</h3>
             {/* 📱 R-RESP-O: PHONE-FIRST, and this form is the reason the rule exists.
                 It is an organiser's site-visit report -- filled in standing up, in a
                 branch -- and it had NO breakpoint at all: a hard `grid-cols-2`, so every
@@ -114,7 +122,10 @@ export const OrganizerReport = ({ filters }) => {
                 subtitle="Streamline and record organizer site visits, branch engagements, and membership recruitment across all financial institutions."
             />
             <div className="mt-5 max-w-4xl rounded-lg bg-surface p-6 shadow-(--shadow-1)">
-                <div className="text-center mb-6 pb-4 border-b-2 border-brand">
+                {/* The form's own letterhead, kept because this IS a paper form that gets
+                    printed -- but as a hairline and quiet ink rather than a 2px brand rule.
+                    Nothing else in this world underlines itself in the brand's colour. */}
+                <div className="mb-6 border-b border-line pb-4 text-center">
                     {/* 🔴 THIS WAS AN <h1>, AND IT IS THE SUBTLER HALF OF N8. The page's
                         actual title was an <h2> above it while this line of form chrome --
                         `text-sm`, uppercase, 14px -- was the document's top-level heading.
@@ -122,7 +133,7 @@ export const OrganizerReport = ({ filters }) => {
                         most important thing on the page was the form's letterhead. It is
                         the form's name, so it is a heading, but a SECOND-level one under
                         the page title PageTitle now supplies. */}
-                    <h2 className="text-sm font-semibold text-brand-ink tracking-wide uppercase">
+                    <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-muted">
                         SASBO Finance Union — Organizer's Branch / Department Report Form
                     </h2>
                 </div>
@@ -167,9 +178,11 @@ export const OrganizerReport = ({ filters }) => {
                         <Field label="Date Captured" name="dateCaptured" type="date" />
                     </Section>
 
-                    <div className="flex justify-center gap-3 pt-4 border-t border-line">
-                        <Button type="submit" variant="primary">Submit Report</Button>
-                        <Button type="reset" variant="default">Clear Form</Button>
+                    {/* The actions sit where every other surface in this world puts them:
+                        at the end of the sheet, to the right, primary last. */}
+                    <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-line pt-4">
+                        <Button type="reset" variant="default">Clear form</Button>
+                        <Button type="submit" variant="primary">Submit report</Button>
                     </div>
                 </form>
             </div>

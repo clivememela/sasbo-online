@@ -43,8 +43,24 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
   const subListId = `sidebar-sub-${String(item.href ?? item.title).replace(/\W+/g, '-')}`;
   const linkClass = "flex min-w-0 flex-1 items-center gap-3 self-stretch rounded-lg";
 
+  /*
+   * 🔴 `contents`, NOT A BOX — and it is the difference between half-transcribing the mock
+   * and transcribing it. card.css:135 is `.nav { display: grid; gap: 2px; flex: 1 }`, and
+   * in the mock EVERY row is a direct child of that grid: `<a class="nav__item">Members</a>`
+   * is followed by `<a class="nav__item--sub">Capture Member</a>` as a SIBLING. So the
+   * stretch is shared by all of them and the pitch is uniform (measured on the mock:
+   * 66/65/62/65).
+   *
+   * With this component's wrapper as a real box, only the top-level rows were grid tracks:
+   * the parents spread to 73px while the sub-rows stayed at 34-36 inside their own box, so
+   * the rail read as a tight cluster under Members with everything else over-spread. The
+   * finish review measured exactly that and called the fix half-made.
+   *
+   * `display: contents` removes the wrapper's box and promotes its children into the grid,
+   * which is the mock's markup expressed in a component that has to nest.
+   */
   return (
-    <div>
+    <div className="contents">
       {/* 🔴 THIS ROW WAS A `<div onClick>` WRAPPING A `<Link>`, AND BOTH HALVES WERE WRONG.
 
           For a parent item the div's handler called `onToggle`, so the ONLY way to expand a
@@ -110,8 +126,11 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
         )}
       </div>
 
+      {/* Also `contents`: the sub-rows join the rail's own grid rather than forming a
+          second one inside it. The element stays in the document so `aria-controls` on the
+          disclosure still resolves to something real. */}
       {hasSubItems && isExpanded && (
-        <div id={subListId} className="mt-0.5 grid gap-0.5">
+        <div id={subListId} className="contents">
           {item.subItems.map((subItem, index) => (
             <SidebarItem
               key={`${subItem.href}-${subItem.title}-${index}`}

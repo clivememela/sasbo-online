@@ -1,7 +1,9 @@
+import { Pencil } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
-import { SearchableSelect, SelectInput } from '../../components/form';
+import { Button, SearchableSelect, SelectInput } from '../../components/form';
+import { formatDateLong, formatZar } from '../../lib/format.js';
 import { subscriptionsService } from '../../services/subscriptionsService';
 import { bankService } from '../../services/bankService.js';
 import { useState, useEffect, useMemo } from 'react';
@@ -47,11 +49,10 @@ export default function Subscriptions() {
     const refs = useReferenceData(REFERENCE_LOADERS);
     const bankNames = refs.data.banks;
 
-    const formatDate = (d) => {
-        if (!d) return '';
-        if (Array.isArray(d)) return `${d[0]}-${String(d[1]).padStart(2,'0')}-${String(d[2]).padStart(2,'0')}`;
-        return new Date(d).toLocaleDateString();
-    };
+    /* ♻️ The private date formatter is gone. It printed the wire's own `2026-09-09` for an
+       array and the browser's locale string for anything else -- two shapes on one screen,
+       neither of them the design's. `formatDateLong` is the one every other surface reads,
+       and it already knows the API's `[y, m, d]`. */
 
     useEffect(() => {
         setLoading(true);
@@ -163,12 +164,13 @@ export default function Subscriptions() {
                     </div>
                 )}
 
-                {/* 🔴 THE LAST `vh` IN `src`, AND IT IS A `vh` ON A SCROLLER. conventions §6: on a
-                    phone `100vh` is the viewport WITHOUT the browser chrome that is actually
-                    covering it, so `60vh` is 60% of a taller box than exists -- the bottom of
-                    the list sits under the address bar and the scroller's own end is
-                    unreachable. `dvh` tracks the chrome as it hides and shows. */}
-                <div className="scroll-quiet relative max-h-[60dvh] overflow-y-auto">
+                {/* 🔴 THE INNER `max-h-[60dvh]` SCROLLER IS GONE, 2026-09-10. A sheet whose
+                    own box scrolls ends mid-row with the next one sliced in half, which is
+                    what the finish review's frame showed: the page already scrolls, and a
+                    sheet in this world ends where its rows end. (The `dvh` note it carried
+                    was right about `vh` and is kept in conventions §6; there is simply no
+                    viewport-height box here any more.) */}
+                <div className="relative">
                     {/* 🔑 THE THIRD HAND-ROLLED SPINNER, RETIRED. `06.2`.
                         It was a bordered div with `animate-spin` and its own copy -- one of
                         three separate spinners in the tree, none of which agreed about size,
@@ -245,18 +247,26 @@ export default function Subscriptions() {
                                                     <option value="INACTIVE">INACTIVE</option>
                                                 </select>
                                             </td>
-                                            <td className="px-3.5 py-[11px] first:pl-5 text-ink-muted">{formatDate(sub.registrationDate)}</td>
-                                            <td className="px-3.5 py-[11px] first:pl-5 text-center whitespace-nowrap">
-                                                <button type="button" onClick={handleSave} aria-label={`Save changes to ${editData.bankName || 'this subscription'}`} className="touch-target bg-brand hover-hover:hover:bg-brand-hover text-on-brand px-3 py-1 rounded text-xs mr-2">Save</button>
-                                                <button type="button" onClick={handleCancel} aria-label="Discard these changes" className="touch-target border border-line-strong bg-surface hover-hover:hover:bg-surface-2 text-ink px-3 py-1 rounded text-xs">Cancel</button>
+                                            <td className="px-3.5 py-[11px] first:pl-5 text-ink-muted">{formatDateLong(sub.registrationDate)}</td>
+                                            {/* ♻️ The two hand-rolled buttons are the primitive's now: one
+                                                focus ring, one hit area, one hover rule, and the primary
+                                                LAST, as every other surface in this world orders them. */}
+                                            <td className="whitespace-nowrap px-3.5 py-[11px] text-right first:pl-5">
+                                                <span className="inline-flex gap-2">
+                                                    <Button size="sm" onClick={handleCancel} aria-label="Discard these changes">Cancel</Button>
+                                                    <Button size="sm" variant="primary" onClick={handleSave} aria-label={`Save changes to ${editData.bankName || 'this subscription'}`}>Save</Button>
+                                                </span>
                                             </td>
                                         </>
                                     ) : (
                                         <>
-                                            <td className="px-3.5 py-[11px] first:pl-5">{sub.bankName}</td>
-                                            <td className="px-3.5 py-[11px] first:pl-5">{sub.acbDebitDay}</td>
-                                            <td className="px-3.5 py-[11px] first:pl-5">R {parseFloat(sub.subscriptionAmount).toFixed(2)}</td>
-                                            <td className="px-3.5 py-[11px] first:pl-5">{sub.isCoreBanking ? 'Yes' : 'No'}</td>
+                                            {/* A subscription whose bank never arrived is a fact worth
+                                                seeing: an em dash says "no bank on this row", a blank
+                                                cell says nothing and reads as a rendering fault. */}
+                                            <td className="px-3.5 py-[11px] font-medium text-ink first:pl-5">{sub.bankName || '—'}</td>
+                                            <td className="px-3.5 py-[11px] tabular-nums first:pl-5">{sub.acbDebitDay ?? '—'}</td>
+                                            <td className="px-3.5 py-[11px] tabular-nums first:pl-5">{formatZar(sub.subscriptionAmount)}</td>
+                                            <td className="px-3.5 py-[11px] text-ink-muted first:pl-5">{sub.isCoreBanking ? 'Yes' : 'No'}</td>
                                             <td className="px-3.5 py-[11px] first:pl-5">
                                                 {/* ♻️ THE FOURTH COPY OF THE STATUS CHIP, and the one
                                                     that was wrong in the most damaging direction: it knew
@@ -272,8 +282,21 @@ export default function Subscriptions() {
                                                     is on the wire, not ours to change here. */}
                                                 <StatusChip status={sub.status} />
                                             </td>
-                                            <td className="px-3.5 py-[11px] first:pl-5">{formatDate(sub.registrationDate)}</td>
-                                            <td className="px-3.5 py-[11px] first:pl-5 text-center text-xs text-ink-muted">click to edit</td>
+                                            <td className="px-3.5 py-[11px] text-ink-muted first:pl-5">{formatDateLong(sub.registrationDate)}</td>
+                                            {/* 🔴 IT SAID "click to edit" -- a hint where a control belongs,
+                                                and the only way in was a mouse on the row. The row still
+                                                opens on a click as a pointer convenience; this is the
+                                                control a keyboard reaches, named for the bank it edits. */}
+                                            <td className="whitespace-nowrap px-3.5 py-[11px] text-right first:pl-5">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={(e) => { e.stopPropagation(); handleRowClick(sub); }}
+                                                    aria-label={`Edit the subscription for ${sub.bankName || 'this bank'}`}
+                                                >
+                                                    <Pencil size={14} strokeWidth={1.75} aria-hidden="true" /> Edit
+                                                </Button>
+                                            </td>
                                         </>
                                     )}
                                 </tr>

@@ -116,7 +116,13 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
         </Button>
 
         {/* The mock drops the crumbs at 1100px: on a narrow window, where you are matters
-            less than getting somewhere, and two competing rows would wrap. */}
+            less than getting somewhere, and two competing rows would wrap.
+
+            ⚠️ NO `min-w-0` HERE, and the reason is worth a line. This is the grid's `auto`
+            track, so its width is its own min-content; `min-w-0` makes that zero, and the
+            search's flexible track then takes everything and squeezes the trail to
+            "Membe…" at 1440, where there was room for all three. The trail sizes itself;
+            what yields under pressure is the search, between its 220 and 520. */}
         <div className="hidden min-[1101px]:block">
           <Breadcrumbs />
         </div>
@@ -173,9 +179,12 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
           <span className="grid size-7 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-ink">
             SA
           </span>
-          {/* The name yields before the crumbs do: with the panel docked at 1349 the main
-              column is 645px, and the name's width came straight out of the breadcrumb. */}
-          <span className="hidden whitespace-nowrap text-[13.5px] font-medium text-ink min-[1440px]:inline">Administrator</span>
+          {/* 🔑 THE NAME IS PRESENT ACROSS THE WHOLE DESK, which is what the mock's topbar
+              shows and what the contract calls desktop -- from `xl` (1280), the same edge
+              the record panel docks at. It was briefly hidden below 1440 because it had been
+              pushing the breadcrumb off; the trail carries `min-w-0` now, so the row's
+              give comes out of the crumbs and the name stays where the mock puts it. */}
+          <span className="hidden whitespace-nowrap text-[13.5px] font-medium text-ink xl:inline">Administrator</span>
         </p>
       </div>
     </header>

@@ -19,6 +19,9 @@ import { cn } from "../lib/utils";
 const findAncestors = (items, target, path = []) => {
   let best = null;
   for (const item of items) {
+    // An entry with no route (Labels, Maintenance > Bank/Branch) is a label, not a
+    // destination: it can never be the target and it contributes nothing to a path.
+    if (!item.href) continue;
     const current = [...path, item.href];
     if (item.href === target && (!best || current.length < best.length)) best = current;
     if (item.subItems) {

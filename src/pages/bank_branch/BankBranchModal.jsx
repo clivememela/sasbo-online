@@ -114,7 +114,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
         {isReadOnlyView ? (
           <div className="space-y-6">
             <section className="space-y-4">
-              <h4 className="text-sm font-bold uppercase tracking-widest text-brand-ink border-l-4 border-brand pl-3">General Info</h4>
+              <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">General Info</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <DetailItem label="Bank Name" value={form.bankName} />
                 <DetailItem label="Abbreviation" value={form.bankAbbreviation} />
@@ -126,7 +126,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
             </section>
 
             <section className="space-y-4">
-              <h4 className="text-sm font-bold uppercase tracking-widest text-brand-ink border-l-4 border-brand pl-3">Contact & Management</h4>
+              <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Contact & Management</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <DetailItem label="Phone Number" value={form.phoneNumber} />
                 <DetailItem label="Fax" value={form.fax} />
@@ -136,7 +136,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
             </section>
 
             <section className="space-y-4">
-              <h4 className="text-sm font-bold uppercase tracking-widest text-brand-ink border-l-4 border-brand pl-3">Address</h4>
+              <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Address</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <DetailItem label="Physical Address" value={form.physicalAddress} />
                 <DetailItem label="Postal Address" value={form.postalAddress} />
@@ -144,7 +144,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
             </section>
 
             <section className="space-y-4">
-              <h4 className="text-sm font-bold uppercase tracking-widest text-brand-ink border-l-4 border-brand pl-3">Operations & Codes</h4>
+              <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Operations & Codes</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <DetailItem label="Province Committee Code" value={form.provinceCommitteeCode} />
                 <DetailItem label="Province Committee Name" value={form.provinceCommitteeName} />
@@ -160,7 +160,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
         ) : (
           <form id="add-bank-form" onSubmit={handleSubmit} className="space-y-6">
           <section className="space-y-4">
-            <h4 className="text-sm font-bold uppercase tracking-widest text-brand-ink border-l-4 border-brand pl-3">General Info</h4>
+            <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">General Info</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <TextInput label="Bank Name *" value={form.bankName} onChange={set("bankName")} placeholder="e.g. Standard Bank" />
               <TextInput label="Abbreviation" value={form.bankAbbreviation} onChange={set("bankAbbreviation")} placeholder="e.g. STD" />
@@ -172,7 +172,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
           </section>
 
           <section className="space-y-4">
-            <h4 className="text-sm font-bold uppercase tracking-widest text-brand-ink border-l-4 border-brand pl-3">Contact & Management</h4>
+            <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Contact & Management</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <TextInput label="Phone Number" value={form.phoneNumber} onChange={set("phoneNumber")} placeholder="Phone" />
               <TextInput label="Fax" value={form.fax} onChange={set("fax")} placeholder="Fax" />
@@ -182,7 +182,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
           </section>
 
           <section className="space-y-4">
-            <h4 className="text-sm font-bold uppercase tracking-widest text-brand-ink border-l-4 border-brand pl-3">Address</h4>
+            <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Address</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <AddressAutocomplete label="Physical Address" value={form.physicalAddress} onChange={set("physicalAddress")} placeholder="Start typing a physical address..." />
               <AddressAutocomplete label="Postal Address" value={form.postalAddress} onChange={set("postalAddress")} placeholder="Start typing a postal address..." />
@@ -190,7 +190,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
           </section>
 
           <section className="space-y-4">
-            <h4 className="text-sm font-bold uppercase tracking-widest text-brand-ink border-l-4 border-brand pl-3">Operations & Codes</h4>
+            <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Operations & Codes</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <TextInput label="Province Committee Code" value={form.provinceCommitteeCode} onChange={set("provinceCommitteeCode")} placeholder="e.g. GP" />
               <TextInput label="Province Committee Name" value={form.provinceCommitteeName} onChange={set("provinceCommitteeName")} placeholder="e.g. Gauteng" />

@@ -33,17 +33,18 @@ export default function GeneralForm({ filters }) {
 
     return (
         <div className="mt-5 rounded-lg bg-surface p-6 text-ink shadow-(--shadow-1)">
-            <div className="text-center mb-8 border-b-2 border-brand pb-4">
+            <div className="mb-6 border-b border-line pb-4 text-center">
                 {/* 🔴 An <h1> used as a `text-sm` caption -- N8's other half, and the
                     same shape as `OrganizerReport`. This component renders INSIDE a page
                     that already has its own title, so it was giving that route two <h1>s
                     the moment `PageTitle` was promoted. */}
-                <h2 className="text-sm font-semibold text-brand-ink uppercase tracking-wide">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-muted">
                     SASBO — The Finance Union — General Form
                 </h2>
             </div>
 
-            <div className="mb-8 p-4 bg-brand-soft rounded-lg border-l-4 border-brand text-sm leading-relaxed italic text-ink">
+            <div className="mb-6 rounded-lg bg-accent-soft px-3 py-2.5 text-sm leading-relaxed text-ink">
+                <span className="mb-0.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-ink">How to complete this form</span>
                 Please indicate below the title, initials and surname of every non-member of SASBO at the branch / department, as well as, after attempting to recruit the individual, provide one of the following indicators in the application column:{' '}
                 <span className="font-bold not-italic text-brand-ink">
                     'J' = Joined, 'NI' = Not Interested, 'NA' = Not Available, 'NT' = No Time to See.

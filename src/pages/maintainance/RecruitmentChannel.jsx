@@ -170,7 +170,7 @@ export default function RecruitmentChannel() {
 
                 {/* Add row */}
                 {showAdd && (
-                    <div className="flex items-center gap-2 mb-3 p-3 rounded-xl bg-brand-soft border border-brand-ring">
+                    <div className="mb-3 flex items-center gap-2 rounded-lg bg-brand-soft p-3">
                         <input
                             autoFocus
                             value={newName}
