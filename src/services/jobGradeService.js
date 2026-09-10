@@ -1,4 +1,5 @@
 import { apiUrl } from './api';
+import { requestJson } from './parseApiError';
 import { JOB_GRADE_OPTIONS } from '../config/memberConstants.js';
 import { bankService } from './bankService.js';
 
@@ -31,18 +32,19 @@ export const jobGradeService = {
         });
         if (found && found.universalBranchCode) bankCode = found.universalBranchCode;
       }
-    } catch (e) {
-      // ignore mapping errors gracefully
+    } catch {
+      // The NAME->CODE lookup only. A failure here means the code could not be resolved, so the
+      // query below runs with whatever the caller passed -- which is the right degradation, and is
+      // not the same thing as swallowing the job-grade request itself.
     }
 
     const qs = `?bankCode=${encodeURIComponent(String(bankCode))}`;
 
-    return fetch(apiUrl(`/api/job-grades${qs}`), { credentials: 'include' })
-        .then(async (r) => {
-          if (!r.ok) {
-            return JOB_GRADE_OPTIONS;
-          }
-          const payload = await r.json();
+    return requestJson((signal) => fetch(apiUrl(`/api/job-grades${qs}`), {
+      credentials: 'include',
+      signal,
+    }))
+        .then((payload) => {
             const list = normalizeList(payload);
 
             const normalized = list
@@ -66,6 +68,20 @@ export const jobGradeService = {
 
           return normalized.length ? normalized : JOB_GRADE_OPTIONS;
         })
+        /*
+         * ⚠️ A25 IS STILL OPEN HERE, AND ON PURPOSE -- ITS TWO HALVES CANNOT LAND SEPARATELY.
+         *
+         * The register's own criterion is *"the method rejects AND the caller renders an error"*,
+         * and this one `catch` is the first clause. Removing it today would make `getByBank`
+         * reject into `CaptureMember` and `Members`, neither of which has an error state for a
+         * reference list yet -- so the visible result would be an unhandled rejection where there
+         * used to be a usable fallback. That is a worse application, not a closed row.
+         *
+         * ✅ WHAT DID CHANGE: the failure is now a proper error on the one path (`kind`, `status`,
+         * `retryable`, the server's own message) instead of a bare `HTTP 500:`. So `06.1b` closes
+         * A25 by deleting this single line and giving the two callers a per-panel error state with
+         * retry (EH-D9), and the pin flips in that commit -- one move, both clauses.
+         */
         .catch(() => JOB_GRADE_OPTIONS);
   }
 };

@@ -132,24 +132,51 @@ export const DEFECTS = {
 // ever does start resolving an error envelope, it reddens there and names the
 // method.
 
-  A13: define(
-    'A13',
-    'bankService turns a failed request into an empty list',
-    'getBankNames catches and returns [] after logging; getBankListing swallows the ' +
-      'inner /api/banks failure with .catch(() => []). "There are no banks" and "the ' +
-      'backend is down" become the same screen. bank is the reference domain for both ' +
-      'the server coverage phase and the e2e reference journey, so this is the pattern ' +
-      'every other domain is told to copy.',
-  ),
+// A13 is RETIRED, 2026-09-10, by the design arc's 06.1a.
+//
+// It read: "bankService turns a failed request into an empty list". `getBankNames` ended in
+// `.catch(err => { console.error(...); return [] })`, so a 500, a network failure and a
+// non-JSON body ALL resolved with an empty array -- and eight consumers across seven screens
+// then rendered "no banks". A down backend and a database with no banks in it were the same
+// screen, and the only trace was a console line no user sees. bank being the reference domain
+// is what made it worse: it was the pattern every other domain was told to copy.
+//
+// It is on `requestJson` now (conventions.md §16) and REJECTS on all three cases, so an empty
+// array means the server genuinely returned no banks. Closed under BR-12, with the owner's nod
+// recorded in the 2026-09-09 dialog.
+//
+// Its two pins were deleted and its entry removed from the errorContract's BREACHES map in the
+// same commit -- flipped, not repaired (contract 4).
+//
+// ⚠️ What is NOT closed with it: `getBankListing`'s INNER `/api/banks` lookup still falls back
+// to `[]`, and that is deliberate and now documented at the site. It is an ENRICHMENT (it
+// supplies the universal branch codes); losing it empties one column rather than the page, which
+// is EH-D9's "partial failure stays partial" and not this row's defect. The PRIMARY call rejects.
 
-  A14: define(
-    'A14',
-    'no request timeout anywhere -- a hung backend spins forever',
-    'Zero AbortController, zero signal:, zero timeout in src/services/. The three-state ' +
-      'rule covers loading, empty and failed. A request that never resolves is none of ' +
-      'them: it renders the loading state indefinitely, which an administrator reads as ' +
-      '"the system is slow" rather than "it is down".',
-  ),
+// A14 is RETIRED, 2026-09-10, by the design arc's 06.1a.
+//
+// It read: "no request timeout anywhere -- a hung backend spins forever". Zero
+// AbortController, zero `signal:`, zero timeout of any kind across `src/services/`. It was the
+// failure mode with the longest time to detection in this application precisely because it
+// looks like the system working: an administrator reads a permanent spinner as "slow" rather
+// than "down", so nobody is called and nothing is escalated.
+//
+// Every service now threads an `AbortSignal` through `requestJson`, with the ceilings published
+// in conventions.md §16 -- 10s reads, 20s writes, and a "taking longer than expected" notice at
+// 5s that belongs to the component. A deadline we imposed rejects as `kind: 'timeout'`,
+// retryable; a caller superseding its own request is `kind: 'abort'` and is not a failure at all.
+//
+// 🔑 ITS STATIC HALF IS WHY THIS ROW COULD NOT BE SPLIT, and it shaped the commit. That pin
+// scanned `src/services/*.js` for `AbortController|signal:|AbortSignal|setTimeout` and asserted
+// the match list was EMPTY -- so a ceiling on SOME services would have failed the scan without
+// closing the row. The ceiling therefore landed across all eight services at once.
+//
+// Both pins deleted, the standard-facing test un-skipped, and the static assertion INVERTED
+// rather than deleted: it now requires the service layer to still be able to express a ceiling,
+// so a refactor that quietly drops the signal threading turns it red and names the row.
+//
+// 📨 The diff shape is owed to the Capture Member arc, whose own copy of this pin flips when the
+// branches meet. Their session was offline when this landed; recorded in repoState.md.
 
   A23: define(
     'A23',
@@ -240,16 +267,30 @@ export const DEFECTS = {
       'safe today, and this one is asserted, not assumed.',
   ),
 
-  A24: define(
-    'A24',
-    'error detail does not survive the service layer',
-    'Every service throws new Error(`HTTP ${status}`), discarding validationErrors -- ' +
-      'the one part of the Spring envelope that is stable and field-addressable. So a ' +
-      'form cannot show "idNumber: must be 13 digits" even though the server sent ' +
-      'exactly that, and the user is told only that something went wrong. The status ' +
-      'code is discarded with it, so a caller cannot distinguish a 400 it caused from ' +
-      'a 500 it did not.',
-  ),
+// A24 is RETIRED, 2026-09-10, by the design arc's 06.1a.
+//
+// It read: "error detail does not survive the service layer". Every service threw
+// `new Error(\`HTTP ${status}: ${statusText}\`)`, discarding `validationErrors` -- the one part
+// of the Spring envelope that is stable and field-addressable -- so a form could not show
+// "identityNumber: must be 13 digits" even though the server had sent exactly that. The status
+// went with it, so a caller could not tell a 400 it caused from a 500 it did not. And
+// `statusText` is the EMPTY STRING over HTTP/2, which every deployment of this application uses:
+// the whole of a failed capture's diagnosis was `HTTP 500:` with nothing after the colon.
+//
+// A QUIETER HALF, worth recording because it is the part a reader would not predict: three
+// modules (recruiter, recruitmentChannel, subscriptions) did `Promise.reject(msg)` with the raw
+// response TEXT, so a caller's ordinary `catch (e) { e.message }` was `undefined` and even the
+// free-text message was lost by anyone handling the failure the normal way.
+//
+// Every service is on `requestJson` now and rejects with an `Error` carrying `message`, `status`,
+// `validationErrors`, `kind` and `retryable` (conventions.md §16). The helper itself came verbatim
+// from the Capture Member arc's `phase/capture-member` f020af9 -- deliberately, because two error
+// paths in one service layer is worse than either -- and this arc added `kind`, `retryable` and
+// the ceiling.
+//
+// Its two pins were deleted and the standard-facing test un-skipped, plus three new live
+// assertions: the closed `kind` vocabulary over the whole discovered population, and that a 5xx is
+// retryable while a 4xx is not (so no retry button lies).
 
   A1: define(
     'A1',

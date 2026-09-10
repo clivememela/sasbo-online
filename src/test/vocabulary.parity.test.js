@@ -388,12 +388,29 @@ describe('vocabulary parity between this browser and its server', () => {
       )
     })
 
-    it(pin(DEFECTS.A24, 'no service reads a single key of the error envelope'), () => {
-      // Every service throws `HTTP ${r.status}: ${r.statusText}` -- the HTTP
-      // Response's own fields, never the server's JSON body. So `message`,
-      // `validationErrors` and the rest are published, sent, and discarded: a
-      // 400 listing exactly which fields are invalid reaches the user as
-      // "HTTP 400: Bad Request", and the form highlights nothing.
+    it('the service layer READS the error envelope, which is A24 closed', () => {
+      /*
+       * ✅ A24's PIN, FLIPPED BY 06.1a AND INVERTED RATHER THAN DELETED.
+       *
+       * It asserted that NO service read a single key of the envelope: every service threw
+       * `HTTP ${r.status}: ${r.statusText}` — the HTTP Response's own fields, never the server's
+       * JSON body — so `message`, `validationErrors` and the rest were published, sent, and
+       * discarded. A 400 listing exactly which fields were invalid reached the user as
+       * "HTTP 400: Bad Request" and the form highlighted nothing.
+       *
+       * `parseApiError.js` reads them now, so the same scan asserts the opposite. Kept rather than
+       * deleted because it is the only check that the envelope is read AT ALL — a refactor that
+       * reverted to `statusText` would otherwise be invisible.
+       *
+       * 🔴 AND THE PATTERN NEEDED ONE FIX TO SURVIVE THE FLIP, which is the interesting part. It
+       * matched a PLAIN DOT. `parseApiError` is written defensively against a body that may be
+       * `null`, so every read is OPTIONAL CHAINING — `body?.message`, `body?.validationErrors` —
+       * and a `?` is not whitespace, so the original pattern matched NEITHER. Inverting the
+       * assertion without fixing it would have reported "the envelope is still not read" against
+       * code that reads it on the line above. A guard aimed at a notation rather than at a fact
+       * catches whichever spelling it happened to be written against, which is the species this
+       * suite keeps recording, so the `?` is explicit now.
+       */
       //
       // Matched in a MEMBER position or a destructuring, not only as
       // `body.<key>` -- `const { validationErrors } = await r.json()` is the
@@ -422,18 +439,21 @@ describe('vocabulary parity between this browser and its server', () => {
       // ~450ms cold, against ~330ms hoisted." Same slip, smaller loop.
       const keysRead = vocabulary.errorEnvelopeKeys.filter((key) => {
         const reads = new RegExp(
-          `\\b(?:${BODY})\\s*\\.\\s*${key}\\b` + `|\\{[^}]*\\b${key}\\b[^}]*\\}\\s*=[^=]`,
+          `\\b(?:${BODY})\\s*\\??\\.\\s*${key}\\b` + `|\\{[^}]*\\b${key}\\b[^}]*\\}\\s*=[^=]`,
           'i',
         )
         return sources.some((source) => reads.test(source.code))
       })
 
+      // The two keys that carry meaning for a person and for a form, asserted BY NAME against
+      // the committed vocabulary rather than as a count — so "the envelope is read" cannot be
+      // satisfied by reading `timestamp`.
       expect(
         keysRead,
-        'A service now reads the error envelope. Good -- A24 is being fixed. Assert the ' +
-          'keys it reads against api-vocabulary.json rather than against a guess, then ' +
-          'replace this pin with that assertion and close row A24.',
-      ).toEqual([])
+        'The service layer has stopped reading the error envelope, so a 400 that names the ' +
+          'invalid fields reaches the user as a status code again and the form highlights ' +
+          'nothing. That is A24, reopened.',
+      ).toEqual(expect.arrayContaining(['message', 'validationErrors']))
     })
   })
 })

@@ -95,7 +95,12 @@ const BODYLESS = new Set([
  * MEASURED 2026-09-04 by executing every method under every case.
  */
 const BREACHES = {
-  'bankService.getBankNames': { cases: ['envelope', 'network', 'nonJson'], defect: DEFECTS.A13 },
+  // ✅ `bankService.getBankNames` IS GONE FROM THIS LIST -- A13 is CLOSED by `06.1a`.
+  //
+  // It used to end in `.catch(() => [])`, so a 500, a network failure and a non-JSON body all
+  // resolved with an empty array and eight consumers across seven screens rendered "no banks".
+  // It is on `requestJson` now and rejects on all three, which is why its two pins below are
+  // gone rather than "repaired": the register row is closed, under BR-12 and the owner's nod.
   'jobGradeService.getByBank': { cases: ['envelope', 'network', 'nonJson'], defect: DEFECTS.A25 },
   'bankService.updateBank': { cases: ['nonJson'], defect: DEFECTS.A26 },
 }
@@ -264,61 +269,110 @@ describe('the service error contract', () => {
 })
 
 describe('what a rejection carries', () => {
-  const methods = allServiceMethods().filter((m) => !NON_FETCHING.has(m.qualified))
-
-  it.skip(
-    disabled(DEFECTS.A24, 'a rejection must carry status and validationErrors'),
-    async () => {
-      // Written to the standard. The server sends validationErrors -- the one
-      // part of its envelope that is stable and field-addressable -- and the
-      // service layer throws it away, so a form cannot show
-      // "identityNumber: must be 13 digits" even though it was sent.
-      for (const m of methods) {
-        server.use(envelope(400))
-        const { rejected } = await settle(m)
-        expect(rejected, `${m.qualified}`).toMatchObject({
-          status: 400,
-          validationErrors: { identityNumber: 'must be 13 digits' },
-        })
-      }
-    },
+  /*
+   * 🔴 THE BREACHED METHODS ARE EXCLUDED, AND SAYING WHY MATTERS MORE THAN THE FILTER.
+   *
+   * This block is about the SHAPE of a rejection, not about which methods reject. Two are still
+   * admitted not to reject on every case — `jobGradeService.getByBank` (A25) and
+   * `bankService.updateBank` (A26) — and both are documented at their sites with the reason. Asking
+   * them "what does your rejection carry" produces `undefined`, which is a fact about A25 and A26
+   * and tells you nothing about A24.
+   *
+   * ⚠️ AND THE EXCLUSION IS DERIVED FROM `BREACHES`, never listed again here. A second hand-typed
+   * list would drift from the first the day a row closes — which is precisely what happened to the
+   * skipped version of this test: it iterated ALL methods, and nobody noticed it could not have
+   * passed, because it was skipped.
+   */
+  const methods = allServiceMethods().filter(
+    (m) => !NON_FETCHING.has(m.qualified) && !BREACHES[m.qualified],
   )
 
-  it(pin(DEFECTS.A24, 'every rejection still discards status and validationErrors'), async () => {
-    const carrying = []
+  /*
+   * ✅ A24 IS CLOSED BY `06.1a`, AND THIS IS THE FLIPPED PAIR.
+   *
+   * The standard-facing test below was `it.skip(disabled(DEFECTS.A24, ...))` and is now live; the
+   * two pins that asserted the defect are DELETED rather than made to pass. What they asserted:
+   *
+   *   "every rejection still discards status and validationErrors" -- every service threw
+   *   `new Error(\`HTTP ${r.status}: ${r.statusText}\`)`, which keeps neither. And `statusText` is
+   *   the EMPTY STRING over HTTP/2, which every deployment of this application uses, so the whole
+   *   of a failed capture's diagnosis was `HTTP 500:` with nothing after the colon.
+   *
+   *   "three modules still reject with a bare string rather than an Error" -- `handleResponse` in
+   *   recruiterService, recruitmentChannelService and subscriptionsService did
+   *   `Promise.reject(msg)` with the raw response TEXT, so a caller's ordinary
+   *   `catch (e) { e.message }` was `undefined` and even the free-text message was lost.
+   *
+   * Both are fixed at one home: every service goes through `requestJson`, which rejects with an
+   * `Error` carrying `message`, `status`, `validationErrors`, `kind` and `retryable`
+   * (conventions.md §16).
+   */
+  it('a rejection carries status and validationErrors, on every method', async () => {
+    // The server sends `validationErrors` -- the one part of its envelope that is stable and
+    // field-addressable -- and the service layer used to throw it away, so a form could not show
+    // "identityNumber: must be 13 digits" even though it had been sent.
     for (const m of methods) {
       server.use(envelope(400))
       const { rejected } = await settle(m)
-      if (rejected?.status !== undefined || rejected?.validationErrors !== undefined) {
-        carrying.push(m.qualified)
+      expect(rejected, `${m.qualified}`).toMatchObject({
+        status: 400,
+        validationErrors: { identityNumber: 'must be 13 digits' },
+      })
+    }
+  })
+
+  it('every rejection is an Error, so `e.message` is never undefined', async () => {
+    const nonErrors = []
+    for (const m of methods) {
+      server.use(envelope(400))
+      const { rejected } = await settle(m)
+      if (rejected !== undefined && !(rejected instanceof Error)) nonErrors.push(m.qualified)
+    }
+    expect(
+      nonErrors,
+      'A service is rejecting with something that is not an Error again. A caller doing the ' +
+        'ordinary `catch (e) { e.message }` gets `undefined`, so the server\'s own sentence is ' +
+        'lost by anyone handling the failure the normal way -- which is A24\'s quieter half.',
+    ).toEqual([])
+  })
+
+  it('every rejection carries a `kind` from the closed vocabulary, and a `retryable`', async () => {
+    // 🔑 §16's VOCABULARY, ASSERTED OVER THE WHOLE DISCOVERED POPULATION rather than at the one
+    // or two call sites a hand-written test would have picked. A sixth kind invented at a call
+    // site is how a consumer's `switch` silently stops covering its input.
+    const KINDS = new Set(['http', 'network', 'nonJson', 'timeout', 'abort'])
+    const wrong = []
+    for (const m of methods) {
+      server.use(envelope(500))
+      const { rejected } = await settle(m)
+      if (!rejected) continue
+      if (!KINDS.has(rejected.kind) || typeof rejected.retryable !== 'boolean') {
+        wrong.push(`${m.qualified} kind=${rejected.kind} retryable=${rejected.retryable}`)
       }
     }
     expect(
-      carrying,
-      `These methods now carry structured error detail through the rejection: ` +
-        `${carrying.join(', ')}. A24 has been fixed -- delete this pin, un-skip the test ` +
-        `above, and close the row.`,
-    ).toHaveLength(0)
+      wrong,
+      'A rejection is missing `kind` or `retryable`, or carries a kind outside the closed set ' +
+        `${[...KINDS].join(' | ')}. Both are published in conventions.md §16 and the Capture ` +
+        'Member arc consumes them.',
+    ).toEqual([])
   })
 
-  it(
-    pin(DEFECTS.A24, 'three modules still reject with a bare string rather than an Error'),
-    async () => {
-      // A second, quieter half of A24. `handleResponse` in recruiterService,
-      // recruitmentChannelService and subscriptionsService does
-      // `Promise.reject(msg)` with the raw response TEXT. The caller's
-      // `catch (e) { e.message }` is therefore undefined, so even the free-text
-      // message is lost by anyone handling it the ordinary way.
-      const nonErrors = []
-      for (const m of methods) {
-        server.use(envelope(400))
-        const { rejected } = await settle(m)
-        if (rejected !== undefined && !(rejected instanceof Error)) nonErrors.push(m.qualified)
-      }
-      expect(nonErrors.length, `still rejecting with a non-Error: ${nonErrors.join(', ')}`)
-        .toBeGreaterThan(0)
-    },
-  )
+  it('a 5xx is retryable and a 4xx is NOT, so no retry button lies', async () => {
+    // Derived once in the helper rather than by each consumer from `status`. A 4xx is the server
+    // saying the request was wrong: retrying it unchanged produces the same refusal, and a retry
+    // control that cannot work is worse than none.
+    const m = methods.find((x) => !NON_FETCHING.has(x.qualified))
+
+    server.use(envelope(500))
+    expect((await settle(m)).rejected).toMatchObject({ kind: 'http', retryable: true })
+
+    server.use(envelope(400))
+    expect((await settle(m)).rejected).toMatchObject({ kind: 'http', retryable: false })
+
+    server.use(networkFailure())
+    expect((await settle(m)).rejected).toMatchObject({ kind: 'network', retryable: true })
+  })
 })
 
 describe('the endpoint each method actually calls', () => {

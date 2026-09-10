@@ -1,4 +1,5 @@
 import { apiUrl } from './api';
+import { requestJson, requestJsonWrite, requestOptionalJson } from './parseApiError';
 
 const PAGE_SIZE = 100;
 
@@ -48,22 +49,23 @@ const getUniversalCode = (record) =>
 
 export const bankService = {
   getBankListing: () =>
-    fetch(apiUrl('/api/banks/branches'), { credentials: 'include' })
-      .then(async (branchesResponse) => {
-        if (!branchesResponse.ok) {
-          throw new Error(`HTTP ${branchesResponse.status}: ${branchesResponse.statusText}`);
-        }
-
-        const branchPayload = await branchesResponse.json();
+    requestJson((signal) => fetch(apiUrl('/api/banks/branches'), {
+      credentials: 'include',
+      signal,
+    }))
+      .then(async (branchPayload) => {
         const branches = normalizeListPayload(branchPayload);
 
-        const banksResult = await fetch(apiUrl('/api/banks'), { credentials: 'include' })
-          .then((banksResponse) => {
-            if (!banksResponse.ok) return [];
-            return banksResponse.json();
-          })
-          .then((banksPayload) => normalizeListPayload(banksPayload))
-          .catch(() => []);
+        // 🔑 THE SECOND CALL IS AN ENRICHMENT, AND ITS FALLBACK IS DELIBERATE -- one of the very
+        // few places in this file where swallowing is correct. `/api/banks` supplies the universal
+        // branch codes; without them the listing still renders, with that one column empty. So a
+        // failure here degrades the row rather than losing the page, which is EH-D9's rule
+        // (partial failure stays partial) rather than A13's defect (failure indistinguishable from
+        // emptiness) -- the difference being that the PRIMARY call above now rejects properly.
+        const banksResult = await requestJson((signal) => fetch(apiUrl('/api/banks'), {
+          credentials: 'include',
+          signal,
+        })).then((banksPayload) => normalizeListPayload(banksPayload)).catch(() => []);
 
         if (banksResult.length === 0) {
           return branches;
@@ -123,82 +125,78 @@ export const bankService = {
               ?? '',
           };
         });
-      })
-      .catch(err => {
-        console.error('Failed to fetch bank listing:', err);
-        throw err;
       }),
 
+  /**
+   * 🔴 A13, AND THIS METHOD IS THE WHOLE REASON THAT ROW EXISTS. It ended in
+   *
+   *     .catch(err => { console.error(...); return []; })
+   *
+   * so a 500, a network failure and a non-JSON body ALL resolved with an empty array — and eight
+   * consumers across seven screens then rendered *"no banks"*. A down backend and a database with
+   * no banks in it were the same result, and the only trace was a console line no user sees. That
+   * is A27's class in the service layer: a confident wrong answer one level below where the
+   * three-state rule looks for it.
+   *
+   * ✅ FIXED HERE UNDER BR-12, with the owner's nod recorded in the 2026-09-09 dialog: this unit
+   * makes `bankService` distinguish failure from emptiness. It now REJECTS, and an empty array
+   * means the server genuinely returned no banks.
+   *
+   * ⚠️ THIS REDDENS A13's PIN BY DESIGN, and the correct response is to flip the pin/disabled pair
+   * and close the register row — never to restore the `catch` (contract ④).
+   */
   getBankNames: () =>
-    fetch(apiUrl('/api/banks'), { credentials: 'include' })
-      .then(r => {
-        if (!r.ok) {
-          throw new Error(`HTTP ${r.status}: ${r.statusText}`);
-        }
-        return r.json();
-      })
-      .then(payload => {
-        const banks = normalizeListPayload(payload);
-        return banks
-          .map(bank => bank.name ?? bank.bankName ?? '')
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b));
-      })
-      .catch(err => {
-        console.error('Failed to fetch bank names:', err);
-        return [];
-      }),
+    requestJson((signal) => fetch(apiUrl('/api/banks'), {
+      credentials: 'include',
+      signal,
+    })).then((payload) => normalizeListPayload(payload)
+      .map((bank) => bank.name ?? bank.bankName ?? '')
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b))),
 
   getBanks: () =>
-    fetch(apiUrl('/api/banks/branches'), { credentials: 'include' })
-      .then(r => {
-        if (!r.ok) {
-          throw new Error(`HTTP ${r.status}: ${r.statusText}`);
-        }
-        return r.json();
-      })
-      .catch(err => {
-        console.error('Failed to fetch banks:', err);
-        throw err;
-      }),
+    requestJson((signal) => fetch(apiUrl('/api/banks/branches'), {
+      credentials: 'include',
+      signal,
+    })),
 
   getPageSize: () => PAGE_SIZE,
 
   createBank: (data) =>
-    fetch(apiUrl('/api/banks/branches'), {
+    requestJsonWrite((signal) => fetch(apiUrl('/api/banks/branches'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
-    })
-      .then(r => {
-        if (!r.ok) throw new Error('Failed to create bank');
-        return r.json();
-      })
-      .catch(err => {
-        console.error('Failed to create bank:', err);
-        throw err;
-      }),
+      signal,
+    })),
 
-  updateBank: (id, data) =>
-    fetch(apiUrl(`/api/banks/branches/${id}`), {
+  /**
+   * ⚠️ A26 IS DELIBERATELY LEFT OPEN HERE, AND THE REASON IS A CLASSIFICATION, NOT A DEFERRAL.
+   *
+   * A26 records that `updateBank` resolves on a 2xx whose body is not JSON. It does — and for a
+   * PUT that is the CORRECT behaviour, not a defect: this endpoint answers some deployments with
+   * the updated record and others with an empty 200, and a write that succeeded is a write that
+   * succeeded. Rejecting because the server chose not to echo the row back would turn a saved
+   * change into a reported failure, which is worse than the row it is filed under.
+   *
+   * So it is classified as a BODY-LESS WRITE (`parseBody: false`) — the same treatment the three
+   * DELETEs get and for the same reason — and the optimistic `{ ...data, id }` result stays. What
+   * changes is the FAILURE path: a 4xx/5xx now rejects with the server's own message, `status`
+   * and `validationErrors` instead of the string `'Failed to update bank'`.
+   *
+   * 🔑 A26's PIN THEREFORE STAYS GREEN AND THE ROW STAYS OPEN, on purpose. Whether the row should
+   * be re-scoped or closed as "not a defect" is a REGISTER decision, and the register is the
+   * single id namespace — not something an error-handling commit gets to settle quietly
+   * (contract ⑥).
+   */
+  updateBank: async (id, data) => {
+    const updated = await requestOptionalJson((signal) => fetch(apiUrl(`/api/banks/branches/${id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
-    })
-      .then(async r => {
-        if (!r.ok) throw new Error('Failed to update bank');
-
-        const responseText = await r.text();
-        if (!responseText) return { ...data, id };
-
-        try {
-          return JSON.parse(responseText);
-        } catch {
-          return { ...data, id };
-        }
-      })
-      .catch(err => {
-        console.error('Failed to update bank:', err);
-        throw err;
-      }),
+      signal,
+    }));
+    // The echo when there is one, the optimistic result when there is not.
+    return updated ?? { ...data, id };
+  },
 };

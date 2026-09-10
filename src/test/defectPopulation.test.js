@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { DEFECTS, DEFECT_ROWS } from './knownDefects'
-import { assertNonVacuousScan, FLOORS } from './assertNonVacuousScan'
+import { assertBlankingPreservedCode, assertNonVacuousScan, FLOORS } from './assertNonVacuousScan'
+import { blankComments } from './sourceScan'
 
 /**
  * EVERY SKIPPED TEST IS ACCOUNTED FOR, IN BOTH DIRECTIONS.
@@ -31,13 +32,36 @@ import { assertNonVacuousScan, FLOORS } from './assertNonVacuousScan'
  */
 
 /** Every test source in the repository, read as text. */
+/*
+ * 🔴 COMMENTS ARE BLANKED, AND THIS SCAN READ THEM AS CODE UNTIL `06.1a`.
+ *
+ * Every pattern below looks for `DEFECTS.<ROW>` and `it.skip(disabled(` in test SOURCE — and it
+ * read the raw text, so PROSE ABOUT a skip counted as a skip. It bit for real the moment three
+ * rows were closed: the commit that retired A13, A14 and A24 recorded, in comments, what their
+ * flipped pins used to assert — sentences of the form
+ *
+ *     The test below was `it.skip(disabled(DEFECTS.A14, ...))`; it is live now.
+ *
+ * That single comment satisfied both the row pattern AND the skip pattern, so the guard reported
+ * A14 as *"cited by a skipped test but not defined in knownDefects.js"* — about a row that had
+ * just been correctly closed, in a file with no skips left in it at all.
+ *
+ * 🔑 THE FIX IS THE INSTRUMENT, NOT THE PROSE. Rewording the comment to dodge the pattern is the
+ * move this repository explicitly refuses: it makes the documentation worse to keep a scanner
+ * quiet, and the scanner stays wrong for the next author. Same species as F-P29, where a metric
+ * counted the comments explaining its own fixes and reported the members lane as getting worse.
+ *
+ * `blankComments` replaces comment bodies with spaces and preserves line structure, so line
+ * numbers in any future message stay true. `assertBlankingPreservedCode` proves it did not simply
+ * empty the files — a blanker that returned "" would make every scan here vacuous and green.
+ */
 const TEST_SOURCES = Object.entries(
   import.meta.glob('../**/*.test.{js,jsx}', {
     query: '?raw',
     import: 'default',
     eager: true,
   }),
-)
+).map(([path, raw]) => [path, blankComments(raw)])
 
 /**
  * Which rows a file cites, and whether that file skips and pins.
@@ -97,9 +121,18 @@ const ALL_SKIPS = TEST_SOURCES.flatMap(([path, src]) =>
 )
 
 describe('the disabled population', () => {
-  it('read the test sources at all', () => {
+  it('read the test sources at all, and the blanker did not empty them', () => {
     assertNonVacuousScan(TEST_SOURCES, FLOORS.TEST_SOURCE_FILES, 'test source files')
     assertNonVacuousScan(DEFECT_ROWS, FLOORS.DEFECT_ROWS, 'register rows in knownDefects.js')
+
+    // 🔑 THE SECOND HALF OF BLANKING COMMENTS. A blanker that returned "" for every file would
+    // make every pattern below find nothing, report no offenders, and go green — which is also
+    // exactly what success looks like. `assertBlankingPreservedCode` takes the shape the rest of
+    // the suite uses; here the sources are already blanked, so the check is that code survived.
+    assertBlankingPreservedCode(
+      TEST_SOURCES.filter(([, code]) => !/\b(?:import|describe|it|expect)\b/.test(code))
+        .map(([path]) => ({ path })),
+    )
   })
 
   it('FORWARDS -- every skipped test cites a row that exists', () => {

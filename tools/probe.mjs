@@ -175,12 +175,26 @@ export const themeReadout = `(() => {
  * a floor on the APP rather than on any one route's content — a per-route selector would be a
  * second thing to keep in step with 25 routes.
  */
+/*
+ * 🔴 AND EVERY CLAUSE IS NULL-SAFE, BECAUSE MID-NAVIGATION THERE IS NO `document.body`.
+ *
+ * `document.body.children.length` and `getComputedStyle(document.body)` both THROW on a document
+ * that has not built its body yet — which is the state a poll started immediately after
+ * `Page.navigate` can catch. This was latent from the day the predicate was written and invisible
+ * because the old hand-copied `evaluate()` in four of six tools SWALLOWED page exceptions and
+ * returned `undefined`, which the readiness loops read as "not ready yet" and simply retried.
+ *
+ * 🔑 THE STRICT `evaluate` IN `cdp.mjs` FOUND IT WITHIN ONE RUN. Once a thrown expression became
+ * a real error instead of a silent `undefined`, `edges` and `contrast` both aborted with
+ * `Cannot read properties of null (reading 'children')` — the fifth defect the refactor pass
+ * turned up, and the clearest possible argument for having stopped swallowing exceptions.
+ */
 export const pageReady = `(() => (
   document.fonts.status === 'loaded'
   && !document.querySelector('[data-testid="route-pending"]')
-  && document.body.children.length > 0
+  && (document.body?.children.length ?? 0) > 0
   && (document.getElementById('root')?.children.length ?? 0) > 0
-  && getComputedStyle(document.body).backgroundColor !== 'rgba(0, 0, 0, 0)'
+  && (document.body ? getComputedStyle(document.body).backgroundColor : 'rgba(0, 0, 0, 0)') !== 'rgba(0, 0, 0, 0)'
 ))()`;
 
 /** Where a row was taken, for a complaint message. Rows are shaped differently per tool. */
