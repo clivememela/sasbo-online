@@ -10,7 +10,12 @@ import {
   assertNothingWasSkipped,
   FLOORS,
 } from './assertNonVacuousScan.js'
-import { DETECTOR_CANARY, PALETTE_FAMILIES, paletteLiteralsIn } from './paletteLiterals.js'
+import {
+  DETECTOR_CANARY,
+  PALETTE_FAMILIES,
+  darkTwinsOnTokens,
+  paletteLiteralsIn,
+} from './paletteLiterals.js'
 import { blankingDestroyedCode, readSources, unreadableDirectories } from './sourceScan.js'
 
 /**
@@ -33,31 +38,21 @@ import { blankingDestroyedCode, readSources, unreadableDirectories } from './sou
  * ⚠️ THE LIST IS P4's OWN SCHEDULE, wave by wave, and it reaches ZERO when P4 closes.
  */
 
-/** The waves, exactly as `IMPLEMENTATION.md` splits them. */
-const NOT_YET_CONVERTED = {
-  /** `04.3` -- admin, maintainance, archives, reports, bank_branch, acb, forms. */
-  'src/pages/acb/AcbDebits.jsx': '04.3',
-  'src/pages/admin/Acb.jsx': '04.3',
-  'src/pages/admin/Admin.jsx': '04.3',
-  'src/pages/admin/DailyMenu.jsx': '04.3',
-  'src/pages/admin/Maintenance.jsx': '04.3',
-  'src/pages/admin/MonthlyMenu.jsx': '04.3',
-  'src/pages/archives/AffiliationsOtherTradeUnions.jsx': '04.3',
-  'src/pages/archives/ArchiveSearch.jsx': '04.3',
-  'src/pages/archives/FinanceHouses.jsx': '04.3',
-  'src/pages/archives/ResearchInformation.jsx': '04.3',
-  'src/pages/bank_branch/BankBranch.jsx': '04.3',
-  'src/pages/bank_branch/BankBranchModal.jsx': '04.3',
-  'src/pages/bank_branch/BankListing.jsx': '04.3',
-  'src/pages/forms/Forms.jsx': '04.3',
-  'src/pages/forms/GeneralForm.jsx': '04.3',
-  'src/pages/forms/MembershipApplication.jsx': '04.3',
-  'src/pages/maintainance/RecruitmentChannel.jsx': '04.3',
-  'src/pages/maintainance/Subscriptions.jsx': '04.3',
-  'src/pages/reports/LocationListing.jsx': '04.3',
-  'src/pages/reports/Locations.jsx': '04.3',
-  'src/pages/reports/OrganizerReport.jsx': '04.3',
-}
+/**
+ * Files P4 has not converted yet.
+ *
+ * ✅ EMPTY, AND THAT IS THE POINT IT WAS BUILT TO REACH. It opened at `04.1` with 24
+ * entries -- three for `04.2`, twenty-one for `04.3` -- and shrank by exactly the files
+ * each wave converted, because a converted file left on the list reddens this suite as
+ * hard as an unconverted file taken off it.
+ *
+ * 🔑 IT STAYS RATHER THAN BEING DELETED. Empty, the two assertions below collapse into
+ * one rule with no exceptions: EVERY non-test file under `src` holds zero palette
+ * literals. The mechanism is still here for the next arc that needs to convert a tree in
+ * waves -- and, more usefully, an entry added tomorrow is visible as an exemption rather
+ * than as a passing test.
+ */
+const NOT_YET_CONVERTED = {}
 
 /**
  * Every non-test source file under `src/`, comments blanked.
@@ -109,6 +104,57 @@ describe('the palette-literal detector', () => {
       'A colour token is named after a Tailwind palette family, so the detector cannot ' +
         'tell a token from a literal. Rename the token to a ROLE (conventions §1); do ' +
         'not weaken the detector.',
+    ).toEqual([])
+  })
+})
+
+/** Every `--color-<role>` the theme defines, read from the stylesheet itself. */
+function tokenRoles() {
+  const css = readFileSync(join(REPO_ROOT, 'src', 'assets', 'styles', 'index.css'), 'utf8')
+  return [...new Set([...css.matchAll(/--color-([a-z0-9-]+)\s*:/g)].map((match) => match[1]))]
+}
+
+describe('no `dark:` variant on a token utility', () => {
+  it('the detector sees a dark twin, and does not convict a bare token', () => {
+    const roles = tokenRoles()
+    assertNonVacuousScan(roles, FLOORS.COLOUR_TOKENS, 'colour tokens in index.css')
+
+    // 🔴 THE CANARY. This check reads the token list from the stylesheet, so an empty
+    // or mis-parsed list makes it silently vacuous -- no roles to match, no twins found,
+    // green.
+    expect(
+      darkTwinsOnTokens('text-ink dark:text-on-brand', roles).map((hit) => hit.utility),
+      'The detector cannot see a dark twin on a token. Every assertion below is vacuous.',
+    ).toEqual(['dark:text-on-brand'])
+
+    expect(
+      darkTwinsOnTokens('md:dark:bg-surface-2 hover:dark:border-line-strong', roles).length,
+      'Variant stacks hide the twin. `md:dark:bg-surface` is the same mistake, indented.',
+    ).toBe(2)
+
+    expect(
+      darkTwinsOnTokens('text-ink bg-surface border-line dark:bg-gray-800', roles),
+      'The detector convicted a bare token, or a dark: on a PALETTE literal -- which is ' +
+        "`paletteLiteralsIn`'s business, not this one's.",
+    ).toEqual([])
+  })
+
+  it('no file carries one', () => {
+    const sources = scan()
+    const roles = tokenRoles()
+    assertNonVacuousScan(sources, FLOORS.SRC_SOURCE_FILES, 'non-test source files under src/')
+
+    const offenders = sources.flatMap((source) =>
+      darkTwinsOnTokens(source.code, roles).map((hit) => `${source.path}:${hit.line} ${hit.utility}`),
+    )
+
+    expect(
+      offenders,
+      'A token utility carries a `dark:` variant. A token already carries BOTH themes — ' +
+        '`--color-ink` is dark ink in light mode and light ink in dark mode — so the ' +
+        'variant either does nothing or silently overrides the theme. Delete it; do not ' +
+        'translate it. Note the colour gate reports these files CLEAN, because a token is ' +
+        'the right answer and only its `dark:` twin is wrong.',
     ).toEqual([])
   })
 })

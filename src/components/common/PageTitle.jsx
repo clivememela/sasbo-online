@@ -24,8 +24,15 @@ export default function PageTitle({ title, subtitle }) {
           8.26 on surface; dark 7.98 vs 11.17), so the pair needs no new token -- and
           "the shell should look approximately the same" is the invariant this
           restores, not a preference. */}
+      {/* 📱 R-RESP-O: A READABLE MEASURE, AND IT BELONGS HERE RATHER THAN ON EACH PAGE.
+          Several of these subtitles are full sentences — Finance Houses' runs to 140
+          characters — and with nothing constraining them they set as ONE line across a
+          1440px window, which is roughly 200 characters and about three times the span an
+          eye tracks without losing its place. `max-w-prose` is ~65ch, and putting it in
+          the shared component means the next page to be written gets it without anybody
+          remembering. */}
       {subtitle && (
-        <p className="text-xl text-center mt-2 text-brand">
+        <p className="mx-auto mt-2 max-w-prose text-balance text-center text-xl text-brand">
           {subtitle}
         </p>
       )}

@@ -81,7 +81,6 @@ export const MEMBER_FIELD_LABEL_MAP = {
   bankAccountNumber: 'Bank Account Number',
   branch: 'Bank Branch Where Member Works',
   ibtNo: 'IBT No.',
-  /*workIbtNo: 'Work IBT No.',*/
   paymentType: 'Payment Type',
   debitDay: 'Day to be debited',
   bankAddress: 'Bank Address',

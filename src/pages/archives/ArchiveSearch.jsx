@@ -10,7 +10,7 @@ const cards = [
 
 export default function ArchiveSearch() {
   return (
-    <div className="p-6 text-gray-900 dark:text-gray-100">
+    <div className="p-6 text-ink">
       <PageTitle title="Search Archives" subtitle="Select options below" />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto text-center">
         {cards.map((card) => <NavigationCard key={card.href} {...card} />)}

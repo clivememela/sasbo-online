@@ -3,6 +3,8 @@ import { Printer } from "lucide-react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, SearchableSelect, Button } from "../../components/form";
 import BankBranchModal from "./BankBranchModal.jsx";
+import PageTitle from '../../components/common/PageTitle';
+import Table from '../../components/table/Table.jsx';
 
 const PAGE_SIZE = bankService.getPageSize();
 
@@ -43,14 +45,50 @@ export default function BankBranch() {
     setPage(1);
   };
 
-  return (
-    <div className="p-6 text-gray-900 dark:text-gray-100">
-      <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">Bank/Branch</h2>
-      <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-        Access, manage, and track Sasbo member records across South Africa's leading financial institutions and branch networks.
-      </p>
+  /**
+   * 🔴 NINE COLUMNS, IN A `grid-cols-9`, WITH `<div onClick>` ROWS. The header was nine
+   * `<div>`s with no relationship to the cells beneath them, so a screen-reader user got
+   * eighty-one unlabelled values in a row; and opening a branch to edit it was mouse-only.
+   *
+   * 📱 R-RESP-K IS DOING REAL WORK HERE. Nine columns at 390px is roughly 40px each --
+   * every value truncated to nothing. Two are essential and the other seven drop into the
+   * row's detail panel, so a phone shows a usable list instead of a wall of ellipses.
+   */
+  const bankColumns = useMemo(() => [
+    {
+      key: 'bankName',
+      header: 'Bank Name',
+      priority: 'essential',
+      truncate: true,
+      cell: (bank) => (
+        <button
+          type="button"
+          onClick={() => setSelectedBank(bank)}
+          aria-label={`${bank.bankName || 'This bank'} \u2014 open the ${bank.branchName || 'branch'} record`}
+          className="touch-target rounded-sm text-left font-medium text-brand-ink underline-offset-2 hover-hover:hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+        >
+          {bank.bankName}
+        </button>
+      ),
+    },
+    { key: 'bankAbbreviation', header: 'Abbreviation', priority: 'essential', cell: (b) => b.bankAbbreviation || '\u2014' },
+    { key: 'branchName', header: 'Branch', priority: 'secondary', truncate: true, cell: (b) => b.branchName || '\u2014' },
+    { key: 'area', header: 'Area', priority: 'secondary', truncate: true, cell: (b) => b.area || '\u2014' },
+    { key: 'randomAccessNumber', header: 'Random Access Number', priority: 'detail', cell: (b) => b.randomAccessNumber || '\u2014' },
+    { key: 'phoneNumber', header: 'Phone', priority: 'detail', cell: (b) => b.phoneNumber || '\u2014' },
+    { key: 'managerName', header: 'Manager', priority: 'detail', cell: (b) => b.managerName || '\u2014' },
+    { key: 'fax', header: 'Fax', priority: 'detail', cell: (b) => b.fax || '\u2014' },
+    { key: 'email', header: 'Email', priority: 'detail', truncate: true, cell: (b) => b.email || '\u2014' },
+  ], []);
 
-      <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
+  return (
+    <div className="p-6 text-ink">
+      <PageTitle
+        title="Bank/Branch"
+        subtitle="Access, manage, and track Sasbo member records across South Africa's leading financial institutions and branch networks."
+      />
+
+      <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-surface">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
           <SearchableSelect
             label="Bank Name"
@@ -80,13 +118,14 @@ export default function BankBranch() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm no-print">
-          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+          <div className="flex items-center gap-2 text-ink-muted">
             Showing {filteredBanks.length === 0 ? 0 : startIndex + 1}-{endIndex} of {filteredBanks.length} banks
             {filteredBanks.length > 0 && (
               <button
+                type="button"
                 onClick={() => globalThis.print()}
-                title="Print results"
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition"
+                aria-label="Print this bank branch listing"
+                className="touch-target p-1 rounded hover-hover:hover:bg-surface-2 text-ink-muted transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
               >
                 <Printer size={16} />
               </button>
@@ -103,7 +142,7 @@ export default function BankBranch() {
             >
               Prev
             </Button>
-            <span className="text-gray-600 dark:text-gray-300">
+            <span className="text-ink-muted">
               Page {page} of {totalPages}
             </span>
             <Button
@@ -119,42 +158,15 @@ export default function BankBranch() {
         </div>
 
         <div className="mt-4 overflow-hidden rounded-xl border border-transparent print-area">
-          <div className="grid grid-cols-9 gap-4 px-4 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300">
-            <div>Bank Name</div>
-            <div>Abbreviation</div>
-            <div>Branch</div>
-            <div>Area</div>
-            <div>Random Access Number</div>
-            <div>Phone</div>
-            <div>Manager</div>
-            <div>Fax</div>
-            <div>Email</div>
-          </div>
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {visibleBanks.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-gray-600 dark:text-gray-300">
-                No banks match your search.
-              </div>
-            ) : (
-              visibleBanks.map((bank) => (
-                <div
-                  key={bank.id}
-                  onClick={() => setSelectedBank(bank)}
-                  className="grid grid-cols-9 gap-4 px-4 py-3 text-sm bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition"
-                >
-                  <div className="">{bank.bankName}</div>
-                  <div className="font-semibold text-cyan-600 dark:text-cyan-400">{bank.bankAbbreviation}</div>
-                  <div>{bank.branchName}</div>
-                  <div>{bank.area}</div>
-                  <div>{bank.randomAccessNumber}</div>
-                  <div>{bank.phoneNumber}</div>
-                  <div>{bank.managerName}</div>
-                  <div>{bank.fax}</div>
-                  <div className="truncate" title={bank.email}>{bank.email}</div>
-                </div>
-              ))
-            )}
-          </div>
+          <Table
+            caption="Bank branches"
+            columns={bankColumns}
+            rows={visibleBanks}
+            rowKey="id"
+            emptyTitle="No banks match your search."
+            emptyMessage="Try a different bank name, branch or area."
+            dense
+          />
         </div>
       </div>
 

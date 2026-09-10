@@ -89,20 +89,23 @@ const LocationListing = ({ data, filters }) => {
     }
 
     return (
-        <div className="print-area bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md max-w-6xl mx-auto my-6 font-sans border border-gray-200 dark:border-gray-700">
+        <div className="print-area bg-surface p-6 rounded-lg shadow-md max-w-6xl mx-auto my-6 font-sans border border-line">
 
             {/* Title */}
-            <div className="text-center font-bold text-base tracking-wide mb-5 pb-3 border-b border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white uppercase">
+            <div className="text-center font-bold text-base tracking-wide mb-5 pb-3 border-b border-line-strong text-ink uppercase">
                 SASBO Finance Union — Location Listing
             </div>
 
             {/* Header info */}
-            <div className="grid grid-cols-4 gap-x-6 gap-y-1.5 mb-5 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-sm">
+            {/* 📱 FOUR COLUMNS WITH NO BREAKPOINT. At 390px that is roughly 90px per
+                column for label-and-value pairs, so every value wrapped or clipped. One
+                column on a phone, two on a tablet, four where there is room. */}
+            <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 mb-5 p-3 rounded-lg bg-surface-2 border border-line text-sm sm:grid-cols-2 lg:grid-cols-4">
                 {[['Bank', listingData.bank], ['IBT No', listingData.ibtNo], ['R/A No', listingData.raNo], ['Cost Code', listingData.costCode],
                   ['Tel No', listingData.telNo], ['Fax No', listingData.faxNo, 3], ['Branch', listingData.branch], ['Address', listingData.address, 3]
                 ].map(([label, value, span]) => (
-                    <div key={label} className={`flex gap-1.5 text-gray-700 dark:text-gray-300${span ? ` col-span-${span}` : ''}`}>
-                        <span className="font-semibold shrink-0 text-gray-900 dark:text-gray-100">{label}:</span>
+                    <div key={label} className={`flex gap-1.5 text-ink${span ? ` col-span-${span}` : ''}`}>
+                        <span className="font-semibold shrink-0 text-ink">{label}:</span>
                         <span>{value}</span>
                     </div>
                 ))}
@@ -112,7 +115,7 @@ const LocationListing = ({ data, filters }) => {
             <div className="overflow-x-auto mb-5">
                 <table className="w-full border-collapse text-sm">
                     <thead>
-                        <tr className="bg-gray-100 dark:bg-gray-800 text-left text-xs uppercase tracking-wide text-gray-600 dark:text-gray-300 border-b border-gray-300 dark:border-gray-600">
+                        <tr className="bg-surface-2 text-left text-xs uppercase tracking-wide text-ink-muted border-b border-line-strong">
                             <th className="py-2 px-2 whitespace-nowrap">Mem No</th>
                             <th className="py-2 px-2">Name of Member</th>
                             <th className="py-2 px-2">Bank At</th>
@@ -129,7 +132,7 @@ const LocationListing = ({ data, filters }) => {
                     <tbody>
                         {listingData.members.map((member, index) => (
                             <React.Fragment key={index}>
-                                <tr className={`text-sm text-gray-800 dark:text-gray-200 ${index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800/60'}`}>
+                                <tr className={`text-sm text-ink ${index % 2 === 0 ? 'bg-surface' : 'bg-surface-2/60'}`}>
                                     <td className="py-1.5 px-2 whitespace-nowrap">{member.memNo}</td>
                                     <td className="py-1.5 px-2 font-semibold whitespace-nowrap">{member.name}</td>
                                     <td className="py-1.5 px-2">{member.bankAt}</td>
@@ -142,9 +145,9 @@ const LocationListing = ({ data, filters }) => {
                                     <td className="py-1.5 px-2 text-center">{member.susp}</td>
                                     <td className="py-1.5 px-2 text-center">{member.label}</td>
                                 </tr>
-                                <tr className="border-b border-gray-100 dark:border-gray-700">
+                                <tr className="border-b border-line">
                                     <td />
-                                    <td colSpan="10" className="pb-2 px-2 text-xs italic text-gray-400 dark:text-gray-500">
+                                    <td colSpan="10" className="pb-2 px-2 text-xs italic text-ink-muted">
                                         Alt. Address: {member.alternateAddress}
                                     </td>
                                 </tr>
@@ -155,7 +158,7 @@ const LocationListing = ({ data, filters }) => {
             </div>
 
             {/* Footer details */}
-            <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-1">
+            <div className="pt-4 border-t border-line space-y-1">
                 {[
                     ['Area Rep Name', listingData.areaRepName],
                     ['BEC Members', listingData.becMembers],
@@ -168,8 +171,8 @@ const LocationListing = ({ data, filters }) => {
                     ['Membership', listingData.membership],
                     ['Last Visited', listingData.lastVisited],
                 ].map(([label, value]) => (
-                    <div key={label} className="flex gap-2 text-sm text-gray-700 dark:text-gray-300">
-                        <span className="font-semibold min-w-[220px] shrink-0 text-gray-900 dark:text-gray-100">{label}:</span>
+                    <div key={label} className="flex gap-2 text-sm text-ink">
+                        <span className="font-semibold min-w-[220px] shrink-0 text-ink">{label}:</span>
                         <span>{value}</span>
                     </div>
                 ))}

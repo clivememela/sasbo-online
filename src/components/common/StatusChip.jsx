@@ -29,11 +29,39 @@ const STATUS_TOKENS = {
 /** The vocabulary this component knows how to render. */
 export const KNOWN_STATUSES = Object.freeze(Object.keys(STATUS_TOKENS));
 
+const BY_LOWER_CASE = new Map(
+  Object.entries(STATUS_TOKENS).map(([status, classes]) => [status.toLowerCase(), classes]),
+);
+
+/**
+ * 🔑 THE LOOKUP IS CASE-INSENSITIVE BECAUSE THERE ARE TWO VOCABULARIES, and the
+ * vocabulary guard is what established that rather than an assumption.
+ *
+ * A MEMBER's status is title case (`Active`) and comes from `STATUS_OPTIONS`. A
+ * SUBSCRIPTION's is upper case (`ACTIVE`) because the server declares
+ * `SubscriptionsStatus {PENDING, ACTIVE, CANCELLED, INACTIVE}` with no display names, so
+ * Jackson puts the enum NAME on the wire -- and `vocabulary.parity.test.js` records that
+ * as ACCEPTED, not as drift. They are different lists that happen to share a field name.
+ *
+ * ⚠️ SO THE VALUE IS RENDERED AS IT ARRIVED, never normalised. The first draft
+ * title-cased subscription statuses so this map would match, which changed what a
+ * subscription's status READS as on screen and quietly implied the two vocabularies were
+ * one. Only the colour lookup ignores case.
+ *
+ * 🔴 AND AN UNKNOWN VALUE FALLS BACK TO NEUTRAL, WHICH IS THE POINT. `CANCELLED` and
+ * `INACTIVE` belong to the subscription list and have no colour here, so they get the
+ * quiet surface -- where the copy this replaced painted them with the SUSPENDED red. A
+ * cancelled subscription and a suspended member are different facts about a member's
+ * money, and they were rendering identically.
+ */
 export default function StatusChip({ status }) {
+  const classes =
+    typeof status === 'string' ? BY_LOWER_CASE.get(status.toLowerCase()) : undefined;
+
   return (
     <span
       className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-bold ${
-        STATUS_TOKENS[status] || 'bg-surface-2 text-ink-muted'
+        classes || 'bg-surface-2 text-ink-muted'
       }`}
     >
       {status || 'Unknown'}

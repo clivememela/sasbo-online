@@ -1,5 +1,7 @@
 import { Download, FileText, ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import { useState, useMemo } from "react";
+import PageTitle from '../../components/common/PageTitle';
+import { Button, TextInput } from '../../components/form';
 
 export default function ResearchInformation() {
   const [expandedFolders, setExpandedFolders] = useState({});
@@ -261,38 +263,34 @@ export default function ResearchInformation() {
   }, [fileStructure, searchQuery]);
 
   return (
-    <div className="p-6 text-gray-900 dark:text-gray-100">
-      <h2 className="text-3xl text-center mb-2 text-cyan-700 dark:text-cyan-400">
-        Information & Research
-      </h2>
-      <p className="text-center text-gray-600 dark:text-gray-400 mb-2">
-        Research publications, circulars, legislation, and labour articles
-      </p>
-      <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
+    <div className="p-6 text-ink">
+      <PageTitle
+        title="Information & Research"
+        subtitle="Research publications, circulars, legislation, and labour articles"
+      />
+      <p className="text-center text-ink-muted mb-8">
         {totalFiles} documents across {Object.keys(fileStructure).length} categories
       </p>
 
       <div className="max-w-4xl mx-auto mb-6">
-        <div className="relative">
-          <Search size={18} className="absolute left-3 top-3 text-gray-400 dark:text-gray-500" />
-          <input
-            type="text"
-            placeholder="Search documents and folders..."
+        {/* 🔴 THE CLEAR BUTTON HAD NO ACCESSIBLE NAME -- an `<X>` icon and
+            nothing else. `TextInput kind="search"` also brings the search
+            keyboard and the "Search" return key on a phone, and the 16px rule. */}
+        <div className="flex items-end gap-2">
+          <TextInput
+            label="Search"
+            kind="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            placeholder="Search documents and folders..."
+            className="flex-1"
           />
           {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-            >
-              <X size={18} />
-            </button>
+            <Button variant="ghost" onClick={() => setSearchQuery("")}>Clear</Button>
           )}
         </div>
         {searchQuery && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+          <p className="text-sm text-ink-muted mt-2">
             Found {Object.keys(filteredStructure).length} categories with matching documents
           </p>
         )}
@@ -302,32 +300,34 @@ export default function ResearchInformation() {
         {Object.entries(filteredStructure).map(([category, subcategories]) => (
           <div key={category} className="mb-2">
             <button
+              type="button"
               onClick={() => toggleFolder(category)}
-              className="w-full flex items-center gap-2 p-3 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-700 text-left"
+              aria-expanded={Boolean(expandedFolders[category])}
+              className="touch-target w-full flex items-center gap-2 p-3 bg-surface rounded-lg shadow hover:shadow-md transition-shadow border border-line text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
             >
               {expandedFolders[category] ? (
-                <ChevronDown size={18} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                <ChevronDown size={18} className="text-brand-ink flex-shrink-0" />
               ) : (
-                <ChevronRight size={18} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                <ChevronRight size={18} className="text-brand-ink flex-shrink-0" />
               )}
               <span className="font-semibold">{category}</span>
             </button>
 
             {expandedFolders[category] && (
-              <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-300 dark:border-gray-600 pl-4">
+              <div className="ml-2 mt-1 sm:ml-4 space-y-1 border-l-2 border-line-strong pl-2 sm:pl-4">
                 {Array.isArray(subcategories) ? (
                   subcategories.map((file, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-900 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      className="flex items-center justify-between p-2 bg-surface-2 rounded hover:bg-surface-2 transition-colors"
                     >
                       <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <FileText size={16} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                        <FileText size={16} className="text-brand-ink flex-shrink-0" />
                         <span className="text-sm truncate">{file}</span>
                       </div>
-                      <button className="ml-2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors flex-shrink-0">
-                        <Download size={16} className="text-cyan-600 dark:text-cyan-400" />
-                      </button>
+                      <Button size="icon" variant="ghost" aria-label={`Download ${file}`} className="ml-2 shrink-0">
+                        <Download size={16} aria-hidden="true" className="text-brand-ink" />
+                      </Button>
                     </div>
                   ))
                 ) : (
@@ -335,31 +335,31 @@ export default function ResearchInformation() {
                     <div key={subcategory} className="mb-2">
                       <button
                         onClick={() => toggleSubFolder(`${category}-${subcategory}`)}
-                        className="w-full flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-left"
+                        className="w-full flex items-center gap-2 p-2 bg-surface-2 rounded hover-hover:hover:bg-surface-2 transition-colors text-left"
                       >
                         {expandedFolders[`${category}-${subcategory}`] ? (
-                          <ChevronDown size={16} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                          <ChevronDown size={16} className="text-brand-ink flex-shrink-0" />
                         ) : (
-                          <ChevronRight size={16} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                          <ChevronRight size={16} className="text-brand-ink flex-shrink-0" />
                         )}
                         <span className="text-sm font-medium">{subcategory}</span>
-                        <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">({files.length})</span>
+                        <span className="ml-auto text-xs text-ink-muted">({files.length})</span>
                       </button>
 
                       {expandedFolders[`${category}-${subcategory}`] && (
-                        <div className="ml-4 mt-1 space-y-1">
+                        <div className="ml-2 mt-1 sm:ml-4 space-y-1">
                           {files.map((file, idx) => (
                             <div
                               key={idx}
-                              className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-900 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                              className="flex items-center justify-between p-2 bg-surface-2 rounded hover:bg-surface-2 transition-colors"
                             >
                               <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <FileText size={14} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                                <FileText size={14} className="text-brand-ink flex-shrink-0" />
                                 <span className="text-xs truncate">{file}</span>
                               </div>
-                              <button className="ml-2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors flex-shrink-0">
-                                <Download size={14} className="text-cyan-600 dark:text-cyan-400" />
-                              </button>
+                              <Button size="icon" variant="ghost" aria-label={`Download ${file}`} className="ml-2 shrink-0">
+                                <Download size={14} aria-hidden="true" className="text-brand-ink" />
+                              </Button>
                             </div>
                           ))}
                         </div>

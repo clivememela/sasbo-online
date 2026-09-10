@@ -96,7 +96,6 @@ export default function CaptureMember() {
         branch: "",
         employmentType: "",
         ibtNo: "",
-        /*workIbtNo: "",*/
         paymentType: "Debit Order",
         debitDay: "20",
         bankAddress: "",
@@ -562,7 +561,6 @@ export default function CaptureMember() {
                                     </p>
                                 )}
                                 <Field label="IBT No." value={form.ibtNo} onChange={handleChange("ibtNo")} />
-                                {/*<Field label="Work IBT No." value={form.workIbtNo} onChange={handleChange("workIbtNo")} />*/}
                                 <AddressAutocomplete label="Bank Address" value={form.bankAddress} onChange={handleChange("bankAddress")} placeholder="Start typing a bank address..." className="md:col-span-2" />
                             </>
                         )}

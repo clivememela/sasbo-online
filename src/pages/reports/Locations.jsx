@@ -3,6 +3,7 @@ import {Search, X, Printer} from "lucide-react";
 import LocationListing from "./LocationListing.jsx";
 import {locationService} from "../../services/locationService.js";
 import { TextInput, Button } from "../../components/form";
+import PageTitle from '../../components/common/PageTitle';
 
 export function Locations() {
     const [filters, setFilters] = useState({
@@ -32,14 +33,12 @@ export function Locations() {
     };
 
     return (
-        <div className="p-6 text-gray-900 dark:text-gray-100">
-            <h2 className="text-3xl text-center mb-2 text-cyan-700 dark:text-cyan-400">
-                Location Listings
-            </h2>
-            <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                View and manage branch location records, member listings, and contact details across all financial institutions.
-            </p>
-            <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800 mb-8">
+        <div className="p-6 text-ink">
+            <PageTitle
+                title="Location Listings"
+                subtitle="View and manage branch location records, member listings, and contact details across all financial institutions."
+            />
+            <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-surface mb-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                     <TextInput label="Bank Name" value={filters.bankName} onChange={handleInputChange("bankName")} placeholder="Search bank name" />
                     <TextInput label="Branch" value={filters.branch} onChange={handleInputChange("branch")} placeholder="Search branch" />
@@ -49,13 +48,14 @@ export function Locations() {
 
                 <div className="flex items-center justify-between mt-4">
                     {searched && (
-                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-2 text-sm text-ink-muted">
                             {results.length} location{results.length !== 1 ? "s" : ""} found
                             {results.length > 0 && (
                                 <button
+                                    type="button"
                                     onClick={() => window.print()}
-                                    title="Print results"
-                                    className="no-print p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition"
+                                    aria-label="Print these location results"
+                                    className="no-print touch-target p-1 rounded hover-hover:hover:bg-surface-2 text-ink-muted transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
                                 >
                                     <Printer size={16} />
                                 </button>
@@ -68,19 +68,18 @@ export function Locations() {
                                 <X size={14} /> Clear
                             </Button>
                         )}
-                        <button
-                            onClick={handleSearch}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition text-sm shadow-sm"
-                        >
-                            <Search size={16} strokeWidth={2}/>
+                        {/* Its visible text IS its name, so it needs no aria-label -- what it
+                            was missing was the primitive's hit area and focus ring. */}
+                        <Button variant="primary" onClick={handleSearch}>
+                            <Search size={16} strokeWidth={2} aria-hidden="true" />
                             Search
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
 
             {searched && results.length === 0 && (
-                <div className="max-w-6xl mx-auto text-center py-12 text-gray-500 dark:text-gray-400 text-sm">
+                <div className="max-w-6xl mx-auto text-center py-12 text-ink-muted text-sm">
                     No locations match your search criteria.
                 </div>
             )}

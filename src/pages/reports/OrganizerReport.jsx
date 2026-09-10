@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import TextInput from '../../components/form/TextInput';
 import DateField from '../../components/form/DateField';
 import Button from '../../components/form/Button';
+import PageTitle from '../../components/common/PageTitle';
 
 export const OrganizerReport = ({ filters }) => {
     const [formData, setFormData] = useState({
@@ -39,18 +40,28 @@ export const OrganizerReport = ({ filters }) => {
         console.log('Form submitted:', formData);
     };
 
-    // Textarea uses same label style as TextInput but renders a textarea element
+    /**
+     * 🔴 BR-4's FOURTH WRAPPER, AND THE LAST ONE. `blastRadius.md` counted four answers
+     * to "what wraps a form control": the shared `SearchableSelect`, a private one in
+     * `CaptureMember.jsx`, a private `Field` there, and this. `03.2a` built the shared
+     * `Field`, `04.2` retired the two in `CaptureMember.jsx`, and this closes the set.
+     *
+     * 🔑 IT WRAPPED THE LABEL AROUND THE CONTROL, which works and is not what the rest
+     * of this application does -- so this textarea was the one control in the tree whose
+     * label was not a `<label htmlFor>`, and the difference was invisible until something
+     * tried to query it by label. `TextInput multiline` is the same textarea with the
+     * shared chrome: one label element, one error path, one focus ring, one 16px rule.
+     */
     const TextArea = ({ label, name, rows = 3 }) => (
-        <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 col-span-2">
-            {label}
-            <textarea
-                name={name}
-                value={formData[name]}
-                onChange={handleChange}
-                rows={rows}
-                className="rounded-lg px-3 py-2 field-text font-normal normal-case tracking-normal border bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 resize-y"
-            />
-        </label>
+        <TextInput
+            label={label}
+            name={name}
+            multiline
+            rows={rows}
+            value={formData[name]}
+            onChange={handleChange}
+            className="sm:col-span-2"
+        />
     );
 
     // 🔴 `03.3`: `type="date"` routes to DateField rather than to a native date input.
@@ -61,7 +72,9 @@ export const OrganizerReport = ({ filters }) => {
         textarea
             ? <TextArea label={label} name={name} />
             : (
-                <div className={fullWidth ? 'col-span-2' : ''}>
+                // `sm:col-span-2`, not `col-span-2`: in a one-column grid a span of two
+                // is a span past the end, which some engines honour by widening the track.
+                <div className={fullWidth ? 'sm:col-span-2' : ''}>
                     {type === 'date'
                         ? <DateField label={label} name={name} value={formData[name]} onChange={handleChange} hint="ago" />
                         : <TextInput label={label} name={name} type={type} value={formData[name]} onChange={handleChange} />}
@@ -70,22 +83,36 @@ export const OrganizerReport = ({ filters }) => {
 
     const Section = ({ title, children }) => (
         <div className="mb-6">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-white bg-cyan-700 dark:bg-cyan-800 px-4 py-2 rounded-md mb-4">{title}</h2>
-            <div className="grid grid-cols-2 gap-4">{children}</div>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-on-brand bg-brand-hover px-4 py-2 rounded-md mb-4">{title}</h3>
+            {/* 📱 R-RESP-O: PHONE-FIRST, and this form is the reason the rule exists.
+                It is an organiser's site-visit report -- filled in standing up, in a
+                branch -- and it had NO breakpoint at all: a hard `grid-cols-2`, so every
+                field was half of 390px, roughly 170px, on the device it is actually used
+                on. One column is the DEFAULT here and two is the enhancement, which is
+                what "phone-first" means as opposed to a desktop layout with a phone
+                exception bolted on. */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>
         </div>
     );
 
     return (
-        <div className="p-6 text-gray-900 dark:text-gray-100">
-            <h2 className="text-3xl text-center mb-2 text-cyan-700 dark:text-cyan-400">Organizer Report</h2>
-            <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                Streamline and record organizer site visits, branch engagements, and membership recruitment across all financial institutions.
-            </p>
-            <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
-                <div className="text-center mb-6 pb-4 border-b-2 border-cyan-700 dark:border-cyan-600">
-                    <h1 className="text-sm font-semibold text-cyan-700 dark:text-cyan-400 tracking-wide uppercase">
+        <div className="p-6 text-ink">
+            <PageTitle
+                title="Organizer Report"
+                subtitle="Streamline and record organizer site visits, branch engagements, and membership recruitment across all financial institutions."
+            />
+            <div className="max-w-4xl mx-auto bg-surface rounded-2xl shadow-lg p-8">
+                <div className="text-center mb-6 pb-4 border-b-2 border-brand">
+                    {/* 🔴 THIS WAS AN <h1>, AND IT IS THE SUBTLER HALF OF N8. The page's
+                        actual title was an <h2> above it while this line of form chrome --
+                        `text-sm`, uppercase, 14px -- was the document's top-level heading.
+                        A screen-reader user jumping by heading landed here and was told the
+                        most important thing on the page was the form's letterhead. It is
+                        the form's name, so it is a heading, but a SECOND-level one under
+                        the page title PageTitle now supplies. */}
+                    <h2 className="text-sm font-semibold text-brand-ink tracking-wide uppercase">
                         SASBO Finance Union — Organizer's Branch / Department Report Form
-                    </h1>
+                    </h2>
                 </div>
                 <form onSubmit={handleSubmit}>
                     <Section title="General Data">
@@ -128,7 +155,7 @@ export const OrganizerReport = ({ filters }) => {
                         <Field label="Date Captured" name="dateCaptured" type="date" />
                     </Section>
 
-                    <div className="flex justify-center gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div className="flex justify-center gap-3 pt-4 border-t border-line">
                         <Button type="submit" variant="primary">Submit Report</Button>
                         <Button type="reset" variant="default">Clear Form</Button>
                     </div>

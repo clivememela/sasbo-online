@@ -83,6 +83,53 @@ export function paletteLiteralsIn(code) {
 }
 
 /**
+ * Every ROLE the token layer defines, as a Tailwind utility suffix.
+ *
+ * Derived from `index.css`'s `@theme` block by `paletteLiterals.test.js`, never listed
+ * here: a hand-typed copy of a token list is a second source of truth, and this one exists
+ * precisely to catch a mismatch between source and tokens.
+ */
+
+/**
+ * A `dark:` variant sitting on a TOKEN utility -- `dark:text-on-brand`, `dark:bg-surface`.
+ *
+ * 🔴 IT IS ALWAYS REDUNDANT AND SOMETIMES WRONG, AND NO OTHER CHECK HERE CAN SEE IT.
+ * A token already carries both themes: `--color-ink` is dark ink in light mode and light
+ * ink in dark mode, by definition. Writing `text-ink dark:text-on-brand` says "and in dark
+ * mode paint it white instead", which either does nothing (if it agrees) or silently
+ * overrides the theme (if it does not).
+ *
+ * 🔑 `paletteLiteralsIn` REPORTS IT CLEAN, because `on-brand` is a token and the whole
+ * point of that scan is that tokens are the good answer. So a mechanical migration that
+ * half-translates `text-gray-900 dark:text-white` into `text-ink dark:text-on-brand`
+ * passes the colour gate while leaving a theme override behind. Found exactly that way in
+ * `04.3`: four sites, from a light/dark PAIR whose two halves were too far apart in the
+ * class string for the pair rule to match, so the singles rule translated each half on its
+ * own.
+ *
+ * ⚠️ A `dark:` on a PALETTE literal is not this function's business -- that is already
+ * a literal and `paletteLiteralsIn` convicts it.
+ */
+export function darkTwinsOnTokens(code, tokenRoles) {
+  if (!tokenRoles.length) return []
+
+  // Longest first, so `status-active-bg` is matched before `status-active`.
+  const roles = [...tokenRoles].sort((a, b) => b.length - a.length).join('|')
+  const pattern = new RegExp(
+    String.raw`(?<![\w-])((?:[a-z-]+:)*dark:(?:[a-z-]+:)*(?:${HEADS})-(?:${roles}))(?![\w-])`,
+    'g',
+  )
+
+  const found = []
+  code.split('\n').forEach((line, index) => {
+    for (const match of line.matchAll(pattern)) {
+      found.push({ line: index + 1, utility: match[1] })
+    }
+  })
+  return found
+}
+
+/**
  * A string the detector MUST convict, and one it MUST NOT.
  *
  * 🔑 THIS IS THE CANARY, and it is exported rather than inlined in the test so the

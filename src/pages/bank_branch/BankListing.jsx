@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Printer } from "lucide-react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, Button } from "../../components/form";
+import PageTitle from '../../components/common/PageTitle';
+import Table from "../../components/table/Table.jsx";
 
 const PAGE_SIZE = bankService.getPageSize();
 
@@ -24,11 +26,13 @@ export default function BankListing() {
     return [];
   };
 
-  useEffect(() => {
+  // Named, so the table's retry can re-run exactly what the mount ran. An error state
+  // whose button cannot repeat the request is an error state with a dead end in it.
+  const loadBanks = useCallback(() => {
     setIsLoading(true);
     setError("");
 
-    bankService
+    return bankService
       .getBankListing()
       .then((data) => {
         setBanks(normalizeBankResponse(data));
@@ -40,6 +44,10 @@ export default function BankListing() {
         setIsLoading(false);
       });
   }, []);
+
+  useEffect(() => {
+    loadBanks();
+  }, [loadBanks]);
 
   const listingRows = useMemo(() => {
     return banks.map((bank) => ({
@@ -78,14 +86,25 @@ export default function BankListing() {
   const endIndex = Math.min(startIndex + PAGE_SIZE, filteredRows.length);
   const visibleRows = filteredRows.slice(startIndex, endIndex);
 
-  return (
-    <div className="p-6 text-gray-900 dark:text-gray-100">
-      <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">Bank Listing</h2>
-      <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-        Comprehensive listing of all banks with abbreviations and universal branch codes for reference.
-      </p>
+  const bankColumns = useMemo(() => [
+    { key: 'bankName', header: 'Bank Name', priority: 'essential', truncate: true, cell: (b) => b.bankName || '\u2014' },
+    {
+      key: 'abbreviation',
+      header: 'Abbreviation',
+      priority: 'essential',
+      cell: (b) => <span className="font-semibold text-brand-ink">{b.abbreviation || '\u2014'}</span>,
+    },
+    { key: 'universalBranchCode', header: 'Universal Branch Code', priority: 'essential', cell: (b) => b.universalBranchCode || '\u2014' },
+  ], []);
 
-      <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
+  return (
+    <div className="p-6 text-ink">
+      <PageTitle
+        title="Bank Listing"
+        subtitle="Comprehensive listing of all banks with abbreviations and universal branch codes for reference."
+      />
+
+      <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-surface">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end no-print">
           <TextInput
             label="Bank Name"
@@ -108,16 +127,19 @@ export default function BankListing() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm no-print">
-          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+          <div className="flex items-center gap-2 text-ink-muted">
             Showing {filteredRows.length === 0 ? 0 : startIndex + 1}-{endIndex} of {filteredRows.length} banks
+            {/* `title` is not an accessible name a keyboard user can reach, and an
+                icon-only button has none of its own. */}
             {filteredRows.length > 0 && (
-              <button
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Print this bank listing"
                 onClick={() => globalThis.print()}
-                title="Print results"
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition"
               >
-                <Printer size={16} />
-              </button>
+                <Printer size={16} aria-hidden="true" />
+              </Button>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -130,7 +152,7 @@ export default function BankListing() {
             >
               Prev
             </Button>
-            <span className="text-gray-600 dark:text-gray-300">
+            <span className="text-ink-muted">
               Page {safePage} of {totalPages}
             </span>
             <Button
@@ -145,32 +167,29 @@ export default function BankListing() {
           </div>
         </div>
 
-        <div className="mt-4 overflow-hidden rounded-xl border border-transparent print-area">
-          <div className="grid grid-cols-3 gap-4 px-4 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300">
-            <div>Bank Name</div>
-            <div>Abbreviation</div>
-            <div>Universal Branch Code</div>
-          </div>
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {isLoading ? (
-              <div className="px-4 py-6 text-sm text-gray-600 dark:text-gray-300">Loading banks...</div>
-            ) : error ? (
-              <div className="px-4 py-6 text-sm text-red-600 dark:text-red-400">{error}</div>
-            ) : visibleRows.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-gray-600 dark:text-gray-300">No banks found.</div>
-            ) : (
-              visibleRows.map((bank) => (
-                <div
-                  key={bank.id}
-                  className="grid grid-cols-3 gap-4 px-4 py-3 text-sm bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100"
-                >
-                  <div>{bank.bankName}</div>
-                  <div className="font-semibold text-cyan-600 dark:text-cyan-400">{bank.abbreviation}</div>
-                  <div>{bank.universalBranchCode}</div>
-                </div>
-              ))
-            )}
-          </div>
+        {/* 🔴 A `grid-cols-3` PSEUDO-TABLE, AND THE LAST OF THE SEVEN run 7 counted.
+            Its header was three `<div>`s with no relationship to the cells beneath, so a
+            screen-reader user met a stream of values with no column names -- and this is a
+            reference table whose entire job is "which code belongs to which bank".
+
+            🔑 IT ALREADY HAD ALL THREE STATES, hand-rolled, and they were CORRECT --
+            loading, error and empty as separate branches with error never rendering as
+            empty. That is rarer than it sounds (A27 is the same page one module over
+            getting it wrong), so this is not a fix, it is the same three states expressed
+            through the primitive that now owns them. The retry is new: the hand-rolled
+            error branch printed the message and offered no way out. */}
+        <div className="mt-4 print-area">
+          <Table
+            caption="Banks, with their abbreviations and universal branch codes"
+            columns={bankColumns}
+            rows={visibleRows}
+            rowKey="id"
+            loading={isLoading}
+            error={error || null}
+            onRetry={loadBanks}
+            emptyTitle="No banks found."
+            emptyMessage="Try a different bank name, abbreviation or branch code."
+          />
         </div>
       </div>
     </div>

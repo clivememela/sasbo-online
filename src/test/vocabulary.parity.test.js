@@ -207,18 +207,24 @@ const EXPECTED = {
       '"Payroll Deduction" row really can reach the browser. This is the client-side twin ' +
       'of the server PAYROLL_DEDUCTION shim in PaymentType.fromString.',
   },
-  'src/pages/maintainance/Subscriptions.jsx :: sub.status === "ACTIVE"': {
-    verdict: 'ACCEPTED',
-    why:
-      'a SUBSCRIPTION status, not a member status. The server declares SubscriptionsStatus ' +
-      '{PENDING, ACTIVE, CANCELLED, INACTIVE} with no display names, so Jackson puts the ' +
-      'enum NAME on the wire and upper case is correct here. STATUS_OPTIONS is the member ' +
-      'vocabulary -- a different list that happens to share a field name.',
-  },
-  'src/pages/maintainance/Subscriptions.jsx :: sub.status === "PENDING"': {
-    verdict: 'ACCEPTED',
-    why: 'the same subscription vocabulary as the ACTIVE comparison beside it.',
-  },
+  // 🔑 TWO ACCEPTED SITES WERE HERE AND `04.3` REMOVED THEM -- not because they were
+  // wrong, but because the code that held them went. They were
+  // `Subscriptions.jsx :: sub.status === "ACTIVE"` and `=== "PENDING"`, a presentational
+  // ternary picking a chip colour, and both were recorded ACCEPTED: a SUBSCRIPTION status
+  // is upper case because the server declares `SubscriptionsStatus {PENDING, ACTIVE,
+  // CANCELLED, INACTIVE}` with no display names, so Jackson puts the enum NAME on the
+  // wire. `STATUS_OPTIONS` is the MEMBER vocabulary -- a different list that happens to
+  // share a field name.
+  //
+  // The ternary is now `<StatusChip status={sub.status} />`, which looks its colour up
+  // case-insensitively and renders the value unchanged. So there are two fewer places
+  // hard-coding a vocabulary string, and no register row to close: nothing was fixed
+  // because nothing was broken.
+  //
+  // ⚠️ THIS GUARD IS WHAT CAUGHT THE FIRST ATTEMPT AT THAT CHANGE. It title-cased the
+  // subscription status so the shared chip's map would match -- which would have changed
+  // what a subscription reads as on screen and merged two vocabularies the server keeps
+  // apart. The equality below is what refused it.
 }
 
 describe('vocabulary parity between this browser and its server', () => {

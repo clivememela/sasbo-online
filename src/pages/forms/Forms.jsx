@@ -5,6 +5,7 @@ import LocationListing from "../reports/LocationListing.jsx";
 import MembershipApplication from "./MembershipApplication.jsx";
 import {TextInput, Button, FilterForm, SearchableSelect} from "../../components/form";
 import { FileSearch } from "lucide-react";
+import PageTitle from '../../components/common/PageTitle';
 
 export function Forms(){
     const [filters, setFilters] = useState({
@@ -51,13 +52,8 @@ export function Forms(){
     };
 
     return (
-        <div className="p-6 text-gray-900 dark:text-gray-100">
-            <h2 className="text-3xl text-center mb-4 text-cyan-700 dark:text-cyan-400">
-                Forms
-            </h2>
-            <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                Search and complete Forms
-            </p>
+        <div className="p-6 text-ink">
+            <PageTitle title="Forms" subtitle="Search and complete Forms" />
             <FilterForm onSubmit={handleSubmit}>
                 <TextInput
                     label="Bank Name"

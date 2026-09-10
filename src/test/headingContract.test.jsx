@@ -62,29 +62,18 @@ const discoverRoutes = () => {
 const ROUTES = discoverRoutes()
 
 /**
- * Routes with no page-level `<h1>` yet, each against the wave that gives it one.
+ * Routes with no page-level `<h1>` yet.
  *
- * 🔑 MEASURED THROUGH THIS GUARD'S OWN RENDER on 2026-09-09, never predicted from which
- * files import `PageTitle`: three of these routes render the SAME page under two paths,
- * and one renders a page whose heading comes from a component nested inside it. A list
- * derived from imports would have been wrong about both.
+ * ✅ EMPTY. It opened at `04.1` with nine entries and `04.3` cleared the last eight.
+ * With nothing on it, the two assertions below collapse into one rule that admits no
+ * exceptions: EVERY route renders exactly one `<h1>`, and it names the page.
+ *
+ * 🔑 IT STAYS RATHER THAN BEING DELETED, for the reason the equality below is an
+ * equality: a route that loses its heading tomorrow reddens this file, and the only way to
+ * quiet it is to add a line here -- which is visible as an exemption, where a deleted
+ * mechanism would just be a passing test.
  */
-const AWAITING_PAGE_TITLE = {
-  /** `04.1` keeps the auth screens headed by their own markup, not `PageTitle`. */
-
-  /** `04.2` -- the members lane. `/members/capture` adopted PageTitle; `/members/apply`
-      is `MembershipApplication`, which belongs to `04.3`'s forms wave despite its path. */
-  '/members/apply': '04.3',
-
-  /** `04.3` -- admin, maintainance, archives, reports, bank_branch, acb, forms. */
-  '/archives/affiliations-other-trade-unions': '04.3',
-  '/archives/finance-houses': '04.3',
-  '/archives/research-information': '04.3',
-  '/banks': '04.3',
-  '/banks/listing': '04.3',
-  '/reports/forms': '04.3',
-  '/reports/locations': '04.3',
-}
+const AWAITING_PAGE_TITLE = {}
 
 const renderRoute = (path) =>
   render(

@@ -1,10 +1,12 @@
-import { useState, useMemo, useEffect } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import PageTitle from "../../components/common/PageTitle.jsx";
 import { TextInput, Button } from "../../components/form";
 import Modal from "../../components/overlay/Modal.jsx";
 import { memberService } from "../../services/memberService.js";
 import { validateSAID } from "../../utils/validateSAID.js";
+import Table from '../../components/table/Table.jsx';
+import StatusChip from '../../components/common/StatusChip.jsx';
 
 export default function AcbDebits() {
     const [membersList, setMembersList] = useState([]);
@@ -13,6 +15,11 @@ export default function AcbDebits() {
     const [searched, setSearched] = useState(false);
     const [selectedMember, setSelectedMember] = useState(null);
     const [loadingId, setLoadingId] = useState(null);
+    const [notice, setNotice] = useState(null);
+    const noticeRef = useRef(null);
+    useEffect(() => {
+        if (notice) noticeRef.current?.focus();
+    }, [notice]);
     const [confirmed, setConfirmed] = useState(false);
 
     // Edit modal state
@@ -29,7 +36,6 @@ export default function AcbDebits() {
             branch: selectedMember.branch || "",
             bankAccountNumber: selectedMember.bankAccountNumber || "",
             ibtNo: selectedMember.ibtNo || "",
-            /*workIbtNo: selectedMember.workIbtNo || "",*/
             bankAddress: selectedMember.bankAddress || "",
             workBankAddress: selectedMember.workBankAddress || "",
             paymentType: selectedMember.paymentType || "",
@@ -49,7 +55,11 @@ export default function AcbDebits() {
             setEditing(false);
         } catch (err) {
             console.error(err);
-            alert('Failed to update banking details');
+            // 🔴 A BANKING CHANGE THAT FAILED, ANNOUNCED IN A DIALOG THE USER DISMISSES.
+            // This screen writes a member's debit-order details; "Failed to update banking
+            // details" arriving as a native modal, and leaving no trace once dismissed, is
+            // the worst place in the application for that pattern.
+            setNotice('Those banking details were not saved. Nothing was written \u2014 check the values and try again.');
         } finally {
             setSaving(false);
         }
@@ -80,7 +90,9 @@ export default function AcbDebits() {
         if (field === "identityNumber") setIdError(val ? validateSAID(val) : null);
     };
 
-    const handleSelectMember = (m) => {
+    // Stable, because `memberColumns` closes over it: a callback rebuilt every render
+    // rebuilds the column list every render, which rebuilds every cell.
+    const handleSelectMember = useCallback((m) => {
         if (selectedMember?.id === m.id) { setSelectedMember(null); setConfirmed(false); return; }
         setConfirmed(false);
         setLoadingId(m.id);
@@ -88,31 +100,83 @@ export default function AcbDebits() {
             .then(full => { setSelectedMember(full); })
             .catch(() => { setSelectedMember(m); })
             .finally(() => setLoadingId(null));
-    };
+    }, [selectedMember]);
 
-    const statusBadge = (status) => (
-        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-            status === "Active" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-            : status === "Pending" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-            : status === "Suspended" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-            : "bg-gray-100 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300"
-        }`}>{status}</span>
-    );
+    /**
+     * 🔴 THE ROW WAS A `<div onClick>` INSIDE A `grid-cols-5`. Selecting a member for an
+     * ACB banking change -- which is what this screen exists to do -- was mouse-only: no
+     * tab stop, no accessible name, no Enter. `Table` offers no `onRowClick` at all, so
+     * the action is a real button on the membership number.
+     *
+     * 📱 R-RESP-K: five columns do not fit at 390px. ID number and bank drop into the
+     * row's detail panel rather than being crushed or hidden.
+     */
+    const memberColumns = useMemo(() => [
+        {
+            key: 'membershipNumber',
+            header: 'Membership No.',
+            priority: 'essential',
+            cell: (m) => (
+                <button
+                    type="button"
+                    onClick={() => handleSelectMember(m)}
+                    aria-pressed={selectedMember?.id === m.id}
+                    aria-label={`${m.membershipNumber || 'This member'} \u2014 load banking details for ${[m.title, m.initials, m.surname].filter(Boolean).join(' ') || 'this member'}`}
+                    className="touch-target inline-flex items-center gap-2 rounded-sm font-medium text-brand-ink underline-offset-2 hover-hover:hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+                >
+                    {m.membershipNumber}
+                    {loadingId === m.id && (
+                        <span
+                            role="status"
+                            aria-label="Loading banking details"
+                            className="inline-block size-3 animate-spin rounded-full border-2 border-brand border-t-transparent motion-reduce:animate-none"
+                        />
+                    )}
+                </button>
+            ),
+        },
+        {
+            key: 'name',
+            header: 'Name',
+            priority: 'essential',
+            truncate: true,
+            cell: (m) => `${m.title ? `${m.title} ` : ''}${m.initials || ''} ${m.surname || ''}`.trim() || '\u2014',
+        },
+        { key: 'identityNumber', header: 'ID Number', priority: 'secondary', truncate: true, cell: (m) => m.identityNumber || '\u2014' },
+        { key: 'bankName', header: 'Bank', priority: 'secondary', truncate: true, cell: (m) => m.bankName || '\u2014' },
+        { key: 'status', header: 'Status', priority: 'essential', cell: (m) => <StatusChip status={m.status} /> },
+    ], [loadingId, selectedMember, handleSelectMember]);
 
     return (
-        <div className="p-6 text-gray-900 dark:text-gray-100">
+        <div className="p-6 text-ink">
             <PageTitle title="Manage Debits" subtitle="Capture Resubmission Debits" />
+
+            {/* 🔴 WHAT THE `alert()` BECAME. Focused rather than `role="alert"`: the
+                form primitives already give inline messages that role, and stacking a
+                page-level live region on top is two announcements for one failure. */}
+            {notice && (
+                <div
+                    ref={noticeRef}
+                    tabIndex={-1}
+                    aria-labelledby="acb-notice-title"
+                    className="mx-auto mb-4 flex max-w-4xl items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                >
+                    <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
+                    <p id="acb-notice-title" className="flex-1">{notice}</p>
+                    <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dismiss</Button>
+                </div>
+            )}
 
             <div className="max-w-4xl mx-auto">
                 {/* Search */}
-                <div className="p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-4">Member Search</h3>
+                <div className="p-6 rounded-2xl shadow-lg bg-surface">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-ink-muted mb-4">Member Search</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                         <TextInput label="Surname" value={filters.surname} onChange={handleChange("surname")} placeholder="Search by surname" />
                         <TextInput label="Membership Number" value={filters.membershipNumber} onChange={handleChange("membershipNumber")} placeholder="Search by membership number" />
                         <div className="flex flex-col gap-1">
                             <TextInput label="Identity Number" value={filters.identityNumber} onChange={handleChange("identityNumber")} placeholder="Search by ID number" />
-                            {idError && <p className="text-xs text-red-500 dark:text-red-400">{idError}</p>}
+                            {idError && <p className="text-xs text-status-suspended">{idError}</p>}
                         </div>
                     </div>
                     <div className="flex gap-2 mt-4">
@@ -123,65 +187,37 @@ export default function AcbDebits() {
 
                 {/* Results */}
                 {searched && (
-                    <div className="mt-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800 overflow-hidden">
-                        <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400">
+                    <div className="mt-6 rounded-2xl shadow-lg bg-surface overflow-hidden">
+                        <div className="px-6 py-3 border-b border-line text-sm text-ink-muted">
                             {results.length} member{results.length !== 1 ? "s" : ""} found
                         </div>
-                        {results.length === 0 ? (
-                            <p className="px-6 py-6 text-sm text-gray-500 dark:text-gray-400">No members match your search.</p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <div className="grid grid-cols-5 gap-4 px-6 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300">
-                                    <div>Membership No.</div>
-                                    <div>Name</div>
-                                    <div>ID Number</div>
-                                    <div>Bank</div>
-                                    <div>Status</div>
-                                </div>
-                                <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                                    {results.map(m => (
-                                        <div
-                                            key={m.id}
-                                            onClick={() => handleSelectMember(m)}
-                                            className={`grid grid-cols-5 gap-4 px-6 py-3 text-sm cursor-pointer transition ${
-                                                selectedMember?.id === m.id
-                                                    ? "bg-cyan-50 dark:bg-cyan-900/20"
-                                                    : "hover:bg-gray-50 dark:hover:bg-gray-700"
-                                            }`}
-                                        >
-                                            <div className="font-medium flex items-center gap-2">
-                                                {m.membershipNumber}
-                                                {loadingId === m.id && (
-                                                    <span className="w-3 h-3 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin inline-block" />
-                                                )}
-                                            </div>
-                                            <div className="truncate">{m.title ? `${m.title} ` : ""}{m.initials} {m.surname}</div>
-                                            <div className="truncate">{m.identityNumber}</div>
-                                            <div className="truncate">{m.bankName}</div>
-                                            <div>{statusBadge(m.status)}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        <Table
+                            caption="Members matching the ACB search"
+                            columns={memberColumns}
+                            rows={results}
+                            rowKey="id"
+                            emptyTitle="No members match your search."
+                            emptyMessage="Try a different membership or identity number."
+                            dense
+                        />
                     </div>
                 )}
 
                 {/* Banking Details & Confirmation */}
                 {selectedMember && (
-                    <div className="mt-4 rounded-2xl shadow-lg bg-white dark:bg-gray-800 overflow-hidden">
+                    <div className="mt-4 rounded-2xl shadow-lg bg-surface overflow-hidden">
                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                        <div className="px-6 py-4 border-b border-line flex items-center justify-between">
                             <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Banking Details</p>
-                                <p className="mt-0.5 font-semibold text-gray-900 dark:text-gray-100">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Banking Details</p>
+                                <p className="mt-0.5 font-semibold text-ink">
                                     {selectedMember.title ? `${selectedMember.title} ` : ""}{selectedMember.initials} {selectedMember.surname}
-                                    <span className="ml-2 text-gray-400 font-normal text-sm">· {selectedMember.membershipNumber}</span>
+                                    <span className="ml-2 text-ink-muted font-normal text-sm">· {selectedMember.membershipNumber}</span>
                                 </p>
                             </div>
                             <div className="flex items-center gap-3">
                                 <Button onClick={openEdit}>Edit Details</Button>
-                                {statusBadge(selectedMember.status)}
+                                <StatusChip status={selectedMember.status} />
                             </div>
                         </div>
 
@@ -199,22 +235,22 @@ export default function AcbDebits() {
                                 ["Deduct via ACB", selectedMember.deductACB],
                             ].map(([label, val]) => (
                                 <div key={label}>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-                                    <p className="mt-0.5 font-semibold text-gray-800 dark:text-gray-200">{val || "-"}</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{label}</p>
+                                    <p className="mt-0.5 font-semibold text-ink">{val || "-"}</p>
                                 </div>
                             ))}
                         </div>
 
                         {/* Confirmation footer */}
-                        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                        <div className="px-6 py-4 border-t border-line bg-surface-2">
                             {confirmed ? (
-                                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm font-semibold">
+                                <div className="flex items-center gap-2 text-status-active text-sm font-semibold">
                                     <CheckCircle2 size={18} />
                                     Banking details confirmed for {selectedMember.initials} {selectedMember.surname}
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-4">
-                                    <p className="text-sm text-gray-600 dark:text-gray-400 flex-1">
+                                    <p className="text-sm text-ink-muted flex-1">
                                         Please verify the banking details above are correct before confirming the re-debit.
                                     </p>
                                     <Button variant="primary" onClick={() => setConfirmed(true)}>Confirm Details</Button>
@@ -243,7 +279,6 @@ export default function AcbDebits() {
                                         <TextInput label="Branch" value={bankForm.branch} onChange={handleBankChange('branch')} />
                                         <TextInput label="Account Number" value={bankForm.bankAccountNumber} onChange={handleBankChange('bankAccountNumber')} />
                                         <TextInput label="IBT No." value={bankForm.ibtNo} onChange={handleBankChange('ibtNo')} />
-                                        {/*<TextInput label="Work IBT No." value={bankForm.workIbtNo} onChange={handleBankChange('workIbtNo')} />*/}
                                         <TextInput label="Payment Type" value={bankForm.paymentType} onChange={handleBankChange('paymentType')} />
                                         <TextInput label="Debit Day" value={bankForm.debitDay} onChange={handleBankChange('debitDay')} />
                                         <TextInput label="Bank Address" value={bankForm.bankAddress} onChange={handleBankChange('bankAddress')} />

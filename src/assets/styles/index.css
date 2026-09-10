@@ -385,12 +385,46 @@
   header, nav, footer,
   [role="tablist"] { display: none !important; }
 
-  /* The legacy single-area mode, kept for the seven sites that use it -- but
-     STATIC, so a long area paginates instead of being clipped at the fold. */
+  /* 🖨️ THE SINGLE-AREA MODE. Four screens nominate one subtree with `.print-area`
+     and mean "print this, not the page around it".
+
+     🔴 THE ORIGINAL DID IT WITH `visibility: hidden` ON EVERYTHING PLUS
+     `position: fixed` ON THE AREA, and both halves were wrong on paper.
+     `visibility: hidden` hides a box and KEEPS it, so every hidden element
+     printed as blank space -- the shell's full height above the content. And
+     `position: fixed` does not paginate: an area longer than one sheet was cut
+     off at the fold with no second page. A bank listing of 200 rows printed
+     about 30 of them.
+
+     🔑 `:has()` IS WHAT MAKES `display: none` USABLE HERE. The old rule needed
+     `visibility` because there was no way to say "everything except this
+     subtree and its ancestors" -- `display: none` on an ancestor takes the area
+     with it. `:has()` says exactly that: hide every element that is not the
+     area, not inside it, and not an ancestor of it. Boxes are then REMOVED, so
+     nothing prints blank, and the area is in normal flow, so it paginates. */
+  body:has(.print-area) *:not(.print-area):not(.print-area *):not(:has(.print-area)) {
+    display: none !important;
+  }
+
   .print-area {
     position: static !important;
     width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
   }
+
+  /* A table that scrolls on screen must not scroll on paper -- there is nowhere
+     for it to scroll to, so the columns past the fold simply vanish. */
+  .print-area [class*="overflow-"] {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  .print-area thead { display: table-header-group; }
+  .print-area tr { break-inside: avoid; }
 
   /* 🖨️ THE MEMBER RECORD. It prints from inside a Radix dialog, which is a
      portalled fixed overlay with its own scroller and a scrim -- none of which
