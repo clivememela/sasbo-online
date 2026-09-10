@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { Printer } from "lucide-react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, SearchableSelect, Button } from "../../components/form";
@@ -10,7 +10,24 @@ const PAGE_SIZE = bankService.getPageSize();
 
 export default function BankBranch() {
   const [banks, setBanks] = useState([]);
-  useEffect(() => { bankService.getBanks().then(setBanks); }, []);
+
+  /**
+   * 🔴 THIS WAS `bankService.getBanks().then(setBanks)` WITH NO `.catch` AT ALL. A
+   * failed request became an unhandled rejection and the screen rendered "No banks match
+   * your search" -- a confident wrong answer with not even a console line behind it. A27
+   * is the same defect on the member register, and the plan predicted this: "A27 is
+   * probably one instance of a class."
+   */
+  const [listState, setListState] = useState('loading');
+
+  const loadBanks = useCallback(() => {
+    setListState('loading');
+    return bankService.getBanks()
+      .then((data) => { setBanks(data ?? []); setListState('ready'); })
+      .catch((err) => { console.error('Failed to load bank branches', err); setListState('error'); });
+  }, []);
+
+  useEffect(() => { loadBanks(); }, [loadBanks]);
   const [filters, setFilters] = useState({
     bankName: "",
     branch: "",
@@ -163,6 +180,9 @@ export default function BankBranch() {
             columns={bankColumns}
             rows={visibleBanks}
             rowKey="id"
+            loading={listState === 'loading'}
+            error={listState === 'error' ? 'We could not load the bank branches.' : null}
+            onRetry={loadBanks}
             emptyTitle="No banks match your search."
             emptyMessage="Try a different bank name, branch or area."
             dense

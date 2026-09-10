@@ -219,6 +219,16 @@ export const FLOORS = {
   COLOUR_TOKENS: 40,
 
   /**
+   * Page components under `src/pages/`, as the list-state guard walks them.
+   * Measured through that guard's own `readSources` walk on 2026-09-10: 31.
+   *
+   * What it catches is the walk returning nothing -- a wrong root, or a pattern that
+   * stopped matching `.jsx`. The guard would then find no page that fetches, no page
+   * that fails to handle a failure, and report the rule holding over an empty set.
+   */
+  PAGE_FILES: 20,
+
+  /**
    * Routes the heading-contract guard mounts, from `App.jsx`'s own route table.
    * Measured through that guard's own render on 2026-09-09: 27 path-bearing
    * routes, the same population the route smoke drives.

@@ -19,17 +19,39 @@ export function Locations() {
         setFilters((prev) => ({ ...prev, [field]: event.target.value }));
     };
 
+    /**
+     * 🔴 FOUND BY `listStates.test.js` ON ITS FIRST RUN, and it is the third instance of
+     * A27's class after the member register and two more in `04.3`.
+     *
+     * 🔑 AND IT FAILED MORE QUIETLY THAN THE OTHER TWO. Those rendered an EMPTY state
+     * against a down backend, which is a wrong answer. This rendered NOTHING: a rejection
+     * left `searched` false, so the screen stayed exactly as it was before the button was
+     * pressed. Somebody presses Search, the page does not move, and there is no way to
+     * tell "the request failed" from "the click did not land" -- so the natural response
+     * is to press it again.
+     */
+    const [searchState, setSearchState] = useState('idle');
+
     const handleSearch = () => {
-        locationService.search(filters).then((data) => {
-            setResults(data);
-            setSearched(true);
-        });
+        setSearchState('loading');
+        locationService.search(filters)
+            .then((data) => {
+                setResults(data ?? []);
+                setSearched(true);
+                setSearchState('ready');
+            })
+            .catch((err) => {
+                console.error('Location search failed', err);
+                setSearched(true);
+                setSearchState('error');
+            });
     };
 
     const handleClear = () => {
         setFilters({ bankName: "", branch: "", area: "", randomAccessNumber: "" });
         setResults([]);
         setSearched(false);
+        setSearchState('idle');
     };
 
     return (
@@ -78,13 +100,30 @@ export function Locations() {
                 </div>
             </div>
 
-            {searched && results.length === 0 && (
+            {searchState === 'loading' && (
+                <div role="status" className="max-w-6xl mx-auto text-center py-12 text-ink-muted text-sm">
+                    Searching locations…
+                </div>
+            )}
+
+            {/* 🔴 THE ERROR BRANCH IS SEPARATE FROM THE EMPTY ONE, and never falls through
+                to it. "No locations match your search criteria" against a down backend is
+                a statement about the union's branches; this is a statement about the
+                server, and they are different facts. */}
+            {searchState === 'error' && (
+                <div role="alert" className="max-w-6xl mx-auto flex flex-col items-center gap-3 py-12 text-center">
+                    <p className="text-sm font-medium text-ink">We could not run that search.</p>
+                    <Button onClick={handleSearch}>Try again</Button>
+                </div>
+            )}
+
+            {searchState === 'ready' && searched && results.length === 0 && (
                 <div className="max-w-6xl mx-auto text-center py-12 text-ink-muted text-sm">
                     No locations match your search criteria.
                 </div>
             )}
 
-            {results.map((location, index) => (
+            {searchState === 'ready' && results.map((location, index) => (
                 <LocationListing key={index} data={location} />
             ))}
         </div>

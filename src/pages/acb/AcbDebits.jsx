@@ -27,7 +27,25 @@ export default function AcbDebits() {
     const [bankForm, setBankForm] = useState({});
     const [saving, setSaving] = useState(false);
 
-    useEffect(() => { memberService.getMembers().then(setMembersList); }, []);
+    /**
+     * 🔴 SAME SHAPE, SAME MISSING `.catch`. And it matters more here than on a listing:
+     * this screen is how a member's debit-order banking gets changed, so "no members match
+     * your search" against a down backend invites somebody to conclude the member is not
+     * on file.
+     *
+     * The table's states are gated on `searched` as well, because an untouched search box
+     * is not an empty result -- it is a question nobody has asked yet.
+     */
+    const [listState, setListState] = useState('loading');
+
+    const loadMembers = useCallback(() => {
+        setListState('loading');
+        return memberService.getMembers()
+            .then((data) => { setMembersList(data ?? []); setListState('ready'); })
+            .catch((err) => { console.error('Failed to load members', err); setListState('error'); });
+    }, []);
+
+    useEffect(() => { loadMembers(); }, [loadMembers]);
 
     const openEdit = () => {
         if (!selectedMember) return;
@@ -196,6 +214,9 @@ export default function AcbDebits() {
                             columns={memberColumns}
                             rows={results}
                             rowKey="id"
+                            loading={listState === 'loading'}
+                            error={listState === 'error' ? 'We could not load the member list.' : null}
+                            onRetry={loadMembers}
                             emptyTitle="No members match your search."
                             emptyMessage="Try a different membership or identity number."
                             dense
