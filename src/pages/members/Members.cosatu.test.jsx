@@ -2,7 +2,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { screen } from '@testing-library/react'
-import { readFileSync } from 'node:fs'
 
 import MembersPage from './Members'
 import { renderWithProviders } from '../../test/renderWithProviders'
@@ -10,7 +9,6 @@ import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
 import { DEFECTS, disabled, pin } from '../../test/knownDefects'
-import { blankComments } from '../../test/sourceScan'
 
 /**
  * A LIST-VALUED FIELD THAT ARRIVES AS A STRING -- register A37, and A38 beside it.

@@ -1,9 +1,8 @@
 import { Menu } from "lucide-react";
-import Logo from "./common/Logo";
 import ThemeToggle from "./common/ThemeToggle";
 import Breadcrumbs from "./common/Breadcrumbs";
 import Button from "./form/Button";
-import { SIDEBAR_ID } from "./Sidebar";
+import { MENU_BUTTON_ID, SIDEBAR_ID } from "./shellIds";
 
 export default function Header({ setSideBarOpen, sideBarOpen }) {
   return (
@@ -20,6 +19,7 @@ export default function Header({ setSideBarOpen, sideBarOpen }) {
               `aria-expanded` + `aria-controls` are the other half: the drawer it opens
               is a sibling in `AppLayout`, so without them nothing connects the two. */}
           <Button
+            id={MENU_BUTTON_ID}
             size="icon"
             variant="ghost"
             className="lg:hidden"

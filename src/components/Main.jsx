@@ -4,13 +4,7 @@ import Header from "./Header";
 import Footer from "./Footer";
 import ErrorBoundary from "./common/ErrorBoundary";
 import RoutePending from "./common/RoutePending";
-
-/**
- * The id the skip link jumps to. Exported rather than written twice: a skip link whose
- * target id has been renamed is a skip link that silently does nothing, and it is invisible
- * until focused, so nobody sees it fail.
- */
-export const MAIN_CONTENT_ID = 'main-content';
+import { MAIN_CONTENT_ID } from "./shellIds";
 
 export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref }) {
   return (

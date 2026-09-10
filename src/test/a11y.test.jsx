@@ -101,6 +101,18 @@ describe('the a11y gate can actually fail', () => {
     // block above. A gate that has never been seen to fail is not a gate.
     const { container } = renderWithProviders(
       <div>
+        {/* 🔑 THE ONE PLACE IN THIS REPOSITORY WHERE MISSING `alt` IS THE POINT, so the
+            lint rule and this test assert opposite things and the test is the stronger of
+            the two. `jsx-a11y/alt-text` reads this as the defect it is designed to catch;
+            what it cannot see is that the defect is the FIXTURE. Disabled here, at the one
+            site, with the reason -- never at config level, because a rule switched off for
+            the file would then be off for every real `<img>` a future test renders, which
+            is exactly the masking L20 describes.
+
+            It cannot hide a genuine regression either: the assertions below REQUIRE axe to
+            report `image-alt` here, so an `alt` added to quieten the linter turns this test
+            red rather than green. */}
+        {/* eslint-disable-next-line jsx-a11y/alt-text -- deliberately invalid: this is the gate's own reddening fixture, and the assertions below require it to fail */}
         <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" />
         <input type="text" />
       </div>,

@@ -11,7 +11,7 @@ import Table from "../../components/table/Table.jsx";
 import Modal, { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
 import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
-    STATUS_OPTIONS, YES_NO_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
+    STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
     JOB_GRADE_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS,
 } from "../../config/memberConstants.js";
@@ -211,7 +211,6 @@ export default function Members() {
     const raceOptions = RACE_OPTIONS;
     const paymentTypeOptions = PAYMENT_TYPE_OPTIONS;
     const statusOptions = STATUS_OPTIONS;
-    const yesNoOptions = YES_NO_OPTIONS;
     const bankOptions = bankNames;
     const branchOptions = BRANCH_OPTIONS;
     const genderOptions = GENDER_OPTIONS;

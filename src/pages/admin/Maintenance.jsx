@@ -1,9 +1,8 @@
-import {
-    FileBadge, Landmark, LucideArrowUpDown, LucideBrushCleaning,
-    LucideCopyCheck, LucideFileText, LucideFileX,
-    LucideLocate, LucideMails,
-    LucideTable, LucideTreePalm, LucideUserKey, LucideUsers
-} from "lucide-react";
+// ⚠️ ONLY THE THREE ICONS THIS PAGE ACTUALLY RENDERS. Ten more were imported here and used
+// nowhere but inside the commented-out card blocks below -- so a grep for each name found two
+// hits and concluded it was live, while eslint (which reads code, not comments) called all ten
+// dead. eslint was right. Anyone restoring one of those cards restores its icon import with it.
+import { Landmark, LucideCopyCheck, LucideMails } from "lucide-react";
 import NavigationCard from '../../components/common/NavigationCard.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
 import {useOutletContext} from "react-router-dom";

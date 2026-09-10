@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { screen, within } from '@testing-library/react'
 
 import App from '../App'
+import * as SHELL_IDS from './shellIds'
 import { renderWithProviders } from '../test/renderWithProviders'
 import { server } from '../test/msw/server'
 import { smokeHandlers } from '../test/msw/smokeLayer'
@@ -220,6 +221,86 @@ describe('the shell — landmarks and the skip link, `05.3`', () => {
       document.getElementById(controls),
       `aria-controls="${controls}" names an element that is not in the document.`,
     ).toBeInTheDocument()
+  })
+})
+
+describe('the shell — the drawer can be closed without a mouse, `05.4`', () => {
+  beforeEach(() => {
+    server.use(...smokeHandlers)
+  })
+
+  it('Escape closes the drawer and puts focus back on the control that opened it', async () => {
+    const user = setupUser()
+    appRoute()
+
+    const menu = await screen.findByRole('button', { name: /open navigation menu/i })
+    await user.click(menu)
+    expect(menu).toHaveAttribute('aria-expanded', 'true')
+
+    // 🔴 THE DRAWER HAD TWO WAYS OUT AND BOTH WERE A MOUSE — the transparent scrim, and
+    // the X inside the panel. A keyboard user on a narrow window who opened it was stuck:
+    // no Escape handler existed anywhere in the application.
+    await user.keyboard('{Escape}')
+
+    expect(
+      menu,
+      'Escape did not close the drawer. On a narrow window it is the only dismissal a ' +
+        'keyboard user has, because the scrim is a click target and nothing else.',
+    ).toHaveAttribute('aria-expanded', 'false')
+
+    // 🔑 AND FOCUS COMES BACK, which is the half that fails silently. Left where it was,
+    // focus sits inside a <nav> that is now translated off-screen, so the next Tab resumes
+    // from somewhere the user cannot see — the same defect `05.3` found in every dialog.
+    expect(
+      document.activeElement,
+      'The drawer closed and focus stayed inside it. The panel is off-screen now, so the ' +
+        'next Tab continues from a place with nothing visible in it.',
+    ).toBe(menu)
+  })
+
+  it('the scrim is a mouse convenience, and is not in the accessibility tree', async () => {
+    const user = setupUser()
+    appRoute()
+
+    const menu = await screen.findByRole('button', { name: /open navigation menu/i })
+    await user.click(menu)
+
+    // The scrim carries an onClick, which is what `click-events-have-key-events` and
+    // `no-static-element-interactions` fire on. `aria-hidden` is why they stand down, and
+    // it is only honest while Escape above actually works — so the two are asserted
+    // together rather than one being trusted to imply the other.
+    const scrim = document.querySelector('[aria-hidden="true"].fixed.inset-0')
+    expect(
+      scrim,
+      'The drawer scrim is no longer aria-hidden. It is a transparent full-screen <div> ' +
+        'with a click handler, so in the accessibility tree it is a giant unlabelled ' +
+        'control — and its keyboard equivalent is Escape, not a focus stop.',
+    ).not.toBeNull()
+  })
+})
+
+describe('the shell — every id relationship RESOLVES, `05.4`', () => {
+  beforeEach(() => {
+    server.use(...smokeHandlers)
+  })
+
+  it('the three shell ids each name an element that is in the document', async () => {
+    appRoute()
+    await screen.findByRole('button', { name: /open navigation menu/i })
+
+    // 🔑 ASSERTED BY RESOLUTION, NOT BY PRESENCE. Every one of these relationships crosses
+    // a file boundary and every one fails in silence when it breaks: `aria-controls` naming
+    // a missing element is ignored outright, `getElementById(...)?.focus()` on a renamed id
+    // does nothing, and a skip link pointing at nothing moves the caret and not the focus.
+    // They live in `shellIds.js` for that reason — three files needed them and two of the
+    // exports had started to form an import cycle.
+    for (const [name, id] of Object.entries(SHELL_IDS)) {
+      expect(
+        document.getElementById(id),
+        `${name} is "${id}", and there is no element with that id in the document. ` +
+          `Whatever points at it is now pointing at nothing, silently.`,
+      ).not.toBeNull()
+    }
   })
 })
 

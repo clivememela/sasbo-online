@@ -1,7 +1,8 @@
 import '../assets/styles/App.css'
 import { useState } from "react";
 import Sidebar from "../components/Sidebar.jsx";
-import Main, { MAIN_CONTENT_ID } from "../components/Main";
+import Main from "../components/Main";
+import { MAIN_CONTENT_ID } from "../components/shellIds";
 
 export default function AppLayout() {
   const [sideBarOpen, setSideBarOpen] = useState(false);

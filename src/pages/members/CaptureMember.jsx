@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { recruiterService } from "../../services/recruiterService.js";
@@ -253,20 +253,10 @@ export default function CaptureMember() {
         }
     };
 
-    const handleStructureCheckboxChange = (structureName) => (event) => {
-        const checked = event.target.checked;
-        setForm((prev) => {
-            let currentSelections = [...prev.selectedBecStructures];
-            if (checked) {
-                if (!currentSelections.includes(structureName)) {
-                    currentSelections.push(structureName);
-                }
-            } else {
-                currentSelections = currentSelections.filter(item => item !== structureName);
-            }
-            return { ...prev, selectedBecStructures: currentSelections };
-        });
-    };
+    // `handleStructureCheckboxChange` lived here until `05.4`: eighteen lines of per-checkbox
+    // add/remove bookkeeping that nothing had called since `04.2` gave the BEC structures a
+    // real `CheckboxGroup`, which owns the toggle and hands back the whole next selection.
+    // It survived because `no-unused-vars` was the only thing that could see it was dead.
 
     const validateFormBeforeSave = () => {
         const errors = {};
@@ -408,7 +398,7 @@ export default function CaptureMember() {
             try {
                 const grades = await jobGradeService.getByBank(bankIdentifier);
                 if (!cancelled) setJobGradeOptions(Array.isArray(grades) && grades.length ? grades : JOB_GRADE_OPTIONS);
-            } catch (e) {
+            } catch {
                 if (!cancelled) setJobGradeOptions(JOB_GRADE_OPTIONS);
             } finally {
                 if (!cancelled) setJobGradeLoading(false);

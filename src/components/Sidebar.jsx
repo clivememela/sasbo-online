@@ -1,19 +1,11 @@
 import { X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Logo from "./common/Logo";
 import SidebarItem from "./common/SidebarItem";
 import Button from "./form/Button";
 import { navItems, authItems } from "../config/navigation";
-
-/**
- * The drawer's id, so the header's hamburger can point `aria-controls` at it.
- *
- * Exported rather than written twice: two hand-typed copies of an id is how
- * `aria-controls` ends up naming an element that is not in the document, which fails
- * silently -- the attribute is simply ignored and the relationship is gone.
- */
-export const SIDEBAR_ID = "app-navigation";
+import { MENU_BUTTON_ID, SIDEBAR_ID } from "./shellIds";
 
 const findAncestors = (items, target, path = []) => {
   for (const item of items) {
@@ -58,11 +50,50 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
     });
   };
 
+  /**
+   * 🔴 ESCAPE CLOSES THE DRAWER, AND UNTIL `05.4` NOTHING DID.
+   *
+   * The drawer had exactly two ways out and both of them were a mouse: the scrim below, and
+   * the X inside it. On a phone that is fine, because a phone has no Escape key -- but the
+   * drawer is also what a keyboard user on a narrow window gets, and for them an opened
+   * drawer was a one-way door. Escape is the convention every dismissible overlay obeys, and
+   * it is what makes the scrim's `aria-hidden` honest rather than a way of quieting a linter:
+   * the click target is a mouse convenience, and the keyboard has its own route out.
+   *
+   * Focus goes back to the control that opened it. Leaving it where it was drops it on a
+   * `<nav>` that is now translated off-screen, so the next Tab resumes from a place the user
+   * cannot see -- the same defect `05.3` found in every dialog in the application, which is
+   * why the drawer is checked for it too rather than assumed different.
+   */
+  useEffect(() => {
+    if (!sideBarOpen) return;
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      setSideBarOpen(false);
+      // The trigger is in `Header`, a sibling two levels up, so it is reached by the id
+      // `Header` exports rather than by a ref threaded through `Main`.
+      document.getElementById(MENU_BUTTON_ID)?.focus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [sideBarOpen, setSideBarOpen]);
+
   return (
     <>
-      {/* Overlay for mobile */}
+      {/* The scrim: a click anywhere outside the drawer closes it.
+
+          🔑 `aria-hidden` BECAUSE IT IS TRULY DECORATIVE, not to satisfy a rule. It is a
+          transparent full-screen `<div>` whose only job is to catch a click a mouse user
+          aims at "not the menu". There is nothing here to announce, nothing to focus, and
+          putting it in the accessibility tree as a giant unlabelled control would be worse
+          than leaving it out. The keyboard equivalent is Escape, above -- and `jsx-a11y`'s
+          `click-events-have-key-events` and `no-static-element-interactions` both stand down
+          for exactly this reason, because the element is no longer *visible* to assistive
+          technology. Measured, 2026-09-10: with `aria-hidden` both rules go quiet; with
+          `role="none"` instead, `role-supports-aria-props` fires. */}
       {sideBarOpen && (
         <div
+          aria-hidden="true"
           className="fixed inset-0 bg-transparent z-10 lg:hidden"
           onClick={() => setSideBarOpen(false)}
         ></div>
