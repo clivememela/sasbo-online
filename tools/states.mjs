@@ -17,12 +17,12 @@
  * reach' is not a jsdom question"* — and it was deferred here. This is the first time that
  * sheet has been laid out at 390 real pixels.
  */
-import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
+
+import { launch, sleep } from './cdp.mjs';
 
 import { overflowProbe, pageReady, populationComplaints, storeTheme, themeDimensionComplaints, themeReadout } from './probe.mjs';
 
-const CHROME = 'C:/Users/mfazl/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe';
 const baseUrl = process.argv[2] ?? 'http://127.0.0.1:4319';
 const shotsDir = process.argv[3];
 
@@ -140,61 +140,51 @@ const STATES = [
 ];
 
 const WIDTH = 390;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const PORT = 9700 + Math.floor(Math.random() * 80);
-const chrome = spawn(CHROME, [
-  '--headless=new', '--disable-gpu', '--hide-scrollbars',
-  `--remote-debugging-port=${PORT}`, '--no-first-run',
-  '--user-data-dir=' + process.env.TEMP + '/states-' + PORT, 'about:blank',
-], { stdio: 'ignore' });
-
-let ws;
-let id = 0;
-const pending = new Map();
-const send = (method, params = {}) =>
-  new Promise((resolve, reject) => {
-    const msg = { id: ++id, method, params };
-    pending.set(msg.id, { resolve, reject });
-    ws.send(JSON.stringify(msg));
-  });
-const evaluate = async (expression) =>
-  (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
-
 const results = [];
+let cdp;
+
 try {
-  let targets;
-  for (let i = 0; i < 60; i++) {
-    try {
-      targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
-      if (targets.some((t) => t.type === 'page')) break;
-    } catch { /* not up yet */ }
-    await sleep(250);
-  }
-  ws = new WebSocket(targets.find((t) => t.type === 'page').webSocketDebuggerUrl);
-  await new Promise((r) => { ws.onopen = r; });
-  ws.onmessage = (e) => {
-    const m = JSON.parse(e.data);
-    if (m.id && pending.has(m.id)) {
-      const p = pending.get(m.id);
-      pending.delete(m.id);
-      m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result);
-    }
-  };
-  await send('Page.enable');
-  await send('Runtime.enable');
+  // The browser, the socket, the strict `evaluate`, the viewport rule and T23's identity
+  // check all live in `cdp.mjs` -- see its header for the four defects six hand-copies of
+  // this block had already drifted into.
+  cdp = await launch('states');
+  const { send, evaluate, metrics, waitFor, assertBuiltClient } = cdp;
+
+  console.log('identity OK — entry script', await assertBuiltClient(baseUrl));
   if (shotsDir) mkdirSync(shotsDir, { recursive: true });
+
+  /**
+   * A row for a state that never became ready.
+   *
+   * 🔑 ONE BUILDER, SO THE TWO PATHS CANNOT DISAGREE. `elements: 0` is the load-bearing field:
+   * `populationComplaints` keys off it, and a row without it is invisible to the canary rather
+   * than caught by it. `0` is honest here — the state genuinely never rendered — and it is a
+   * real number, so the check convicts the row instead of skipping it.
+   */
+  const unreachedRow = (state, theme, why) => ({
+    ...state,
+    theme,
+    reached: false,
+    missed: [why],
+    overflows: false,
+    offenders: [],
+    offenderCount: 0,
+    scrollWidth: 0,
+    innerWidth: 0,
+    requested: WIDTH,
+    elements: 0,
+  });
 
   // localStorage belongs to an ORIGIN, and the browser starts on about:blank -- which has
   // none. One throwaway navigation gives the first `storeTheme` somewhere to write.
   await send('Page.navigate', { url: baseUrl + '/' });
-  for (let i = 0; i < 60; i++) {
-    if (await evaluate('document.readyState === "complete"') === true) break;
-    await sleep(150);
-  }
+  await waitFor('document.readyState === "complete"', { tries: 60 });
 
   for (const state of STATES) {
     for (const theme of ['light', 'dark']) {
-      await send('Emulation.setDeviceMetricsOverride', { width: WIDTH, height: 844, deviceScaleFactor: 2, mobile: true });
+      // Through `cdp.mjs`'s one viewport rule, so this harness and the matrix agree about
+      // what a 390px phone is.
+      await metrics(WIDTH);
       // 🔴 THE THEME IS SET BEFORE THE NAVIGATION, NOT AFTER IT. Setting it after meant
       // setting it before React mounted, and `ThemeContext`'s mount effect then re-applied
       // the class from its own `localStorage`-seeded state -- so the dark half of every run
@@ -202,10 +192,7 @@ try {
       // makes the theme correct from the first frame. See `probe.mjs`.
       await evaluate(storeTheme(theme === 'dark'));
       await send('Page.navigate', { url: baseUrl + state.route });
-      for (let i = 0; i < 80; i++) {
-        if (await evaluate(pageReady) === true) break;
-        await sleep(150);
-      }
+      await waitFor(pageReady);
 
       // 🔴 WAIT FOR WHAT THIS STATE NEEDS, not for a fixed number of milliseconds.
       // The first run reached 4 of 12, and the pattern gave the cause away: two cases
@@ -214,15 +201,16 @@ try {
       // makes the result depend on how busy the machine is, which is the definition of a
       // flaky measurement.
       if (state.ready) {
-        let settled = false;
-        for (let i = 0; i < 80; i++) {
-          if (await evaluate(state.ready) === true) { settled = true; break; }
-          await sleep(150);
-        }
-        if (!settled) {
+        if (!await waitFor(state.ready)) {
           // No theme readout: a state that never became ready was never painted, and a row
           // with a placeholder colour would poison the theme canary below.
-          results.push({ ...state, theme, reached: false, missed: ['never became ready: ' + state.ready], overflows: false, offenders: [], offenderCount: 0, scrollWidth: 0, innerWidth: 0, requested: WIDTH });
+          //
+          // 🔴 IT STILL CARRIES AN `elements` COUNT, AND IT USED NOT TO. This path hand-listed
+          // eight fields and omitted that one — the single key `populationComplaints` reads —
+          // so an unreached state fell straight out of the population canary and the run came
+          // back clean about a row that had measured nothing. One row builder now, so a field
+          // added to the measured row cannot go missing from this one.
+          results.push(unreachedRow(state, theme, 'never became ready: ' + state.ready));
           continue;
         }
       }
@@ -255,8 +243,7 @@ try {
   console.error('states failed:', e.message);
   process.exitCode = 1;
 } finally {
-  try { ws && ws.close(); } catch { /* closed */ }
-  chrome.kill();
+  cdp?.close();
 }
 
 writeFileSync('reports/states.json', JSON.stringify(results, null, 2));

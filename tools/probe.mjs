@@ -45,6 +45,24 @@ export const ROUTES = [
 export const overflowProbe = (requested) => `(() => {
   const asked = ${requested};
   const offenders = [];
+  // 🔑 ONE STYLE RESOLUTION PER ANCESTOR, NOT ONE PER DESCENDANT-ANCESTOR PAIR. Every element
+  // walks its ancestor chain asking the same question of the same parents, so on /members
+  // (~1,000 elements under #root, ~700 of them table cells) the TableScroller div alone was
+  // asked ~700 times and each shell container hundreds. Measured shape: ~5,500 forced style
+  // resolutions where at most ~300 distinct ancestors exist -- and this probe runs ~700 times
+  // across a full sweep, on a box that has been under 1.5 GB free.
+  //
+  // ⚠️ IT MEMOISES ONLY, AND THAT IS DELIBERATE. The walk order, the \`p !== document.body\`
+  // stop and the early \`break\` are untouched, so the "inside a horizontal scroller is
+  // allowed" rule is character-for-character the rule it was. A faster top-down pass exists
+  // and would RESTATE that rule rather than cache it, which is the trade this file does not
+  // make -- see this module's header on three copies of one probe drifting apart.
+  const overflowX = new Map();
+  const overflowXOf = (p) => {
+    let v = overflowX.get(p);
+    if (v === undefined) { v = getComputedStyle(p).overflowX; overflowX.set(p, v); }
+    return v;
+  };
   for (const el of document.querySelectorAll('body *')) {
     const r = el.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) continue;
@@ -52,7 +70,7 @@ export const overflowProbe = (requested) => `(() => {
     // what the scroller is FOR. Only an element that pushes the DOCUMENT wide counts.
     let scrolled = false;
     for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
-      const o = getComputedStyle(p).overflowX;
+      const o = overflowXOf(p);
       if (o === 'auto' || o === 'scroll' || o === 'hidden') { scrolled = true; break; }
     }
     if (scrolled) continue;
@@ -165,13 +183,9 @@ export const pageReady = `(() => (
   && getComputedStyle(document.body).backgroundColor !== 'rgba(0, 0, 0, 0)'
 ))()`;
 
-/**
- * 🔑 THE THEME CANARY. Given every row a run produced, prove the two themes rendered
- * DIFFERENTLY. A run whose dark rows are pixel-identical to its light rows has measured one
- * theme twice and reported it as two, and every "× 2 themes" claim built on it is inflated.
- *
- * Returns a list of complaints; empty means the dimension is real.
- */
+/** Where a row was taken, for a complaint message. Rows are shaped differently per tool. */
+const rowWhere = (r) => `${r.route ?? r.name ?? '?'}@${r.width ?? r.requested ?? '?'}`;
+
 /**
  * 🔑 THE PAGE-POPULATION CANARY. Given every row a run produced, complain about any that was
  * taken against a page with almost nothing in it.
@@ -185,18 +199,49 @@ export const pageReady = `(() => (
  * `src/test/floors.js` states for the suite's own floors). The lightest real route in this
  * application renders 11 elements at its emptiest, so 8 separates "a page" from "no page"
  * without reddening for a route that is legitimately sparse.
+ *
+ * 🔴 A ROW WITH NO `elements` FIELD IS A COMPLAINT, NOT A SKIP — AND THE FIRST VERSION HAD
+ * THAT BACKWARDS. It read `typeof r.elements === 'number' && r.elements < floor`, so a row
+ * that never carried the field simply fell out of the filter and the run came back clean.
+ * Two live cases, both in the commit that introduced this function: `contrast.mjs`, whose rows
+ * come from axe and never touch `overflowProbe`, and `states.mjs`'s never-ready path, which
+ * hand-built a row listing eight fields and omitted this one. **The vacuity checker was
+ * itself vacuous**, which is the exact species it exists to catch, one level up.
  */
 export function populationComplaints(rows, floor = 8) {
+  const complaints = [];
+
+  const missing = rows.filter((r) => typeof r.elements !== 'number');
+  if (missing.length) {
+    complaints.push(
+      `${missing.length} of ${rows.length} rows carry no \`elements\` count ` +
+        `(${missing.slice(0, 5).map(rowWhere).join(', ')}${missing.length > 5 ? ', …' : ''}), so ` +
+        `this canary cannot tell whether they were measured against a real page. Give the row ` +
+        `an element census — do NOT let it fall out of the check, which is how the check ` +
+        `becomes the thing it was written to catch.`,
+    );
+  }
+
   const empty = rows.filter((r) => typeof r.elements === 'number' && r.elements < floor);
-  if (!empty.length) return [];
-  const where = (r) => `${r.route ?? r.name ?? '?'}@${r.width ?? r.requested ?? '?'}`;
-  return [
-    `${empty.length} of ${rows.length} rows were measured against a page with fewer than ` +
-      `${floor} elements under #root (${empty.slice(0, 5).map((r) => `${where(r)}=${r.elements}`).join(', ')}` +
-      `${empty.length > 5 ? ', …' : ''}) — the application had not rendered, so those rows are ` +
-      `facts about a blank page. An empty page never overflows.`,
-  ];
+  if (empty.length) {
+    complaints.push(
+      `${empty.length} of ${rows.length} rows were measured against a page with fewer than ` +
+        `${floor} elements under #root (${empty.slice(0, 5).map((r) => `${rowWhere(r)}=${r.elements}`).join(', ')}` +
+        `${empty.length > 5 ? ', …' : ''}) — the application had not rendered, so those rows are ` +
+        `facts about a blank page. An empty page never overflows.`,
+    );
+  }
+
+  return complaints;
 }
+
+/**
+ * 🔑 THE THEME CANARY. Given every row a run produced, prove the two themes rendered
+ * DIFFERENTLY. A run whose dark rows are pixel-identical to its light rows has measured one
+ * theme twice and reported it as two, and every "× 2 themes" claim built on it is inflated.
+ *
+ * Returns a list of complaints; empty means the dimension is real.
+ */
 
 export function themeDimensionComplaints(rows) {
   const complaints = [];

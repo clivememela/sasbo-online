@@ -23,9 +23,18 @@
  * against three-character names proves nothing about a column that has to hold
  * "Pietermaritzburg & Midlands Branch".
  */
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
+
+/** Is this a readable file? One stat, and a missing path is simply `false`. */
+const isFile = (path) => {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+};
 
 const ROOT = process.argv[2] ?? 'dist';
 const PORT = Number(process.argv[3] ?? 4319);
@@ -137,21 +146,77 @@ const API = {
   '/api/locations': bankRows.slice(0, 6).map((b) => ({ ...b, members: members.slice(0, 12) })),
 };
 
+/**
+ * The stub routes, longest first, established ONCE.
+ *
+ * It was re-keyed and re-sorted on every `/api/` hit — a per-request recomputation of a
+ * constant, in the one server all ~700 navigations of a full sweep pass through. Sorting here
+ * also makes "longest match first" a property of a value rather than a claim in a comment.
+ */
+const API_KEYS = Object.keys(API).sort((a, b) => b.length - a.length);
+
+/**
+ * Payloads serialised once at startup.
+ *
+ * `/api/branches` is 189 KB of JSON and cost 0.6ms per call to stringify; `/api/locations` is
+ * 57 KB and `/api/members` 46 KB. Holding the buffers costs ~470 KB of memory and removes both
+ * the CPU and ~189 KB of garbage from every hit.
+ */
+const API_BODY = new Map(API_KEYS.map((k) => [k, Buffer.from(JSON.stringify(API[k]), 'utf8')]));
+
+/**
+ * 🔴 UNMATCHED `/api/` PATHS ARE A LOUD 501, AND THEY USED TO BE A CHEERFUL `200 []`.
+ *
+ * That default is the exact failure this whole family of tools is written against. A client that
+ * renames an endpoint, or a stub table that drifts from the app, produced an EMPTY TABLE on a
+ * page that rendered perfectly: it cleared `pageReady`, cleared the 8-element population floor,
+ * and never overflowed — because an empty page is the most reliably non-overflowing page there
+ * is. Every "0 overflow" in the phase rested on this default not having fired.
+ *
+ * It is also not hypothetical here: the sweep that found this was itself run against a build
+ * whose tables were empty, and only the population canary caught it.
+ *
+ * So an unmatched path answers **501** and is COUNTED, and the count is printed at shutdown and
+ * folded into the exit code — a drifted stub reddens a lane instead of producing a clean sweep of
+ * empty tables.
+ *
+ * ⚠️ MATCHING IS STILL PREFIX-BASED, deliberately: the app calls `/api/members/42/banking` and
+ * `/api/banks/branches/7`, so a strict exact-match table would need every id. What changed is
+ * that a path matching NOTHING is an error rather than an empty array.
+ */
+const unmatched = new Map();
+
 const server = createServer((req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1');
   const path = decodeURIComponent(url.pathname);
 
   if (path.startsWith('/api/')) {
-    // Longest match first, so `/api/banks/branches` beats `/api/banks`.
-    const key = Object.keys(API).sort((a, b) => b.length - a.length).find((k) => path.startsWith(k));
+    const key = API_KEYS.find((k) => path.startsWith(k));
+    if (!key) {
+      // 🔴 LOGGED ON FIRST SIGHT, not only at shutdown. On Windows a measurement session ends
+      // this process with a forced kill, which runs no SIGINT/SIGTERM handler — so a report
+      // that only prints on the way out is a report that never prints. Once per distinct path,
+      // so a route requested 400 times does not bury everything else.
+      if (!unmatched.has(path)) console.error(`⚠ NO STUB: ${path} — answered 501`);
+      unmatched.set(path, (unmatched.get(path) ?? 0) + 1);
+      res.writeHead(501, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        error: 'no stub for this path',
+        path,
+        hint: 'add it to API in tools/serve-dist.mjs — an empty array here would measure as a '
+          + 'page that renders fine and never overflows',
+      }));
+      return;
+    }
     res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify(key ? API[key] : []));
+    res.end(API_BODY.get(key));
     return;
   }
 
   const rel = normalize(path).replace(/^([/\\])+/, '');
   const file = join(ROOT, rel);
-  if (rel && existsSync(file) && statSync(file).isFile()) {
+  // One stat, not `existsSync` followed by `statSync` — two syscalls for one question.
+  if (rel && isFile(file)) {
     res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
     createReadStream(file).pipe(res);
     return;
@@ -167,3 +232,30 @@ server.listen(PORT, '127.0.0.1', () => {
   const { address, port } = server.address();
   console.log(`serving ${ROOT} on http://${address}:${port}  (api stubbed, synthetic data)`);
 });
+
+/**
+ * On the way out, say what the app asked for that this server does not have.
+ *
+ * 🔑 A STUB THAT DRIFTED IS SILENT BY NATURE, so the report is the point. The 501s above make a
+ * single request loud; this makes the RUN loud, because a measurement session ends by killing
+ * this process and nobody reads a log they were not told to look at. Non-zero exit so a script
+ * that starts the server, sweeps and stops it can tell.
+ */
+const reportUnmatched = () => {
+  if (!unmatched.size) {
+    console.log('every /api/ path the app requested had a stub.');
+    process.exit(0);
+  }
+  console.error(`\n⚠ ${unmatched.size} /api/ path(s) had NO STUB and were answered 501:`);
+  for (const [path, hits] of [...unmatched].sort((a, b) => b[1] - a[1])) {
+    console.error(`    ${String(hits).padStart(4)} × ${path}`);
+  }
+  console.error(
+    '  Whatever consumed those paths measured an EMPTY surface. Add them to API and re-run —\n'
+    + '  an empty table renders perfectly, clears every readiness check, and never overflows.',
+  );
+  process.exit(1);
+};
+
+process.on('SIGINT', reportUnmatched);
+process.on('SIGTERM', reportUnmatched);

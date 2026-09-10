@@ -1,15 +1,11 @@
-import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { REPO_ROOT } from './apiContractScan.js'
 import {
-  assertBlankingPreservedCode,
-  assertNonVacuousScan,
-  assertNothingWasSkipped,
+  assertScanIsHonest,
   FLOORS,
 } from './assertNonVacuousScan.js'
-import { blankingDestroyedCode, readSources, unreadableDirectories } from './sourceScan.js'
+import { nonTestSources } from './sourceScan.js'
 
 /**
  * No `vh` in `src`. `05.1`, and conventions §6.
@@ -44,7 +40,21 @@ import { blankingDestroyedCode, readSources, unreadableDirectories } from './sou
  * scrollbar's width, so on any desktop with a classic scrollbar it is wider than the
  * viewport — the single most common cause of the horizontal overflow `05.1` measures.
  */
-const BARE_VH = /(?<![a-z])(?<!\d)\d[\d.]*vh\b|(?<![-\w])(?:min-|max-)?[hw]-screen\b/g
+/*
+ * 🔑 DECLARED WITHOUT `/g`, AND THAT IS WHY IT CAN BE USED DIRECTLY.
+ *
+ * It used to carry the flag, which forced every consumer to write `new RegExp(X.source)` —
+ * three times in this file — because a global regex keeps `lastIndex` between `.test()` calls
+ * and so reports a match on one sample and a miss on the next. That re-wrapping is
+ * flag-laundering a reader has to decode, and it is one "simplification" away from becoming the
+ * intermittent bug it was avoiding: anybody who tidies `new RegExp(X.source).test(s)` down to
+ * `X.test(s)` reintroduces the statefulness silently.
+ *
+ * Without the flag `.test()` is stateless, and the one place that needs every match uses
+ * `matchAll`, which per spec CLONES the regex and cannot leak state either — the same shape
+ * `dynamicUtilities.js` already uses.
+ */
+const BARE_VH = /(?<![a-z])(?<!\d)\d[\d.]*vh\b|(?<![-\w])(?:min-|max-)?[hw]-screen\b/
 
 /**
  * 🔴 THE CANARY. This assertion is `toEqual([])`, so a regex that has stopped matching is
@@ -64,20 +74,21 @@ const CANARY = {
 }
 
 function scan() {
-  return readSources(join(REPO_ROOT, 'src'), { root: REPO_ROOT, pattern: /\.(jsx?|mjs|css)$/ }).filter(
-    (source) => !/\.test\.|\/test\//.test(source.path),
-  )
+  // The walk, the non-test exclusion and the read all live in `sourceScan.js`; the PATTERN
+  // stays here because it is this guard's own population — `.css` included, because a bare
+  // `vh` in a stylesheet is exactly what this rule is about.
+  return nonTestSources({ pattern: /\.(jsx?|mjs|css)$/ })
 }
 
 describe('no static viewport-height units in src', () => {
   it('the detector sees a bare vh and lets every dynamic unit through', () => {
     expect(
-      CANARY.mustConvict.filter((sample) => !new RegExp(BARE_VH.source).test(sample)),
+      CANARY.mustConvict.filter((sample) => !BARE_VH.test(sample)),
       'The detector stopped recognising a bare `vh`. The scan below is now vacuous.',
     ).toEqual([])
 
     expect(
-      CANARY.mustAcquit.filter((sample) => new RegExp(BARE_VH.source).test(sample)),
+      CANARY.mustAcquit.filter((sample) => BARE_VH.test(sample)),
       'The detector convicted `dvh`/`svh`/`lvh` — which are the FIX — or something that ' +
         'merely contains the letters. Re-aim the predicate; do not rewrite the code.',
     ).toEqual([])
@@ -86,12 +97,10 @@ describe('no static viewport-height units in src', () => {
   it('no source file carries one', () => {
     const sources = scan()
 
-    assertNothingWasSkipped(unreadableDirectories(), 'the viewport-unit scan')
-    assertBlankingPreservedCode(blankingDestroyedCode(sources))
-    assertNonVacuousScan(sources, FLOORS.SRC_SOURCE_FILES, 'non-test source files under src/')
+    assertScanIsHonest(sources, FLOORS.SRC_STYLEABLE_FILES, 'the viewport-unit scan')
 
     const offenders = sources.flatMap((source) => {
-      const hits = source.code.match(new RegExp(BARE_VH.source, 'g')) ?? []
+      const hits = [...source.code.matchAll(new RegExp(BARE_VH, 'g'))].map((m) => m[0])
       return hits.map((hit) => `${source.path} ${hit}`)
     })
 

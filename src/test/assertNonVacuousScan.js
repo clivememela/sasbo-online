@@ -1,5 +1,7 @@
 import { expect } from 'vitest'
 
+import { blankingDestroyedCode, unreadableDirectories } from './sourceScan.js'
+
 /**
  * The one place this repository decides that a scan actually scanned something.
  *
@@ -93,6 +95,54 @@ export function assertNothingWasSkipped(skipped, what) {
       `clears its floor, still finds no offenders, and still reports success. Fix the ` +
       `access or the path; do not lower the floor, which was never the thing that ` +
       `noticed:\n  ${skipped.join('\n  ')}`,
+  ).toEqual([])
+}
+
+/**
+ * All three preflight assertions a source-scanning guard owes, in one call.
+ *
+ * 🔴 NINE GUARDS WROTE THIS TRIO OUT BY HAND, AND IT HAD ALREADY DRIFTED. Every scan in this
+ * repository must establish three separate things before its findings mean anything — that the
+ * walk reached everything (`assertNothingWasSkipped`), that the comment blanker did not empty a
+ * file it was supposed to preserve (`assertBlankingPreservedCode`), and that it found enough to
+ * be looking at the codebase at all (`assertNonVacuousScan`). Written out per guard, four of the
+ * five newest were byte-identical and the fifth had reordered them — which is exactly the drift
+ * this file's own header describes: *"Two call sites had already grown two different failure
+ * messages for an identical failure."* There were nine.
+ *
+ * 🔑 ORDER MATTERS AND IS FIXED HERE. Completeness first: a partial walk can still clear a floor
+ * with headroom, so checking the floor first would report the wrong cause. The blanker next,
+ * because every offender list downstream is computed from its output. The floor last.
+ */
+export function assertScanIsHonest(sources, floor, what) {
+  assertNothingWasSkipped(unreadableDirectories(), what)
+  assertBlankingPreservedCode(blankingDestroyedCode(sources))
+  assertNonVacuousScan(sources, floor, what)
+}
+
+/**
+ * A detector convicts every offence it must and acquits every innocent shape.
+ *
+ * 🔴 BOTH HALVES, BECAUSE EITHER ALONE IS SATISFIED BY A BROKEN DETECTOR. One that matched
+ * nothing passes the acquit half; one that matched everything passes the convict half. Six
+ * guards wrote this pair out with six different failure messages, and the pattern is the whole
+ * basis on which any of their results are believed.
+ *
+ * `detect` returns the offenders it found in a sample — any array-like; only emptiness is read.
+ */
+export function assertDetectorCanary(canary, detect, what) {
+  expect(
+    canary.mustConvict.filter((sample) => detect(sample).length === 0),
+    `The ${what} detector stopped recognising an offence it is written to catch. Every scan ` +
+      `built on it is now VACUOUS — it will find no offenders and report success, which is ` +
+      `also exactly what success looks like. Fix the detector; do not lower anything.`,
+  ).toEqual([])
+
+  expect(
+    canary.mustAcquit.filter((sample) => detect(sample).length > 0),
+    `The ${what} detector convicted a shape that is CORRECT. Fix the detector, never the ` +
+      `code it is accusing — a guard that cries wolf gets switched off by whoever is unlucky ` +
+      `enough to hit it, and then it protects nothing.`,
   ).toEqual([])
 }
 

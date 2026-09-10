@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { DEFECTS } from './knownDefects.js'
-import { readSources } from './sourceScan.js'
+import { readSources, REPO_ROOT } from './sourceScan.js'
 
 /**
  * Discovering every endpoint this browser calls, from its own source.
@@ -17,8 +17,10 @@ import { readSources } from './sourceScan.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
-/** `src/test/` -> repo root. */
-export const REPO_ROOT = resolve(HERE, '..', '..')
+// Re-exported, not redefined: `REPO_ROOT` moved down to `sourceScan.js` so the walk's own
+// helpers could use it without importing this file back and forming a cycle. Every existing
+// `import { REPO_ROOT } from './apiContractScan.js'` keeps working unchanged.
+export { REPO_ROOT }
 
 export const SURFACE_FILE = join(HERE, 'api-surface.txt')
 export const VOCABULARY_FILE = join(HERE, 'api-vocabulary.json')

@@ -34,12 +34,12 @@
  *
  *   node tools/contrast.mjs <baseUrl> [--widths 1440,390] [--routes a,b]
  */
-import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { ROUTES as ALL_ROUTES, pageReady, storeTheme, themeDimensionComplaints, themeReadout } from './probe.mjs';
+import { launch, sleep } from './cdp.mjs';
 
-const CHROME = 'C:/Users/mfazl/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe';
+import { ROUTES as ALL_ROUTES, pageReady, populationComplaints, storeTheme, themeDimensionComplaints, themeReadout } from './probe.mjs';
+
 
 const args = process.argv.slice(2);
 const baseUrl = args[0] ?? 'http://127.0.0.1:4319';
@@ -62,29 +62,6 @@ const THEMES = ['light', 'dark'];
 
 const AXE = readFileSync('node_modules/axe-core/axe.min.js', 'utf8');
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const PORT = 9500 + Math.floor(Math.random() * 80);
-const chrome = spawn(CHROME, [
-  '--headless=new', '--disable-gpu', '--hide-scrollbars',
-  `--remote-debugging-port=${PORT}`, '--no-first-run',
-  '--user-data-dir=' + process.env.TEMP + '/contrast-profile-' + PORT, 'about:blank',
-], { stdio: 'ignore' });
-
-let ws;
-let id = 0;
-const pending = new Map();
-const send = (method, params = {}) =>
-  new Promise((resolve, reject) => {
-    const msg = { id: ++id, method, params };
-    pending.set(msg.id, { resolve, reject });
-    ws.send(JSON.stringify(msg));
-  });
-/** Long-running expressions need the await; axe takes seconds on a heavy route. */
-const evaluate = async (expression, awaitPromise = false) => {
-  const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise });
-  if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? 'evaluate threw');
-  return r.result.value;
-};
 
 /**
  * Run axe with ONLY `color-contrast` on, and return all three buckets.
@@ -122,65 +99,56 @@ const RUN_AXE = `(async () => {
 })()`;
 
 const rows = [];
-
-/** Navigate, settle, inject axe. Shared by the canary and the sweep so both use one path. */
-const openForMeasurement = async (route, theme, width) => {
-  const mobile = width < 700;
-  await send('Emulation.setDeviceMetricsOverride', {
-    width, height: mobile ? 844 : 900, deviceScaleFactor: 1, mobile,
-  });
-  // Before the navigation -- see probe.mjs. Applied after, it lands before React mounts and
-  // ThemeContext's mount effect puts it back, so every "dark" row is the light page again.
-  await evaluate(storeTheme(theme === 'dark'));
-  await send('Page.navigate', { url: baseUrl + route });
-
-  let ready = false;
-  for (let i = 0; i < 120; i++) {
-    if (await evaluate(pageReady) === true) { ready = true; break; }
-    await sleep(150);
-  }
-  // 🔴 T5: NEVER MEASURE MID-TRANSITION. The shell animates the drawer and the theme swap
-  // over 300ms, and a colour sampled halfway through a transition is a colour that exists
-  // for one frame and is on no design's palette.
-  await sleep(500);
-  await evaluate(AXE + '\n;window.__axeReady = typeof window.axe === "object";');
-  const injected = await evaluate('window.__axeReady === true');
-  if (!injected) throw new Error(`axe did not inject on ${route}`);
-  return ready;
-};
+let cdp;
 
 try {
-  let targets;
-  for (let i = 0; i < 60; i++) {
-    try {
-      targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
-      if (targets.some((t) => t.type === 'page')) break;
-    } catch { /* chrome not up yet */ }
-    await sleep(250);
-  }
-  const page = targets && targets.find((t) => t.type === 'page');
-  if (!page) throw new Error('no page target on port ' + PORT);
-  ws = new WebSocket(page.webSocketDebuggerUrl);
-  await new Promise((r) => { ws.onopen = r; });
-  ws.onmessage = (e) => {
-    const m = JSON.parse(e.data);
-    if (m.id && pending.has(m.id)) {
-      const p = pending.get(m.id);
-      pending.delete(m.id);
-      m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result);
-    }
-  };
-  await send('Page.enable');
-  await send('Runtime.enable');
+  // The browser, the socket, the strict `evaluate`, the viewport rule and T23's identity
+  // check all live in `cdp.mjs` -- see its header for the four defects six hand-copies of
+  // this block had already drifted into.
+  cdp = await launch('contrast');
+  const { send, evaluate, metrics, waitFor, assertBuiltClient } = cdp;
 
   // T23: prove the server is the built client before believing a single colour off it.
-  await send('Page.navigate', { url: baseUrl + '/login' });
-  await sleep(800);
-  const identity = await evaluate(`document.querySelector('script[type=module]')?.src || location.href`);
-  if (!/\/assets\/index-[A-Za-z0-9_-]+\.js$/.test(identity)) {
-    throw new Error(`the server at ${baseUrl} is not the built client (entry script: ${identity})`);
-  }
-  console.log('identity OK — entry script', identity.split('/').pop());
+  console.log('identity OK — entry script', await assertBuiltClient(baseUrl));
+
+  /*
+   * 🔑 axe IS INSTALLED ONCE, BROWSER-SIDE, NOT PUSHED DOWN THE WIRE 97 TIMES.
+   *
+   * `axe.min.js` is 580 KB, and the `Runtime.evaluate` frame carrying it is 603 KB. Injecting
+   * it per combination sent **55.8 MB** through the WebSocket per run and churned ~1.2 MB of
+   * transient garbage per call in this process — on a box that has been under 1.5 GB free.
+   *
+   * `Page.addScriptToEvaluateOnNewDocument` is exactly the mechanism for this: Chrome holds the
+   * source and evaluates it on every new document, so one 603 KB frame replaces 97.
+   *
+   * ⚠️ RE-EVALUATING IT PER DOCUMENT IS REQUIRED, NOT WASTE. `Page.navigate` builds a new
+   * realm, so axe genuinely does not survive a navigation — and SPA-navigating inside one
+   * document to avoid that would trade the cold-cache honesty `pageReady` exists to protect
+   * (see probe.mjs) for speed. The per-document parse stays; only the transmission goes.
+   */
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: AXE });
+
+  /** Navigate, settle, and confirm axe arrived. One path for the canary and the sweep. */
+  const openForMeasurement = async (route, theme, width) => {
+    await metrics(width);
+    // Before the navigation -- see probe.mjs. Applied after, it lands before React mounts and
+    // ThemeContext's mount effect puts it back, so every "dark" row is the light page again.
+    await evaluate(storeTheme(theme === 'dark'));
+    await send('Page.navigate', { url: baseUrl + route });
+
+    const ready = await waitFor(pageReady, { tries: 120 });
+    // 🔴 T5: NEVER MEASURE MID-TRANSITION. The shell animates the drawer and the theme swap
+    // over 300ms, and a colour sampled halfway through a transition is a colour that exists
+    // for one frame and is on no design's palette.
+    await sleep(500);
+    // Still asserted per document. The install above is a promise about every FUTURE document;
+    // this is the check that THIS one has it, and it is the difference between "we asked for
+    // axe" and "axe is here".
+    if (await evaluate('typeof window.axe === "object"') !== true) {
+      throw new Error(`axe did not arrive on ${route} — the on-new-document install did not run`);
+    }
+    return ready;
+  };
 
   // ── THE CANARY, AND THE RUN DOES NOT PROCEED WITHOUT IT ─────────────────────────────
   //
@@ -200,7 +168,7 @@ try {
     document.body.appendChild(el);
     return true;
   })()`);
-  const canary = await evaluate(RUN_AXE, true);
+  const canary = await evaluate(RUN_AXE, { awaitPromise: true });
   const caughtCanary = canary.violations.some((n) => n.target.includes('__contrast_canary'));
   console.log(
     `canary: ${caughtCanary ? 'CAUGHT' : 'MISSED'} — ` +
@@ -223,10 +191,17 @@ try {
     for (const theme of THEMES) {
       for (const route of ROUTES) {
         const ready = await openForMeasurement(route, theme, width);
-        const paint = await evaluate(themeReadout);
-        const r = await evaluate(RUN_AXE, true);
+        // The readout and the census on one tick, before the (slow) axe run. `elements` is
+        // what makes this tool's rows legible to `populationComplaints` — without it every row
+        // here fell out of that check, and a canary that silently skips its subject is the
+        // thing this arc keeps finding. `passCount` is axe's own population and answers a
+        // different question: how much TEXT it judged, not how much page there was.
+        const { paint, elements } = await evaluate(
+          `({ paint: ${themeReadout}, elements: document.querySelectorAll('#root *').length })`,
+        );
+        const r = await evaluate(RUN_AXE, { awaitPromise: true });
         rows.push({
-          width, theme, route, ready,
+          width, theme, route, ready, elements,
           violations: r.violations, incomplete: r.incomplete, passCount: r.passCount,
           theme_dark: paint?.dark, theme_bg: paint?.bg,
         });
@@ -239,8 +214,7 @@ try {
   console.error('contrast failed:', e.message);
   process.exitCode = 1;
 } finally {
-  try { ws && ws.close(); } catch { /* already closed */ }
-  chrome.kill();
+  cdp?.close();
 }
 
 writeFileSync('reports/contrast.json', JSON.stringify(rows, null, 2));
@@ -271,6 +245,8 @@ for (const r of unclear.slice(0, 10)) {
   for (const n of r.incomplete.slice(0, 4)) console.log(`        ${n.target}  ${n.summary.slice(0, 140)}`);
 }
 
+const populationIssues = populationComplaints(rows);
+for (const complaint of populationIssues) console.log(`  POPULATION  ${complaint}`);
 const themeComplaints = themeDimensionComplaints(rows);
 for (const complaint of themeComplaints) console.log(`  THEME  ${complaint}`);
 console.log(`body background by theme: ${[...new Set(rows.map((r) => `${r.theme}=${r.theme_bg}`))].sort().join('  ')}`);
@@ -282,4 +258,6 @@ if (examined < 200) {
   console.log(`\n  ⚠ VACUOUS: only ${examined} text nodes were examined across ${rows.length} combinations.`);
   process.exitCode = 1;
 }
-if (failing.length || rows.some((r) => !r.ready) || themeComplaints.length) process.exitCode = 1;
+if (failing.length || rows.some((r) => !r.ready) || themeComplaints.length || populationIssues.length) {
+  process.exitCode = 1;
+}

@@ -26,12 +26,12 @@
  *
  *   node tools/edges.mjs <baseUrl>
  */
-import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
+
+import { launch, sleep } from './cdp.mjs';
 
 import { ROUTES, overflowProbe, pageReady, populationComplaints, storeTheme } from './probe.mjs';
 
-const CHROME = 'C:/Users/mfazl/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe';
 const baseUrl = process.argv[2] ?? 'http://127.0.0.1:4319';
 
 /**
@@ -45,40 +45,14 @@ const baseUrl = process.argv[2] ?? 'http://127.0.0.1:4319';
 const BREAKPOINTS = [640, 760, 768, 1024, 1280, 1536];
 const EDGE_WIDTHS = BREAKPOINTS.flatMap((bp) => [bp - 1, bp + 1]);
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const PORT = 9600 + Math.floor(Math.random() * 80);
-const chrome = spawn(CHROME, [
-  '--headless=new', '--disable-gpu', '--hide-scrollbars',
-  `--remote-debugging-port=${PORT}`, '--no-first-run',
-  '--user-data-dir=' + process.env.TEMP + '/edges-' + PORT, 'about:blank',
-], { stdio: 'ignore' });
-
-let ws;
-let id = 0;
-const pending = new Map();
-const send = (method, params = {}) =>
-  new Promise((resolve, reject) => {
-    const msg = { id: ++id, method, params };
-    pending.set(msg.id, { resolve, reject });
-    ws.send(JSON.stringify(msg));
-  });
-const evaluate = async (expression) =>
-  (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
-
-const metrics = (width, height = 900) =>
-  send('Emulation.setDeviceMetricsOverride', {
-    width, height, deviceScaleFactor: width < 500 ? 2 : 1, mobile: width < 500,
-  });
-
-/** Navigate and wait until the page is genuinely ready to measure. */
-async function land(route) {
-  await send('Page.navigate', { url: baseUrl + route });
-  for (let i = 0; i < 80; i++) {
-    if (await evaluate(pageReady) === true) return true;
-    await sleep(150);
-  }
-  return false;
-}
+/*
+ * 🔴 `metrics()` USED TO LIVE HERE, WITH A DIFFERENT ANSWER TO "IS THIS A PHONE".
+ *
+ * This file's copy used `width < 500`; `matrix.mjs` and `contrast.mjs` used `width < 700`, and
+ * one of the three hard-coded `deviceScaleFactor: 1`. So the matrix and this edge sweep were
+ * NOT measuring the same 640±1 condition on the same 25 routes — which is the one thing a
+ * matrix and an edge sweep exist to do together. It is `cdp.mjs`'s now, with one threshold.
+ */
 
 const findings = [];
 const record = (kind, where, r, extra = {}) => {
@@ -87,27 +61,48 @@ const record = (kind, where, r, extra = {}) => {
   return overflows;
 };
 
+let cdp;
+
 try {
-  let targets;
-  for (let i = 0; i < 60; i++) {
-    try {
-      targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
-      if (targets.some((t) => t.type === 'page')) break;
-    } catch { /* not up yet */ }
-    await sleep(250);
-  }
-  ws = new WebSocket(targets.find((t) => t.type === 'page').webSocketDebuggerUrl);
-  await new Promise((r) => { ws.onopen = r; });
-  ws.onmessage = (e) => {
-    const m = JSON.parse(e.data);
-    if (m.id && pending.has(m.id)) {
-      const p = pending.get(m.id);
-      pending.delete(m.id);
-      m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result);
+  // The browser, the socket, the strict `evaluate`, the viewport rule and T23's identity
+  // check all live in `cdp.mjs` -- see its header for the four defects six hand-copies of
+  // this block had already drifted into.
+  cdp = await launch('edges');
+  const { send, evaluate, metrics, waitFor, assertBuiltClient } = cdp;
+
+  console.log('identity OK — entry script', await assertBuiltClient(baseUrl));
+
+  /** Navigate and wait until the page is genuinely ready to measure. */
+  const land = async (route) => {
+    await send('Page.navigate', { url: baseUrl + route });
+    return waitFor(pageReady);
+  };
+
+  let swept = 0;
+  let missed = 0;
+
+  /**
+   * One sweep: every route at every width, recorded under `kind`.
+   *
+   * 🔑 WRITTEN ONCE BECAUSE THE `missed` DISCIPLINE IS THE POINT OF THIS FILE. The three
+   * sweeps below were the same eight lines three times, differing in the kind string, the
+   * width list and one extra per-route step — and the `if (!await land(route)) { missed += 1 }`
+   * clause, which is the whole reason this tool exists (a route that never became ready was
+   * NOT swept, and counting it as clean is the failure the family is written against), had to
+   * be re-typed in each. A fourth condition would have had to remember it again.
+   */
+  const sweep = async (kind, widths, beforeMeasure) => {
+    for (const width of widths) {
+      await metrics(width);
+      for (const route of ROUTES) {
+        if (!await land(route)) { missed += 1; continue; }
+        if (beforeMeasure) await beforeMeasure(route, width);
+        record(kind, `${width}px ${route}`, await evaluate(overflowProbe(width)));
+        swept += 1;
+      }
+      console.log(`  ${width}: ${ROUTES.length} routes`);
     }
   };
-  await send('Page.enable');
-  await send('Runtime.enable');
 
   // Establish the origin so `storeTheme` has somewhere to write, then stay in light: an
   // edge is a LAYOUT fact, and the matrix has already covered both themes at six widths.
@@ -117,46 +112,26 @@ try {
 
   // ---------------------------------------------------------------- ① edge sweep
   console.log(`\n① edge sweep — ${ROUTES.length} routes × ${EDGE_WIDTHS.length} widths (${BREAKPOINTS.join(', ')} ±1)`);
-  let swept = 0;
-  let missed = 0;
-  for (const width of EDGE_WIDTHS) {
-    await metrics(width);
-    for (const route of ROUTES) {
-      if (!await land(route)) { missed += 1; continue; }
-      record('edge', `${width}px ${route}`, await evaluate(overflowProbe(width)));
-      swept += 1;
-    }
-    process.stdout.write(`  ${width}: ${ROUTES.length} routes\n`);
-  }
-  // 🔴 A ROUTE THAT NEVER BECAME READY WAS NOT SWEPT, and counting it as clean is the
-  // failure this whole family of tools is written against.
+  await sweep('edge', EDGE_WIDTHS);
   if (missed) console.log(`  ⚠ ${missed} route×width combinations never became ready`);
   console.log(`  swept ${swept}`);
 
   // ------------------------------------------------------- ② 125% root font-size
   console.log('\n② root font-size 125% — WCAG 1.4.4');
-  for (const width of [390, 1024]) {
-    await metrics(width);
-    for (const route of ROUTES) {
-      if (!await land(route)) { missed += 1; continue; }
-      await evaluate(`document.documentElement.style.fontSize = '125%'; true`);
-      await sleep(120);
-      record('125%', `${width}px ${route}`, await evaluate(overflowProbe(width)));
-    }
-    console.log(`  ${width}: ${ROUTES.length} routes`);
-  }
+  await sweep('125%', [390, 1024], async () => {
+    await evaluate(`document.documentElement.style.fontSize = '125%'; true`);
+    // The reflow is not instant, and measuring before it lands measures the old layout.
+    await sleep(120);
+  });
 
   // ------------------------------------------------- ③ forced-colors: active
   console.log('\n③ forced-colors: active — Windows High Contrast');
   await send('Emulation.setEmulatedMedia', {
     features: [{ name: 'forced-colors', value: 'active' }],
   });
-  await metrics(1024);
   const invisible = [];
   let controlsSeen = 0;
-  for (const route of ROUTES) {
-    if (!await land(route)) { missed += 1; continue; }
-    record('forced-colors', `1024px ${route}`, await evaluate(overflowProbe(1024)));
+  await sweep('forced-colors', [1024], async (route) => {
     // 🔑 THE POINT IS NOT THAT IT LOOKS THE SAME. Forced colours replace the token layer
     // outright; what must not happen is a control losing its only affordance. A button
     // whose shape came entirely from a background colour becomes an invisible hit area.
@@ -177,7 +152,7 @@ try {
     })()`);
     controlsSeen += seen.examined;
     if (seen.bad.length) invisible.push(`${route}: ${seen.bad.join(', ')}`);
-  }
+  });
   await send('Emulation.setEmulatedMedia', { features: [] });
   // 🔴 THE POPULATION, NOT JUST THE VERDICT. "0 offenders" and "the selector matched
   // nothing" print identically, and this arc has now been caught by that shape a dozen
@@ -260,6 +235,5 @@ try {
   console.error('edges failed:', e.message);
   process.exitCode = 1;
 } finally {
-  try { ws && ws.close(); } catch { /* closed */ }
-  chrome.kill();
+  cdp?.close();
 }

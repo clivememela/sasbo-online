@@ -1,16 +1,13 @@
-import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { REPO_ROOT } from './apiContractScan.js'
 import {
-  assertBlankingPreservedCode,
-  assertNonVacuousScan,
-  assertNothingWasSkipped,
+  assertDetectorCanary,
+  assertScanIsHonest,
   FLOORS,
 } from './assertNonVacuousScan.js'
 import { DETECTOR_CANARY, dynamicUtilitiesIn } from './dynamicUtilities.js'
-import { blankingDestroyedCode, readSources, unreadableDirectories } from './sourceScan.js'
+import { nonTestSources } from './sourceScan.js'
 
 /**
  * No Tailwind utility is assembled at runtime. `05.2`.
@@ -32,9 +29,9 @@ import { blankingDestroyedCode, readSources, unreadableDirectories } from './sou
 
 /** Every non-test source file under `src/`, comments blanked. */
 function scan() {
-  return readSources(join(REPO_ROOT, 'src'), { root: REPO_ROOT, pattern: /\.(jsx?|mjs)$/ }).filter(
-    (source) => !/\.test\.|\/test\//.test(source.path),
-  )
+  // The walk, the non-test exclusion and the read all live in `sourceScan.js`; the PATTERN
+  // stays here because it is this guard's own population.
+  return nonTestSources({ pattern: /\.(jsx?|mjs)$/ })
 }
 
 describe('the runtime-utility detector', () => {
@@ -42,19 +39,7 @@ describe('the runtime-utility detector', () => {
     // 🔴 THE CANARY, and it is doing more work here than usual: the whole assertion below
     // is `toEqual([])`, so a detector that has stopped matching anything at all is
     // indistinguishable from a clean tree.
-    expect(
-      DETECTOR_CANARY.mustConvict.filter((sample) => dynamicUtilitiesIn(sample).length === 0),
-      'The detector stopped recognising a Tailwind utility spliced together at runtime. ' +
-        'The scan below is now vacuous: it will find nothing and report green.',
-    ).toEqual([])
-
-    expect(
-      DETECTOR_CANARY.mustAcquit.filter((sample) => dynamicUtilitiesIn(sample).length > 0),
-      'The detector convicted an interpolation that is CORRECT — a DOM id, an API path, ' +
-        'or a whole class name the scanner can still see. Interpolating into a string is ' +
-        'normal; only splicing a value into the scale position of a utility is the bug. ' +
-        'Re-aim the predicate, do not rewrite the code it convicted.',
-    ).toEqual([])
+    assertDetectorCanary(DETECTOR_CANARY, (sample) => dynamicUtilitiesIn(sample), 'the runtime-utility scan')
   })
 })
 
@@ -62,9 +47,7 @@ describe('no Tailwind utility is assembled at runtime', () => {
   it('every file under src emits class names Tailwind can see', () => {
     const sources = scan()
 
-    assertNothingWasSkipped(unreadableDirectories(), 'the runtime-utility scan')
-    assertBlankingPreservedCode(blankingDestroyedCode(sources))
-    assertNonVacuousScan(sources, FLOORS.SRC_SOURCE_FILES, 'non-test source files under src/')
+    assertScanIsHonest(sources, FLOORS.SRC_SOURCE_FILES, 'the runtime-utility scan')
 
     const offenders = sources.flatMap((source) =>
       dynamicUtilitiesIn(source.code).map((hit) => `${source.path}:${hit.line} ${hit.utility}`),

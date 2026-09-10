@@ -1,15 +1,12 @@
-import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { REPO_ROOT } from './apiContractScan.js'
 import {
-  assertBlankingPreservedCode,
-  assertNonVacuousScan,
-  assertNothingWasSkipped,
+  assertDetectorCanary,
+  assertScanIsHonest,
   FLOORS,
 } from './assertNonVacuousScan.js'
-import { blankingDestroyedCode, readSources, unreadableDirectories } from './sourceScan.js'
+import { nonTestSources } from './sourceScan.js'
 
 /**
  * No `<table>` anywhere in `src` renders outside a `TableScroller`. `05.2`, contract ⑮.
@@ -61,30 +58,22 @@ const CANARY = {
 }
 
 function scan() {
-  return readSources(join(REPO_ROOT, 'src'), { root: REPO_ROOT, pattern: /\.jsx$/ }).filter(
-    (source) => !/\.test\.|\/test\//.test(source.path),
-  )
+  // The walk, the non-test exclusion and the read all live in `sourceScan.js`; the PATTERN
+  // stays here because it is this guard's own population — `.jsx` only, since a `<table>` can
+  // only be written in JSX. That narrower population is why this guard has its OWN floor
+  // (`SRC_JSX_FILES`, 61 measured) rather than borrowing one calibrated against 84 files.
+  return nonTestSources({ pattern: /\.jsx$/ })
 }
 
 describe('every table scrolls, structurally', () => {
   it('the detector sees a bare table and acquits a wrapped one', () => {
-    expect(
-      CANARY.mustConvict.filter((sample) => unwrappedTables(sample).length === 0),
-      'The detector stopped recognising an unwrapped `<table>`. The scan below is vacuous.',
-    ).toEqual([])
-
-    expect(
-      CANARY.mustAcquit.filter((sample) => unwrappedTables(sample).length > 0),
-      'The detector convicted a table that IS inside a scroller. Fix the walk, not the code.',
-    ).toEqual([])
+    assertDetectorCanary(CANARY, (sample) => unwrappedTables(sample), 'the table-scroller scan')
   })
 
   it('no page renders a table outside one', () => {
     const sources = scan()
 
-    assertNothingWasSkipped(unreadableDirectories(), 'the table-scroller scan')
-    assertBlankingPreservedCode(blankingDestroyedCode(sources))
-    assertNonVacuousScan(sources, FLOORS.SRC_SOURCE_FILES, 'non-test source files under src/')
+    assertScanIsHonest(sources, FLOORS.SRC_JSX_FILES, 'the table-scroller scan')
 
     const offenders = sources.flatMap((source) =>
       unwrappedTables(source.code).map((line) => `${source.path}:${line}`),

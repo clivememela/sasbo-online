@@ -26,10 +26,11 @@
  *
  *   node tools/tokenContrast.mjs [baseUrl]
  */
-import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 
-const CHROME = 'C:/Users/mfazl/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe';
+import { launch, sleep } from './cdp.mjs';
+import { pageReady, storeTheme, themeDimensionComplaints } from './probe.mjs';
+
 
 /** The ink roles, and the grounds each is actually painted on. */
 const INKS = ['ink', 'ink-muted', 'ink-faint', 'brand-ink', 'nav-ink'];
@@ -64,29 +65,6 @@ const NON_TEXT_ROLES = new Set(['ink-faint']);
  */
 const AA_TEXT = 4.5;
 const AA_LARGE_OR_NONTEXT = 3.0;
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const PORT = 9600 + Math.floor(Math.random() * 80);
-const chrome = spawn(CHROME, [
-  '--headless=new', '--disable-gpu',
-  `--remote-debugging-port=${PORT}`, '--no-first-run',
-  '--user-data-dir=' + process.env.TEMP + '/tokens-profile-' + PORT, 'about:blank',
-], { stdio: 'ignore' });
-
-let ws;
-let id = 0;
-const pending = new Map();
-const send = (method, params = {}) =>
-  new Promise((resolve, reject) => {
-    const msg = { id: ++id, method, params };
-    pending.set(msg.id, { resolve, reject });
-    ws.send(JSON.stringify(msg));
-  });
-const evaluate = async (expression) => {
-  const r = await send('Runtime.evaluate', { expression, returnByValue: true });
-  if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? 'threw');
-  return r.result.value;
-};
 
 /**
  * Resolve every pair in the page and compute the ratio there.
@@ -158,31 +136,21 @@ const MEASURE = (inks, grounds) => `(() => {
 })()`;
 
 const results = [];
+let cdp;
+
 try {
-  let targets;
-  for (let i = 0; i < 60; i++) {
-    try {
-      targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
-      if (targets.some((t) => t.type === 'page')) break;
-    } catch { /* not up */ }
-    await sleep(250);
-  }
-  const page = targets && targets.find((t) => t.type === 'page');
-  if (!page) throw new Error('no page target');
-  ws = new WebSocket(page.webSocketDebuggerUrl);
-  await new Promise((r) => { ws.onopen = r; });
-  ws.onmessage = (e) => {
-    const m = JSON.parse(e.data);
-    if (m.id && pending.has(m.id)) {
-      const p = pending.get(m.id);
-      pending.delete(m.id);
-      m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result);
-    }
-  };
-  await send('Page.enable');
-  await send('Runtime.enable');
+  // The browser, the socket, the strict `evaluate`, the viewport rule and T23's identity
+  // check all live in `cdp.mjs` -- see its header for the four defects six hand-copies of
+  // this block had already drifted into.
+  cdp = await launch('tokens');
+  const { send, evaluate, waitFor, assertBuiltClient } = cdp;
 
   const baseUrl = process.argv[2] ?? 'http://127.0.0.1:4319';
+
+  // T23, which this tool did not have. It reads COLOURS off whatever holds the port, and the
+  // mockups are built from the same tokens — so a wrong-server reading here would be the most
+  // plausible-looking wrong answer in the whole harness.
+  console.log('identity OK — entry script', await assertBuiltClient(baseUrl));
 
   // ── THE PROBE'S OWN KNOWN-BROKEN CASE, BEFORE ANY TOKEN IS BELIEVED (T1) ────────────
   //
@@ -222,29 +190,39 @@ try {
   }
 
   for (const theme of ['light', 'dark']) {
-    await evaluate(`(() => { try { localStorage.setItem('darkMode', '${theme === 'dark'}') } catch {} return 1 })()`);
+    // 🔴 `storeTheme`, IMPORTED -- this file had a FOURTH hand-written copy of the theme write,
+    // and it had already lost half of it: `probe.mjs`'s version also toggles the `.dark` class,
+    // "for the case where the caller is re-theming a page it is not going to reload". Writing
+    // only the key re-opened, in the same commit, the exact hole `probe.mjs` was created to close.
+    await evaluate(storeTheme(theme === 'dark'));
     await send('Page.navigate', { url: baseUrl + '/home' });
-    await sleep(1500);
+    // And a readiness predicate rather than a fixed 1.5s sleep -- a sleep makes the result
+    // depend on how busy the machine is, which `states.mjs` names as the definition of a flaky
+    // measurement.
+    await waitFor(pageReady);
+    await sleep(300);
     const painted = await evaluate('getComputedStyle(document.body).backgroundColor');
     const rows = await evaluate(MEASURE(INKS, GROUNDS));
     for (const r of rows) results.push({ theme, painted, ...r });
     console.log(`${theme}: ${rows.length} pairs, body painted ${painted}`);
   }
 
-  // The theme dimension, proved rather than counted -- if both halves painted the same
-  // ground, one theme was measured twice and every "both themes" claim here is inflated.
-  if (new Set(results.map((r) => r.painted)).size < 2) {
-    throw new Error(
-      'both themes painted the same body background ' +
-      `(${[...new Set(results.map((r) => `${r.theme}=${r.painted}`))].join(' ')})`,
-    );
-  }
+  // The theme dimension, proved rather than counted -- if both halves painted the same ground,
+  // one theme was measured twice and every "both themes" claim here is inflated.
+  //
+  // 🔑 THROUGH THE SHARED CANARY. The local check compared a SET of painted grounds and so made
+  // one of the four assertions `themeDimensionComplaints` makes: it would not have caught a row
+  // measured before the stylesheet applied (`rgba(0, 0, 0, 0)`), a dark row missing the `.dark`
+  // class, or told you WHICH rows were at fault.
+  const themeComplaints = themeDimensionComplaints(
+    results.map((r) => ({ ...r, theme_bg: r.painted, theme_dark: r.theme === 'dark' })),
+  );
+  if (themeComplaints.length) throw new Error(themeComplaints.join('; '));
 } catch (e) {
   console.error('token contrast failed:', e.message);
   process.exitCode = 1;
 } finally {
-  try { ws && ws.close(); } catch { /* closed */ }
-  chrome.kill();
+  cdp?.close();
 }
 
 writeFileSync('reports/token-contrast.json', JSON.stringify(results, null, 2));

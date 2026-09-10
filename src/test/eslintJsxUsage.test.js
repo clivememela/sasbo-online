@@ -32,11 +32,27 @@ import { ESLint } from 'eslint'
  */
 
 /** Lint a source string as if it were a file under `src/`, through the repo's own config. */
+/**
+ * One instance for the file, not one per call.
+ *
+ * `lintText` is stateless with respect to the instance, but config resolution and rule
+ * compilation are not: measured here, the first `lintText` pays ~1,170ms for those, a second
+ * call on a NEW instance pays 67ms, and on a reused instance 9.8ms. Hoisting saves ~57ms of
+ * pure setup and changes nothing about what is linted.
+ *
+ * ⚠️ THE DOMINANT COSTS ARE IRREDUCIBLE AND WORTH KNOWING ON THIS BOX: importing `eslint` is
+ * ~426ms and ~63 MB, and RSS settles around 150 MB. This one test file is therefore a ~150 MB
+ * worker, and with `VITEST_MAX_WORKERS=2` it sits alongside one other. That is the price of the
+ * guard's whole point — running the REAL ESLint over the REAL `eslint.config.js` — and it is
+ * paid deliberately rather than by accident.
+ *
+ * No `cwd`: ESLint defaults to the process working directory, which is the repository root
+ * under vitest. Naming it explicitly would need `process`, and this config declares browser
+ * globals only -- so reaching for it is a `no-undef` error in the guard itself.
+ */
+const eslint = new ESLint()
+
 const lint = async (code) => {
-  // No `cwd`: ESLint defaults to the process working directory, which is the repository
-  // root under vitest. Naming it explicitly would need `process`, and this config declares
-  // browser globals only -- so reaching for it is a `no-undef` error in the guard itself.
-  const eslint = new ESLint()
   // The path decides which config block applies. It must look like a source file under
   // `src/`, and must not be a real one -- `lintText` does not read it, but a name that
   // collides with a tracked file makes the fixture hard to find later.

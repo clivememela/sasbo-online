@@ -1,5 +1,6 @@
 import React from 'react';
 import TableScroller from "../../components/table/TableScroller.jsx";
+import { cn } from "../../lib/utils";
 
 /**
  * The blank form's worked example. `Forms.jsx` renders `<LocationListing />` with no props
@@ -44,18 +45,24 @@ const SAMPLE_LISTING = Object.freeze({
     lastVisited: "Mar 2025 , Oct 2024 , Nov 2023 , Nov 2021 , Jul 2021 , Jan 2021 , Jul 2019 , Jun 2017 , Aug 2016 , Nov 2015",
 });
 
-/**
- * 🔴 WRITTEN OUT IN FULL BECAUSE TAILWIND READS SOURCE, NOT RUNTIME. This grid used
- * `` `col-span-${span}` `` — which produces a perfectly valid class name that the scanner
- * never sees, so `.col-span-3` was never generated and the rule silently did nothing.
- * Confirmed against the built stylesheet: `.col-span-2` is present (something else asks for
- * it literally) and `.col-span-3` is absent, while the class sits in the DOM matching
- * nothing. A style that is present, spelled correctly, and inert.
+/*
+ * 🔴 THE SPAN IS A WHOLE CLASS NAME IN THE DATA, BECAUSE TAILWIND READS SOURCE, NOT RUNTIME.
+ *
+ * This grid used `` `col-span-${span}` `` — a perfectly valid class name the scanner never
+ * sees, so `.col-span-3` was never generated and the rule silently did nothing. Confirmed
+ * against the built stylesheet: `.col-span-2` is present (something else asks for it
+ * literally) and `.col-span-3` is absent, while the class sat in the DOM matching nothing.
+ * A style present, spelled correctly, and inert. `src/test/dynamicUtilities.test.js` guards
+ * the class of defect.
+ *
+ * 🔑 AND A `{ 3: 'lg:col-span-3' }` LOOKUP WOULD FIX THE INTERPOLATION WHILE KEEPING THE
+ * SILENT DEGRADE ONE KEY AWAY — `SPAN_CLASS[4]` is `undefined`, which interpolates as the
+ * literal class name "undefined": inert again, with no error. So the class lives in the row
+ * itself, where the scanner can see it, and `cn` simply drops the rows that carry none.
  *
  * `lg:` because the span is only meaningful once there are four columns to span; at
  * `grid-cols-1` it would be asking a phone for three columns it does not have.
  */
-const SPAN_CLASS = { 3: 'lg:col-span-3' };
 
 const LocationListing = ({ data, filters }) => {
     // A caller either hands over a record or asks for the worked example. These are NOT
@@ -91,9 +98,10 @@ const LocationListing = ({ data, filters }) => {
                 column on a phone, two on a tablet, four where there is room. */}
             <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 mb-5 p-3 rounded-lg bg-surface-2 border border-line text-sm sm:grid-cols-2 lg:grid-cols-4">
                 {[['Bank', listingData.bank], ['IBT No', listingData.ibtNo], ['R/A No', listingData.raNo], ['Cost Code', listingData.costCode],
-                  ['Tel No', listingData.telNo], ['Fax No', listingData.faxNo, 3], ['Branch', listingData.branch], ['Address', listingData.address, 3]
+                  ['Tel No', listingData.telNo], ['Fax No', listingData.faxNo, 'lg:col-span-3'], ['Branch', listingData.branch],
+                  ['Address', listingData.address, 'lg:col-span-3']
                 ].map(([label, value, span]) => (
-                    <div key={label} className={`flex gap-1.5 text-ink${span ? ` ${SPAN_CLASS[span]}` : ''}`}>
+                    <div key={label} className={cn('flex gap-1.5 text-ink', span)}>
                         <span className="font-semibold shrink-0 text-ink">{label}:</span>
                         <span>{value}</span>
                     </div>

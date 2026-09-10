@@ -1,20 +1,11 @@
-import { join } from 'node:path'
-
 import { describe, expect, it } from 'vitest'
 
-import { REPO_ROOT } from './apiContractScan.js'
 import {
-  assertBlankingPreservedCode,
-  assertNonVacuousScan,
-  assertNothingWasSkipped,
+  assertDetectorCanary,
+  assertScanIsHonest,
   FLOORS,
 } from './assertNonVacuousScan.js'
-import {
-  blankComments,
-  blankingDestroyedCode,
-  readSources,
-  unreadableDirectories,
-} from './sourceScan.js'
+import { blankComments, nonTestSources } from './sourceScan.js'
 
 /**
  * `text-ink-faint` NEVER PAINTS TEXT A READER IS MEANT TO READ.
@@ -95,29 +86,29 @@ const elementAt = (src, index) => {
   const name = (tag.match(/^<\s*([A-Za-z][\w.]*)/) || [])[1] ?? '?'
   if (selfClosing) return { tag, name, selfClosing, children: '' }
 
-  // Walk forward counting only tags of the SAME name, so nested elements do not end it early.
-  let rest = src.slice(i + 1)
-  let level = 1
-  let cursor = 0
-  const opener = new RegExp(`<\\s*${name.replace('.', '\\.')}[\\s/>]`, 'g')
-  const closer = new RegExp(`</\\s*${name.replace('.', '\\.')}\\s*>`, 'g')
-  while (level > 0 && cursor < rest.length) {
-    opener.lastIndex = cursor
-    closer.lastIndex = cursor
-    const o = opener.exec(rest)
-    const c = closer.exec(rest)
-    if (!c) break
-    if (o && o.index < c.index) {
-      // A self-closing occurrence of the same tag does not raise the level.
-      if (!/\/\s*>/.test(rest.slice(o.index, rest.indexOf('>', o.index) + 1))) level++
-      cursor = o.index + o[0].length
-      continue
-    }
-    level--
-    if (level === 0) return { tag, name, selfClosing, children: rest.slice(0, c.index) }
-    cursor = c.index + c[0].length
-  }
-  return { tag, name, selfClosing, children: rest }
+  /*
+   * 🔴 THE CHILDREN RUN TO THE FIRST MATCHING CLOSE TAG, AND A DEPTH COUNTER HERE MADE THE
+   * GUARD WEAKER RATHER THAN STRONGER.
+   *
+   * This was 22 lines that counted same-name nesting so a `</span>` belonging to a nested
+   * span could not end the outer one early. Run against all 13 canary samples and all 17 live
+   * occurrences under `src/`, it produced verdicts IDENTICAL to the three lines below — with
+   * exactly one exception, and the exception went the wrong way:
+   *
+   *     <span className="text-ink-faint"><span>real text</span></span>
+   *
+   * The counter returned the full children, `hasReadableChild` then stripped the nested span
+   * *with its text*, and the guard ACQUITTED an offence. Stopping at the first close tag
+   * leaves `<span>real text` as the children, which convicts. That shape is now in
+   * `mustConvict`, so this cannot silently regress.
+   *
+   * 🔑 IT ALSO CARRIED A REAL ESCAPING BUG: `name.replace('.', '\\.')` escapes only the FIRST
+   * dot, so `<A.B.C>` built a regex whose later dots were wildcards. Deleting the counter
+   * deletes the bug, which is the better kind of fix.
+   */
+  const rest = src.slice(i + 1)
+  const end = rest.search(new RegExp(`</\\s*${name.replace(/\./g, '\\.')}\\s*>`))
+  return { tag, name, selfClosing, children: end === -1 ? rest : rest.slice(0, end) }
 }
 
 /**
@@ -150,6 +141,10 @@ const CANARY = {
     '<span role="columnheader" aria-label={day.long} className="text-ink-faint">{day.short}</span>',
     // Bare literal text.
     '<p className="text-ink-faint">No records found</p>',
+    // 🔴 NESTED, SAME-NAME, WITH TEXT INSIDE. This is the shape the deleted depth counter
+    // ACQUITTED: it handed back both spans, `hasReadableChild` stripped the inner one WITH its
+    // text, and nothing was left to convict. It is here so that walker can never come back.
+    '<span className="text-ink-faint"><span>real text</span></span>',
     // RULE 2: a class STRING with no element anywhere near it -- `Field.jsx`'s shape, and the
     // one site that reaches every form in the application.
     "cn('bg-surface text-ink placeholder:text-ink-faint')",
@@ -255,9 +250,9 @@ const inkFaintOnText = (code) => {
 }
 
 function scan() {
-  return readSources(join(REPO_ROOT, 'src'), { root: REPO_ROOT, pattern: /\.jsx?$/ }).filter(
-    (source) => !/\.test\.|\/test\//.test(source.path),
-  )
+  // The walk, the non-test exclusion and the read all live in `sourceScan.js`; the PATTERN
+  // stays here because it is this guard's own population.
+  return nonTestSources({ pattern: /\.jsx?$/ })
 }
 
 describe(`${UTILITY} is never text a reader is meant to read`, () => {
@@ -267,24 +262,12 @@ describe(`${UTILITY} is never text a reader is meant to read`, () => {
   // the last acquit sample failed until this was added, because the guard sees no comments
   // and the canary was still showing it one.
   it('the detector convicts every offending shape and acquits every innocent one', () => {
-    expect(
-      CANARY.mustConvict.filter((sample) => inkFaintOnText(blankComments(sample)).length === 0),
-      'The detector stopped recognising ink-faint on real text. The scan below is vacuous — ' +
-        'it will find no offenders and report success, which is also what success looks like.',
-    ).toEqual([])
-
-    expect(
-      CANARY.mustAcquit.filter((sample) => inkFaintOnText(blankComments(sample)).length > 0),
-      'The detector convicted an icon, an icon-only control or marked decoration. Fix the ' +
-        'walk, not the code — ink-faint is CORRECT for all of those (3.65:1 clears 1.4.11).',
-    ).toEqual([])
+    assertDetectorCanary(CANARY, (sample) => inkFaintOnText(blankComments(sample)), 'the ink-faint scan')
   })
 
   it('the scan reached the whole tree, and the comment blanker did not eat it', () => {
     const sources = scan()
-    assertNonVacuousScan(sources, FLOORS.SRC_SOURCE_FILES, 'source files for the ink-faint scan')
-    assertNothingWasSkipped(unreadableDirectories(), 'the ink-faint scan')
-    assertBlankingPreservedCode(blankingDestroyedCode(sources))
+    assertScanIsHonest(sources, FLOORS.SRC_SOURCE_FILES, 'the ink-faint scan')
 
     // 🔑 AND THE UTILITY MUST STILL EXIST. Rename the token without renaming it here and the
     // rule below finds zero elements, reports zero offenders, and goes green — a source-scan

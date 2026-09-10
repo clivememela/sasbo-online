@@ -12,66 +12,37 @@
  * page to come back clean, because a probe that reports overflow unconditionally is the
  * other way to be useless.
  */
-import { spawn } from 'node:child_process';
 
-// 🔑 THE SAME MODULE THE MEASURING TOOLS IMPORT. When this file carried its own copy, the
-// three bodies had already drifted to three different hashes — so the canary was proving a
-// probe nothing else ran. Importing it is what makes a pass here mean anything there.
-import { overflowProbe, storeTheme, themeReadout } from './probe.mjs';
+// 🔑 THE SAME MODULES THE MEASURING TOOLS IMPORT — both of them. When this file carried its own
+// copy of the probe, the three bodies had already drifted to three different hashes, so the
+// canary was proving a probe nothing else ran; when it carried its own CDP plumbing and its own
+// two-clause readiness predicate, it was certifying a browser session set up differently from
+// the one under test. Importing both is what makes a pass here mean anything there.
+import { launch, sleep } from './cdp.mjs';
+import { overflowProbe, pageReady, storeTheme, themeReadout } from './probe.mjs';
 
-const CHROME = 'C:/Users/mfazl/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe';
 const baseUrl = process.argv[2] ?? 'http://127.0.0.1:4319';
 const WIDTH = 390;
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const PORT = 9500 + Math.floor(Math.random() * 80);
-const chrome = spawn(CHROME, [
-  '--headless=new', '--disable-gpu', '--hide-scrollbars',
-  `--remote-debugging-port=${PORT}`, '--no-first-run',
-  '--user-data-dir=' + process.env.TEMP + '/canary-profile-' + PORT, 'about:blank',
-], { stdio: 'ignore' });
-
-let ws;
-let id = 0;
-const pending = new Map();
-const send = (method, params = {}) =>
-  new Promise((resolve, reject) => {
-    const msg = { id: ++id, method, params };
-    pending.set(msg.id, { resolve, reject });
-    ws.send(JSON.stringify(msg));
-  });
-const evaluate = async (expression) =>
-  (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
-
 let failed = false;
+let cdp;
+
 try {
-  let targets;
-  for (let i = 0; i < 60; i++) {
-    try {
-      targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
-      if (targets.some((t) => t.type === 'page')) break;
-    } catch { /* not up yet */ }
-    await sleep(250);
-  }
-  const page = targets.find((t) => t.type === 'page');
-  ws = new WebSocket(page.webSocketDebuggerUrl);
-  await new Promise((r) => { ws.onopen = r; });
-  ws.onmessage = (e) => {
-    const m = JSON.parse(e.data);
-    if (m.id && pending.has(m.id)) {
-      const p = pending.get(m.id);
-      pending.delete(m.id);
-      m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result);
-    }
-  };
-  await send('Page.enable');
-  await send('Runtime.enable');
-  await send('Emulation.setDeviceMetricsOverride', { width: WIDTH, height: 844, deviceScaleFactor: 2, mobile: true });
+  // The browser, the socket, the strict `evaluate`, the viewport rule and T23's identity
+  // check all live in `cdp.mjs` -- see its header for the four defects six hand-copies of
+  // this block had already drifted into.
+  cdp = await launch('canary');
+  const { send, evaluate, metrics, waitFor } = cdp;
+  // Through `cdp.mjs`'s rule, so what is certified here is the viewport the tools request.
+  await metrics(WIDTH);
   await send('Page.navigate', { url: baseUrl + '/members' });
-  for (let i = 0; i < 60; i++) {
-    if (await evaluate(`document.fonts.status === 'loaded' && document.body.children.length > 0`) === true) break;
-    await sleep(150);
-  }
+  // 🔴 `pageReady`, IMPORTED -- NOT TWO OF ITS FIVE CLAUSES RETYPED HERE. This file used to
+  // wait on `fonts.status === 'loaded' && body.children.length > 0`, which is exactly the pair
+  // `probe.mjs` documents as satisfied by a page where React never mounted. The tool whose
+  // ONLY job is to certify the matrix's probe was waiting on the predicate the matrix had to
+  // be fixed for -- a canary certifying something adjacent to its subject, which is the
+  // species this whole family of files exists to catch.
+  await waitFor(pageReady);
   await sleep(400);
 
   // --- 1. the viewport is REALLY 390 (T14) -------------------------------
@@ -127,10 +98,7 @@ try {
   for (const theme of ['light', 'dark']) {
     await evaluate(storeTheme(theme === 'dark'));
     await send('Page.navigate', { url: baseUrl + '/members' });
-    for (let i = 0; i < 60; i++) {
-      if (await evaluate(`document.fonts.status === 'loaded' && document.body.children.length > 0`) === true) break;
-      await sleep(150);
-    }
+    await waitFor(pageReady);
     await sleep(400);
     painted[theme] = await evaluate(themeReadout);
   }
@@ -150,8 +118,7 @@ try {
   console.error('canary failed to run:', e.message);
   failed = true;
 } finally {
-  try { ws && ws.close(); } catch { /* closed */ }
-  chrome.kill();
+  cdp?.close();
 }
 
 console.log(failed ? '\nCANARY FAILED — the matrix result cannot be believed' : '\nCANARY PASSED — the probe sees overflow, and the 390px viewport is real');

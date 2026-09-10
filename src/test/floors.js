@@ -196,15 +196,42 @@ export const FLOORS = {
   BUNDLE_FILES: 4,
 
   /**
-   * Non-test source files under `src/` that the palette-literal scan walks.
+   * Non-test source files under `src/` matching `.js` / `.jsx` / `.mjs`.
    * Measured through that guard's own `readSources` walk on 2026-09-09: 81.
+   * Re-measured 2026-09-10 through `nonTestSources()`: 84.
    *
    * What it catches is the walk returning nothing -- a wrong root, a pattern
    * that stopped matching `.jsx`. The scan would then find no palette literals
    * in no files, and P4's "no literal colour utilities, grep-proved" box would
    * be ticked by a guard that looked at nothing.
+   *
+   * ⚠️ THIS ROW IS FOR THE `jsx?|mjs` POPULATION ONLY. It was lent to three other walks and
+   * that broke this registry's own rule -- see `SRC_JSX_FILES` and `SRC_STYLEABLE_FILES`.
    */
   SRC_SOURCE_FILES: 50,
+
+  /**
+   * Non-test `.jsx` files under `src/` -- the population a JSX-only walk sees.
+   * Measured 2026-09-10 through `tableScroller.structural.test.js`'s own walk: 61.
+   *
+   * 🔴 ITS OWN ROW BECAUSE LENDING `SRC_SOURCE_FILES` TO IT BROKE THIS FILE'S STATED RULE:
+   * *"A floor calibrated for one population is never lent to another."* That floor is 50,
+   * measured against 84 files; this walk sees 61. Eleven files of headroom on a population the
+   * number was never measured against -- so a walk that silently lost the whole of `src/pages/`
+   * (31 files, per `PAGE_FILES`) would still clear it, which is precisely the partial-scan hole
+   * `assertNothingWasSkipped` exists to close. Headroom is silence, in the amount of the headroom.
+   */
+  SRC_JSX_FILES: 40,
+
+  /**
+   * Non-test source files under `src/` that can carry a STYLE -- `.js` / `.jsx` / `.mjs` plus
+   * `.css`. Measured 2026-09-10 through `viewportUnits`' and `hoverIntent`'s own walk: 86.
+   *
+   * Its own row for the same reason as above, and the difference is small but real: a viewport-
+   * unit or hover-media scan that stopped matching `.css` would lose the two stylesheets where
+   * those rules most plausibly live while still clearing a floor set for the JS population.
+   */
+  SRC_STYLEABLE_FILES: 55,
 
   /**
    * `--color-*` declarations in `index.css`. Measured through that guard's own

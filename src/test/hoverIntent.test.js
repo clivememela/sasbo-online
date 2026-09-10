@@ -1,15 +1,11 @@
-import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { REPO_ROOT } from './apiContractScan.js'
 import {
-  assertBlankingPreservedCode,
-  assertNonVacuousScan,
-  assertNothingWasSkipped,
+  assertScanIsHonest,
   FLOORS,
 } from './assertNonVacuousScan.js'
-import { blankingDestroyedCode, readSources, unreadableDirectories } from './sourceScan.js'
+import { nonTestSources } from './sourceScan.js'
 
 /**
  * Every hover style is behind `hover-hover:`. `05.1`, R-RESP-H.
@@ -34,7 +30,21 @@ import { blankingDestroyedCode, readSources, unreadableDirectories } from './sou
  * is this arc's recurring species, and it very nearly caused 49 correct sites to be
  * "migrated" a second time.
  */
-const BARE_HOVER = /(?<!hover-hover:)(?<![-\w])hover:(?=[a-z[])/g
+/*
+ * 🔑 DECLARED WITHOUT `/g`, AND THAT IS WHY IT CAN BE USED DIRECTLY.
+ *
+ * It used to carry the flag, which forced every consumer to write `new RegExp(X.source)` —
+ * three times in this file — because a global regex keeps `lastIndex` between `.test()` calls
+ * and so reports a match on one sample and a miss on the next. That re-wrapping is
+ * flag-laundering a reader has to decode, and it is one "simplification" away from becoming the
+ * intermittent bug it was avoiding: anybody who tidies `new RegExp(X.source).test(s)` down to
+ * `X.test(s)` reintroduces the statefulness silently.
+ *
+ * Without the flag `.test()` is stateless, and the one place that needs every match uses
+ * `matchAll`, which per spec CLONES the regex and cannot leak state either — the same shape
+ * `dynamicUtilities.js` already uses.
+ */
+const BARE_HOVER = /(?<!hover-hover:)(?<![-\w])hover:(?=[a-z[])/
 
 /** 🔴 THE CANARY: the assertion below is `toEqual([])`, so a dead regex reads as success. */
 const CANARY = {
@@ -56,20 +66,21 @@ const CANARY = {
 }
 
 function scan() {
-  return readSources(join(REPO_ROOT, 'src'), { root: REPO_ROOT, pattern: /\.(jsx?|mjs|css)$/ }).filter(
-    (source) => !/\.test\.|\/test\//.test(source.path),
-  )
+  // The walk, the non-test exclusion and the read all live in `sourceScan.js`; the PATTERN
+  // stays here because it is this guard's own population — `.css` included, because a bare
+  // `:hover` rule in a stylesheet is as much a defect as one in a class name.
+  return nonTestSources({ pattern: /\.(jsx?|mjs|css)$/ })
 }
 
 describe('no hover style applies where hover is not real', () => {
   it('the detector sees a bare hover and acquits the migrated form', () => {
     expect(
-      CANARY.mustConvict.filter((sample) => !new RegExp(BARE_HOVER.source).test(sample)),
+      CANARY.mustConvict.filter((sample) => !BARE_HOVER.test(sample)),
       'The detector stopped recognising a bare `hover:`. The scan below is now vacuous.',
     ).toEqual([])
 
     expect(
-      CANARY.mustAcquit.filter((sample) => new RegExp(BARE_HOVER.source).test(sample)),
+      CANARY.mustAcquit.filter((sample) => BARE_HOVER.test(sample)),
       'The detector convicted `hover-hover:hover:` — the CORRECT form — or a relational ' +
         'variant, or the media query that defines the variant. Convicting the fix is how ' +
         '49 already-migrated sites came within one commit of being wrapped twice.',
@@ -79,12 +90,10 @@ describe('no hover style applies where hover is not real', () => {
   it('no source file carries one', () => {
     const sources = scan()
 
-    assertNothingWasSkipped(unreadableDirectories(), 'the hover-intent scan')
-    assertBlankingPreservedCode(blankingDestroyedCode(sources))
-    assertNonVacuousScan(sources, FLOORS.SRC_SOURCE_FILES, 'non-test source files under src/')
+    assertScanIsHonest(sources, FLOORS.SRC_STYLEABLE_FILES, 'the hover-intent scan')
 
     const offenders = sources.flatMap((source) => {
-      const hits = source.code.match(new RegExp(BARE_HOVER.source, 'g')) ?? []
+      const hits = [...source.code.matchAll(new RegExp(BARE_HOVER, 'g'))].map((m) => m[0])
       return hits.map((hit) => `${source.path} ${hit}`)
     })
 

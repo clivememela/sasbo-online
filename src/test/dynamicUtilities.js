@@ -28,7 +28,17 @@
 /**
  * Tailwind utilities whose final segment is a scale value.
  *
- * Longest first, so `min-w` is tested before `w` and `space-x` before `space`.
+ * ⚠️ THE `.sort()` IS INSURANCE, NOT A FIX FOR A LIVE HAZARD, and the comment used to claim
+ * otherwise. It said *"longest first, so `min-w` is tested before `w`"* — which describes a real
+ * class of bug and not this pattern's: the alternation is anchored by `-\$\{` immediately after
+ * the name and by a boundary before it, so a short alternative cannot complete where a long one
+ * should and the engine backtracks to the right one regardless of order. Checked across the whole
+ * list for two utilities that can both complete at the same start offset: there are none.
+ *
+ * It is kept because the ORDERING is free and the anchoring is the kind of property a later edit
+ * to the pattern could remove without anyone noticing — but a comment asserting a hazard the code
+ * has already removed costs the next reader a regex simulation to disprove, which is what it cost
+ * to write this paragraph.
  */
 export const SCALE_UTILITIES = [
   'col-span', 'col-start', 'col-end', 'row-span', 'row-start', 'row-end',
