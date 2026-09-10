@@ -1077,7 +1077,19 @@ export default function Members() {
                             ⏳ The full pattern needs roving focus, and a shared
                             `useRovingFocus` is already on RF's list precisely because this
                             application has three places that want it. */}
-                        <div className="no-print mt-4 flex flex-wrap gap-x-0.5 border-b border-line">
+                        {/* 🔴 FIVE TABS WRAPPED TO THREE ROWS IN THE PANEL. Docked, the record
+                            is a `clamp(360px, 32vw, 448px)` column, and "Personal Information",
+                            "Employment & Bank", "Membership & Subscriptions", "Recruitment
+                            Channel" and "Sasbo Structures" do not fit across it — so the strip
+                            broke into three stacked lines with the rule under only the last of
+                            them, and the record's own heading took 90px before a single field.
+                            The mock's tab strip is ONE line with a rule under it, and one line
+                            is what it stays: the row scrolls sideways instead of wrapping.
+                            The scrollbar itself is hidden: `scroll-quiet` draws a THIN one,
+                            which laid a second horizontal line directly on top of the strip's
+                            own rule. The tabs are their own affordance — the cut-off edge of
+                            the next label is what says there is more. */}
+                        <div className="no-print mt-4 flex gap-x-0.5 overflow-x-auto border-b border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                             {TABS.map((tab) => (
                                 <button
                                     key={tab.id}
