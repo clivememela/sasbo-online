@@ -1,11 +1,25 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { AlertCircle, Pencil, Trash2, UserPlus, Check, X } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
-import { Button } from '../../components/form';
+import Sheet, { Page } from '../../components/common/Sheet.jsx';
+import Criteria, { CRITERION_WIDE } from '../../components/common/Criteria.jsx';
+import TableScroller from '../../components/table/TableScroller.jsx';
+import { Button, TextInput } from '../../components/form';
 import { ConfirmDialog, closeOn } from '../../components/overlay/Modal.jsx';
 import { recruitmentChannelService } from '../../services/recruitmentChannelService.js';
 import DataState from '../../components/common/DataState.jsx';
 import reportError from '../../lib/reportError.js';
+
+/*
+ * 📐 THE CHROME OF AN IN-ROW EDITOR -- one constant, and the same one `Subscriptions.jsx:21`
+ * uses. These two inputs are not fields on a form; they are a cell that becomes a control for
+ * as long as a rename lasts. So they take the compact chrome rather than `TextInput`'s label
+ * block, which would double the row's height mid-edit. The page's own search, which IS a
+ * field, went the other way: it is a `TextInput` inside a `Criteria` row now.
+ */
+const CELL_INPUT = 'w-full rounded border border-line-strong bg-surface-2 px-2 py-1 field-text text-ink';
+
+const HEAD_CELL = 'whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5';
 
 export default function RecruitmentChannel() {
     const [notice, setNotice] = useState(null);
@@ -134,8 +148,11 @@ export default function RecruitmentChannel() {
     };
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
-            <PageTitle title="Recruitment Channel Maintenance" />
+        <Page>
+            <PageTitle
+                title="Recruitment Channel Maintenance"
+                subtitle="The recruiter types a member can be signed up through."
+            />
 
             {/* 🔴 WHAT FOUR `alert(err)` CALLS BECAME. Each passed a raw Error object, which
                 prints "[object Error]" in some browsers -- so the member was shown a dialog
@@ -145,7 +162,7 @@ export default function RecruitmentChannel() {
                     ref={noticeRef}
                     tabIndex={-1}
                     aria-labelledby="channel-notice-title"
-                    className="mt-4 flex items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                    className="mt-4 flex max-w-2xl items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
                 >
                     <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
                     <p id="channel-notice-title" className="flex-1">{notice}</p>
@@ -153,24 +170,26 @@ export default function RecruitmentChannel() {
                 </div>
             )}
 
-            <div className="mt-5 max-w-2xl rounded-lg bg-surface p-5 shadow-(--shadow-1)">
-                {/* Toolbar */}
-                <div className="flex items-center gap-3 mb-4">
-                    <input
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        aria-label="Search recruitment channels"
-                        placeholder="Search Recruitment Channels…"
-                        className="flex-1 rounded-lg px-3 py-2 field-text border bg-surface-2 border-line text-ink focus:outline-none focus:ring-2 focus:ring-brand-ring"
-                    />
-                    <Button variant="primary" onClick={() => { setShowAdd(true); setNewName(''); }}>
-                        <UserPlus size={14} /> Add
-                    </Button>
-                </div>
+            {/* 🔴 THE SEARCH WAS A RAW <input> WITH NO VISIBLE LABEL, held together by an
+                `aria-label`. Every other list in this application prints its criteria ON the
+                page, in a `Criteria` row, because the mock does -- a filter you cannot see is
+                a filter you cannot remember you set. */}
+            <Criteria className="mt-5 max-w-2xl">
+                <TextInput
+                    className={CRITERION_WIDE}
+                    label="Search"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Any recruitment channel"
+                />
+                <Button variant="primary" onClick={() => { setShowAdd(true); setNewName(''); }}>
+                    <UserPlus size={16} strokeWidth={1.75} aria-hidden="true" /> Add a channel
+                </Button>
+            </Criteria>
 
-                {/* Add row */}
+            <Sheet className="mt-4 max-w-2xl">
                 {showAdd && (
-                    <div className="mb-3 flex items-center gap-2 rounded-lg bg-brand-soft p-3">
+                    <div className="flex items-center gap-2 border-b border-line bg-brand-soft p-3">
                         <input
                             autoFocus
                             value={newName}
@@ -178,125 +197,177 @@ export default function RecruitmentChannel() {
                             onKeyDown={e => e.key === 'Enter' && handleAdd()}
                             aria-label="New recruitment channel name"
                             placeholder="Recruitment Channel name"
-                            className="flex-1 rounded-lg px-3 py-1.5 field-text border bg-surface border-line text-ink focus:outline-none focus:ring-2 focus:ring-brand-ring"
+                            className={CELL_INPUT}
                         />
                         <button
                             type="button"
                             onClick={handleAdd}
                             disabled={!newName.trim() || saving}
                             aria-label="Add this recruitment channel"
-                            className="touch-target p-1.5 rounded-md text-status-active hover-hover:hover:bg-status-active-bg disabled:opacity-40 transition">
+                            className="touch-target rounded-md p-1.5 text-status-active transition hover-hover:hover:bg-status-active-bg disabled:opacity-40">
                             <Check size={16} />
                         </button>
                         <button
                             type="button"
                             onClick={() => setShowAdd(false)}
                             aria-label="Cancel adding a recruitment channel"
-                            className="touch-target p-1.5 rounded-md text-ink-muted hover-hover:hover:bg-surface-2 transition">
+                            className="touch-target rounded-md p-1.5 text-ink-muted transition hover-hover:hover:bg-surface-2">
                             <X size={16} />
                         </button>
                     </div>
                 )}
 
-                {/* Header */}
-                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-4 py-2 text-xs uppercase tracking-wide bg-surface-2 text-ink-muted rounded-t-xl">
-                    <div>Channel Name</div>
-                    <div>Status</div>
-                    <div>Edit</div>
-                    <div>Delete</div>
-                </div>
-
-                {/* Rows */}
-                <div className="divide-y divide-line border border-t-0 border-line rounded-b-xl">
-                    {/* 🔑 THE THREE STATES ARE SEPARATE BRANCHES, and `error` can no longer
-                        reach the empty copy -- which is the fix, not the states. The empty
-                        copy itself is unchanged wording, now rendered by the one component
-                        the whole application shares rather than as this file's own div. */}
-                    {listState === 'loading' && <DataState state="loading" />}
-
-                    {listState === 'error' && (
-                        <DataState
-                            state="error"
-                            error={loadError}
-                            onRetry={refresh}
-                            title="We could not load the recruiter types."
-                        />
-                    )}
-
-                    {listState === 'ready' && filtered.length === 0 ? (
-                        <DataState state="empty" title="No recruiter types found." />
-                    ) : listState !== 'ready' ? null : filtered.map(r => (
-                        <div key={r.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-4 py-3 items-center text-sm hover-hover:hover:bg-surface-2/40 transition">
-                            {editingId === r.id ? (
-                                <input
-                                    autoFocus
-                                    value={editName}
-                                    onChange={e => setEditName(e.target.value)}
-                                    aria-label={`Rename ${r.name}`}
-                                    onKeyDown={e => {
-                                        if (e.key === 'Enter') handleEdit(r);
-                                        if (e.key === 'Escape') setEditingId(null);
-                                    }}
-                                    className="rounded-lg px-3 py-1 field-text border bg-surface-2 border-line text-ink focus:outline-none focus:ring-2 focus:ring-brand-ring"
-                                />
-                            ) : (
-                                <span className={r.enabled ? '' : 'line-through text-ink-muted'}>{r.name}</span>
+                {/* 🔴 THIS WAS THE LAST PSEUDO-TABLE IN THE APPLICATION. Four `<div>`s across
+                    the top and a matching `grid-cols-[1fr_auto_auto_auto]` on every row: it
+                    LOOKED like a table and carried none of a table's meaning, so a screen
+                    reader read it as a stream of values with no column names, and nothing said
+                    which of the two icon buttons did what to which row. `BankListing`,
+                    `BankBranch` and `Recruiters` were each converted for this reason; this is
+                    the one that was missed. The rows are inline-editable, so it is a
+                    hand-built `<table>` in the world's own cell chrome rather than the shared
+                    `Table` -- the same call, and the same reason, as `Subscriptions`. */}
+                <TableScroller label="Recruitment channels">
+                    <table className="w-full border-collapse text-sm">
+                        <caption className="sr-only">
+                            Recruitment channels, with each one&apos;s status and the controls to rename or delete it
+                        </caption>
+                        <thead className="bg-surface-2">
+                            <tr>
+                                {/* `w-full` on the NAME column: an auto-layout table shares its slack between all
+                                    the columns, which left a 160px gap between the status chip and
+                                    the two icon buttons and floated them in the middle of nowhere.
+                                    The name is the column with something to say, so it takes the
+                                    slack and everything else sits tight at the right edge. */}
+                                <th scope="col" className={`${HEAD_CELL} w-full`}>Channel Name</th>
+                                <th scope="col" className={HEAD_CELL}>Status</th>
+                                {/* The two control columns are named for a screen reader and
+                                    silent on screen: a visible "Edit"/"Delete" head over a pair
+                                    of icon buttons is two words of furniture on every row. */}
+                                <th scope="col" className="w-px px-3.5"><span className="sr-only">Rename</span></th>
+                                <th scope="col" className="w-px px-3.5 pr-5"><span className="sr-only">Delete</span></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-line">
+                            {/* 🔑 THE THREE STATES ARE SEPARATE BRANCHES, and `error` can no
+                                longer reach the empty copy -- which is the fix, not the states. */}
+                            {listState !== 'ready' && (
+                                <tr>
+                                    <td colSpan={4}>
+                                        {listState === 'loading' && <DataState state="loading" />}
+                                        {listState === 'error' && (
+                                            <DataState
+                                                state="error"
+                                                error={loadError}
+                                                onRetry={refresh}
+                                                title="We could not load the recruiter types."
+                                            />
+                                        )}
+                                    </td>
+                                </tr>
                             )}
 
-                            <button
-                                type="button"
-                                onClick={() => handleToggleEnabled(r)}
-                                disabled={saving}
-                                aria-pressed={r.enabled}
-                                aria-label={`${r.name} is ${r.enabled ? 'active' : 'inactive'} — press to ${r.enabled ? 'disable' : 'enable'} it`}
-                                className={`touch-target px-2 py-0.5 rounded-full text-xs font-semibold transition disabled:opacity-40 ${
-                                    r.enabled
-                                        ? 'bg-status-active-bg text-status-active hover-hover:hover:bg-status-active-dot hover-hover:hover:text-on-brand'
-                                        : 'bg-surface-2 text-ink-muted hover-hover:hover:bg-surface'
-                                }`}>
-                                {r.enabled ? 'Active' : 'Inactive'}
-                            </button>
-
-                            {editingId === r.id ? (
-                                <div className="flex items-center gap-1">
-                                    <button type="button" onClick={() => handleEdit(r)} disabled={!editName.trim() || saving}
-                                        aria-label={`Save the new name for ${r.name}`}
-                                        className="touch-target p-1.5 rounded-md text-status-active hover-hover:hover:bg-status-active-bg disabled:opacity-40 transition">
-                                        <Check size={14} />
-                                    </button>
-                                    <button type="button" onClick={() => setEditingId(null)}
-                                        aria-label="Stop renaming and keep the current name"
-                                        className="touch-target p-1.5 rounded-md text-ink-muted hover-hover:hover:bg-surface-2 transition">
-                                        <X size={14} />
-                                    </button>
-                                </div>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={() => { setEditingId(r.id); setEditName(r.name); }}
-                                    disabled={saving}
-                                    aria-label={`Rename ${r.name}`}
-                                    className="touch-target p-1.5 rounded-md text-brand-ink hover-hover:hover:bg-brand-soft hover-hover:hover:text-brand-ink disabled:opacity-40 transition">
-                                    <Pencil size={14} />
-                                </button>
+                            {listState === 'ready' && filtered.length === 0 && (
+                                <tr>
+                                    <td colSpan={4}>
+                                        <DataState state="empty" title="No recruiter types found." />
+                                    </td>
+                                </tr>
                             )}
 
-                            <button
-                                type="button"
-                                onClick={() => setPendingDelete(r)}
-                                disabled={saving}
-                                aria-label={`Delete ${r.name}`}
-                                className="touch-target p-1.5 rounded-md text-status-suspended hover-hover:hover:bg-status-suspended-bg hover-hover:hover:text-status-suspended disabled:opacity-40 transition">
-                                <Trash2 size={14} />
-                            </button>
-                        </div>
-                    ))}
-                </div>
+                            {listState === 'ready' && filtered.map(r => (
+                                <tr key={r.id} className="transition hover-hover:hover:bg-surface-2/40">
+                                    <td className="px-3.5 py-[11px] text-ink first:pl-5">
+                                        {editingId === r.id ? (
+                                            <input
+                                                autoFocus
+                                                value={editName}
+                                                onChange={e => setEditName(e.target.value)}
+                                                aria-label={`Rename ${r.name}`}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter') handleEdit(r);
+                                                    if (e.key === 'Escape') setEditingId(null);
+                                                }}
+                                                className={CELL_INPUT}
+                                            />
+                                        ) : (
+                                            <span className={r.enabled ? '' : 'text-ink-muted line-through'}>{r.name}</span>
+                                        )}
+                                    </td>
 
-                <p className="mt-3 text-xs text-ink-muted text-right">
+                                    <td className="px-3.5 py-[11px]">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleToggleEnabled(r)}
+                                            disabled={saving}
+                                            aria-pressed={r.enabled}
+                                            aria-label={`${r.name} is ${r.enabled ? 'active' : 'inactive'} — press to ${r.enabled ? 'disable' : 'enable'} it`}
+                                            className={`touch-target rounded-full px-2 py-0.5 text-xs font-semibold transition disabled:opacity-40 ${
+                                                r.enabled
+                                                    ? 'bg-status-active-bg text-status-active hover-hover:hover:bg-status-active-dot hover-hover:hover:text-on-brand'
+                                                    : 'bg-surface-2 text-ink-muted hover-hover:hover:bg-surface'
+                                            }`}>
+                                            {r.enabled ? 'Active' : 'Inactive'}
+                                        </button>
+                                    </td>
+
+                                    <td className="px-3.5 py-[11px]">
+                                        {editingId === r.id ? (
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleEdit(r)}
+                                                    disabled={!editName.trim() || saving}
+                                                    aria-label={`Save the new name for ${r.name}`}
+                                                    className="touch-target rounded-md p-1.5 text-status-active transition hover-hover:hover:bg-status-active-bg disabled:opacity-40">
+                                                    <Check size={14} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditingId(null)}
+                                                    aria-label="Stop renaming and keep the current name"
+                                                    className="touch-target rounded-md p-1.5 text-ink-muted transition hover-hover:hover:bg-surface-2">
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => { setEditingId(r.id); setEditName(r.name); }}
+                                                disabled={saving}
+                                                aria-label={`Rename ${r.name}`}
+                                                className="touch-target rounded-md p-1.5 text-brand-ink transition hover-hover:hover:bg-brand-soft disabled:opacity-40">
+                                                <Pencil size={14} />
+                                            </button>
+                                        )}
+                                    </td>
+
+                                    <td className="px-3.5 py-[11px] pr-5">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPendingDelete(r)}
+                                            disabled={saving}
+                                            aria-label={`Delete ${r.name}`}
+                                            className="touch-target rounded-md p-1.5 text-status-suspended transition hover-hover:hover:bg-status-suspended-bg disabled:opacity-40">
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </TableScroller>
+            </Sheet>
+
+            {/* 🔴 A COUNT IS A FACT ABOUT DATA THAT ARRIVED. This line sat outside all three
+                state branches, so a failed load printed "0 recruiter types" directly beneath
+                "We could not load the recruiter types." The file's own header comment above
+                describes fixing exactly this class of defect in the list BODY, and left it
+                standing in the footer. It renders only on a resolved load now. */}
+            {listState === 'ready' && (
+                <p className="mt-3 max-w-2xl text-right text-xs text-ink-muted">
                     {filtered.length} recruiter type{filtered.length !== 1 ? 's' : ''}
                 </p>
-            </div>
+            )}
 
             <ConfirmDialog
                 open={Boolean(pendingDelete)}
@@ -307,6 +378,6 @@ export default function RecruitmentChannel() {
                 loading={saving}
                 onConfirm={handleDelete}
             />
-        </div>
+        </Page>
     );
 }

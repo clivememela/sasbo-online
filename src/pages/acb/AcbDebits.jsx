@@ -7,6 +7,7 @@ import Modal from "../../components/overlay/Modal.jsx";
 import { memberService } from "../../services/memberService.js";
 import { validateSAID } from "../../utils/validateSAID.js";
 import Table from '../../components/table/Table.jsx';
+import Sheet from '../../components/common/Sheet.jsx';
 import StatusChip from '../../components/common/StatusChip.jsx';
 import reportError from '../../lib/reportError.js';
 
@@ -201,10 +202,22 @@ export default function AcbDebits() {
 
                 {/* Results */}
                 {searched && (
-                    <div className="mt-6 overflow-hidden rounded-lg bg-surface shadow-(--shadow-1)">
-                        <div className="px-6 py-3 border-b border-line text-sm text-ink-muted">
-                            {results.length} member{results.length !== 1 ? "s" : ""} found
-                        </div>
+                    <Sheet className="mt-6">
+                        {/* 🔴 A COUNT IS A FACT ABOUT DATA THAT ARRIVED, and this one used to be
+                            stated whatever happened. On a failed load the table below said "We
+                            could not load the member list." while this line above it asserted
+                            "0 members found" -- so the screen that changes a member's debit order
+                            told an administrator both that something had gone wrong and that
+                            their search was simply too narrow, and the second sentence is the one
+                            that invites them to widen it and try again forever. While loading it
+                            was worse: a confident zero under a spinner. conventions §8 -- the
+                            count and the empty copy render ONLY when the data genuinely
+                            resolved. The state's own words are the table's job. */}
+                        {listState === 'ready' && (
+                            <div className="px-6 py-3 border-b border-line text-sm text-ink-muted">
+                                {results.length} member{results.length !== 1 ? "s" : ""} found
+                            </div>
+                        )}
                         <Table
                             caption="Members matching the ACB search"
                             columns={memberColumns}
@@ -217,12 +230,12 @@ export default function AcbDebits() {
                             emptyMessage="Try a different membership or identity number."
                             dense
                         />
-                    </div>
+                    </Sheet>
                 )}
 
                 {/* Banking Details & Confirmation */}
                 {selectedMember && (
-                    <div className="mt-4 overflow-hidden rounded-lg bg-surface shadow-(--shadow-1)">
+                    <Sheet className="mt-4">
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-line flex items-center justify-between">
                             <div>
@@ -302,7 +315,7 @@ export default function AcbDebits() {
                                 <TextInput label="Work Bank Address" value={bankForm.workBankAddress} onChange={handleBankChange('workBankAddress')} />
                             </div>
                         </Modal>
-                    </div>
+                    </Sheet>
                 )}
             </div>
         </div>
