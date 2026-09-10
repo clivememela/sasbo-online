@@ -1,7 +1,7 @@
 import {Landmark, UsersRoundIcon, ChartNoAxesCombined, Archive, LucideDatabase} from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import NavigationCard from '../components/common/NavigationCard';
-import Sheet from '../components/common/Sheet.jsx';
+import Sheet, { Page } from '../components/common/Sheet.jsx';
 import PageTitle from '../components/common/PageTitle';
 
 const cards = [
@@ -15,7 +15,7 @@ const cards = [
 export default function Home() {
   const { setSelectedCardHref } = useOutletContext() || {};
   return (
-    <div className="px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+    <Page>
       <PageTitle title="Welcome to SASBO Online" subtitle="Select an area to begin." />
       <Sheet className="mt-6 max-w-4xl divide-y divide-line">
         {cards.map((card) => (
@@ -26,6 +26,6 @@ export default function Home() {
           />
         ))}
       </Sheet>
-    </div>
+    </Page>
   );
 }

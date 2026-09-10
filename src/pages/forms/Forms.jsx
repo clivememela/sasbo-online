@@ -101,8 +101,13 @@ export function Forms(){
                     </Button>
                 </div>
             </FilterForm>
+            {/* 🔴 `mx-auto` CENTRED THE FORM UNDER A LEFT-ALIGNED PAGE HEAD, so the
+                title sat at the page gutter and the sheet it introduced started 150px
+                to its right. Centring a body column under a left-aligned title is the
+                one typographic thing the mock never does. `max-w-4xl` is the width the
+                four things this switch can render already set for themselves. */}
             {filters.formType && (
-                <div className="max-w-6xl mx-auto mt-6">
+                <div className="mt-6 max-w-4xl">
                     {renderForm()}
                 </div>
             )}
