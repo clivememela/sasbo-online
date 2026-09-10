@@ -81,6 +81,42 @@ const FILTER_FIELDS = [
 // The five sections of a member's record, named once in `memberConstants.js`.
 const TABS = MEMBER_TABS;
 
+/*
+ * 🗣️ WHERE EACH OF THE FIVE SECTIONS SITS IN THE RECORD'S TAB STRIP -- the owner's
+ * arrangement, settled over three rounds on 2026-09-10:
+ *
+ *     Personal                      Membership
+ *                  Employment
+ *     Recruitment                    Structures
+ *
+ * ① Three columns, so the sections line up under each other whatever the width. Left to
+ *    `flex-wrap` the strip broke 4+1 on a 448px panel and 3+2 on the owner's own window,
+ *    because the split was whatever the labels happened to measure.
+ * ② The last section takes the THIRD column, not the second -- *"so that there's a gap in
+ *    the middle between Recruitment and Structures."*
+ * ③ That leaves the middle column holding one tab where the outer two hold two, so it spans
+ *    both rows and centres in them -- *"right in the center, relative to all the other panel
+ *    tabs."*
+ * ④ And the strip is SYMMETRICAL about its own centre line: the left column reads from the
+ *    left edge, the right column to the right edge, and the middle one is centred. Aligning
+ *    all three from the left is what left "Membership" and "Structures" ending in different
+ *    places and the whole block leaning.
+ *
+ * It is a list rather than three conditionals because it is one composition, and a
+ * composition is easier to check when you can see it. It applies only at five sections --
+ * `MEMBER_TABS` carries a sixth commented out, and six fill a 3x2 grid with nothing to
+ * balance, so they fall back to the plain left-aligned flow.
+ */
+const TAB_PLACE = TABS.length === 5
+  ? [
+      'justify-self-start',
+      'row-span-2 justify-self-center self-center',
+      'justify-self-end',
+      'justify-self-start',
+      'col-start-3 justify-self-end',
+    ]
+  : [];
+
 const FIELD_TO_TAB_MAP = {
     title: "personal",
     initials: "personal",
@@ -1190,25 +1226,8 @@ export default function Members() {
                                         // card.css:358 -- 13px, not 14: the strip is a quiet index of the record, not a
                                         // second row of headings, and the extra pixel is what pushed it to three rows.
                                         "touch-target inline-flex items-center justify-self-start gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-[13px] font-medium",
-                                        // 🗣️ THE ARRANGEMENT, IN TWO RULES, BOTH THE OWNER'S (2026-09-10).
-                                        //
-                                        // ① The final row holds one tab, and it goes in the LAST column, under
-                                        //    the third of the row above -- *"so that there's a gap in the middle
-                                        //    between Recruitment and Structures."* The empty cell falls in the
-                                        //    middle, and the block reads as an arrangement rather than as a row
-                                        //    that ran out.
-                                        //
-                                        // ② That leaves the MIDDLE COLUMN holding one tab where the outer two
-                                        //    hold two each, so it spans both rows and centres in them --
-                                        //    *"move Employment down a few pixels so that it can be right in the
-                                        //    center, relative to all the other panel tabs."* The five sections
-                                        //    settle into a balance rather than a ragged second line.
-                                        //
-                                        // Both are guarded on there being exactly five sections, because that
-                                        // is the shape they describe: `MEMBER_TABS` has a sixth commented out,
-                                        // and six would fill a 3x2 grid with nothing to balance.
-                                        TABS.length === 5 && index === TABS.length - 1 && "col-start-3",
-                                        TABS.length === 5 && index === 1 && "row-span-2 self-center",
+                                        // Where this one sits in the composition -- see `TAB_PLACE`.
+                                        TAB_PLACE[index],
                                         "transition-[color,box-shadow] duration-(--duration-instant) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
                                         activeTab === tab.id
                                             ? "font-semibold text-brand-ink shadow-[inset_0_-2px_0_var(--color-brand)]"
