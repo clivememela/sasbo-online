@@ -67,6 +67,13 @@ export const overflowProbe = (requested) => `(() => {
     scrollWidth: document.documentElement.scrollWidth,
     offenders: offenders.slice(0, 10),
     offenderCount: offenders.length,
+    // 🔑 THE POPULATION TRAVELS WITH THE VERDICT, ALWAYS. "This page does not overflow" and
+    // "this page is empty" are the same sentence otherwise, and an empty page is the most
+    // reliably non-overflowing page there is. Carrying the count means every consumer can
+    // tell a clean measurement from a vacuous one WITHOUT having to remember to ask -- which
+    // is the whole reason \`edges.mjs\` reported 25 clean forced-colors rows over three blank
+    // pages: nothing in the row said how much page there had been.
+    elements: document.querySelectorAll('#root *').length,
   };
 })()`;
 
@@ -120,16 +127,41 @@ export const themeReadout = `(() => {
 /**
  * The page is ready to be MEASURED — not merely ready to be looked at.
  *
- * 🔴 THE LAST CLAUSE IS THE ONE THAT WAS MISSING. Without it, one row of a 350-row matrix
- * (`/reports` at 1024, light) was measured with a transparent body — the stylesheet had not
- * applied yet. An unstyled page has an entirely different layout, so "no horizontal
- * overflow" on that row was a fact about a page nobody will ever see. One row in 350 is
- * exactly the rate at which a race gets rounded down to "clean" and never looked at again.
+ * 🔴 EVERY CLAUSE HERE IS A ROW THAT WAS MEASURED BEFORE ITS PAGE EXISTED. The stylesheet
+ * clause came first: without it one row of a 350-row matrix (`/reports` at 1024, light) was
+ * measured with a transparent body, and an unstyled page has an entirely different layout, so
+ * that row's "no horizontal overflow" was a fact about a page nobody will ever see.
+ *
+ * 🔴 AND THEN THE `#root` CLAUSE, WHICH IS THE ONE THAT MATTERED MOST. Measured 2026-09-10:
+ * `edges.mjs`'s forced-colors sweep reported **0 visible controls across all 25 routes**, and
+ * the cause was that all four of the ORIGINAL clauses are satisfied by a page where **React
+ * has not mounted at all**:
+ *
+ *   fonts loaded                   ✓ nothing has asked for a font yet
+ *   no `route-pending` element     ✓ — AND THIS CLAUSE WAS WORSE THAN USELESS. Before React
+ *                                    mounts there is no Suspense fallback EITHER, so the
+ *                                    absence of the pending marker reads as "arrived" when it
+ *                                    actually means "has not started".
+ *   body has children              ✓ `<div id="root">` is in the served HTML
+ *   body background is painted     ✓ index.html's pre-paint script and the CSS do that before
+ *                                    a single component renders
+ *
+ * Confirmed by census: `{"matched":0,"rootKids":0,"firstBox":"none"}` on `/login`, `/home` and
+ * `/admin` while `pageReady` returned `true` and the harness reported `landed=true`. The fourth
+ * route onward worked, because by then the chunks were cached — **so this failure is a COLD
+ * CACHE failure, which is why it hid**: any tool that happened to warm the browser first, or
+ * that slept after landing, saw a populated page and agreed the predicate was fine.
+ *
+ * 🔑 THE CLAUSE IS `#root` HAVING CHILDREN, i.e. the application has rendered something. It is
+ * the only one of the five that cannot be satisfied by the empty shell, and it is deliberately
+ * a floor on the APP rather than on any one route's content — a per-route selector would be a
+ * second thing to keep in step with 25 routes.
  */
 export const pageReady = `(() => (
   document.fonts.status === 'loaded'
   && !document.querySelector('[data-testid="route-pending"]')
   && document.body.children.length > 0
+  && (document.getElementById('root')?.children.length ?? 0) > 0
   && getComputedStyle(document.body).backgroundColor !== 'rgba(0, 0, 0, 0)'
 ))()`;
 
@@ -140,6 +172,32 @@ export const pageReady = `(() => (
  *
  * Returns a list of complaints; empty means the dimension is real.
  */
+/**
+ * 🔑 THE PAGE-POPULATION CANARY. Given every row a run produced, complain about any that was
+ * taken against a page with almost nothing in it.
+ *
+ * A row with 3 elements under `#root` is not evidence about a layout; it is evidence that the
+ * tool measured before the application rendered. `edges.mjs` shipped 25 such rows and called
+ * them clean, and nothing in its output could have shown that — see `pageReady` above for the
+ * five conditions a bare SPA shell satisfies.
+ *
+ * The floor is deliberately LOW (a non-vacuity canary, not a coverage target — the same rule
+ * `src/test/floors.js` states for the suite's own floors). The lightest real route in this
+ * application renders 11 elements at its emptiest, so 8 separates "a page" from "no page"
+ * without reddening for a route that is legitimately sparse.
+ */
+export function populationComplaints(rows, floor = 8) {
+  const empty = rows.filter((r) => typeof r.elements === 'number' && r.elements < floor);
+  if (!empty.length) return [];
+  const where = (r) => `${r.route ?? r.name ?? '?'}@${r.width ?? r.requested ?? '?'}`;
+  return [
+    `${empty.length} of ${rows.length} rows were measured against a page with fewer than ` +
+      `${floor} elements under #root (${empty.slice(0, 5).map((r) => `${where(r)}=${r.elements}`).join(', ')}` +
+      `${empty.length > 5 ? ', …' : ''}) — the application had not rendered, so those rows are ` +
+      `facts about a blank page. An empty page never overflows.`,
+  ];
+}
+
 export function themeDimensionComplaints(rows) {
   const complaints = [];
   const light = rows.filter((r) => r.theme === 'light' && r.theme_bg);

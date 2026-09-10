@@ -75,8 +75,8 @@
 
   /* Ink */
   --color-ink: oklch(17.9% 0.020 252);  /* values, headings, body */
-  --color-ink-muted: oklch(40.0% 0.025 251);  /* labels, secondary, table heads (dark) */
-  --color-ink-faint: oklch(52.6% 0.028 252);  /* placeholders, icons at rest, days outside the month */
+  --color-ink-muted: oklch(40.0% 0.025 251);  /* labels, secondary, table heads, PLACEHOLDERS (card.css:165) */
+  --color-ink-faint: oklch(52.6% 0.028 252);  /* icons and dividers ONLY; never text -- card.css:27 */
   --color-nav-ink: oklch(33.2% 0.027 253);  /* the rail's resting ink */
 
   /* Lines */
@@ -334,6 +334,13 @@
     height: 100%;
   }
 }
+
+/* ==========================================================================
+   END OF THE GENERATED TOKEN LAYER. gen_theme.py rewrites everything ABOVE this
+   line from card.css and PRESERVES everything below it. Hand-authored rules --
+   the print surface, forced-colors, utilities -- belong below, and survive a
+   regeneration. Do not remove this line.
+   ========================================================================== */
 
 /* ==========================================================================
    PRINT -- and print is LIVE, not decorative (the owner, 2026-09-09).

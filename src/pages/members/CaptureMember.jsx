@@ -463,7 +463,7 @@ export default function CaptureMember() {
                                 type="button"
                                 aria-current={activeTab === tab.id ? "true" : undefined}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`touch-target mr-4 inline-flex items-center gap-1 p-4 border-b-2 font-bold text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring ${activeTab === tab.id ? "border-brand text-brand-ink" : "border-transparent text-ink-faint hover-hover:hover:text-ink"}`}
+                                className={`touch-target mr-4 inline-flex items-center gap-1 p-4 border-b-2 font-bold text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring ${activeTab === tab.id ? "border-brand text-brand-ink" : "border-transparent text-ink-muted hover-hover:hover:text-ink"}`}
                             >
                                 <span>{tab.label}</span>
                                 {tabsWithErrors.has(tab.id) && (

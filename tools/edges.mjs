@@ -29,7 +29,7 @@
 import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 
-import { ROUTES, overflowProbe, pageReady, storeTheme } from './probe.mjs';
+import { ROUTES, overflowProbe, pageReady, populationComplaints, storeTheme } from './probe.mjs';
 
 const CHROME = 'C:/Users/mfazl/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe';
 const baseUrl = process.argv[2] ?? 'http://127.0.0.1:4319';
@@ -242,6 +242,12 @@ try {
   writeFileSync('reports/edges.json', JSON.stringify(findings, null, 2));
 
   // ------------------------------------------------------------------ verdict
+  // 🔴 THE POPULATION CHECK, AND THIS TOOL IS WHY IT EXISTS. Its forced-colors sweep
+  // reported 25 clean rows over three pages where React had not rendered at all. Every row
+  // now carries its own element count and a blank one is a FAILURE rather than a clean
+  // measurement -- see `pageReady` in probe.mjs for the five conditions a bare shell met.
+  const populationIssues = populationComplaints(findings);
+  for (const complaint of populationIssues) console.log(`  POPULATION  ${complaint}`);
   const bad = findings.filter((f) => f.overflows);
   console.log(`\n${findings.length} measurements, ${bad.length} overflowing`);
   for (const f of bad.slice(0, 30)) {
@@ -249,7 +255,7 @@ try {
     console.log(`      scroll=${f.scrollWidth} asked=${f.requested} offenders=${f.offenderCount}`);
     for (const o of f.offenders.slice(0, 4)) console.log(`      ${o}`);
   }
-  if (bad.length || invisible.length || resized.length || missed) process.exitCode = 1;
+  if (bad.length || invisible.length || resized.length || missed || populationIssues.length) process.exitCode = 1;
 } catch (e) {
   console.error('edges failed:', e.message);
   process.exitCode = 1;

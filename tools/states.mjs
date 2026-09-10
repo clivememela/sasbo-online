@@ -20,7 +20,7 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
-import { overflowProbe, pageReady, storeTheme, themeDimensionComplaints, themeReadout } from './probe.mjs';
+import { overflowProbe, pageReady, populationComplaints, storeTheme, themeDimensionComplaints, themeReadout } from './probe.mjs';
 
 const CHROME = 'C:/Users/mfazl/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe';
 const baseUrl = process.argv[2] ?? 'http://127.0.0.1:4319';
@@ -276,6 +276,8 @@ for (const r of results) {
 // produced was once byte-identical, because the theme was applied after React had already
 // re-applied its own. A run that measured one theme twice must not report twelve
 // combinations.
+const populationIssues = populationComplaints(results);
+for (const complaint of populationIssues) console.log(`  POPULATION  ${complaint}`);
 const themeComplaints = themeDimensionComplaints(results);
 for (const complaint of themeComplaints) console.log(`  THEME  ${complaint}`);
 const themes = [...new Set(results.map((r) => `${r.theme}=${r.theme_bg}`))].sort();
@@ -287,4 +289,4 @@ const overflowing = results.filter((r) => r.reached && r.overflows);
 console.log(`\nreached: ${results.length - unreached.length}/${results.length}   overflowing: ${overflowing.length}`);
 // 🔴 A STATE THAT WAS NEVER REACHED IS NOT A PASS. It is a measurement that did not happen,
 // and reporting it as clean is the failure this whole file is written against.
-if (unreached.length || overflowing.length || themeComplaints.length) process.exitCode = 1;
+if (unreached.length || overflowing.length || themeComplaints.length || populationIssues.length) process.exitCode = 1;

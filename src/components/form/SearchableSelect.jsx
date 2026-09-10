@@ -295,7 +295,7 @@ export default function SearchableSelect({
               {filtered.length === 0 ? (
                 // Not a `role="option"`: an unselectable row inside a listbox is
                 // announced as a choice, and this one is a message.
-                <li className="field-text px-3 py-2 text-ink-faint" role="presentation">
+                <li className="field-text px-3 py-2 text-ink-muted" role="presentation">
                   {noMatchLabel}
                 </li>
               ) : (

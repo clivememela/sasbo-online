@@ -573,7 +573,7 @@ export default function DateField({
             role="columnheader"
             aria-label={day.long}
             title={day.long}
-            className="w-9 text-center text-2xs font-semibold uppercase tracking-wide text-ink-faint"
+            className="w-9 text-center text-2xs font-semibold uppercase tracking-wide text-ink-muted"
           >
             {day.short}
           </span>
@@ -612,7 +612,7 @@ export default function DateField({
                   'size-9 rounded-md text-sm text-ink',
                   'hover-hover:hover:bg-surface-2',
                   FOCUS_RING,
-                  outside && 'text-ink-faint opacity-60',
+                  outside && 'text-ink-muted',
                   unavailable && 'cursor-not-allowed opacity-40',
                   // Today is RINGED in accent; the choice is FILLED in brand. The mock is
                   // explicit that they are different marks, so that today still reads as

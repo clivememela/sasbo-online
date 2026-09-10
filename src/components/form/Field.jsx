@@ -108,7 +108,17 @@ export default function Field({
 export function controlClasses({ invalid, className } = {}) {
   return cn(
     'field-text w-full rounded-lg border px-3 py-2 font-normal normal-case tracking-normal',
-    'min-h-(--size-control) bg-surface text-ink placeholder:text-ink-faint',
+    // 🔴 `placeholder:` IS `ink-muted`, NOT `ink-faint`, AND THE DIFFERENCE IS EVERY FORM IN
+    // THE APPLICATION. A placeholder is text, so WCAG 1.4.3 applies to it -- and `ink-faint`
+    // measures 3.65:1 at worst in dark and 4.15:1 on `bg-raised` in light, against a 4.5:1
+    // bar. `card.css:165` puts placeholders on `--ink-2` and says of `--ink-3` "icons,
+    // dividers; NEVER body text"; the arc's own `tokens.md` had widened that note to include
+    // placeholders, and this line believed the note. Both are corrected at their one home.
+    //
+    // ⚠️ NO PROBE COULD HAVE CAUGHT IT. axe judges text NODES; a placeholder is an attribute,
+    // so the 100-combination pixel sweep passed every one of these controls without ever
+    // measuring the colour. `tools/tokenContrast.mjs` measures the PAIR, which is why it exists.
+    'min-h-(--size-control) bg-surface text-ink placeholder:text-ink-muted',
     'transition-colors duration-(--duration-instant) ease-(--ease-out)',
     'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring',
     'disabled:cursor-not-allowed disabled:opacity-60',

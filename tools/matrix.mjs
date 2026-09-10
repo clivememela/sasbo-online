@@ -23,7 +23,7 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
-import { ROUTES as ALL_ROUTES, overflowProbe, pageReady, storeTheme, themeDimensionComplaints, themeReadout } from './probe.mjs';
+import { ROUTES as ALL_ROUTES, overflowProbe, pageReady, populationComplaints, storeTheme, themeDimensionComplaints, themeReadout } from './probe.mjs';
 import { join } from 'node:path';
 
 const CHROME = 'C:/Users/mfazl/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe';
@@ -193,8 +193,10 @@ for (const r of bad.slice(0, 40)) {
 // 🔑 THE THEME DIMENSION IS PROVED, NOT COUNTED. Half of this matrix claims to be the
 // dark theme; until the two halves are shown to render differently, "350 combinations" is
 // 175 measured twice.
+const populationIssues = populationComplaints(rows);
+for (const complaint of populationIssues) console.log(`  POPULATION  ${complaint}`);
 const themeComplaints = themeDimensionComplaints(rows);
 for (const complaint of themeComplaints) console.log(`  THEME  ${complaint}`);
 console.log(`body background by theme: ${[...new Set(rows.map((r) => `${r.theme}=${r.theme_bg}`))].sort().join('  ')}`);
 
-if (failures || themeComplaints.length) process.exitCode = 1;
+if (failures || themeComplaints.length || populationIssues.length) process.exitCode = 1;
