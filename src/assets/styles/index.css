@@ -65,6 +65,12 @@
   --duration-fast: 200ms;
   --duration-base: 280ms;
   --duration-slow: 580ms;
+  /* The record panel's column is the largest single movement in the application -- 448px of
+     shell opening or closing -- and at `--duration-base` it arrived faster than the eye
+     tracks it, which reads as a jump rather than as a panel. It gets its own token so the
+     component, the scrim and the record inside it cannot drift out of step with each other.
+     `MemberPanel`'s `PANEL_MS` is this number; they are commented at both ends. */
+  --duration-panel: 380ms;
   --duration-pour: 1200ms;
 
   /* Grounds */
@@ -239,8 +245,19 @@
   --card-foil: linear-gradient(135deg, #8E7230 0%, #D4B86A 42%, #F3E4AE 50%, #C9A85A 58%, #7F6528 100%);
 
   /* Depth */
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5);
-  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 12px 32px rgba(0, 0, 0, 0.5);
+  /* 🔴 SOFTER AND WIDER THAN card.css's DARK SHADOWS, and this is a deliberate departure
+     with a measured reason. The mock's dark `--shadow-1` is `0 1px 2px rgba(0,0,0,.4),
+     0 1px 3px rgba(0,0,0,.5)` -- two very tight, very dark layers. Against the mock's own
+     dark ground that reads as depth, because in the MOCK the register's sheet has a 448px
+     record panel beside it and the shadow falls into a gap. In this application the panel
+     closes when nothing is selected (the owner, 2026-09-10), so the sheet now runs to the
+     page gutter and its right shadow is the last thing before the window edge -- where a
+     3px spread at 50% black stops reading as depth and starts reading as a drawn black
+     line. The owner saw it and called it exactly that.
+     The alpha comes down and the blur goes up: the same elevation, cast rather than
+     stamped. Light is untouched -- it was never the problem, and it is the mock's. */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.28), 0 4px 10px rgba(0, 0, 0, 0.32);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.34), 0 14px 36px rgba(0, 0, 0, 0.40);
   --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.5), 0 18px 40px rgba(0, 0, 0, 0.55), 0 40px 80px rgba(0, 0, 0, 0.45);
 
   /* New */
@@ -756,7 +773,6 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
 .fieldgroup > :nth-child(8)  { --i: 7; }
 .fieldgroup > :nth-child(9)  { --i: 8; }
 .fieldgroup > :nth-child(n+10) { --i: 9; }
-.panel-empty-in { animation: fade-in var(--duration-base) ease-out both; }
 
 /* ── Tab changes move in the direction of travel (card.css `.is-enter-fwd/back`) ── */
 @keyframes tab-enter-fwd {

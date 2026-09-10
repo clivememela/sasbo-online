@@ -57,9 +57,21 @@ export default function FigureStrip({
       data-testid="figure-strip"
       className={cn(
         // 🔑 THE RULES ARE THE COMPONENT. Two hairlines, top and bottom, and the figures
-        // sit BETWEEN them -- `justify-start` so the strip ends where the figures end
-        // rather than stretching to fill, which would turn it back into a row of tiles.
-        'grid auto-cols-max grid-flow-col justify-start',
+        // sit BETWEEN them. The contract refuses "hero-metric tiles, dashboards of
+        // same-size cards", so this is a ledger line and not a row of boxes.
+        //
+        // 🔴 `auto-cols-fr`, AND IT USED TO BE `auto-cols-max justify-start` -- the figures
+        // packed to the left at their own widths. That was right while the record panel took
+        // 448px of the desk and the strip was 680px wide. The moment the panel learned to
+        // close (the owner, 2026-09-10) the strip became 1128px, and five figures crammed
+        // into the first 560px of a rule that ran the whole way looked, in the owner's word,
+        // squashed -- half a ruled line with nothing on it.
+        //
+        // Equal columns are not tiles: there is still no box, no fill and no radius, and the
+        // hairlines still divide one continuous rule. What changes is that the division is
+        // even, which is what a ledger's columns are, and it is dynamic by construction --
+        // the columns re-share whatever width the panel leaves behind.
+        'grid auto-cols-fr grid-flow-col',
         'border-y border-line-strong',
         // Below `sm` five columns cannot hold their numerals, so it wraps to a grid --
         // still ruled, still not tiles.
@@ -71,9 +83,12 @@ export default function FigureStrip({
         <div
           key={figure.label}
           className={cn(
-            'grid gap-1 py-2.5 pr-5',
+            // `px-5 first:pl-0` rather than `pr-5 mr-5`: with columns of equal width the
+            // hairline belongs ON the column's edge, so the rules fall at even intervals
+            // across the strip. The first figure keeps the page's own gutter.
+            'grid content-start gap-1 px-5 py-2.5 first:pl-0 max-sm:px-0',
             // The separating hairline, on every figure but the last.
-            index < figures.length - 1 && 'mr-5 border-r border-line max-sm:border-r-0 max-sm:mr-0',
+            index < figures.length - 1 && 'border-r border-line max-sm:border-r-0',
           )}
         >
           <dt className="flex items-center gap-[7px] whitespace-nowrap text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-muted">

@@ -28,6 +28,7 @@ import FigureStrip from "../../components/members/FigureStrip.jsx";
 import MemberPanel from "../../components/members/MemberPanel.jsx";
 import Criteria, { CRITERION } from "../../components/common/Criteria.jsx";
 import Pager from "../../components/common/Pager.jsx";
+import KeyHints from "../../components/common/KeyHints.jsx";
 import Sheet from "../../components/common/Sheet.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
@@ -35,6 +36,14 @@ import { parseDate, sameDate, today } from "../../lib/format.js";
 import { cn } from "../../lib/utils";
 
 const PAGE_SIZE = memberService.getPageSize();
+
+/*
+ * 🔴 HOW LONG THE RECORD OUTLIVES THE CLICK THAT CLOSED IT. This is `--duration-panel` in
+ * `index.css`, and the two are commented at both ends because nothing else keeps them in
+ * step: the panel's column animates from 448px to nothing over that time, and if the record
+ * is thrown away first the animation plays over an empty white box.
+ */
+const PANEL_MS = 380;
 
 /** The fields the topbar's search reads -- card.js `visible()`, plus the wire's own names. */
 const SEARCH_FIELDS = [
@@ -188,6 +197,42 @@ export default function Members() {
     const [filters, setFilters] = useState(() => getInitialFilters(location.state));
     const [page, setPage] = useState(1);
     const [selectedMember, setSelectedMember] = useState(null);
+
+    /*
+     * 🔴 CLOSING IS TWO THINGS, AND THEY DO NOT HAPPEN AT THE SAME MOMENT: the column starts
+     * to collapse now, and the record is thrown away when it has finished. `panelClosing`
+     * carries the gap. `open` is the column's business, `selectedMember` is the record's, and
+     * `MemberPanel` renders its body off the record rather than off `open` for this reason.
+     *
+     * ⚠️ CHOOSING ANOTHER MEMBER MID-CLOSE MUST CANCEL THE PENDING CLEAR, or the timer lands
+     * a few hundred milliseconds later and throws away the member you just picked -- which is
+     * exactly the shape of bug a delayed teardown introduces if nobody owns it.
+     */
+    const [panelClosing, setPanelClosing] = useState(false);
+    const closeTimer = useRef(null);
+
+    const openRecord = useCallback((member) => {
+        if (closeTimer.current) {
+            clearTimeout(closeTimer.current);
+            closeTimer.current = null;
+        }
+        setPanelClosing(false);
+        setSelectedMember(member);
+    }, []);
+
+    const closeRecord = useCallback(() => {
+        if (closeTimer.current) return;
+        setPanelClosing(true);
+        closeTimer.current = setTimeout(() => {
+            closeTimer.current = null;
+            setPanelClosing(false);
+            setSelectedMember(null);
+        }, PANEL_MS);
+    }, []);
+
+    useEffect(() => () => {
+        if (closeTimer.current) clearTimeout(closeTimer.current);
+    }, []);
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState({});
     const [activeTab, setActiveTab] = useState("personal");
@@ -321,7 +366,7 @@ export default function Members() {
             // dialog, a listbox -- is not a request to close the whole record. Without this
             // guard, Escape in the calendar of the edit form threw the member away.
             if (e.defaultPrevented || e.target?.closest?.('[role="dialog"], [role="listbox"]')) return;
-            setSelectedMember(null);
+            closeRecord();
             setIsEditing(false);
         };
         window.addEventListener("keydown", onKeyDown);
@@ -687,7 +732,7 @@ export default function Members() {
                     <button
                         type="button"
                         data-row-action=""
-                        onClick={() => setSelectedMember(member)}
+                        onClick={() => openRecord(member)}
                         // The number alone is not a name a screen-reader user can act on:
                         // "1002" says nothing about what pressing it does, and every row
                         // has one.
@@ -771,7 +816,11 @@ export default function Members() {
             priority: "essential",
             cell: (member) => <StatusChip status={member.status} />,
         },
-    ], []);
+    // `openRecord` is a `useCallback` with no dependencies, so this list is still stable and
+    // the columns are still built once -- it is named because the rule is right: a closure
+    // that is not declared is a closure nobody will remember to check when it stops being
+    // stable.
+    ], [openRecord]);
 
     return (
         /* 📐 card.html's `.main`, section by section: the page head, the ruled figure strip,
@@ -940,7 +989,7 @@ export default function Members() {
                         rows={visibleMembers}
                         rowKey="id"
                         selectedKey={selectedMember?.id}
-                        onRowSelect={setSelectedMember}
+                        onRowSelect={openRecord}
                         enterKey={enterKey}
                         loading={listState === "loading"}
                         error={listState === "error" ? "The register could not be reached" : null}
@@ -965,6 +1014,21 @@ export default function Members() {
                         end={endIndex}
                         noun="members"
                         loading={listState === "loading"}
+                        /* 🔴 THE KEYBOARD LEGEND MOVED HERE FROM THE RECORD PANEL'S EMPTY
+                           STATE. It always described THIS surface -- ↑ and ↓ move the
+                           selection, Enter opens the record -- and it was only ever on screen
+                           while the panel had nothing in it, so when the owner asked for that
+                           empty column to close it would have taken the one place the
+                           application teaches its own keyboard model with it. */
+                        hint={filteredMembers.length > 0 ? (
+                            <KeyHints
+                                hints={[
+                                    [['↑', '↓'], 'move'],
+                                    [['Enter'], 'open'],
+                                    [['⌘K'], 'search'],
+                                ]}
+                            />
+                        ) : null}
                     />
                 </Sheet>
             </section>
@@ -995,8 +1059,8 @@ export default function Members() {
                 moment the page mounted -- caught by the route smoke, not by reading. */}
             <MemberPanel
                 member={selectedMember}
-                open={Boolean(selectedMember)}
-                onClose={() => setSelectedMember(null)}
+                open={Boolean(selectedMember) && !panelClosing}
+                onClose={closeRecord}
                 footer={
                     isEditing ? (
                         <>

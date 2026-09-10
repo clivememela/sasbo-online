@@ -22,6 +22,7 @@ export default function Pager({
   end,
   noun = 'rows',
   loading = false,
+  hint,
   children,
   className,
 }) {
@@ -45,6 +46,10 @@ export default function Pager({
       )}
     >
       <p className="text-sm text-ink-muted">{text}</p>
+      {/* 📐 THE MIDDLE SLOT. The foot ran count-left, buttons-right with a wide gap between
+          them, and a legend about the keys that work on THIS surface is exactly what belongs
+          in it. Hidden below `lg`, because a phone has no arrow keys to teach. */}
+      {hint && <div className="hidden lg:block">{hint}</div>}
       <div className="flex items-center gap-2">
         {children}
         <Button

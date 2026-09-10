@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { IdCard, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
 import { formatDateLong } from '../../lib/format';
@@ -109,70 +109,76 @@ export default function MemberPanel({ member, open, onClose, children, footer })
     <>
       {/* The scrim exists ONLY below the docking edge. Docked, the panel is a column of the
           page and a scrim over the register would be a lie about what is interactive. */}
-      {open && (
+      {member && (
         <button
           type="button"
           aria-label="Close member details"
           onClick={onClose}
-          className="fixed inset-0 z-30 bg-ink/25 xl:hidden"
+          className={cn(
+            'fixed inset-0 z-30 bg-ink/25 transition-opacity duration-(--duration-panel) ease-(--ease-out) xl:hidden',
+            'motion-reduce:transition-none',
+            open ? 'opacity-100' : 'pointer-events-none opacity-0',
+          )}
         />
       )}
 
+      {/* 🔴 THE COLUMN CLOSES WHEN THERE IS NOTHING IN IT -- the owner, 2026-09-10, looking at
+          a screenshot of the empty slot: *"Is it not better to rather close that right hand
+          bar instead of showing an empty card slot?"*
+
+          It used to hold a dashed card outline and an invitation, permanently, on a column
+          `clamp(360px, 32vw, 448px)` wide. Two things were wrong with that. It is a picture of
+          absence taking up a third of the desk -- the wallet's empty slot was a nice idea and
+          a nice idea is not a reason to spend 448px on nothing. And it cost the REGISTER that
+          width: the register's columns are chosen by a container query, so at 1440 it was
+          reading ~680px and dropping to its narrow ladder, which is why the desk showed four
+          columns where the phone showed six. Closing the column gives both back.
+
+          It COLLAPSES rather than unmounting, so the width can be animated: an instant 448px
+          reflow of the register underneath it is the kind of jump this design does not make.
+          `overflow-hidden` clips the content during the slide -- safe here because `DateField`
+          portals its calendar, and the panel's own scroller already clips anything else. */}
       <aside
         ref={asideRef}
-        aria-label="Member details"
+        aria-label={open ? 'Member details' : undefined}
+        aria-hidden={open ? undefined : 'true'}
         data-testid="member-panel"
         data-open={open ? 'true' : undefined}
         className={cn(
           'flex min-w-0 flex-col border-line bg-surface',
-          // ── docked: a real third column ────────────────────────────────────
-          'xl:sticky xl:top-0 xl:h-dvh xl:w-[clamp(360px,32vw,448px)] xl:shrink-0 xl:border-l xl:shadow-none',
-          // ── drawer: everything below xl, hidden at rest as the mock has it ──
+          // ── docked: a real third column, and no column at all when it is empty ──
+          'xl:sticky xl:top-0 xl:h-dvh xl:shrink-0 xl:overflow-hidden xl:shadow-none',
+          'xl:transition-[width] xl:duration-(--duration-panel) xl:ease-(--ease-out)',
+          open ? 'xl:w-[clamp(360px,32vw,448px)] xl:border-l' : 'xl:w-0 xl:border-l-0',
+          // ── drawer: everything below xl. It SLIDES now rather than being switched off:
+          //    `hidden` cut the drawer out of the layout on the same frame the record was
+          //    cleared, so the phone's close was the one movement in the application with no
+          //    motion at all. It is out of the layout again as soon as there is no record.
           'max-xl:fixed max-xl:inset-y-0 max-xl:right-0 max-xl:z-40 max-xl:w-[min(448px,100vw)]',
           'max-xl:border-l max-xl:shadow-(--shadow-2)',
-          !open && 'max-xl:hidden',
+          'max-xl:transition-transform max-xl:duration-(--duration-panel) max-xl:ease-(--ease-out)',
+          open ? 'max-xl:translate-x-0' : 'max-xl:translate-x-full',
+          !member && 'max-xl:hidden',
+          'motion-reduce:transition-none',
         )}
       >
-        {!open ? (
-          /* The wallet's empty slot. Docked only — as a drawer there is nothing to rest. */
-          <div className="panel-empty-in hidden h-full place-content-center justify-items-center gap-2.5 px-8 py-12 text-center xl:grid">
-            <div
-              aria-hidden="true"
-              className="mb-2.5 grid aspect-[1.586] w-full max-w-[300px] place-items-center rounded-card border-[1.5px] border-dashed border-line-strong text-ink-faint"
-              style={{ backgroundImage: 'linear-gradient(135deg, var(--color-surface-2), transparent)' }}
-            >
-              <IdCard className="size-[34px]" strokeWidth={1.5} />
-            </div>
-            <h2 className="text-md font-semibold text-ink">Select a member to open their card</h2>
-            <p className="max-w-[34ch] text-[13.5px] text-ink-muted">
-              Their record, subscriptions and structures open here, beside the register.
-            </p>
-            <p className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-[12.5px] text-ink-muted">
-              {[
-                [['↑', '↓'], 'move'],
-                [['Enter'], 'open'],
-                [['⌘K'], 'search'],
-                [['Esc'], 'close'],
-              ].map(([keys, what], index) => (
-                <span key={what} className="flex items-center gap-1.5">
-                  {index > 0 && <span aria-hidden="true" className="text-ink-faint">·</span>}
-                  <b className="flex items-center gap-1.5 whitespace-nowrap font-medium">
-                    {keys.map((key) => (
-                      <kbd
-                        key={key}
-                        className="rounded-[5px] border border-line-strong border-b-2 bg-surface-2 px-1.5 py-[3px] font-sans text-[11px] font-medium leading-none text-ink-muted"
-                      >
-                        {key}
-                      </kbd>
-                    ))}
-                    {what}
-                  </b>
-                </span>
-              ))}
-            </p>
-          </div>
-        ) : (
-          <>
+        {/* 🔴 THE RECORD LEAVES WITH THE COLUMN. Rendered on `open`, it was cleared on the
+            same frame the collapse began, so a 380px animation played over an empty white
+            box -- the panel did not slide away, it emptied and then shrank. It renders on
+            `member` instead, and `Members.jsx` holds the member for exactly this long.
+
+            📐 THE FIXED WIDTH IS WHAT MAKES IT A SLIDE. Without it the body is a flex child
+            of a box whose width is animating, so every line of the record re-wraps sixty
+            times a second on the way out. Held at the column's own width and clipped by the
+            aside, it travels instead of reflowing. */}
+        {member && (
+          <div
+            className={cn(
+              'flex h-full min-h-0 flex-col max-xl:w-full xl:w-[clamp(360px,32vw,448px)]',
+              'transition-opacity duration-(--duration-panel) ease-(--ease-out) motion-reduce:transition-none',
+              open ? 'opacity-100' : 'opacity-0',
+            )}
+          >
             <div ref={scrollRef} className="scroll-quiet min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-3.5">
               <div className="mb-3 flex h-9 items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Member record</p>
@@ -211,7 +217,7 @@ export default function MemberPanel({ member, open, onClose, children, footer })
               </p>
               {footer && <div className="flex flex-wrap items-center gap-2">{footer}</div>}
             </footer>
-          </>
+          </div>
         )}
       </aside>
     </>
