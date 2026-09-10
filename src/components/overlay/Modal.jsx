@@ -1,4 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
+import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 import { cn, pick } from '../../lib/utils';
@@ -91,6 +92,38 @@ export default function Modal({
   // One blocker, passed three times, rather than the same arrow written three times.
   const block = dismissible ? undefined : (event) => event.preventDefault();
 
+  /**
+   * 🔴 FOCUS RESTORE, WHICH RADIX COULD NOT DO FOR US HERE — AND FAILED SILENTLY.
+   *
+   * Radix returns focus to `Dialog.Trigger` on close. This primitive is deliberately
+   * CONTROLLED (`open` / `onOpenChange`) and renders no trigger, because the nine surfaces
+   * it replaces open from rows, menu items and toolbar buttons that are nowhere near the
+   * dialog. So `triggerRef.current` was always `null`, Radix had nothing to focus, and
+   * focus fell to `<body>` — on every dialog in the application.
+   *
+   * What that costs: closing a dialog puts a keyboard user at the top of the document, so
+   * the next Tab walks the skip link and the entire navigation tree again. They lose their
+   * place on the page every time they open and close a record.
+   *
+   * ⚠️ THE TRAP HAD BEEN TESTED SINCE P3 AND THIS HAD NOT, which is why it survived: both
+   * halves look identical from the outside — the dialog opens, the dialog closes — and
+   * only the second one is felt after it has closed.
+   */
+  const restoreFocusTo = useRef(null);
+  useEffect(() => {
+    if (open) restoreFocusTo.current = document.activeElement;
+  }, [open]);
+
+  const returnFocus = (event) => {
+    const target = restoreFocusTo.current;
+    // Only if it is still in the document: a row action whose row has since been removed
+    // is not somewhere to put focus, and Radix's fallback to `<body>` is right for that.
+    if (target && document.contains(target) && typeof target.focus === 'function') {
+      event.preventDefault();
+      target.focus();
+    }
+  };
+
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -122,6 +155,7 @@ export default function Modal({
           onEscapeKeyDown={block}
           onPointerDownOutside={block}
           onInteractOutside={block}
+          onCloseAutoFocus={returnFocus}
           className={cn(
             'fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2',
             // 📱 `dvh`, never `vh`. The cap and the internal scroll are the primitive's, so

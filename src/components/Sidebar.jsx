@@ -68,9 +68,16 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
         ></div>
       )}
 
-      <div
+      {/* 🔴 A `<div>` HELD THE ENTIRE NAVIGATION. The application's whole menu tree — the
+          only way to reach 25 of its 27 routes — carried no landmark at all, so a screen
+          reader had nothing to jump to and nothing to skip past. `<nav>` costs a tag.
+
+          The label is explicit because `Breadcrumbs` is also a `<nav>`: two unlabelled
+          navigation landmarks are announced identically, which is worse than one. */}
+      <nav
         id={SIDEBAR_ID}
-        className={`fixed bg-bg-raised z-20 w-64 h-screen shadow flex flex-col ${
+        aria-label="Main"
+        className={`fixed bg-bg-raised z-20 w-64 h-dvh shadow flex flex-col ${
           sideBarOpen ? "translate-x-0" : "-translate-x-64"
         } lg:translate-x-0 lg:static transition ease-in-out duration-300`}
       >
@@ -114,7 +121,7 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
               <Link
                 key={item.href}
                 to={item.href}
-                className="flex items-center p-4 hover:bg-surface-2 text-nav-ink cursor-pointer transition-colors rounded-lg"
+                className="flex items-center p-4 hover-hover:hover:bg-surface-2 text-nav-ink cursor-pointer transition-colors rounded-lg"
                 onClick={() => setSideBarOpen(false)}
               >
                 <Icon size={24} strokeWidth={1} className="mr-6 text-brand" />
@@ -123,7 +130,7 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
             );
           })}
         </div>
-      </div>
+      </nav>
     </>
   );
 }

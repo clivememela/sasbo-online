@@ -5,6 +5,7 @@ import { bankService } from '../../services/bankService.js';
 import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import StatusChip from "../../components/common/StatusChip.jsx";
+import TableScroller from "../../components/table/TableScroller.jsx";
 
 // 🔴 `text-sm` WAS 13px, WHICH IS THE iOS ZOOM TRAP, AND THE 16px CHECK COULD NOT SEE
 // IT. That check matches `text-sm` on the TAG; these classes arrive through this variable,
@@ -115,7 +116,12 @@ export default function Subscriptions() {
                     </div>
                 )}
 
-                <div className="relative overflow-hidden rounded-xl border border-line max-h-[60vh] overflow-y-auto">
+                {/* 🔴 THE LAST `vh` IN `src`, AND IT IS A `vh` ON A SCROLLER. conventions §6: on a
+                    phone `100vh` is the viewport WITHOUT the browser chrome that is actually
+                    covering it, so `60vh` is 60% of a taller box than exists -- the bottom of
+                    the list sits under the address bar and the scroller's own end is
+                    unreachable. `dvh` tracks the chrome as it hides and shows. */}
+                <div className="relative overflow-hidden rounded-xl border border-line max-h-[60dvh] overflow-y-auto">
                     {loading && (
                         <div className="absolute inset-0 bg-surface/60 z-20 flex items-center justify-center backdrop-blur-[1px]">
                             <div className="flex flex-col items-center gap-2">
@@ -125,7 +131,14 @@ export default function Subscriptions() {
                         </div>
                     )}
 
+                    {/* 🔴 THE ONE `<table>` THE PLAN NAMED AS UNWRAPPED, wrapped through the
+                        SHARED scroller rather than by hand. blastRadius.md is explicit that
+                        hand-wrapping this one file is the wrong fix -- it is how MobiZone's
+                        worst responsive defect happened, because the next table anybody
+                        adds has to remember. */}
+                    <TableScroller label="Bank subscriptions">
                     <table className="w-full border-collapse text-sm">
+                        <caption className="sr-only">Bank subscriptions and their debit details</caption>
                         <thead className="sticky top-0 bg-surface-2 z-10">
                             <tr>
                                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">Bank Name</th>
@@ -208,6 +221,7 @@ export default function Subscriptions() {
                             ))}
                         </tbody>
                     </table>
+                    </TableScroller>
                 </div>
             </div>
         </div>

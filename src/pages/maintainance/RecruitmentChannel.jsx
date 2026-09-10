@@ -224,7 +224,7 @@ export default function RecruitmentChannel() {
                                     onClick={() => { setEditingId(r.id); setEditName(r.name); }}
                                     disabled={saving}
                                     aria-label={`Rename ${r.name}`}
-                                    className="touch-target p-1.5 rounded-md text-brand-ink hover:bg-brand-soft hover:text-brand-ink disabled:opacity-40 transition">
+                                    className="touch-target p-1.5 rounded-md text-brand-ink hover-hover:hover:bg-brand-soft hover-hover:hover:text-brand-ink disabled:opacity-40 transition">
                                     <Pencil size={14} />
                                 </button>
                             )}
@@ -234,7 +234,7 @@ export default function RecruitmentChannel() {
                                 onClick={() => setPendingDelete(r)}
                                 disabled={saving}
                                 aria-label={`Delete ${r.name}`}
-                                className="touch-target p-1.5 rounded-md text-status-suspended hover:bg-status-suspended-bg hover:text-status-suspended disabled:opacity-40 transition">
+                                className="touch-target p-1.5 rounded-md text-status-suspended hover-hover:hover:bg-status-suspended-bg hover-hover:hover:text-status-suspended disabled:opacity-40 transition">
                                 <Trash2 size={14} />
                             </button>
                         </div>

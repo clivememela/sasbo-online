@@ -12,7 +12,7 @@ export default function MembershipApplication() {
             <div className="max-w-6xl mx-auto bg-surface rounded-2xl shadow-lg p-6">
                 <iframe
                 src={pdfUrl}
-                className="w-full h-screen rounded-lg border border-line"
+                className="w-full h-dvh rounded-lg border border-line"
                 title="Membership Application PDF"
             />
             </div>

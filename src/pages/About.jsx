@@ -177,7 +177,7 @@ export default function About() {
                 Email:{' '}
                 <a
                   href="mailto:reception@sasbo.org.za"
-                  className="rounded-sm text-brand-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                  className="rounded-sm text-brand-ink hover-hover:hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
                 >
                   reception@sasbo.org.za
                 </a>
@@ -189,7 +189,7 @@ export default function About() {
                 Phone:{' '}
                 <a
                   href="tel:+27114670192"
-                  className="rounded-sm text-brand-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                  className="rounded-sm text-brand-ink hover-hover:hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
                 >
                   +27 11 467 0192
                 </a>
@@ -216,7 +216,7 @@ export default function About() {
                   href={href}
                   target="_blank"
                   rel="noreferrer"
-                  className="touch-target inline-flex items-center gap-2 rounded-sm text-brand-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                  className="touch-target inline-flex items-center gap-2 rounded-sm text-brand-ink hover-hover:hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
                 >
                   <Icon aria-hidden="true" className="h-4 w-4" strokeWidth={1.5} />
                   {name}

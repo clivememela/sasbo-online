@@ -5,11 +5,31 @@ import Footer from "./Footer";
 import ErrorBoundary from "./common/ErrorBoundary";
 import RoutePending from "./common/RoutePending";
 
+/**
+ * The id the skip link jumps to. Exported rather than written twice: a skip link whose
+ * target id has been renamed is a skip link that silently does nothing, and it is invisible
+ * until focused, so nobody sees it fail.
+ */
+export const MAIN_CONTENT_ID = 'main-content';
+
 export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref }) {
   return (
-    <main className="fixed top-40 bottom-0 left-0 right-0 flex-1 flex flex-col overflow-y-auto lg:left-64">
+    /* 🔴 THE LANDMARKS WERE NESTED WRONG, AND THE COST WAS THAT THERE WERE NONE.
+       `<main>` used to be this outer element, with `<Header>` and `<Footer>` inside it —
+       and HTML says a `<header>` maps to the `banner` role ONLY when it is not a descendant
+       of `<main>`, `<article>`, `<aside>`, `<nav>` or `<section>`. The same rule strips
+       `contentinfo` from `<footer>`. So the application rendered a header, a footer and a
+       main region, and a screen reader was offered exactly ONE landmark: nothing to jump
+       to, nothing to skip. The elements were right and the nesting silently voided two of
+       them.
+
+       Swapping which element carries the class moves nothing on screen: `<main>` is now the
+       content wrapper it always visually was, and the header and footer are its siblings. */
+    <div className="fixed top-40 bottom-0 left-0 right-0 flex-1 flex flex-col overflow-y-auto lg:left-64">
       <Header sideBarOpen={sideBarOpen} setSideBarOpen={setSideBarOpen} />
-      <div className="flex-1 w-full flex flex-col pb-14">
+      {/* `tabIndex={-1}` so the skip link has something it can actually move focus TO —
+          a fragment link only moves the caret unless the target is focusable. */}
+      <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 w-full flex flex-col pb-14">
         {/* 🔴 THE BOUNDARY IS HERE, INSIDE THE SHELL, and the position is the whole point.
             A11's standard-facing test says it in one line: "the shell must survive, and
             offer a way to recover". A boundary wrapped around <Routes> would catch the
@@ -25,8 +45,8 @@ export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref 
             <Outlet context={{ setSelectedCardHref, setSideBarOpen }} />
           </Suspense>
         </ErrorBoundary>
-      </div>
+      </main>
       <Footer />
-    </main>
+    </div>
   );
 }

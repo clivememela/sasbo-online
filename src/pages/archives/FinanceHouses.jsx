@@ -483,7 +483,7 @@ export default function FinanceHouses() {
               type="button"
               onClick={() => toggleFolder(bank)}
               aria-expanded={Boolean(expandedFolders[bank])}
-              className="touch-target w-full flex items-center gap-2 p-3 bg-surface rounded-lg shadow hover:shadow-md transition-shadow border border-line text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+              className="touch-target w-full flex items-center gap-2 p-3 bg-surface rounded-lg shadow hover-hover:hover:shadow-md transition-shadow border border-line text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
             >
               {expandedFolders[bank] ? (
                 <ChevronDown size={18} className="text-brand-ink flex-shrink-0" />
@@ -499,7 +499,7 @@ export default function FinanceHouses() {
                   categories.map((file, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between p-2 bg-surface-2 rounded hover:bg-surface-2 transition-colors"
+                      className="flex items-center justify-between p-2 bg-surface-2 rounded hover-hover:hover:bg-surface-2 transition-colors"
                     >
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <FileText size={16} className="text-brand-ink flex-shrink-0" />
@@ -533,7 +533,7 @@ export default function FinanceHouses() {
                           {files.map((file, idx) => (
                             <div
                               key={idx}
-                              className="flex items-center justify-between p-2 bg-surface-2 rounded hover:bg-surface-2 transition-colors"
+                              className="flex items-center justify-between p-2 bg-surface-2 rounded hover-hover:hover:bg-surface-2 transition-colors"
                             >
                               <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <FileText size={14} className="text-brand-ink flex-shrink-0" />

@@ -7,7 +7,7 @@ import ThemeToggle from '../components/common/ThemeToggle';
 
 export default function AuthLayout() {
   return (
-    <div className="bg-bg min-h-screen transition-colors duration-300 flex flex-col">
+    <div className="bg-bg min-h-dvh transition-colors duration-300 flex flex-col">
       {/* 🔑 04.1 MERGED THE SECOND THEME BUTTON AWAY. This was a hand-rolled copy of
           `ThemeToggle` — the same job in different markup, and therefore a second place
           for every future accessibility fix to be applied to only one of. P1 left it

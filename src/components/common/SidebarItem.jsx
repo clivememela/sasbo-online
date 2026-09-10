@@ -18,21 +18,30 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
     return (subItem.subItems || []).some(isSubItemActive);
   };
 
+  const subListId = `sidebar-sub-${item.href.replace(/\W+/g, '-')}`;
+
   return (
     <div>
+      {/* 🔴 THIS ROW WAS A `<div onClick>` WRAPPING A `<Link>`, AND BOTH HALVES WERE WRONG.
+
+          For a parent item the div's handler called `onToggle`, so the ONLY way to expand a
+          section was a mouse: no tab stop, no role, no key handler, and no `aria-expanded`
+          to announce that a section existed at all. A keyboard user reached the `<Link>`,
+          pressed Enter, and navigated — the sub-items were unreachable unless the route they
+          landed on happened to expand them.
+
+          And a click on the link fired BOTH handlers, because the link was inside the
+          clickable div: it navigated and toggled at once. Two controls in one box, one of
+          which nobody could see.
+
+          The disclosure is now its own `<button>` beside the link, which is the standard
+          shape: the link navigates, the button expands, and each says what it is. */}
       <div
-        className={`flex items-center p-4 hover:bg-surface-2 text-nav-ink cursor-pointer transition-colors rounded-lg ${
+        className={`flex items-center p-4 hover-hover:hover:bg-surface-2 text-nav-ink transition-colors rounded-lg ${
           isActive || hasActiveSubItem || isCardSelected
             ? 'bg-brand-soft ring-1 ring-brand-ring'
             : ''
         }`}
-        onClick={() => {
-          if (hasSubItems) {
-            onToggle(item.href);
-          } else {
-            onClick();
-          }
-        }}
       >
         <Link
           to={item.href}
@@ -43,16 +52,26 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
           <div className="font-medium">{item.title}</div>
         </Link>
         {hasSubItems && (
-          <ChevronDown 
-            size={20} 
-            strokeWidth={1} 
-            className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-          />
+          <button
+            type="button"
+            aria-expanded={Boolean(isExpanded)}
+            aria-controls={isExpanded ? subListId : undefined}
+            aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${item.title}`}
+            onClick={() => onToggle(item.href)}
+            className="touch-target -mr-1 shrink-0 rounded-md p-1 hover-hover:hover:bg-surface-2"
+          >
+            <ChevronDown
+              size={20}
+              strokeWidth={1}
+              aria-hidden="true"
+              className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            />
+          </button>
         )}
       </div>
-      
+
       {hasSubItems && isExpanded && (
-        <div className="ml-4 space-y-1">
+        <div id={subListId} className="ml-4 space-y-1">
           {item.subItems.map((subItem, index) => {
             const subItemHasChildren = subItem.subItems && subItem.subItems.length > 0;
 
@@ -77,7 +96,7 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
               <Link
                 key={`${subItem.href}-${subItem.title}-${index}`}
                 to={subItem.href}
-                className={`flex items-center p-3 hover:bg-surface-2 text-nav-ink cursor-pointer transition-colors rounded-lg text-sm ${
+                className={`flex items-center p-3 hover-hover:hover:bg-surface-2 text-nav-ink cursor-pointer transition-colors rounded-lg text-sm ${
                   isSubActive ? 'bg-surface-2' : ''
                 }`}
                 onClick={onClick}

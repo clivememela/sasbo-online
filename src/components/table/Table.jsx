@@ -181,7 +181,12 @@ export default function Table({
         <table className="w-full border-collapse text-left">
           {caption && <caption className="sr-only">{caption}</caption>}
 
-          <thead className="border-b border-line bg-surface-2">
+          {/* 📱 STICKY, so the column names survive a scroll. A ten-row table does not
+              need it; a register of a hundred members read on a phone is exactly a table
+              where the header has left the screen by the time the interesting row arrives,
+              and "which column is this" then costs a scroll back up and a scroll back
+              down. `z-10` keeps it above the rows it is scrolling over. */}
+          <thead className="sticky top-0 z-10 border-b border-line bg-surface-2">
             <tr>
               {expandable && (
                 <th scope="col" className={cn(headCell, 'w-10 md:hidden')}>
@@ -250,7 +255,13 @@ export default function Table({
 
                 return (
                   <Fragment key={key}>
-                    <tr className="hover-hover:hover:bg-surface-2">
+                    {/* 🔑 R-PERF-J: `content-visibility: auto` lets the browser skip
+                        layout and paint for a row that is off screen, and `contain-intrinsic-size`
+                        is what stops that turning into a scrollbar that jumps -- without a
+                        size hint the browser treats a skipped row as zero-height and the
+                        page shortens as you scroll. One rule in the primitive, so every
+                        table gets it and none of them has to remember. */}
+                    <tr className="[content-visibility:auto] [contain-intrinsic-size:auto_var(--size-row)] hover-hover:hover:bg-surface-2">
                       {expandable && (
                         <td className={cn(bodyCell, 'w-10 md:hidden')}>
                           <button

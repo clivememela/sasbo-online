@@ -1,6 +1,6 @@
 // @vitest-environment jsdom -- opens a real portalled dialog and traps focus in it
 import { describe, expect, it, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
 
 import Modal, { ConfirmDialog } from './Modal'
@@ -69,6 +69,35 @@ describe('Modal — the four things the hand-rolled overlays lack', () => {
       ).not.toHaveFocus()
       expect(dialog.contains(document.activeElement)).toBe(true)
     }
+  })
+
+  it('RESTORES FOCUS to the control that opened it, on close', async () => {
+    const user = setupUser()
+    renderWithProviders(<Harness children={<input aria-label="Inside the dialog" />} />)
+
+    const trigger = screen.getByRole('button', { name: 'Open it' })
+    await user.click(trigger)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    // 🔴 TRAPPING FOCUS AND THEN DROPPING IT IS HALF A PATTERN, and the second half is
+    // the half a keyboard user feels. When a dialog closes without restoring, focus falls
+    // back to `<body>` and the next Tab starts again from the top of the document — which
+    // in this application means the entire navigation tree, from wherever they were.
+    // `05.3` names trap AND restore; the trap has been proved since P3, this had not.
+    //
+    // ⚠️ `waitFor`, because the close is synchronous but the restore is not: Radix returns
+    // focus from a cleanup effect, one tick after the dialog leaves the DOM. Asserting
+    // immediately reads `<body>` and reports a defect that is not there.
+    await waitFor(() => {
+      expect(
+        trigger,
+        'The dialog closed and focus went nowhere. Tab now restarts from the top of the ' +
+          'document, so closing a dialog costs a keyboard user their place on the page.',
+      ).toHaveFocus()
+    })
   })
 
   it('ESCAPE closes it — seven of the eight it replaces ignore Escape', async () => {

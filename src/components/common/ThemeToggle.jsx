@@ -49,7 +49,7 @@ export default function ThemeToggle({ compact = false, className }) {
       className={cn(
         "flex items-center gap-2 cursor-pointer rounded-full",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring",
-        compact && "touch-target bg-surface p-2 shadow-md transition-colors hover:bg-surface-2",
+        compact && "touch-target bg-surface p-2 shadow-md transition-colors hover-hover:hover:bg-surface-2",
         className,
       )}
     >

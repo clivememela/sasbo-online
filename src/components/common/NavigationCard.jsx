@@ -31,7 +31,7 @@ export default function NavigationCard({ title, icon: Icon, href, desc, onSelect
     <Link
       to={href}
       onClick={onSelect}
-      className="block rounded-card border border-line bg-surface p-6 text-ink shadow-(--shadow-1) transition-shadow duration-(--duration-fast) ease-(--ease-out) hover:shadow-(--shadow-2) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+      className="block rounded-card border border-line bg-surface p-6 text-ink shadow-(--shadow-1) transition-shadow duration-(--duration-fast) ease-(--ease-out) hover-hover:hover:shadow-(--shadow-2) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
     >
       {Icon && <Icon size={48} strokeWidth={1} aria-hidden="true" className="mb-4 mx-auto text-brand" />}
       <h3 className="mb-2 text-xl text-brand-ink">{title}</h3>

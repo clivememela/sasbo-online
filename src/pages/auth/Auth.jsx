@@ -115,7 +115,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4">
+    <div className="flex min-h-dvh flex-col items-center justify-center p-4">
       <div className="w-full max-w-md rounded-card border border-line bg-surface p-8 shadow-(--shadow-2)">
         <div className="mb-8 flex flex-col items-center text-center">
           <Logo className="mb-4 h-24 w-auto" alt="SASBO - The Finance Union" />
