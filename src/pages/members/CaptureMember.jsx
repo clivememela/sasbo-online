@@ -15,30 +15,6 @@ import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderF
     formatDate } from "../../utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 
-// 44 Unique SASBO Branches for Primary Selection Dropdown
-const SASBO_BRANCHES = [
-    "Absa Johannesburg Central", "Absa Pretoria", "Absa Cape Town", "Absa Durban", "Absa Gqeberha",
-    "Standard Bank Gauteng South", "Standard Bank KZN", "Standard Bank Western Cape", "Standard Bank Eastern Cape",
-    "Nedbank Wits & Pretoria", "Nedbank Coastal", "Capitec Western Cape", "Capitec Gauteng", "FNB Corporate HQ",
-    "FNB Regional West", "FNB Eastern Cape", "FNB KZN Area", "Discovery Bank National", "TymeBank Johannesburg",
-    "African Bank Midrand", "Bidvest Bank Regional", "Albaraka Bank National", "Mercantile Bank Central",
-    "HBZ Bank South Africa", "Sasfin Bank Gauteng", "Grindrod Bank Coastal", "Investec Sandton", "Investec Cape Town",
-    "SARB Pretoria HQ", "SARB Johannesburg", "SARB Cape Town Branch", "SARB Durban Branch", "Finbond National",
-    "Ubank Mining Belt North", "Ubank Mining Belt South", "Postbank Free State", "Postbank Limpopo",
-    "Land Bank Head Office", "Development Bank SA", "SNG Grant Thornton", "Santam Johannesburg",
-    "Old Mutual Financial Services", "Hollard Insurance Group", "Regent Insurance National"
-];
-
-// BEC Structure Representative Options (Multiple Selection Allowed)
-const STRUCTURE_REP_OPTIONS = [
-    "INC / IC", "NCF / SJC", "VP", "President", "MANCOM", "Resolutions Committee"
-];
-
-// BEC Executive Positions (Only One Position Allowed)
-const BEC_EXECUTIVE_POSITIONS = [
-    "Chairperson", "Deputy Chairperson", "Secretary", "Deputy Secretary", "Treasurer"
-];
-
 const FIELD_TO_TAB_MAP = {
     title: "personal",
     initials: "personal",
@@ -58,9 +34,6 @@ const FIELD_TO_TAB_MAP = {
     paymentType: "employment",
     bankAccountNumber: "employment",
     debitDay: "employment",
-    shopStewardElectionDate: "structures",
-    becBranchName: "structures",
-    becExecutivePosition: "structures"
 };
 
 export default function CaptureMember() {
@@ -116,22 +89,6 @@ export default function CaptureMember() {
         homeLoanReducedRateOption: "N",
         structure1: "",
 
-        // Exact Flow diagram state bindings
-        isShopSteward: "N",
-        shopStewardElectionDate: "",
-        isBecMember: "N",
-        becBranchName: "", // Choice among the 44 unique branches
-        isBecRecruiter: "N",
-        isBecStructureRep: "N",
-        selectedBecStructures: [], // Array for MULTIPLE STRUCTURES ALLOWED
-        isBecExecutive: "N",
-        becExecutivePosition: "", // Single Selection Allowed
-
-        // COSATU Structure
-        isCosatu: "N",
-        isCosatuLocal: "",
-        isCosatuRegional: "",
-        cosatuPositions: [] // Multi-select: PEC, CEC, Treasurer, Chairperson, Secretary
     });
 
     const [fieldErrors, setFieldErrors] = useState({});
@@ -184,29 +141,6 @@ export default function CaptureMember() {
                 updatedForm.initials = autoInitials;
             }
 
-            if (field === "isShopSteward" && value === "N") {
-                updatedForm.shopStewardElectionDate = "";
-            }
-            if (field === "isBecMember" && value === "N") {
-                updatedForm.becBranchName = "";
-                updatedForm.isBecRecruiter = "N";
-                updatedForm.isBecStructureRep = "N";
-                updatedForm.selectedBecStructures = [];
-                updatedForm.isBecExecutive = "N";
-                updatedForm.becExecutivePosition = "";
-            }
-            if (field === "isBecStructureRep" && value === "N") {
-                updatedForm.selectedBecStructures = [];
-            }
-            if (field === "isBecExecutive" && value === "N") {
-                updatedForm.becExecutivePosition = "";
-            }
-            if (field === "isCosatu" && value === "N") {
-                updatedForm.cosatuLocal = "";
-                updatedForm.cosatuRegion = "";
-                updatedForm.cosatuPositions = [];
-            }
-
             return updatedForm;
         });
 
@@ -250,21 +184,6 @@ export default function CaptureMember() {
         }
     };
 
-    const handleStructureCheckboxChange = (structureName) => (event) => {
-        const checked = event.target.checked;
-        setForm((prev) => {
-            let currentSelections = [...prev.selectedBecStructures];
-            if (checked) {
-                if (!currentSelections.includes(structureName)) {
-                    currentSelections.push(structureName);
-                }
-            } else {
-                currentSelections = currentSelections.filter(item => item !== structureName);
-            }
-            return { ...prev, selectedBecStructures: currentSelections };
-        });
-    };
-
     const validateFormBeforeSave = () => {
         const errors = {};
 
@@ -290,17 +209,6 @@ export default function CaptureMember() {
             const validDays = ["20", "25", "31", 20, 25, 31];
             if (!validDays.includes(form.debitDay)) {
                 errors.debitDay = "Debit day must be one of 20, 25 or 31 when payment type is 'Debit Order'";
-            }
-        }
-
-        if (form.isShopSteward === "Y" && !form.shopStewardElectionDate) {
-            errors.shopStewardElectionDate = "Shop Steward Election Date is required";
-        }
-
-        if (form.isBecMember === "Y") {
-            if (!form.becBranchName) errors.becBranchName = "BEC branch committee selection is required";
-            if (form.isBecExecutive === "Y" && !form.becExecutivePosition) {
-                errors.becExecutivePosition = "An Executive position assignment must be declared";
             }
         }
 
@@ -502,170 +410,6 @@ export default function CaptureMember() {
                                 <Field label="IBT No." value={form.ibtNo} onChange={handleChange("ibtNo")} />
                                 {/*<Field label="Work IBT No." value={form.workIbtNo} onChange={handleChange("workIbtNo")} />*/}
                                 <AddressAutocomplete label="Bank Address" value={form.bankAddress} onChange={handleChange("bankAddress")} placeholder="Start typing a bank address..." className="md:col-span-2" />
-                            </>
-                        )}
-
-                        {activeTab === "structures" && (
-                            <>
-                                <SectionTitle title="SASBO Hierarchy Core Alignment Matrix" />
-
-                                {/* Flow node 1: Shop Steward? */}
-                                <Field
-                                    label="Shop Steward?"
-                                    value={form.isShopSteward}
-                                    onChange={handleChange("isShopSteward")}
-                                    options={yesNoOptions}
-                                />
-
-                                {form.isShopSteward === "Y" && (
-                                    <div className="md:col-span-2 p-4 bg-cyan-50/50 dark:bg-cyan-950/10 border border-cyan-100 rounded-lg animate-in fade-in duration-200">
-                                        <Field
-                                            label="Enter Shop Steward Election Date"
-                                            value={form.shopStewardElectionDate}
-                                            onChange={handleChange("shopStewardElectionDate")}
-                                            error={fieldErrors.shopStewardElectionDate}
-                                            type="date"
-                                            required
-                                        />
-                                    </div>
-                                )}
-
-                                {/* COSATU Structure */}
-                                <Field
-                                    label="COSATU Member?"
-                                    value={form.isCosatu}
-                                    onChange={handleChange("isCosatu")}
-                                    options={yesNoOptions}
-                                />
-
-                                {form.isCosatu === "Y" && (
-                                    <div className="md:col-span-2 space-y-4 border-l-2 border-orange-400 pl-4 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <p className="text-xs font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">COSATU Structure</p>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <Field
-                                                label="Local?"
-                                                value={form.isCosatuLocal}
-                                                onChange={handleChange("isCosatuLocal")}
-                                                options={yesNoOptions}
-                                            />
-                                            <Field
-                                                label="Regional?"
-                                                value={form.isCosatuRegional}
-                                                onChange={handleChange("isCosatuRegional")}
-                                                options={yesNoOptions}
-                                            />
-                                        </div>
-                                        <div className="p-4 bg-orange-50/50 dark:bg-orange-950/10 border border-orange-200 dark:border-orange-800 rounded-lg">
-                                            <label className="block text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-400 mb-2">
-                                                COSATU Positions — Multiple Allowed
-                                            </label>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                {["PEC", "CEC", "Treasurer", "Chairperson", "Secretary"].map((pos) => (
-                                                    <label key={pos} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={(form.cosatuPositions || []).includes(pos)}
-                                                            onChange={(e) => {
-                                                                const checked = e.target.checked;
-                                                                setForm(prev => ({
-                                                                    ...prev,
-                                                                    cosatuPositions: checked
-                                                                        ? [...(prev.cosatuPositions || []), pos]
-                                                                        : (prev.cosatuPositions || []).filter(p => p !== pos)
-                                                                }));
-                                                            }}
-                                                            className="rounded border-gray-300 text-orange-500 focus:ring-orange-400 w-4 h-4"
-                                                        />
-                                                        {pos === "PEC" ? "PEC (Provincial Executive Committee)" :
-                                                         pos === "CEC" ? "CEC (Central Executive Committee)" : pos}
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Flow node 2: BEC? */}
-                                <Field
-                                    label="BEC Member?"
-                                    value={form.isBecMember}
-                                    onChange={handleChange("isBecMember")}
-                                    options={yesNoOptions}
-                                />
-
-                                {form.isBecMember === "Y" && (
-                                    <div className="md:col-span-2 space-y-6 border-l-2 border-cyan-500 pl-4 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-
-                                        {/* Flow node 3: 44 BEC Committees (Single Selection branch selector) */}
-                                        <Field
-                                            label="Select primary BEC Committee (44 Unique Branches Available)"
-                                            value={form.becBranchName}
-                                            onChange={handleChange("becBranchName")}
-                                            options={SASBO_BRANCHES}
-                                            error={fieldErrors.becBranchName}
-                                            searchable
-                                            required
-                                        />
-
-                                        {/* Flow node 4: BEC Recruiter? */}
-                                        <Field
-                                            label="BEC Recruiter?"
-                                            value={form.isBecRecruiter}
-                                            onChange={handleChange("isBecRecruiter")}
-                                            options={yesNoOptions}
-                                        />
-
-                                        {/* Flow node 5: BEC Structure Representative? */}
-                                        <Field
-                                            label="BEC Structure Representative?"
-                                            value={form.isBecStructureRep}
-                                            onChange={handleChange("isBecStructureRep")}
-                                            options={yesNoOptions}
-                                        />
-
-                                        {form.isBecStructureRep === "Y" && (
-                                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 animate-in fade-in duration-200">
-                                                <label className="block text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:text-cyan-400 mb-2">
-                                                    Select BEC Structure(s) - MULTIPLE STRUCTURES ALLOWED
-                                                </label>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    {STRUCTURE_REP_OPTIONS.map((struct) => (
-                                                        <label key={struct} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={form.selectedBecStructures.includes(struct)}
-                                                                onChange={handleStructureCheckboxChange(struct)}
-                                                                className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500 w-4 h-4"
-                                                            />
-                                                            {struct}
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Flow node 6: BEC Executive? */}
-                                        <Field
-                                            label="BEC Executive?"
-                                            value={form.isBecExecutive}
-                                            onChange={handleChange("isBecExecutive")}
-                                            options={yesNoOptions}
-                                        />
-
-                                        {form.isBecExecutive === "Y" && (
-                                            <div className="p-4 bg-purple-50/50 dark:bg-purple-950/10 rounded-lg border border-purple-200 dark:border-purple-800 animate-in slide-in-from-left-2 duration-300">
-                                                <Field
-                                                    label="Select BEC Executive Position - ONLY ONE POSITION ALLOWED"
-                                                    value={form.becExecutivePosition}
-                                                    onChange={handleChange("becExecutivePosition")}
-                                                    options={BEC_EXECUTIVE_POSITIONS}
-                                                    error={fieldErrors.becExecutivePosition}
-                                                    required
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
                             </>
                         )}
 

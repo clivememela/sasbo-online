@@ -43,7 +43,6 @@ export const MEMBER_TABS = [
   { id: 'employment', label: 'Employment & Bank' },
   { id: 'membership', label: 'Membership & Subscriptions' },
   { id: 'representatives', label: 'Recruitment Channel' },
-  { id: 'structures', label: 'Sasbo Structures' },
   // { id: 'history', label: 'History & Remarks' },
 ];
 
