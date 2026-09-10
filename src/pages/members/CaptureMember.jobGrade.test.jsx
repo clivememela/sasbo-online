@@ -31,12 +31,24 @@ import { setupUser } from '../../test/user'
  * one-line simplification that looks harmless beside every other select on the
  * form, which is exactly why it needs an assertion rather than a convention.
  *
- * ⚠️ WHAT THIS DELIBERATELY DOES NOT ASSERT. `jobGradeService`'s failure paths
- * returning a different type from its success path is `A25`, a live register row
- * with a skip and a pin already asserting it in
- * `services.errorContract.test.js`. Repairing or re-asserting it here would turn
- * a deliberate red green and redden the disabled-population guards in all three
- * repositories. This file covers the SUCCESS shape, which nothing covered.
+ * ✅ IT NOW ASSERTS THE FAILURE PATH TOO, AND THAT IS `06.1b` CLOSING A25.
+ *
+ * This block used to say the opposite -- that the failure path was A25's, a live
+ * register row asserted by a skip and a pin in `services.errorContract.test.js`,
+ * and that re-asserting it here would turn a deliberate red green. That was
+ * correct while the row was open. It is now closed, and the reason the closure
+ * needed a test in THIS file is the row's own criterion:
+ *
+ *     "the method rejects AND the caller renders an error"
+ *
+ * `services.errorContract.test.js` proves the first clause, by discovery, over
+ * every service method. Nothing but a test that drives this screen can prove the
+ * second -- and a fix that satisfied only the first would be a regression, since
+ * before it there was at least a quiet fallback where there would now be an
+ * unhandled rejection.
+ *
+ * This file covers the SUCCESS shape, which nothing covered, and now the FAILURE
+ * shape from the side a user sees.
  *
  * 🔑 AND IT DRIVES THE REAL SCREEN rather than rendering the select in
  * isolation. `Field` is not exported, and exporting it to test it would be a
@@ -163,5 +175,92 @@ describe('the job-grade dropdown', () => {
     // because it proves the two assertions above are about grades that arrived
     // from the server rather than about anything the component had already.
     expect(await screen.findByText('No job grades available')).toBeInTheDocument()
+  })
+})
+
+describe("when the job grades cannot be fetched -- A25’s second clause", () => {
+  /**
+   * The grades endpoint fails; everything else on the screen is healthy.
+   *
+   * 🔑 ONE OF NINE, NOT ALL NINE, AND THAT IS THE POINT (EH-D9). This screen has
+   * nine mount fetches. Failing all of them would prove a page-level error state,
+   * which is the thing this unit is arguing AGAINST: a bank whose grades cannot be
+   * fetched must not blank a capture form the user has half filled in.
+   */
+  const gradesFail = (status = 500) =>
+    server.use(
+      http.get('*/api/job-grades', () =>
+        HttpResponse.json({ message: 'Grades are unavailable.' }, { status }),
+      ),
+    )
+
+  it('says the field failed, and does NOT say the bank has no grades', async () => {
+    // 🔴 THIS IS THE WHOLE OF A25, AS A USER MET IT. `getByBank` ended in
+    // `.catch(() => JOB_GRADE_OPTIONS)`, and that constant had been emptied, so a
+    // 500 rendered as "No job grades available" -- the screen stating, confidently,
+    // a fact about the member's BANK that it had no evidence for.
+    //
+    // Both halves are asserted, and the second is the one that would catch a
+    // careless repair: it is not enough that an error appears, the empty copy must
+    // be ABSENT. A component that rendered both would pass a test that only looked
+    // for the error. (conventions §8, EH-D4.)
+    gradesFail()
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+
+    await chooseBank(user)
+
+    expect(await screen.findByText('Job Grade could not be loaded.')).toBeInTheDocument()
+    expect(screen.queryByText('No job grades available')).not.toBeInTheDocument()
+  })
+
+  it('offers a retry, and the retry actually re-runs the fetch', async () => {
+    // EH-D4: an error state with no way out is a dead end. Asserting the BUTTON
+    // exists would not prove that, so this drives it: the endpoint is repaired
+    // between the failure and the click, and the grades then arrive.
+    gradesFail()
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+
+    await chooseBank(user)
+    await screen.findByText('Job Grade could not be loaded.')
+
+    server.use(http.get('*/api/job-grades', () => HttpResponse.json(GRADES)))
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+
+    expect(await screen.findByRole('option', { name: 'C1 - Clerk - Permanent' })).toHaveValue('C1')
+  })
+
+  it('leaves the rest of the form working -- the failure is per-panel', async () => {
+    // EH-D9. The bank field is the one immediately beside the failed one and it is
+    // fed by a DIFFERENT service, so if a reference-list failure were being handled
+    // at page level rather than per panel this is where it would show.
+    gradesFail()
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+
+    await chooseBank(user)
+    await screen.findByText('Job Grade could not be loaded.')
+
+    // The bank the user chose is still chosen, and the tabs still navigate.
+    expect(screen.getByDisplayValue(BANK.bankName)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Personal Information/ }))
+    expect(await screen.findByText(/^Surname/)).toBeInTheDocument()
+  })
+
+  it('does NOT offer a retry when retrying cannot work', async () => {
+    // 🔑 THE HALF THAT KEEPS THE RETRY HONEST. `06.1a` derives `retryable` once, in
+    // `parseApiError`: a 4xx is the server saying the request was wrong, so retrying
+    // it unchanged produces the same refusal and a button that cannot work is worse
+    // than none. Without this assertion "always show a retry" would pass every other
+    // test in this block.
+    gradesFail(400)
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+
+    await chooseBank(user)
+
+    expect(await screen.findByText('Job Grade could not be loaded.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
   })
 })

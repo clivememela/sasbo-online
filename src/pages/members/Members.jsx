@@ -12,7 +12,6 @@ import Modal, { ConfirmDialog, closeOn } from "../../components/overlay/Modal.js
 import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
-    JOB_GRADE_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS,
 } from "../../config/memberConstants.js";
 import {
@@ -20,6 +19,8 @@ import {
 } from "../../utils/validateSAID.js";
 import PageTitle from "../../components/common/PageTitle.jsx";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
+import DataState from "../../components/common/DataState.jsx";
+import { cn } from "../../lib/utils";
 
 const PAGE_SIZE = memberService.getPageSize();
 const EMPTY_FILTERS = {
@@ -214,7 +215,15 @@ export default function Members() {
     const bankOptions = bankNames;
     const branchOptions = BRANCH_OPTIONS;
     const genderOptions = GENDER_OPTIONS;
-    const [jobGradeOptions, setJobGradeOptions] = useState(JOB_GRADE_OPTIONS);
+    const [jobGradeOptions, setJobGradeOptions] = useState([]);
+    /*
+     * ✅ A25's SECOND CLAUSE, `06.1b` -- the other of the two callers. Same reasoning as the
+     * one written out at `CaptureMember.jsx`: `getByBank` no longer swallows a failure into
+     * the (empty) static list, so this panel renders the failure with a retry instead of
+     * telling an administrator that the member's bank has no job grades on file.
+     */
+    const [jobGradeError, setJobGradeError] = useState(null);
+    const [jobGradeAttempt, setJobGradeAttempt] = useState(0);
     const jobGrade = jobGradeOptions;
 
     useEffect(() => {
@@ -252,15 +261,22 @@ export default function Members() {
 
     useEffect(() => {
         if (!editForm.bankName) {
-            setJobGradeOptions(JOB_GRADE_OPTIONS);
+            setJobGradeOptions([]);
+            setJobGradeError(null);
             setEditForm(prev => ({ ...prev, jobGrade: "" }));
             return;
         }
 
+        setJobGradeError(null);
         jobGradeService.getByBank(editForm.bankName)
-            .then((grades) => setJobGradeOptions(Array.isArray(grades) && grades.length ? grades : JOB_GRADE_OPTIONS))
-            .catch(() => setJobGradeOptions(JOB_GRADE_OPTIONS));
-    }, [editForm.bankName]);
+            .then((grades) => setJobGradeOptions(Array.isArray(grades) ? grades : []))
+            .catch((error) => {
+                // An abort is the caller superseding itself, not a failure (§16, EH-D3).
+                if (error?.kind === 'abort') return;
+                setJobGradeOptions([]);
+                setJobGradeError(error);
+            });
+    }, [editForm.bankName, jobGradeAttempt]);
 
     const handleEditToggle = () => {
         setIsEditing((editing) => {
@@ -826,7 +842,7 @@ export default function Members() {
                                     <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="identifier" />
                                     <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
                                     <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
-                                    <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGrade} onChange={handleEditChange("jobGrade")} disabled={!editForm.bankName} />
+                                    <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGrade} onChange={handleEditChange("jobGrade")} disabled={!editForm.bankName} loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
                                     <Detail label="Bank Branch" value={editForm.branch} isEditing={isEditing} options={branchOptions} error={fieldErrors.branch} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("branch")} />
                                     <Detail label="Payment Type" value={editForm.paymentType} isEditing={isEditing} options={paymentTypeOptions} onChange={handleEditChange("paymentType")} />
 
@@ -1127,12 +1143,45 @@ export default function Members() {
  * when there are not, and a definition-list entry when reading. `useId` inside `Field`
  * makes the collision impossible rather than unlikely.
  */
-function Detail({ label, value, isEditing, onChange, className = "", options = null, kind = "text", error = null, disabled = false, required = false }) {
+function Detail({ label, value, isEditing, onChange, className = "", options = null, kind = "text", error = null, disabled = false, required = false, loadError = null, onRetryLoad }) {
     if (!isEditing) {
         return (
             <div className={className}>
                 <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{label}</p>
                 <p className="mt-0.5 rounded-lg border border-line bg-surface-2 p-2 text-sm font-semibold text-ink">{value || "-"}</p>
+            </div>
+        );
+    }
+
+    /*
+     * 🔑 `loadError` IS NOT `error`. `error` says the VALUE is wrong and the user can fix
+     * it by typing; `loadError` says the CHOICES never arrived, which no amount of typing
+     * repairs. Rendering the second as the first blames an administrator for a backend being
+     * down and offers them nothing to do about it -- so the failure gets its own compact
+     * state, with the retry that EH-D4 requires of every error state that can honestly offer
+     * one. (`Detail` is the read/edit twin of `CaptureMember`'s `Field`; the prop pair is
+     * deliberately named the same on both.)
+     */
+    if (loadError) {
+        return (
+            <div className={cn("flex flex-col gap-1", className)}>
+                <SelectInput
+                    label={label}
+                    value={value}
+                    onChange={(next) => onChange?.({ target: { value: next } })}
+                    options={[]}
+                    disabled
+                    required={required}
+                    placeholder="Unavailable"
+                    emptyLabel="Unavailable"
+                />
+                <DataState
+                    state="error"
+                    compact
+                    error={loadError}
+                    onRetry={onRetryLoad}
+                    title={`${label} could not be loaded.`}
+                />
             </div>
         );
     }

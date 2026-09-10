@@ -1,7 +1,29 @@
 import { apiUrl } from './api';
 import { requestJson } from './parseApiError';
-import { JOB_GRADE_OPTIONS } from '../config/memberConstants.js';
 import { bankService } from './bankService.js';
+
+/*
+ * ✅ A25 IS CLOSED HERE, AND `JOB_GRADE_OPTIONS` IS WHAT WENT WITH IT. `06.1b`.
+ *
+ * This module used to end in `.catch(() => JOB_GRADE_OPTIONS)`. That was written as a
+ * graceful degradation and it was one, once: the constant held a real list of grades, so a
+ * backend that was down still let a capture proceed. `JOB_GRADE_OPTIONS` was later EMPTIED
+ * -- grades now come from the backend, per bank -- and the fallback became a swallow. Every
+ * failure resolved as `[]`, which every caller rendered as "this bank has no job grades".
+ * Neither change was wrong on its own, which is why the defect survived both reviews.
+ *
+ * 🔴 THE TWO HALVES COULD NOT LAND SEPARATELY, and that is the whole reason this row waited
+ * for `06.1b` rather than riding `06.1a` with the other three. The register's criterion is
+ * *"the method rejects AND the caller renders an error"*. Deleting the `catch` alone would
+ * have rejected into `CaptureMember` and `Members`, neither of which had an error state for
+ * a reference list -- an unhandled rejection where a (useless, but quiet) fallback used to
+ * be. The commit that deletes it is the commit that gives both callers a per-panel error
+ * state with retry (EH-D9).
+ *
+ * ⚠️ AND THE EMPTY LIST IS STILL A REAL ANSWER. A bank with no grades on file resolves `[]`
+ * and the field says so. What changed is that a 500, a dropped connection, an HTML gateway
+ * page and a ten-second hang no longer say the same thing.
+ */
 
 const normalizeList = (payload) => {
   if (!payload) return [];
@@ -13,12 +35,14 @@ const normalizeList = (payload) => {
 };
 
 export const jobGradeService = {
-  // Attempts to fetch job grades for a given bank name from the backend.
-  // Falls back to the static JOB_GRADE_OPTIONS when the API is not available or returns an empty list.
+  // Fetches the job grades a given bank has on file.
   // bankIdentifier may be a bank code (preferred) or a human-readable bank name.
   // When given a human name we attempt to resolve it to a bank code using bankService.
+  // Resolves the grades -- possibly none -- or REJECTS in conventions.md §16's shape.
   getByBank: async (bankIdentifier) => {
-    if (!bankIdentifier) return Promise.resolve(JOB_GRADE_OPTIONS);
+    // No bank chosen is not a failure and not an error state: there is nothing to ask for
+    // yet. The caller's field is disabled until a bank is picked.
+    if (!bankIdentifier) return [];
     // If the identifier looks like a code (no spaces, short), use as-is; otherwise try to resolve.
     let bankCode = String(bankIdentifier || '').trim();
     try {
@@ -66,22 +90,9 @@ export const jobGradeService = {
                 })
                 .filter(Boolean);
 
-          return normalized.length ? normalized : JOB_GRADE_OPTIONS;
-        })
-        /*
-         * ⚠️ A25 IS STILL OPEN HERE, AND ON PURPOSE -- ITS TWO HALVES CANNOT LAND SEPARATELY.
-         *
-         * The register's own criterion is *"the method rejects AND the caller renders an error"*,
-         * and this one `catch` is the first clause. Removing it today would make `getByBank`
-         * reject into `CaptureMember` and `Members`, neither of which has an error state for a
-         * reference list yet -- so the visible result would be an unhandled rejection where there
-         * used to be a usable fallback. That is a worse application, not a closed row.
-         *
-         * ✅ WHAT DID CHANGE: the failure is now a proper error on the one path (`kind`, `status`,
-         * `retryable`, the server's own message) instead of a bare `HTTP 500:`. So `06.1b` closes
-         * A25 by deleting this single line and giving the two callers a per-panel error state with
-         * retry (EH-D9), and the pin flips in that commit -- one move, both clauses.
-         */
-        .catch(() => JOB_GRADE_OPTIONS);
+          // ⚠️ NO `.catch()` BELOW, AND ITS ABSENCE IS THE FIX. A rejection travels to the
+          // caller, which renders it (EH-D9). See the header.
+          return normalized;
+        });
   }
 };

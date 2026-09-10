@@ -11,12 +11,14 @@ import {
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, YES_NO_OPTIONS,
-    SUSPENSION_CODE_OPTIONS, JOB_GRADE_OPTIONS, MEMBER_TABS,
+    SUSPENSION_CODE_OPTIONS, MEMBER_TABS,
     BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS
 } from "../../config/memberConstants.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
     formatDate } from "../../utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
+import DataState from "../../components/common/DataState";
+import { cn } from "../../lib/utils";
 
 // 44 Unique SASBO Branches for Primary Selection Dropdown
 const SASBO_BRANCHES = [
@@ -357,8 +359,23 @@ export default function CaptureMember() {
     const genderOptions = GENDER_OPTIONS;
     const yesNoOptions = YES_NO_OPTIONS;
     const suspensionCodeOptions = SUSPENSION_CODE_OPTIONS;
-    const [jobGradeOptions, setJobGradeOptions] = useState(JOB_GRADE_OPTIONS);
+    const [jobGradeOptions, setJobGradeOptions] = useState([]);
     const [jobGradeLoading, setJobGradeLoading] = useState(false);
+    /*
+     * ✅ A25's SECOND CLAUSE, `06.1b`. The register's criterion is "the method rejects AND
+     * the caller renders an error", and this is the caller half. `jobGradeService.getByBank`
+     * no longer swallows a failure into the (empty) static list, so a 500, a dropped
+     * connection or the ten-second ceiling arrives here as a rejection in §16's shape and
+     * this field says so, with a retry, instead of reading "No job grades available".
+     *
+     * 🔑 IT IS PER-PANEL, NOT PER-PAGE (EH-D9). Nine things load on this screen. A bank whose
+     * grades cannot be fetched must not blank a capture form the user has half filled in --
+     * the one field says what happened and the other eight keep working.
+     */
+    const [jobGradeError, setJobGradeError] = useState(null);
+    // Bumped by the retry control. It is a dependency of the fetch effect, so "try again"
+    // re-runs exactly the effect that failed rather than duplicating its body.
+    const [jobGradeAttempt, setJobGradeAttempt] = useState(0);
     const [bankListing, setBankListing] = useState([]);
     const [bankNames, setBankNames] = useState([]);
 
@@ -379,13 +396,15 @@ export default function CaptureMember() {
         let cancelled = false;
         const fetchGrades = async () => {
             if (!form.bankName) {
-                setJobGradeOptions(JOB_GRADE_OPTIONS);
+                setJobGradeOptions([]);
+                setJobGradeError(null);
                 setForm(prev => ({ ...prev, jobGrade: "" }));
                 setJobGradeLoading(false);
                 return;
             }
 
             setJobGradeLoading(true);
+            setJobGradeError(null);
 
             // Try to resolve bank code locally from bankListing
             const normalized = String(form.bankName || '').trim().toLowerCase();
@@ -397,16 +416,22 @@ export default function CaptureMember() {
 
             try {
                 const grades = await jobGradeService.getByBank(bankIdentifier);
-                if (!cancelled) setJobGradeOptions(Array.isArray(grades) && grades.length ? grades : JOB_GRADE_OPTIONS);
-            } catch {
-                if (!cancelled) setJobGradeOptions(JOB_GRADE_OPTIONS);
+                if (!cancelled) setJobGradeOptions(Array.isArray(grades) ? grades : []);
+            } catch (error) {
+                // ⚠️ AN ABORT IS NOT A FAILURE (§16, EH-D3). A superseded request is dropped
+                // silently: the state stays exactly as it was, and the field does not tell a
+                // user their bank list broke because they kept typing.
+                if (!cancelled && error?.kind !== 'abort') {
+                    setJobGradeOptions([]);
+                    setJobGradeError(error);
+                }
             } finally {
                 if (!cancelled) setJobGradeLoading(false);
             }
         };
         fetchGrades();
         return () => { cancelled = true; };
-    }, [form.bankName, bankListing]);
+    }, [form.bankName, bankListing, jobGradeAttempt]);
 
     return (
         <div className="p-6 text-ink">
@@ -535,7 +560,7 @@ export default function CaptureMember() {
                                 <Field label="Employee Number" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
                                 <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
-                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} emptyLabel="No job grades available" />
+                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} emptyLabel="No job grades available" loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
                                 <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
 
@@ -894,7 +919,43 @@ function EmailFields({ form, setForm, handleChange, fieldErrors }) {
  */
 function Field({ label, value, onChange, className = "", options = null, type = "text",
                    error = null, disabled = false, searchable = false, note = null, kind, required = false,
-                   loading = false, emptyLabel }) {
+                   loading = false, emptyLabel, loadError = null, onRetryLoad }) {
+    /*
+     * 🔑 `loadError` IS NOT `error`, AND CONFLATING THEM IS THE BUG THIS PROP EXISTS TO AVOID.
+     *
+     *   `error`     the VALUE is wrong. "Enter a valid identity number." The user fixes it.
+     *   `loadError` the CHOICES are missing. The user cannot fix anything by typing; the
+     *               only useful action is to try the fetch again.
+     *
+     * Rendered as a validation message, a failed reference list would blame the member for a
+     * backend being down and offer them no way out -- so it renders as a compact `DataState`
+     * with a retry beneath the control instead (EH-D4: every error state carries a way out
+     * when one is honest, and `retryable` decides whether it is).
+     */
+    if (loadError) {
+        return (
+            <div className={cn("flex flex-col gap-1", className)}>
+                <SelectInput
+                    label={label}
+                    value={value}
+                    onChange={(next) => onChange?.({ target: { value: next } })}
+                    options={[]}
+                    disabled
+                    required={required}
+                    placeholder="Unavailable"
+                    emptyLabel="Unavailable"
+                />
+                <DataState
+                    state="error"
+                    compact
+                    error={loadError}
+                    onRetry={onRetryLoad}
+                    title={`${label} could not be loaded.`}
+                />
+            </div>
+        );
+    }
+
     const shared = {
         label,
         value,

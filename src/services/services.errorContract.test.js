@@ -101,7 +101,14 @@ const BREACHES = {
   // resolved with an empty array and eight consumers across seven screens rendered "no banks".
   // It is on `requestJson` now and rejects on all three, which is why its two pins below are
   // gone rather than "repaired": the register row is closed, under BR-12 and the owner's nod.
-  'jobGradeService.getByBank': { cases: ['envelope', 'network', 'nonJson'], defect: DEFECTS.A25 },
+  // ✅ `jobGradeService.getByBank` IS GONE FROM THIS LIST TOO -- A25 is CLOSED by `06.1b`.
+  //
+  // It ended in `.catch(() => JOB_GRADE_OPTIONS)`, and that constant had been emptied, so a 500,
+  // a network failure and a non-JSON body all resolved `[]` and both callers rendered "No job
+  // grades available". The catch is deleted and the two callers render the failure with a retry
+  // -- the row's own criterion is "the method rejects AND the caller renders an error", which is
+  // why the two halves landed in one commit rather than one of them here. Its three pins below
+  // are gone rather than "repaired", and the method now takes CASE 2, 3 and 4 by discovery.
   'bankService.updateBank': { cases: ['nonJson'], defect: DEFECTS.A26 },
 }
 
@@ -272,11 +279,14 @@ describe('what a rejection carries', () => {
   /*
    * 🔴 THE BREACHED METHODS ARE EXCLUDED, AND SAYING WHY MATTERS MORE THAN THE FILTER.
    *
-   * This block is about the SHAPE of a rejection, not about which methods reject. Two are still
-   * admitted not to reject on every case — `jobGradeService.getByBank` (A25) and
-   * `bankService.updateBank` (A26) — and both are documented at their sites with the reason. Asking
-   * them "what does your rejection carry" produces `undefined`, which is a fact about A25 and A26
-   * and tells you nothing about A24.
+   * This block is about the SHAPE of a rejection, not about which methods reject. One is still
+   * admitted not to reject on every case — `bankService.updateBank` (A26) — and it is documented at
+   * its site with the reason. Asking it "what does your rejection carry" produces `undefined`,
+   * which is a fact about A26 and tells you nothing about A24.
+   *
+   * ✅ `jobGradeService.getByBank` LEFT THIS EXCLUSION AUTOMATICALLY when `06.1b` closed A25, and
+   * that is the derived filter earning its keep: removing one line from `BREACHES` both un-skipped
+   * its three cases above and added it to this population, with nothing here to remember.
    *
    * ⚠️ AND THE EXCLUSION IS DERIVED FROM `BREACHES`, never listed again here. A second hand-typed
    * list would drift from the first the day a row closes — which is precisely what happened to the

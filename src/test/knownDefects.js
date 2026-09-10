@@ -189,17 +189,29 @@ export const DEFECTS = {
       'it addresses.',
   ),
 
-  A25: define(
-    'A25',
-    'jobGradeService.getByBank can never report a failure',
-    'It was written with a deliberate graceful fallback to the static ' +
-      'JOB_GRADE_OPTIONS when the API is unavailable. JOB_GRADE_OPTIONS was later ' +
-      'EMPTIED -- grades now come from the backend per bank -- so the fallback silently ' +
-      'became a swallow: every failure resolves as [], which the UI renders as "this ' +
-      'bank has no job grades". Neither change was wrong on its own. The defect is what ' +
-      'they became together, which is why it survived both reviews. Measured 2026-09-04: ' +
-      'the method resolves [] on a 500, on a network failure and on a non-JSON body.',
-  ),
+// A25 is RETIRED, 2026-09-10, by the design arc's 06.1b.
+//
+// It read: "jobGradeService.getByBank can never report a failure". The method ended in
+// `.catch(() => JOB_GRADE_OPTIONS)`, written as a graceful degradation and genuinely one until
+// JOB_GRADE_OPTIONS was EMPTIED -- after which every 500, dropped connection and HTML gateway
+// page resolved as `[]` and both callers rendered "No job grades available". Neither change was
+// wrong alone; the defect is what they became together, which is why it survived two reviews.
+//
+// 🔑 THE ROW'S OWN CRITERION IS WHY IT COULD NOT RIDE 06.1a WITH A13, A14 AND A24: "the method
+// rejects AND the caller renders an error". Deleting the catch alone would have rejected into
+// `CaptureMember` and `Members`, neither of which had an error state for a reference list -- an
+// unhandled rejection where a quiet fallback used to be, which is a worse application and not a
+// closed row. Both clauses landed in one commit: the catch is gone, `JOB_GRADE_OPTIONS` is gone
+// from the service and from both callers, and each caller's Job Grade field renders the failure
+// with a retry (EH-D9, per-panel: the other eight fetches on the capture form keep working).
+//
+// Its three pins were deleted and its three standard-facing cases un-skipped in the same commit
+// -- flipped, not repaired (BR-5): the method's entry in `BREACHES` is removed, so the ordinary
+// CASE 2 / 3 / 4 assertions now apply to it by discovery, and it joins the population of
+// `what a rejection carries`.
+//
+// Removed rather than marked closed, for the reason A11 records: this file's population IS the
+// set of open rows.
 
   A26: define(
     'A26',
