@@ -194,24 +194,25 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
           </Button>
         </div>
 
-        {/* 📐 THE RAIL'S RHYTHM, AND THE ONE PLACE THIS BUILD DEPARTS FROM THE MOCK'S CSS
-            ON PURPOSE.
+        {/* 📐 THE RAIL'S RHYTHM -- AND THE SECOND TIME THIS BLOCK HAS BEEN WRONG.
+            `card.css:135-141` is `.nav { display: grid; gap: 2px }` over rows of `height: 36px`.
+            That is a 38px pitch, and a 32px pitch for `.nav__item--sub`: a dense, quiet list in
+            which an indented child sits close enough to its parent to read as belonging to it.
 
-            card.css:135 is `.nav { display: grid; gap: 2px; flex: 1 }` — the rows stretch to
-            fill the rail. In a MOCK that is a constant, because the mock is one page with
-            eleven rows; measured on `mock-light.png` the pitch is 66px. In an APPLICATION the
-            row count changes with the route — a section expands, another collapses — so the
-            same rule gave 66px on Members, 81px on Home and 62px on the Organizer report, and
-            the whole menu re-spaced itself under the pointer on every navigation. A rail that
-            moves when you navigate is the opposite of premium.
+            The first attempt measured the pitch off `mock-light.png` as 66px and fixed a
+            64px TRACK to reproduce it. Both halves of that were wrong. 66px is what the mock's
+            OWN page happens to render, because `.nav { flex: 1 }` stretches eleven rows to fill
+            a 900px rail -- it is an artefact of that one page's row count, not a measurement of
+            the design. And reproducing it cost more than it bought: 36px rows floating in 64px
+            tracks put "Capture Member" as far from "Members" as "Recruiters" is, so the
+            parentage the indent is drawing dissolved -- while the FOOT below the rule kept real
+            36px rows 38px apart, so one rail ran two rhythms at once. The round-four review
+            measured both and named it.
 
-            So the TRACK is fixed at the mock's own 66px and the slack falls at the foot: the
-            pitch is identical on every route and identical to the mock on the screen the mock
-            actually draws. `self-start` keeps the 36px pill at the top of its track rather
-            than stretching it — the pill's height is the mock's too.
-
-            64 + the 2px gap = the mock's 66px pitch, measured rather than assumed. */}
-        <div className="scroll-quiet grid auto-rows-[64px] content-start gap-0.5 overflow-y-auto [&>*]:self-start">
+            `content-start` alone is the whole fix. It stops the stretch `flex: 1` would cause,
+            the rows are their own 36px, the gap is the mock's 2px, and the pitch is identical
+            on every route because nothing is being divided. */}
+        <div className="scroll-quiet grid content-start gap-0.5 overflow-y-auto [&>*]:self-start">
           {navItems.map((item) => (
             <SidebarItem
               key={item.href}
@@ -236,7 +237,7 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
                 key={item.href}
                 to={item.href}
                 className={cn(
-                  "flex h-9 items-center gap-3 rounded-lg px-2.5 text-base font-medium text-nav-ink",
+                  "flex h-9 items-center gap-3 rounded-lg px-2.5 text-sm font-medium text-nav-ink",
                   "transition-[background-color,color] duration-(--duration-instant)",
                   "hover-hover:hover:bg-nav-hover hover-hover:hover:text-ink",
                   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",

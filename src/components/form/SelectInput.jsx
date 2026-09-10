@@ -75,6 +75,9 @@ export default function SelectInput({
             name={name}
             value={asOptionValue(value)}
             onChange={handleChange}
+            // The `.crit__blank` half of card.css:217-218, said as an attribute so one rule in
+            // `Criteria` covers this control and `SearchableSelect` alike.
+            data-blank={asOptionValue(value) === '' || undefined}
             required={required}
             disabled={isDisabled}
             aria-invalid={invalid}

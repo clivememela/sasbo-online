@@ -107,7 +107,7 @@ export default function BankListing() {
         subtitle="Every bank, with its abbreviation and universal branch code, for reference."
         actions={
           <Button onClick={() => globalThis.print()} title="Print the listing, or save it as a PDF">
-            <Printer size={16} strokeWidth={1.75} aria-hidden="true" /> Export
+            <Printer size={16} strokeWidth={1.75} aria-hidden="true" /> Print
           </Button>
         }
       />

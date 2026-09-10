@@ -74,7 +74,7 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
       <div
         className={cn(
           "flex items-center rounded-lg pr-1.5",
-          depth === 0 ? "h-9 pl-2.5 text-base font-medium" : cn("h-8 text-[13.5px] font-medium", INDENT[Math.min(depth - 1, INDENT.length - 1)]),
+          depth === 0 ? "h-9 pl-2.5 text-sm font-medium" : cn("h-8 text-[13.5px] font-medium", INDENT[Math.min(depth - 1, INDENT.length - 1)]),
           ROW,
           highlighted ? ACTIVE : RESTING,
         )}

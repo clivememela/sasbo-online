@@ -13,7 +13,11 @@ export const CRITERION =
   'min-w-[120px] shrink grow-0 basis-[140px] ' +
   '[&_input]:rounded-[10px] [&_input]:font-medium [&_input]:shadow-(--shadow-1) ' +
   '[&_select]:rounded-[10px] [&_select]:font-medium [&_select]:shadow-(--shadow-1) ' +
-  "[&_input:not(:placeholder-shown)]:text-brand-ink [&_select:not(:has(option:checked[value='']))]:text-brand-ink";
+  "[&_input:not(:placeholder-shown)]:text-brand-ink [&_select:not(:has(option:checked[value='']))]:text-brand-ink " +
+  // `.crit__blank` (card.css:218) -- and it comes LAST and shouts, because the two rules
+  // above have the same specificity and a criterion that is not filtering must win. A
+  // `SearchableSelect`'s blank state is a real value ("Any"), so nothing else can see it.
+  "[&_[data-blank]]:!font-normal [&_[data-blank]]:!text-ink-muted";
 
 /** A wider criterion, for a free-text search that needs room to read. */
 export const CRITERION_WIDE = CRITERION.replace('basis-[140px]', 'basis-[200px]');

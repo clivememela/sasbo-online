@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, Menu, Search } from "lucide-react";
 import Breadcrumbs from "./common/Breadcrumbs";
@@ -53,6 +53,30 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
   const navigate = useNavigate();
   const location = useLocation();
   const kind = searchKind(search);
+
+  /*
+   * 📱 THE SEARCH COPY SHORTENS WITH THE ROOM. On a phone the long placeholder was cut
+   * mid-word -- "Search members: su" -- and a half-word in the most prominent control on the
+   * screen reads as breakage, not as truncation. The long form earns its place on a desk,
+   * where it names the five things the search will match; a placeholder is an ATTRIBUTE, so
+   * no media query can swap it and the component has to know the width itself.
+   *
+   * 640px is Tailwind's `sm`, the same boundary the topbar's own ⌘K hint appears at, so the
+   * two changes happen together rather than a step apart.
+   */
+  const [narrow, setNarrow] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(max-width: 639px)').matches
+      : false);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const query = window.matchMedia('(max-width: 639px)');
+    const onChange = (event) => setNarrow(event.matches);
+    setNarrow(query.matches);
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -143,7 +167,7 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
           autoComplete="off"
           value={search}
           onChange={onChange}
-          placeholder="Search members: surname, number, I.D., bank, branch"
+          placeholder={narrow ? "Search members" : "Search members: surname, number, I.D., bank, branch"}
           className="search-text min-w-0 flex-1 border-0 bg-transparent text-ink placeholder:text-ink-muted focus:outline-none [&::-webkit-search-cancel-button]:appearance-none"
         />
         {kind && (
@@ -163,7 +187,19 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
       </label>
 
       <div className="flex items-center justify-end gap-1.5">
-        <Button size="icon" variant="ghost" aria-label="Notifications">
+        {/* 🔴 IT HAD A HOVER, A FOCUS RING AND NO HANDLER -- the one dishonest control left
+            in the shell, and the avatar beside it was demoted to an inert chip for exactly
+            this reason. There is no notifications feature to open. So the bell keeps the
+            mock's topbar shape and stops pretending: disabled, out of the tab order, and its
+            accessible name says what is true. It is the same call `NavigationCard` makes for
+            a menu row with no route. */}
+        <Button
+          size="icon"
+          variant="ghost"
+          disabled
+          aria-label="Notifications — none yet"
+          title="No notifications yet"
+        >
           <Bell size={18} strokeWidth={1.75} aria-hidden="true" />
         </Button>
 

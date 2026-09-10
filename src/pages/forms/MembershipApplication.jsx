@@ -20,6 +20,15 @@ import applicationForm from '../../assets/documents/Membership Application.pdf';
  * than a bare `<h1>` over a raw frame. What used to sit here was a centred paragraph under a
  * left-aligned title, which is the one typographic thing the mock never does.
  *
+ * 🔴 THE FRAME ASKS THE VIEWER TO PUT ITS FURNITURE AWAY. A PDF in an `<iframe>` is drawn
+ * by the browser's own viewer, which brings a black toolbar, a zoom stepper, rotate, print
+ * and kebab controls and a thumbnail rail -- a second application's chrome, in a second
+ * application's dark, inside our white sheet. None of it can be styled. The PDF Open
+ * Parameters are the one lever that reaches it: `toolbar=0&navpanes=0&scrollbar=0` takes the
+ * furniture away and `view=FitH` fits the page across the sheet, so what is left is the
+ * document. The controls that mattered are ours already -- "Download the form" in the page
+ * head does what the viewer's download button did.
+ *
  * 🔴 `embedded` EXISTS BECAUSE THIS COMPONENT HAS TWO HOMES, and one of them already has a
  * page head. It is a route (`/members/apply`) AND one of the five things `Forms` renders when
  * you pick a form type -- and inside `Forms` a second `<Page>` doubled the gutter and a second
@@ -31,7 +40,8 @@ import applicationForm from '../../assets/documents/Membership Application.pdf';
 export default function MembershipApplication({ embedded = false }) {
   const frame = (
     <iframe
-      src={applicationForm}
+      // 🔴 THE VIEWER'S CHROME, NOT OURS. See the note above the component.
+      src={`${applicationForm}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
       title="Membership application form"
       className="w-full flex-1 border-0 bg-surface-2"
     />

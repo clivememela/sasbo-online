@@ -162,7 +162,7 @@ export default function RecruitmentChannel() {
                     ref={noticeRef}
                     tabIndex={-1}
                     aria-labelledby="channel-notice-title"
-                    className="mt-4 flex max-w-2xl items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                    className="mt-4 flex max-w-4xl items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
                 >
                     <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
                     <p id="channel-notice-title" className="flex-1">{notice}</p>
@@ -174,7 +174,7 @@ export default function RecruitmentChannel() {
                 `aria-label`. Every other list in this application prints its criteria ON the
                 page, in a `Criteria` row, because the mock does -- a filter you cannot see is
                 a filter you cannot remember you set. */}
-            <Criteria className="mt-5 max-w-2xl">
+            <Criteria className="mt-5 max-w-4xl">
                 <TextInput
                     className={CRITERION_WIDE}
                     label="Search"
@@ -187,7 +187,7 @@ export default function RecruitmentChannel() {
                 </Button>
             </Criteria>
 
-            <Sheet className="mt-4 max-w-2xl">
+            <Sheet className="mt-4 max-w-4xl">
                 {showAdd && (
                     <div className="flex items-center gap-2 border-b border-line bg-brand-soft p-3">
                         <input
@@ -364,7 +364,7 @@ export default function RecruitmentChannel() {
                 describes fixing exactly this class of defect in the list BODY, and left it
                 standing in the footer. It renders only on a resolved load now. */}
             {listState === 'ready' && (
-                <p className="mt-3 max-w-2xl text-right text-xs text-ink-muted">
+                <p className="mt-3 max-w-4xl text-right text-xs text-ink-muted">
                     {filtered.length} recruiter type{filtered.length !== 1 ? 's' : ''}
                 </p>
             )}

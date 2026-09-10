@@ -1,16 +1,44 @@
-import {Landmark, UsersRoundIcon, ChartNoAxesCombined, Archive, LucideDatabase} from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import NavigationCard from '../components/common/NavigationCard';
 import Sheet, { Page } from '../components/common/Sheet.jsx';
 import PageTitle from '../components/common/PageTitle';
+import { navItems } from '../config/navigation';
 
-const cards = [
-    {title: 'Admin Menu', icon: LucideDatabase, href: '/admin', desc: 'Manage and view admin menu'},
-    { title: 'Bank/Branch', icon: Landmark, href: '/banks', desc: 'Manage and view bank information' },
-    { title: 'Members', icon: UsersRoundIcon, href: '/members', desc: 'Access member records and details' },
-    { title: 'Reports', icon: ChartNoAxesCombined, href: '/reports', desc: 'Generate and view system reports' },
-    { title: 'Document Archives', icon: Archive, href: '/archives', desc: 'Browse archived documents' },
-];
+/*
+ * 🔴 THE LANDING PAGE STATED A DIFFERENT INVENTORY OF THE APPLICATION FROM THE RAIL BESIDE
+ * IT. This list was hand-typed: five of the nine top-level areas, in an order of their own,
+ * silently missing A.C.B, Recruiters and Subscriptions -- each of which the rail two inches
+ * to the left lists. "Select an area to begin" under a list that is a subset of the
+ * navigation, with nothing saying so, reads as an oversight rather than as a choice.
+ *
+ * 🔑 SO IT IS NOT A LIST ANY MORE -- it is the rail, read across instead of down. `navItems`
+ * is the one place the application's areas are declared, Home drops only its own entry, and
+ * the two can no longer disagree: an area added to the menu appears here on the same commit,
+ * and one removed disappears from both.
+ *
+ * The descriptions stay hand-written because the rail has none and a menu row with nothing
+ * under its title is a poorer row; they are keyed by href so a renamed title cannot silently
+ * detach one from its area.
+ */
+const DESCRIPTIONS = {
+  '/admin': 'Daily, monthly and maintenance operations',
+  '/admin/acb': 'Automated clearing bureau debits and returns',
+  '/banks': 'Every bank and branch Sasbo members work from',
+  '/archives': 'Agreements, policies and research, by institution',
+  '/members': 'The membership register across every bank',
+  '/recruiters': 'Who signs members up, and how many they bring',
+  '/admin/maintenance/subscriptions': 'What each bank collects, and when it debits',
+  '/reports': 'Organiser reports, locations, forms and listings',
+};
+
+const cards = navItems
+  .filter((item) => item.href && item.href !== '/home')
+  .map((item) => ({
+    title: item.title.trim(),
+    icon: item.icon,
+    href: item.href,
+    desc: DESCRIPTIONS[item.href],
+  }));
 
 export default function Home() {
   const { setSelectedCardHref } = useOutletContext() || {};

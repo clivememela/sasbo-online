@@ -6,6 +6,8 @@ import MembershipApplication from "./MembershipApplication.jsx";
 import {TextInput, Button, FilterForm, SearchableSelect} from "../../components/form";
 import { FileSearch } from "lucide-react";
 import PageTitle from '../../components/common/PageTitle';
+import Sheet from '../../components/common/Sheet.jsx';
+import DataState from '../../components/common/DataState.jsx';
 
 export function Forms(){
     const [filters, setFilters] = useState({
@@ -106,11 +108,23 @@ export function Forms(){
                 to its right. Centring a body column under a left-aligned title is the
                 one typographic thing the mock never does. `max-w-4xl` is the width the
                 four things this switch can render already set for themselves. */}
-            {filters.formType && (
-                <div className="mt-6 max-w-4xl">
-                    {renderForm()}
-                </div>
-            )}
+            {/* 🔴 BELOW THE CRITERIA THE PAGE WAS BARE GROUND. With no form type chosen --
+                which is how every visit starts -- a "Search Form" button sat above 650px of
+                empty `--bg` with no heading, no sentence and no way forward, and a page that
+                renders nothing reads as a page that failed. The mock never leaves the work
+                area empty: its sheet is always there and carries its own state. So this one
+                does too, and the resting state says the one thing the visitor needs. */}
+            <div className="mt-6 max-w-4xl">
+                {filters.formType ? renderForm() : (
+                    <Sheet>
+                        <DataState
+                            state="empty"
+                            title="Choose a form to begin."
+                            message="Pick a form type above and it opens here, ready to complete or print."
+                        />
+                    </Sheet>
+                )}
+            </div>
         </div>
     )
 }

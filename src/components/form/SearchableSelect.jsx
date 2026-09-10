@@ -223,6 +223,17 @@ export default function SearchableSelect({
             spellCheck={false}
             value={displayValue}
             placeholder={shownPlaceholder}
+            /* 🔴 `data-blank` IS HOW A CRITERION SAYS IT IS NOT FILTERING ANYTHING.
+               `card.css:217-218` separates exactly two states -- `.crit__value` in the
+               brand's ink for a value somebody chose, `.crit__blank` in `--ink-2` at weight
+               400 for "Any" -- so a glance down the row tells you what is narrowing the
+               register and what is not. `Criteria`'s `CRITERION` already drew that
+               distinction for a native `<select>`, by testing whether the checked option is
+               the empty one. It could not draw it here, because this control is an `<input>`
+               whose blank state is a real VALUE ("All banks", "Any"), not a placeholder --
+               so `:not(:placeholder-shown)` was true and every unset filter came out teal.
+               Measured on the round-four captures at rgb(9, 87, 96) on five screens. */
+            data-blank={value === '' || value === null || value === undefined || undefined}
             disabled={isDisabled}
             required={required}
             aria-expanded={open}

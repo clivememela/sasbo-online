@@ -791,7 +791,7 @@ export default function Members() {
                                 endpoint that writes a spreadsheet does not exist yet, and a
                                 control that promised one would be a lie in a primary position. */}
                             <Button onClick={() => printWith("register")} title="Print the register, or save it as a PDF">
-                                <Download size={16} strokeWidth={1.75} aria-hidden="true" /> Export
+                                <Printer size={16} strokeWidth={1.75} aria-hidden="true" /> Print
                             </Button>
                             <Button variant="primary" onClick={() => navigate("/members/capture")}>
                                 <LucideUserRoundPlus size={16} strokeWidth={1.75} aria-hidden="true" /> Capture Member
