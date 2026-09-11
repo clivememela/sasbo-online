@@ -272,10 +272,13 @@ export default function CaptureMember() {
     // Fetch job grades for the selected bank whenever bankName changes.
     useEffect(() => {
         let cancelled = false;
+
+        // 🛠️ IMMEDIATELY clear out any previously selected Job Grade when Bank changes
+        setForm(prev => ({ ...prev, jobGrade: "" }));
+
         const fetchGrades = async () => {
             if (!form.bankName) {
                 setJobGradeOptions(JOB_GRADE_OPTIONS);
-                setForm(prev => ({ ...prev, jobGrade: "" }));
                 setJobGradeLoading(false);
                 return;
             }

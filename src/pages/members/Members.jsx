@@ -221,9 +221,11 @@ export default function Members() {
     }, [selectedMember]);
 
     useEffect(() => {
+        // 🛠️ IMMEDIATELY reset the Job Grade value inside the edit modal form when Bank changes
+        setEditForm(prev => ({ ...prev, jobGrade: "" }));
+
         if (!editForm.bankName) {
             setJobGradeOptions(JOB_GRADE_OPTIONS);
-            setEditForm(prev => ({ ...prev, jobGrade: "" }));
             return;
         }
 
@@ -231,6 +233,7 @@ export default function Members() {
             .then((grades) => setJobGradeOptions(Array.isArray(grades) && grades.length ? grades : JOB_GRADE_OPTIONS))
             .catch(() => setJobGradeOptions(JOB_GRADE_OPTIONS));
     }, [editForm.bankName]);
+
 
     const handleEditToggle = () => {
         setIsEditing((editing) => {
