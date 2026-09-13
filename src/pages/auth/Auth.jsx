@@ -115,7 +115,12 @@ export default function Auth() {
   };
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center p-4">
+    // 🔴 `flex-1`, NOT `min-h-dvh`. This screen renders inside `AuthLayout`, whose column is
+    // already a full viewport tall -- so a second `min-h-dvh` here made the page TWO
+    // viewports of height stacked, centred the card in the upper one, and pushed the footer a
+    // whole window further down. `flex-1` fills what the layout has left above its footer,
+    // which is the one height this card should be centred in.
+    <div className="flex flex-1 flex-col items-center justify-center p-4">
       <div className="w-full max-w-md rounded-card bg-surface p-8 shadow-(--shadow-2)">
         {/* 🔑 THE RAIL'S OWN WORDMARK, because this is the first surface anybody sees and
             it should introduce the same product the shell does: the mark, SASBO Online, and

@@ -27,7 +27,17 @@ export default function AuthLayout() {
           </Suspense>
         </ErrorBoundary>
       </div>
-      <Footer absolute />
+      {/* 🔴 THE FOOTER SAT ON TOP OF THE LOGIN CARD -- on the first screen anybody sees.
+          It was `<Footer absolute />`: pinned to the bottom of the viewport at `z-50`, with a
+          translucent blurred ground, so it took no space in the layout and painted over
+          whatever reached the bottom. On a laptop-height window the card does reach the
+          bottom, and "Don't have an account?" ran underneath a frosted band reading
+          "© 2026 SASBO - The Finance Union". The owner noticed, and it was the login page.
+
+          In flow, after a `flex-1` content column, the footer lands at the bottom of the
+          window when the card is short and below the card when it is tall. It cannot
+          overlap anything, because it is no longer drawn over the page -- it is part of it. */}
+      <Footer />
     </div>
   );
 }
