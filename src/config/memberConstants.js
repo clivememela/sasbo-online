@@ -43,7 +43,6 @@ export const MEMBER_TABS = [
   { id: 'employment', label: 'Employment & Bank' },
   { id: 'membership', label: 'Membership & Subscriptions' },
   { id: 'representatives', label: 'Recruitment Channel' },
-  { id: 'structures', label: 'Sasbo Structures' },
   // { id: 'history', label: 'History & Remarks' },
 ];
 
@@ -81,7 +80,7 @@ export const MEMBER_FIELD_LABEL_MAP = {
   bankAccountNumber: 'Bank Account Number',
   branch: 'Bank Branch Where Member Works',
   ibtNo: 'IBT No.',
-  workIbtNo: 'Work IBT No.',
+  /*workIbtNo: 'Work IBT No.',*/
   paymentType: 'Payment Type',
   debitDay: 'Day to be debited',
   bankAddress: 'Bank Address',

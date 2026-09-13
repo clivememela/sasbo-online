@@ -259,7 +259,7 @@ export function Recruiters() {
             branch: member.branch || '',
             bankAccountNumber: member.bankAccountNumber || '',
             ibtNo: member.ibtNo || '',
-            workIbtNo: member.workIbtNo || '',
+            /*workIbtNo: member.workIbtNo || '',*/
             paymentType: member.paymentType || '',
             workBankAddress: member.workBankAddress || '',
             joinDate: member.joinDate || '',
@@ -880,7 +880,7 @@ export function Recruiters() {
                                     <DRow label="Branch" value={selectedMember.branch} />
                                     <DRow label="Account Number" value={selectedMember.bankAccountNumber} />
                                     <DRow label="IBT No." value={selectedMember.ibtNo} />
-                                    <DRow label="Work IBT No." value={selectedMember.workIbtNo} />
+                                    {/*<DRow label="Work IBT No." value={selectedMember.workIbtNo} />*/}
                                     <DRow label="Payment Type" value={selectedMember.paymentType} />
                                     <DRow label="Work Address" value={selectedMember.workBankAddress} />
                                 </Section>

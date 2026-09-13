@@ -221,9 +221,11 @@ export default function Members() {
     }, [selectedMember]);
 
     useEffect(() => {
+        // 🛠️ IMMEDIATELY reset the Job Grade value inside the edit modal form when Bank changes
+        setEditForm(prev => ({ ...prev, jobGrade: "" }));
+
         if (!editForm.bankName) {
             setJobGradeOptions(JOB_GRADE_OPTIONS);
-            setEditForm(prev => ({ ...prev, jobGrade: "" }));
             return;
         }
 
@@ -231,6 +233,7 @@ export default function Members() {
             .then((grades) => setJobGradeOptions(Array.isArray(grades) && grades.length ? grades : JOB_GRADE_OPTIONS))
             .catch(() => setJobGradeOptions(JOB_GRADE_OPTIONS));
     }, [editForm.bankName]);
+
 
     const handleEditToggle = () => {
         setIsEditing((editing) => {
@@ -618,7 +621,7 @@ ${summary}`);
                                         </>
                                     )}
                                     <Detail label="IBT No." value={editForm.ibtNo} isEditing={isEditing} onChange={handleEditChange("ibtNo")} />
-                                    <Detail label="Work IBT No." value={editForm.workIbtNo} isEditing={isEditing} onChange={handleEditChange("workIbtNo")} />
+                                    {/*<Detail label="Work IBT No." value={editForm.workIbtNo} isEditing={isEditing} onChange={handleEditChange("workIbtNo")} />*/}
                                     <div className="md:col-span-2">
                                         {isEditing ? (
                                             <AddressAutocomplete label="Bank Work Address" value={editForm.bankAddress} onChange={handleEditChange("bankAddress")} placeholder="Search coordinates..." />
@@ -641,8 +644,8 @@ ${summary}`);
 
                             {activeTab === "representatives" && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-100 dark:border-gray-800 shadow-xs">
-                                    <Detail label="Assigned Lead Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={isEditing} options={roles.map(r => r.name)} onChange={handleEditChange("recruitmentRepresentativeName")} />
-                                    <Detail label="Regional Area Representative" value={editForm.areasRep} isEditing={isEditing} options={roles.map(r => r.name)} onChange={handleEditChange("areasRep")} />
+                                    <Detail label="Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={isEditing} disabled={true} />
+                                    <Detail label="Area's Recruiter" value={editForm.areasRep} isEditing={isEditing} disabled={true} />
                                 </div>
                             )}
 
