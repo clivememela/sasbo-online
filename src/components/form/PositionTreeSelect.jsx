@@ -1,142 +1,159 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import SelectInput from './SelectInput';
 
 /**
- * Cascading dropdown selects for hierarchical position/structure selection.
+ * Cascading selects for a position in the structure tree. `03.2a`.
  *
- * Renders one <select> per hierarchy level. Selecting a parent at level N
- * populates the children at level N+1.
+ * ⚠️ **RESTYLED, NOT REBUILT -- and that was a decision the plan asked for explicitly.**
+ * `PositionTreeSelect` has no shadcn equivalent, so `03.2` had to settle restyle-vs-rebuild
+ * here rather than mid-P4. It is restyled: the cascade logic is the incumbent's and it is
+ * correct, the one thing genuinely wrong with it was presentational and accessible, and a
+ * rebuild would have put a behaviour change into the phase that is supposed to be building
+ * the layer the rebuild would land on.
+ *
+ * 🔴 WHAT WAS ACTUALLY BROKEN: **every level's `<select>` had no accessible name.** The
+ * level caption was a bare `<label>` with no `htmlFor` and no wrapping -- so, exactly like
+ * [A28](../../../planning/testing/defectRegister.md) one file over, a sighted user saw
+ * "Level 2" and a screen-reader user reached an unnamed combo box. Routing each level
+ * through `SelectInput` fixes that structurally, and brings the 16px rule, the tokens and
+ * the loading/empty states with it (contract ⑮).
+ *
+ * 🔑 AND THE LEVELS ARE NAMED NOW. "Level 1 / Level 2 / Level 3" describes the widget, not
+ * the choice. A cascade whose captions come from the parent's own name -- *Region*, then
+ * the region's children -- tells you what you are choosing. `levelLabels` lets a caller
+ * supply the real vocabulary; the numbered fallback stays for callers that have none.
  *
  * Props:
- *   structures   – tree array from /api/members/structures/tree (nodes have { id, name, children })
- *   selectedIds  – array of currently-selected IDs (all levels combined)
- *   onChange     – callback(selectedIds: number[])
- *   label        – field label
- *   placeholder  – placeholder text for empty selects
+ *   structures   tree from /api/members/structures/tree; nodes are { id, name, children }
+ *   selectedIds  currently-selected ids, all levels
+ *   onChange     callback(selectedIds: number[])
+ *   levelLabels  optional captions, one per depth
  */
 export default function PositionTreeSelect({
-    structures = [],
-    selectedIds = [],
-    onChange,
-    label,
-    placeholder = 'Select...',
+  structures = [],
+  selectedIds = [],
+  onChange,
+  label,
+  placeholder = 'Select...',
+  levelLabels,
+  loading = false,
+  disabled = false,
 }) {
-    // Build a lookup: id → { node, parentChain } for resolving pre-selections
-    const nodeMap = useMemo(() => {
-        const map = new Map();
-        const walk = (nodes, ancestors) => {
-            nodes.forEach(node => {
-                map.set(node.id, { node, ancestors });
-                if (node.children?.length) walk(node.children, [...ancestors, node.id]);
-            });
-        };
-        walk(structures, []);
-        return map;
-    }, [structures]);
+  // id -> { node, ancestors }, for resolving a pre-selection back into a cascade.
+  const nodeMap = useMemo(() => {
+    const map = new Map();
+    const walk = (nodes, ancestors) => {
+      nodes.forEach((node) => {
+        map.set(node.id, { node, ancestors });
+        if (node.children?.length) walk(node.children, [...ancestors, node.id]);
+      });
+    };
+    walk(structures, []);
+    return map;
+  }, [structures]);
 
-    // Derive level selections from selectedIds (supports pre-selection / edit mode)
-    const initialSelections = useMemo(() => {
-        if (!selectedIds.length || !structures.length) return {};
-        // Use the deepest (last) selected ID to reconstruct the cascade
-        const deepestId = selectedIds[selectedIds.length - 1];
-        const entry = nodeMap.get(deepestId);
-        if (!entry) return {};
+  // A pre-selection, resolved back into a cascade -- ONCE, as the initial state. It was a
+  // `useMemo(…, [])` whose only consumer was the `useState` on the next line, which is a
+  // lazy initialiser written as a memo and needing an `exhaustive-deps` disable to survive.
+  // `useState(fn)` is what that is, and the disable goes with it.
+  const [selectionsByLevel, setSelectionsByLevel] = useState(() => {
+    if (!selectedIds.length || !structures.length) return {};
+    const deepestId = selectedIds[selectedIds.length - 1];
+    const entry = nodeMap.get(deepestId);
+    if (!entry) return {};
 
-        const sel = {};
-        entry.ancestors.forEach((id, level) => { sel[level] = id; });
-        sel[entry.ancestors.length] = deepestId;
-        return sel;
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const selection = {};
+    entry.ancestors.forEach((id, level) => {
+      selection[level] = id;
+    });
+    selection[entry.ancestors.length] = deepestId;
+    return selection;
+  });
 
-    // Track the selected ID at each depth level: { 0: id, 1: id, 2: id, ... }
-    const [selectionsByLevel, setSelectionsByLevel] = useState(initialSelections);
+  // Reset when the caller clears the selection (e.g. electedRep toggled back to N).
+  //
+  // 🔑 THE BAIL MATTERS MORE THAN IT LOOKS. `selectedIds` defaults to a new `[]` and call
+  // sites pass computed arrays, so this effect runs on EVERY parent render. Setting a fresh
+  // `{}` each time is never state-equal, so each parent render cost a second full render of
+  // this component -- which invalidated the `levels` memo, produced new `options` identities,
+  // and so defeated the `normaliseOptions` memo inside every `SelectInput` in the cascade.
+  // Returning `previous` when it is already empty stops the whole chain.
+  useEffect(() => {
+    if (selectedIds.length !== 0) return;
+    setSelectionsByLevel((previous) => (Object.keys(previous).length === 0 ? previous : {}));
+  }, [selectedIds]);
 
-    // Sync external selectedIds changes (e.g. reset when electedRep toggled to N)
-    useEffect(() => {
-        if (selectedIds.length === 0) {
-            setSelectionsByLevel({});
-        }
-    }, [selectedIds]);
+  // One entry per visible level: the options at that depth.
+  const levels = useMemo(() => {
+    const result = [structures];
+    let currentLevelNodes = structures;
+    let level = 0;
 
-    // Determine the options available at each level based on the tree
-    const levels = useMemo(() => {
-        const result = [];
+    for (;;) {
+      const selectedId = selectionsByLevel[level];
+      if (selectedId == null) break;
 
-        // Level 0: root nodes
-        result.push(structures);
+      const selectedNode = currentLevelNodes.find((node) => node.id === selectedId);
+      if (!selectedNode?.children?.length) break;
 
-        // Subsequent levels: children of the selected node at the previous level
-        let currentLevelNodes = structures;
-        let level = 0;
-        while (true) {
-            const selectedId = selectionsByLevel[level];
-            if (selectedId == null) break;
+      result.push(selectedNode.children);
+      currentLevelNodes = selectedNode.children;
+      level += 1;
+    }
 
-            const selectedNode = currentLevelNodes.find(n => n.id === selectedId);
-            if (!selectedNode || !selectedNode.children || selectedNode.children.length === 0) break;
+    return result;
+  }, [structures, selectionsByLevel]);
 
-            result.push(selectedNode.children);
-            currentLevelNodes = selectedNode.children;
-            level++;
-        }
+  const handleSelect = useCallback(
+    (level, id) => {
+      const next = { ...selectionsByLevel };
 
-        return result;
-    }, [structures, selectionsByLevel]);
+      // Either way, everything BELOW this level is now stale and goes.
+      Object.keys(next).forEach((key) => {
+        if (Number(key) > level) delete next[key];
+      });
 
-    const handleSelect = useCallback((level, id) => {
-        const newSelections = { ...selectionsByLevel };
+      if (id === '' || id == null) delete next[level];
+      else next[level] = Number(id);
 
-        if (id === '' || id == null) {
-            // Clear this level and all below
-            delete newSelections[level];
-            Object.keys(newSelections).forEach(key => {
-                if (Number(key) > level) delete newSelections[key];
-            });
-        } else {
-            // Set this level, clear all below
-            newSelections[level] = Number(id);
-            Object.keys(newSelections).forEach(key => {
-                if (Number(key) > level) delete newSelections[key];
-            });
-        }
+      setSelectionsByLevel(next);
+      onChange(Object.values(next).map(Number));
+    },
+    [selectionsByLevel, onChange],
+  );
 
-        setSelectionsByLevel(newSelections);
+  if (structures.length === 0 && !loading) return null;
 
-        // Collect all selected IDs across all levels
-        const allIds = Object.values(newSelections).map(Number);
-        onChange(allIds);
-    }, [selectionsByLevel, onChange]);
+  /** The caption for a depth: the caller's vocabulary, then the parent's name, then a number. */
+  const captionFor = (level) => {
+    if (levelLabels?.[level]) return levelLabels[level];
+    if (level === 0) return label || 'Level 1';
+    const parentId = selectionsByLevel[level - 1];
+    const parentName = parentId == null ? null : nodeMap.get(parentId)?.node?.name;
+    return parentName ? `Within ${parentName}` : `Level ${level + 1}`;
+  };
 
-    // Don't render if no structures available
-    if (structures.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      {label && (
+        <span className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{label}</span>
+      )}
 
-    const selectCls =
-        'w-full rounded-lg px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white border-gray-200 dark:border-gray-700';
-
-    return (
-        <div className="flex flex-col gap-2">
-            {label && (
-                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {label}
-                </span>
-            )}
-
-            {levels.map((options, level) => (
-                <div key={level} className="flex flex-col gap-1">
-                    <label className="text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                        {level === 0 ? 'Level 1' : `Level ${level + 1}`}
-                    </label>
-                    <select
-                        value={selectionsByLevel[level] ?? ''}
-                        onChange={(e) => handleSelect(level, e.target.value)}
-                        className={selectCls}
-                    >
-                        <option value="">{placeholder}</option>
-                        {options.map(node => (
-                            <option key={node.id} value={node.id}>{node.name}</option>
-                        ))}
-                    </select>
-                </div>
-            ))}
-        </div>
-    );
+      {levels.map((options, level) => (
+        <SelectInput
+          key={level}
+          label={captionFor(level)}
+          value={selectionsByLevel[level] ?? ''}
+          onChange={(next) => handleSelect(level, next)}
+          options={options}
+          optionValue="id"
+          optionLabel="name"
+          placeholder={placeholder}
+          loading={loading && level === 0}
+          disabled={disabled}
+        />
+      ))}
+    </div>
+  );
 }

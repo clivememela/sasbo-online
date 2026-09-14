@@ -77,6 +77,32 @@ export const FLOORS = {
   TRACKED_FILES: 60,
 
   /**
+   * Tracked files under src/ plus index.html -- everything Tailwind's source
+   * detection must be able to reach. Actual on 2026-09-09: 114.
+   *
+   * What it catches is `git ls-files src` returning nothing. The shadowing
+   * guard would then find zero shadowed files out of zero files and report the
+   * repository clean, which is the precise shape of the defect it exists to
+   * catch: a check that cannot tell its subject from nothing.
+   */
+  TRACKED_SOURCES: 60,
+
+  /**
+   * The ENTRY javascript chunk -- what a first paint actually downloads before
+   * anything can render. Actual on 2026-09-09, after 03.1 split every route:
+   * 286.58 KiB, down from 506.41 KiB when every page was a static import.
+   *
+   * 🔑 IT IS A SEPARATE ROW BECAUSE TOTAL JS CANNOT SEE THE WIN. Splitting moved
+   * bytes out of the entry and into 47 lazy chunks, so the TOTAL went UP (506 ->
+   * 520 KiB, the cost of module boundaries) while the number a user waits for
+   * nearly halved. A budget watching only the total would have called that a
+   * regression, and a budget watching only the total is also blind to the reverse:
+   * someone converting a lazy route back to a static import moves 40 KiB into the
+   * entry without changing the total at all.
+   */
+  BUNDLE_ENTRY_JS_BYTES: 120 * 1024,
+
+  /**
    * Files the secret guard still scans AFTER its path exclusions. Actual on
    * 2026-09-05: 117 of 122.
    *
@@ -112,10 +138,35 @@ export const FLOORS = {
   TEST_SOURCE_FILES: 8,
 
   /**
-   * Register rows declared in `knownDefects.js`. Actual on 2026-09-07: 16.
-   * Previously written as a bare `8` at its call site.
+   * Register rows declared in `knownDefects.js`. Actual on 2026-09-10: **15**
+   * (16 on 2026-09-07, less A25, closed by `06.1b`).
+   *
+   * 🔴 LOWERED TO 1 ON PURPOSE, AND IT IS THE ONLY FLOOR IN THIS FILE THAT SHOULD BE.
+   *
+   * Every other entry here guards a population that grows with the codebase: fewer
+   * routes than expected means the route walker broke, not that routes were deleted.
+   * This one guards a population that SHRINKS WHEN THE WORK SUCCEEDS. A floor of 8
+   * under a DEFECT register asserts, in effect, that we still have at least eight
+   * open defects -- so it goes red on the day the ninth is fixed, with the message
+   * "the scan found too few rows to be trusted", which would be false.
+   *
+   * 💥 IT IS NOT HYPOTHETICAL AND IT IS ALREADY SCHEDULED. Measured by the automation
+   * arc, 2026-09-10: this branch closes A11, A14, A25, A27 and A28; the capture-member
+   * branch closes A6, A7, A37 and A38. The merged intersection falls BELOW eight, so the
+   * merge commit would have met a red guard in the middle of a 29-file reconciliation and
+   * had to work out that the guard, not the merge, was wrong.
+   *
+   * 🔑 SO THE PREDICATE IS RE-AIMED AT THE FACT IT ACTUALLY CARES ABOUT: that the scan
+   * could READ ITS SOURCE. One row proves the module resolved, parsed and exported a
+   * populated register; the day that legitimately reaches zero, the correspondence tests
+   * either side of it are what carry the weight, and the right move is to delete this
+   * guard rather than to keep a row alive to satisfy it.
+   *
+   * ⚠️ A floor should guard that the scan can read its source, not that the source is
+   * still long. The automation arc's phrasing, adopted here verbatim because it is the
+   * general rule and not a note about this entry.
    */
-  DEFECT_ROWS: 8,
+  DEFECT_ROWS: 1,
 
   /**
    * Tests the suite must produce, counted from `reports/junit.xml` by
@@ -168,4 +219,76 @@ export const FLOORS = {
   BUNDLE_CSS_BYTES: 10 * 1024,
   BUNDLE_TOTAL_BYTES: 300 * 1024,
   BUNDLE_FILES: 4,
+
+  /**
+   * Non-test source files under `src/` matching `.js` / `.jsx` / `.mjs`.
+   * Measured through that guard's own `readSources` walk on 2026-09-09: 81.
+   * Re-measured 2026-09-10 through `nonTestSources()`: 84.
+   *
+   * What it catches is the walk returning nothing -- a wrong root, a pattern
+   * that stopped matching `.jsx`. The scan would then find no palette literals
+   * in no files, and P4's "no literal colour utilities, grep-proved" box would
+   * be ticked by a guard that looked at nothing.
+   *
+   * ⚠️ THIS ROW IS FOR THE `jsx?|mjs` POPULATION ONLY. It was lent to three other walks and
+   * that broke this registry's own rule -- see `SRC_JSX_FILES` and `SRC_STYLEABLE_FILES`.
+   */
+  SRC_SOURCE_FILES: 50,
+
+  /**
+   * Non-test `.jsx` files under `src/` -- the population a JSX-only walk sees.
+   * Measured 2026-09-10 through `tableScroller.structural.test.js`'s own walk: 61.
+   *
+   * 🔴 ITS OWN ROW BECAUSE LENDING `SRC_SOURCE_FILES` TO IT BROKE THIS FILE'S STATED RULE:
+   * *"A floor calibrated for one population is never lent to another."* That floor is 50,
+   * measured against 84 files; this walk sees 61. Eleven files of headroom on a population the
+   * number was never measured against -- so a walk that silently lost the whole of `src/pages/`
+   * (31 files, per `PAGE_FILES`) would still clear it, which is precisely the partial-scan hole
+   * `assertNothingWasSkipped` exists to close. Headroom is silence, in the amount of the headroom.
+   */
+  SRC_JSX_FILES: 40,
+
+  /**
+   * Non-test source files under `src/` that can carry a STYLE -- `.js` / `.jsx` / `.mjs` plus
+   * `.css`. Measured 2026-09-10 through `viewportUnits`' and `hoverIntent`'s own walk: 86.
+   *
+   * Its own row for the same reason as above, and the difference is small but real: a viewport-
+   * unit or hover-media scan that stopped matching `.css` would lose the two stylesheets where
+   * those rules most plausibly live while still clearing a floor set for the JS population.
+   */
+  SRC_STYLEABLE_FILES: 55,
+
+  /**
+   * `--color-*` declarations in `index.css`. Measured through that guard's own
+   * regex on 2026-09-09: 87 -- the 34 semantic roles declared twice, once per
+   * theme, plus shadcn's 19 compatibility aliases.
+   *
+   * 🔑 IT FLOORS A COLLISION CHECK, WHICH IS WHY IT EXISTS AT ALL. The check
+   * asks "is any token named after a Tailwind palette family". Against an empty
+   * token list the answer is a truthful, useless "no", and the guard reports
+   * that the detector is safe from a collision it never looked for.
+   */
+  COLOUR_TOKENS: 40,
+
+  /**
+   * Page components under `src/pages/`, as the list-state guard walks them.
+   * Measured through that guard's own `readSources` walk on 2026-09-10: 31.
+   *
+   * What it catches is the walk returning nothing -- a wrong root, or a pattern that
+   * stopped matching `.jsx`. The guard would then find no page that fetches, no page
+   * that fails to handle a failure, and report the rule holding over an empty set.
+   */
+  PAGE_FILES: 20,
+
+  /**
+   * Routes the heading-contract guard mounts, from `App.jsx`'s own route table.
+   * Measured through that guard's own render on 2026-09-09: 27 path-bearing
+   * routes, the same population the route smoke drives.
+   *
+   * Its own entry rather than `ROUTES`, which floors the smoke's discovery of
+   * the route TABLE. This floors how many were actually MOUNTED AND MEASURED --
+   * a render that throws for every route leaves an empty result set, and an
+   * assertion that no route has two `<h1>`s is trivially true of no routes.
+   */
+  HEADINGS_MEASURED: 20,
 }

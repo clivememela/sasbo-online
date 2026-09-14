@@ -39,8 +39,21 @@ const captureCreate = () =>
   })
 
 
-/** The form alerts on validation failure; jsdom has no window.alert. */
+/**
+ * What the form says when it refuses to save.
+ *
+ * 🔴 IT USED TO BE `window.alert`, AND THESE TESTS SPIED ON IT. `04.2` replaced that
+ * with an error summary rendered on the page: a native modal blocks the thread, cannot be
+ * styled, is suppressible, and -- on a six-tab form -- leaves the member facing an
+ * unchanged screen the moment they dismiss it. The spy is KEPT so a regression to `alert()`
+ * is loud rather than silent, and `refusals()` reads the summary the form now shows.
+ */
 const alerts = []
+
+const refusals = () =>
+  [...document.querySelectorAll('[aria-labelledby$="save-notice-title"] li')]
+    .map((li) => li.textContent)
+    .join('\n')
 
 beforeEach(() => {
   posted = undefined
@@ -126,7 +139,7 @@ describe('CaptureMember round-trips its fields', () => {
         posted,
         `Save was clicked and no POST reached /api/members. The form either failed ` +
           `validation silently or never called the service. Alerts raised: ` +
-          `${JSON.stringify(alerts)}`,
+          `${JSON.stringify(alerts)}; refusals shown: ${refusals()}`,
       ).toBeDefined(),
     )
 
@@ -152,7 +165,10 @@ describe('CaptureMember round-trips its fields', () => {
         'refuse -- or worse, accept. Client-side validation that does not stop the ' +
         'request is decoration.',
     ).toBeUndefined()
-    expect(alerts.join('\n')).toMatch(/First Name/i)
+    // The refusal names the FIELD, which `alert()` also did -- and it stays on the screen,
+    // which `alert()` did not.
+    expect(refusals()).toMatch(/First Name/i)
+    expect(alerts, 'a native alert() is back').toEqual([])
   })
 
   it('refuses an identity number that fails the SA ID checksum', async () => {
@@ -231,7 +247,8 @@ describe('the identity-type vocabulary', () => {
     await capturePassportMember(setupUser())
 
     expect(posted).toBeUndefined()
-    expect(alerts.join('\n')).toMatch(/date of birth/i)
+    expect(refusals()).toMatch(/date of birth/i)
+    expect(alerts, 'a native alert() is back').toEqual([])
   })
 
   it(pin(DEFECTS.A7, 'a passport capture still saves with no date of birth'), async () => {

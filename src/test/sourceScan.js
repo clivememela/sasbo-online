@@ -1,5 +1,17 @@
 import { readdirSync, readFileSync } from 'node:fs'
-import { join, relative, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+/**
+ * `src/test/` -> the repository root.
+ *
+ * 🔑 IT LIVES HERE, IN THE LOWEST MODULE, because every consumer of the walk needs it and
+ * this file must not import from anything that imports it. It was in `apiContractScan.js`,
+ * which imports `readSources` FROM here — so `nonTestSources()` below could not have reached
+ * it without a cycle. `apiContractScan.js` re-exports it, so every existing
+ * `import { REPO_ROOT } from './apiContractScan.js'` keeps working unchanged.
+ */
+export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 /**
  * Reading this repository's own source, for the guards that scan it.
@@ -192,18 +204,46 @@ export function filesUnder(dir, pattern = /\.(jsx?|mjs)$/) {
  * runner happened to start in produces failure messages that point somewhere
  * else on another machine.
  */
-export function readSources(dir, { root, pattern } = {}) {
-  return filesUnder(dir, pattern).map((full) => {
-    const raw = readFileSync(full, 'utf8')
-    const path = relative(root, full).split(sep).join('/')
-    return {
-      path,
-      raw,
-      code: blankComments(raw),
-      at(line) {
-        return `${path}:${line}`
-      },
-    }
+export function readSources(dir, { root, pattern, exclude } = {}) {
+  return filesUnder(dir, pattern)
+    .map((full) => ({ full, path: relative(root, full).split(sep).join('/') }))
+    // 🔑 EXCLUDED BEFORE THE READ, NOT AFTER IT. Every caller that wanted non-test sources used
+    // to read the whole tree and then `.filter()` the test files out — so 46 files and ~392 KB
+    // were read from disk AND run through `blankComments`' character walk purely to be
+    // discarded, once per guard, and this arc added five more such guards. Measured on this
+    // tree: 150 files match the widest pattern, 104 survive the exclusion. The filter is
+    // purely path-based, so the resulting array is identical either way.
+    .filter(({ path }) => !exclude?.(path))
+    .map(({ full, path }) => {
+      const raw = readFileSync(full, 'utf8')
+      return {
+        path,
+        raw,
+        code: blankComments(raw),
+        at(line) {
+          return `${path}:${line}`
+        },
+      }
+    })
+}
+
+/**
+ * Every non-test source file under `src/`, which is what nine guards actually want.
+ *
+ * 🔴 THE EXCLUSION RULE WAS HELD IN NINE PLACES. `readSources(join(REPO_ROOT, 'src'), …)`
+ * followed by `.filter((s) => !/\.test\.|\/test\//.test(s.path))` was written out in five new
+ * guards and four older ones, with the regex retyped each time. The day a `__tests__/`
+ * directory appears, eight of them start reading their own canary fixtures as source and the
+ * ninth does not — and a guard that scans its own fixtures finds the offence it planted.
+ *
+ * `pattern` is per-guard on purpose: a viewport-unit scan must read `.css`, a JSX walker must
+ * not. What is shared is the exclusion, not the population.
+ */
+export function nonTestSources({ pattern = /\.(jsx?|mjs)$/ } = {}) {
+  return readSources(join(REPO_ROOT, 'src'), {
+    root: REPO_ROOT,
+    pattern,
+    exclude: (path) => /\.test\.|\/test\//.test(path),
   })
 }
 

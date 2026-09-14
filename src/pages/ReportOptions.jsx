@@ -1,5 +1,6 @@
 import { NotebookPen, Form, MapPinnedIcon } from 'lucide-react';
 import NavigationCard from '../components/common/NavigationCard';
+import Sheet from '../components/common/Sheet.jsx';
 import PageTitle from '../components/common/PageTitle';
 
 const cards = [
@@ -10,11 +11,11 @@ const cards = [
 
 export default function ReportOptions() {
   return (
-    <div className="p-6 text-gray-900 dark:text-gray-100">
+    <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
       <PageTitle title="Reports" subtitle="Select options below" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto text-center">
+      <Sheet className="mt-6 max-w-4xl divide-y divide-line">
         {cards.map((card) => <NavigationCard key={card.href} {...card} />)}
-      </div>
+      </Sheet>
     </div>
   );
 }

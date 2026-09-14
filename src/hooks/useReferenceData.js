@@ -1,0 +1,145 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import reportError from '../lib/reportError';
+
+/**
+ * THE REFERENCE LISTS A SCREEN NEEDS, AND WHICH OF THEM DID NOT ARRIVE. `06.1b`, EH-D9.
+ *
+ * 🔴 **THE DEFECT CLASS THIS EXISTS FOR, COUNTED.** Twelve sites across five screens loaded a
+ * dropdown's options on mount and handled failure with `.catch(err => console.error(err))` or
+ * `.catch(() => setThing([]))`. In every one of them a backend that is down renders as a
+ * dropdown with nothing in it -- which is A27's exact shape (*"failure is indistinguishable
+ * from empty"*) reproduced once per reference list rather than once per screen. `Recruiters`
+ * alone had five, so a single bad deploy could empty the bank, province, area, branch and
+ * role selectors at once and the screen would say nothing at all.
+ *
+ * ⚠️ **AND IT IS WORSE THAN AN EMPTY LIST, BECAUSE THE USER CAN STILL SUBMIT.** An
+ * administrator who cannot find a member's bank in the list does not conclude the backend is
+ * down; they conclude the bank is missing, and they pick the closest one. The silent failure
+ * does not block the work, it corrupts it.
+ *
+ * ---
+ *
+ * 🔑 **WHY A HOOK OVER N SEPARATE `useState`s: THE FOURTH STATE ONLY EXISTS ACROSS THE SET.**
+ *
+ * `loading`, `empty` and `error` are properties of one fetch and can be tracked one at a
+ * time. **`partial` is not.** "Three of five sources answered" is not a fact any individual
+ * fetch knows; it exists only where the set is known, and a screen that tracks five booleans
+ * has nowhere to put it. That is why the DoD asks for four states and not three, and why
+ * this returns the SET rather than being called five times.
+ *
+ * The automation arc's reporting tool is the model, and the rule is theirs: mark a section
+ * `incomplete` and print `DID NOT RUN` rather than zero, because a zero meaning "we did not
+ * look" and a zero meaning "we looked and found nothing" are different facts.
+ *
+ * ---
+ *
+ * 🔑 **A FAILED LIST DOES NOT BLOCK THE OTHERS** — `allSettled`, never `all`. `Promise.all`
+ * rejects on the first failure and the four lists that DID answer are thrown away with it,
+ * which turns one dead endpoint into a blank screen. That is the page-level error state this
+ * unit is arguing against.
+ *
+ * 🔑 **AN ABORT IS NOT A FAILURE** (§16, EH-D3). A rejection carrying `kind: 'abort'` is a
+ * superseded request and leaves the entry exactly as it was.
+ *
+ * @param {Record<string, () => Promise<unknown[]>>} loaders  name → fetcher. **Must be stable**
+ *        across renders (module scope, or `useMemo`), for the reason an effect's dependency
+ *        list always requires it: an object literal rebuilt each render re-fetches forever,
+ *        which looks exactly like a slow backend.
+ * @returns {{
+ *   data: Record<string, unknown[]>,
+ *   failed: string[],
+ *   loading: boolean,
+ *   state: 'loading'|'ready'|'partial'|'error',
+ *   retry: () => void,
+ * }}
+ */
+export default function useReferenceData(loaders) {
+  const names = Object.keys(loaders);
+
+  const [data, setData] = useState(() => Object.fromEntries(names.map((n) => [n, []])));
+  const [failed, setFailed] = useState([]);
+  const [loading, setLoading] = useState(names.length > 0);
+
+  // Same pattern, and the same reason, as `useAsyncOptions`: a result that arrives after a
+  // newer run started must not be written. A retry while a slow first attempt is still in
+  // flight is exactly that race, and it is the one a user creates by clicking "Try again".
+  const ticketRef = useRef(0);
+  const loadersRef = useRef(loaders);
+
+  // Assigned in an effect, never during render: writing a ref while rendering keeps a
+  // discarded render's closure under concurrent rendering, and `react-hooks` reports it.
+  useEffect(() => {
+    loadersRef.current = loaders;
+  });
+
+  const run = useCallback(() => {
+    const ticket = (ticketRef.current += 1);
+    const current = loadersRef.current;
+    const entries = Object.entries(current);
+
+    if (entries.length === 0) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
+    Promise.allSettled(entries.map(([, load]) => load())).then((results) => {
+      if (ticket !== ticketRef.current) return;
+
+      const nextData = {};
+      const nextFailed = [];
+
+      results.forEach((result, index) => {
+        const name = entries[index][0];
+
+        if (result.status === 'fulfilled') {
+          nextData[name] = Array.isArray(result.value) ? result.value : [];
+          return;
+        }
+
+        // A superseded request is not a failure and must not be reported as one.
+        if (result.reason?.kind === 'abort') {
+          nextData[name] = [];
+          return;
+        }
+
+        nextData[name] = [];
+        nextFailed.push(name);
+        // 🔑 ONE SINK, AND THE CONTEXT IS A NAME. `reportError` emits `kind`, `status`,
+        // `retryable` and the refused FIELD NAMES -- never the message, never the envelope.
+        reportError(`reference:${name}`, result.reason);
+      });
+
+      setData(nextData);
+      setFailed(nextFailed);
+      setLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    run();
+  }, [run]);
+
+  /*
+   * 🔑 THE STATE IS DERIVED, NOT STORED, so the illegal combinations cannot be reached.
+   * `Members` learned this one layer down (`listState` as one value rather than two
+   * booleans): four independent booleans have sixteen combinations and only four of them
+   * mean anything, so the other twelve are bugs waiting for a render order to expose them.
+   *
+   * ⚠️ `error` IS "ALL OF THEM FAILED", NOT "ANY OF THEM DID". A screen whose every
+   * reference list is gone is a screen that cannot do its job, and saying so is honest.
+   * A screen missing one of five is `partial`, and blanking it would be the over-correction
+   * this whole unit exists to avoid.
+   */
+  const state = loading
+    ? 'loading'
+    : failed.length === 0
+      ? 'ready'
+      : failed.length === names.length
+        ? 'error'
+        : 'partial';
+
+  return { data, failed, loading, state, retry: run };
+}

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom -- renders the router and reads the rendered tree
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { act, render } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { mkdirSync, writeFileSync } from 'node:fs'
 
@@ -26,9 +26,11 @@ import { assertNonVacuousScan, FLOORS } from './test/assertNonVacuousScan'
  * called outside its provider, a component that reads a property of undefined
  * during first render.
  *
- * It is the only thing in the arc that would notice that class of break, and
- * without an error boundary anywhere in the client (register A11) that class
- * of break blanks the entire application rather than one page.
+ * It is the only thing in the arc that would notice that class of break. Until
+ * 2026-09-09 that class of break blanked the ENTIRE application rather than one page,
+ * because there was no error boundary anywhere in the client (retired row A11); it is
+ * now contained to the outlet, which is also what lets this test attribute a failure
+ * to the route that caused it rather than losing it as an unhandled run error.
  *
  * WHY DISCOVERY RATHER THAN A LIST OF NAMES
  * A new page is smoke-covered the moment it is routed. The guard has no list
@@ -93,6 +95,42 @@ describe('every declared route mounts', () => {
     // value is: a throw here is a real defect on a real page, and it is filed
     // as one rather than worked around.
     expect(() => renderRoute(path)).not.toThrow()
+
+    // 🔴 EVERY ROUTE IS NOW `lazy()` (03.1, R-PERF-A), AND THAT NEARLY BROKE THIS
+    // GUARD SILENTLY. The first render of a split route is the Suspense fallback,
+    // not the page -- and the emptiness assertion below is satisfied by a
+    // fallback. So a page whose module failed to import (a broken default export,
+    // a renamed named-export, a throw at import time -- the entire class this
+    // test exists for) would have rendered a fallback forever and passed.
+    //
+    // Waiting for the fallback to GO is what keeps it honest, and it makes the
+    // guard STRONGER than it was: it now proves the chunk resolved AND the page
+    // rendered, where before there was no chunk to resolve.
+    await waitFor(
+      () =>
+        expect(
+          screen.queryByTestId('route-pending'),
+          `Route "${path}" never got past its Suspense fallback. Its module did ` +
+            `not resolve -- which is an import-time break on that page, not a slow ` +
+            `test. Run the route in a browser and read the console.`,
+        ).not.toBeInTheDocument(),
+      { timeout: 5000 },
+    )
+
+    // 🔴 THE FALLBACK LEAVING IS NOT PROOF THE PAGE ARRIVED. It also leaves when the
+    // import REJECTS. Measured, not assumed: with a default export deliberately removed
+    // from one page, the assertion above passed, this route reported GREEN, and the only
+    // signal was an unattributed "1 unhandled error" after the whole run.
+    //
+    // The layouts' ErrorBoundary is what fixes that: a route that throws now renders the
+    // boundary's fallback IN PLACE, so the failure is visible to the test for the route
+    // that caused it, by name, instead of escaping the run.
+    expect(
+      screen.queryByTestId('route-error'),
+      `Route "${path}" rendered the error boundary's fallback instead of the page. ` +
+        `For a lazy route that is almost always an import-time break -- a missing ` +
+        `default export, a renamed named-export, or a throw at module scope.`,
+    ).not.toBeInTheDocument()
 
     // Let the page's mount-time requests actually START and settle while the
     // smoke layer is still installed. Without this the test finishes, the

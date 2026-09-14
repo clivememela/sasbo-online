@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, Button } from "../../components/form";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
+import Modal, { closeOn } from "../../components/overlay/Modal.jsx";
 import { validateEmail } from "../../utils/validateSAID.js";
 
 const EMPTY = {
@@ -84,23 +85,36 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-gray-100 dark:border-gray-700">
-        <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50">
-          <h3 className="text-2xl font-bold text-cyan-700 dark:text-cyan-400">
-            {isReadOnlyView ? "Bank Details" : isEditMode ? "Edit Bank/Branch Details" : "Add Bank/Branch Details"}
-          </h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition text-gray-500">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
+    // 🔴 `03.4`: was a bare `fixed inset-0` overlay with its own hand-rolled header, its
+    // own close button, and `max-h-[90vh]` -- a `vh` cap, which on a phone puts the Save
+    // button under the browser chrome (conventions §6). `Modal` portals it, traps focus,
+    // handles Escape, locks the page, and caps in `dvh`; the close button is its own.
+    <Modal
+      open
+      onOpenChange={closeOn(onClose)}
+      title={isReadOnlyView ? "Bank Details" : isEditMode ? "Edit Bank/Branch Details" : "Add Bank/Branch Details"}
+      size="xl"
+      footer={
+        <>
+          {/* 🔴 was `variant="secondary"`, which Button has never had -- the old
+              `VARIANTS[variant] ?? VARIANTS.default` silently rendered `default` for it. That
+              is the exact silent degrade `pick()` now refuses, and this call site is what it
+              found. Naming the variant it was ALREADY rendering: no pixel changes. */}
+          <Button type="button" onClick={isReadOnlyView ? onClose : handleCancel} variant="default">{isReadOnlyView ? "Close" : "Cancel"}</Button>
+          {isReadOnlyView ? (
+            <Button type="button" variant="primary" onClick={() => setIsEditing(true)}>Edit</Button>
+          ) : (
+            <Button type="submit" form="add-bank-form" variant="primary" loading={loading}>
+              {isEditMode ? "Save Changes" : "Save"}
+            </Button>
+          )}
+        </>
+      }
+    >
         {isReadOnlyView ? (
-          <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-6">
+          <div className="space-y-6">
             <section className="space-y-4">
-              <h4 className="text-sm font-bold uppercase tracking-widest text-cyan-600 dark:text-cyan-500 border-l-4 border-cyan-600 pl-3">General Info</h4>
+              <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">General Info</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <DetailItem label="Bank Name" value={form.bankName} />
                 <DetailItem label="Abbreviation" value={form.bankAbbreviation} />
@@ -112,7 +126,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
             </section>
 
             <section className="space-y-4">
-              <h4 className="text-sm font-bold uppercase tracking-widest text-cyan-600 dark:text-cyan-500 border-l-4 border-cyan-600 pl-3">Contact & Management</h4>
+              <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Contact & Management</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <DetailItem label="Phone Number" value={form.phoneNumber} />
                 <DetailItem label="Fax" value={form.fax} />
@@ -122,7 +136,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
             </section>
 
             <section className="space-y-4">
-              <h4 className="text-sm font-bold uppercase tracking-widest text-cyan-600 dark:text-cyan-500 border-l-4 border-cyan-600 pl-3">Address</h4>
+              <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Address</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <DetailItem label="Physical Address" value={form.physicalAddress} />
                 <DetailItem label="Postal Address" value={form.postalAddress} />
@@ -130,7 +144,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
             </section>
 
             <section className="space-y-4">
-              <h4 className="text-sm font-bold uppercase tracking-widest text-cyan-600 dark:text-cyan-500 border-l-4 border-cyan-600 pl-3">Operations & Codes</h4>
+              <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Operations & Codes</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <DetailItem label="Province Committee Code" value={form.provinceCommitteeCode} />
                 <DetailItem label="Province Committee Name" value={form.provinceCommitteeName} />
@@ -144,9 +158,9 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
             </section>
           </div>
         ) : (
-          <form id="add-bank-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-6">
+          <form id="add-bank-form" onSubmit={handleSubmit} className="space-y-6">
           <section className="space-y-4">
-            <h4 className="text-sm font-bold uppercase tracking-widest text-cyan-600 dark:text-cyan-500 border-l-4 border-cyan-600 pl-3">General Info</h4>
+            <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">General Info</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <TextInput label="Bank Name *" value={form.bankName} onChange={set("bankName")} placeholder="e.g. Standard Bank" />
               <TextInput label="Abbreviation" value={form.bankAbbreviation} onChange={set("bankAbbreviation")} placeholder="e.g. STD" />
@@ -158,7 +172,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
           </section>
 
           <section className="space-y-4">
-            <h4 className="text-sm font-bold uppercase tracking-widest text-cyan-600 dark:text-cyan-500 border-l-4 border-cyan-600 pl-3">Contact & Management</h4>
+            <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Contact & Management</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <TextInput label="Phone Number" value={form.phoneNumber} onChange={set("phoneNumber")} placeholder="Phone" />
               <TextInput label="Fax" value={form.fax} onChange={set("fax")} placeholder="Fax" />
@@ -168,7 +182,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
           </section>
 
           <section className="space-y-4">
-            <h4 className="text-sm font-bold uppercase tracking-widest text-cyan-600 dark:text-cyan-500 border-l-4 border-cyan-600 pl-3">Address</h4>
+            <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Address</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <AddressAutocomplete label="Physical Address" value={form.physicalAddress} onChange={set("physicalAddress")} placeholder="Start typing a physical address..." />
               <AddressAutocomplete label="Postal Address" value={form.postalAddress} onChange={set("postalAddress")} placeholder="Start typing a postal address..." />
@@ -176,7 +190,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
           </section>
 
           <section className="space-y-4">
-            <h4 className="text-sm font-bold uppercase tracking-widest text-cyan-600 dark:text-cyan-500 border-l-4 border-cyan-600 pl-3">Operations & Codes</h4>
+            <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Operations & Codes</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <TextInput label="Province Committee Code" value={form.provinceCommitteeCode} onChange={set("provinceCommitteeCode")} placeholder="e.g. GP" />
               <TextInput label="Province Committee Name" value={form.provinceCommitteeName} onChange={set("provinceCommitteeName")} placeholder="e.g. Gauteng" />
@@ -189,22 +203,11 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
             </div>
           </section>
 
-          {error && <p className="text-sm text-red-500 dark:text-red-400">{error}</p>}
+          {error && <p className="text-sm text-status-suspended">{error}</p>}
           </form>
         )}
 
-        <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3 bg-gray-50/50 dark:bg-gray-900/50">
-          <Button type="button" onClick={isReadOnlyView ? onClose : handleCancel} variant="secondary">{isReadOnlyView ? "Close" : "Cancel"}</Button>
-          {isReadOnlyView ? (
-            <Button type="button" variant="primary" onClick={() => setIsEditing(true)}>Edit</Button>
-          ) : (
-            <Button type="submit" form="add-bank-form" variant="primary" disabled={loading}>
-              {loading ? "Saving..." : isEditMode ? "Save Changes" : "Save"}
-            </Button>
-          )}
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -213,10 +216,10 @@ function DetailItem({ label, value }) {
 
   return (
     <div>
-      <label className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">
+      <label className="text-[10px] uppercase tracking-wider text-ink-muted font-bold">
         {label}
       </label>
-      <p className="font-semibold text-gray-800 dark:text-gray-200 text-lg break-words">
+      <p className="font-semibold text-ink text-lg break-words">
         {displayValue}
       </p>
     </div>

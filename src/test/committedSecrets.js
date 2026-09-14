@@ -94,9 +94,17 @@ export function isExcluded(path) {
   return PATH_EXCLUSIONS.some((exclusion) => exclusion.match.test(path))
 }
 
-/** Every file git tracks in `repoRoot`, as repo-relative forward-slash paths. */
-export function trackedFiles(repoRoot) {
-  return execFileSync('git', ['ls-files', '-z'], { cwd: repoRoot, encoding: 'utf8' })
+/**
+ * Every file git tracks in `repoRoot`, as repo-relative forward-slash paths.
+ *
+ * The pathspec is optional and additive: no arguments means the whole repository, which
+ * is what the secret scan wants. `ignoredSources.js` passes `'src', 'index.html'` rather
+ * than keeping a second copy of this call -- the NUL-splitting convention and the "git
+ * absent, or not a repository" behaviour belong in one place, because the guard that
+ * consumes them reports a CLEAN repository when they go wrong.
+ */
+export function trackedFiles(repoRoot, ...pathspec) {
+  return execFileSync('git', ['ls-files', '-z', ...pathspec], { cwd: repoRoot, encoding: 'utf8' })
     .split('\0')
     .filter(Boolean)
 }

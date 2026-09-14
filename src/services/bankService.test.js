@@ -3,7 +3,6 @@ import { http, HttpResponse } from 'msw'
 
 import { bankService } from './bankService'
 import { server } from '../test/msw/server'
-import { DEFECTS, disabled, pin } from '../test/knownDefects'
 
 /**
  * `bankService` gets its own file for two reasons.
@@ -74,31 +73,29 @@ describe('bankService.getBankListing', () => {
   })
 
   describe('the second swallow -- the inner /api/banks failure', () => {
-    it.skip(
-      disabled(
-        DEFECTS.A13,
-        'a failed /api/banks call must not be reported as a successful listing',
-      ),
-      async () => {
-        // Written to the correct behaviour: if the data needed to complete the
-        // listing could not be fetched, the caller is told, rather than handed
-        // a listing that is quietly incomplete.
-        server.use(branchesOk(), banksFail())
-        await expect(bankService.getBankListing()).rejects.toThrow()
-      },
-    )
+    /*
+     * ⚠️ THE INNER FALLBACK SURVIVES 06.1a, AND IT IS NO LONGER A13 -- IT IS A CLASSIFICATION.
+     *
+     * A13 is closed: the listing's PRIMARY call (`/api/banks/branches`) rejects properly now. What
+     * remains is the SECOND, enrichment call to `/api/banks`, which supplies the universal branch
+     * codes and still falls back to `[]`. That is deliberate and documented at the site: losing it
+     * empties one column rather than the page, which is EH-D9's "partial failure stays partial"
+     * rather than "failure indistinguishable from emptiness".
+     *
+     * 🔑 SO THIS TEST IS RE-AIMED AT THE REAL REMAINING DEFECT, which is not the fallback but its
+     * SHAPE -- and that is worth keeping because it is genuinely surprising. It cites no register
+     * row because closing A13 would otherwise have taken the only assertion covering this
+     * behaviour with it.
+     */
+    it('a failed /api/banks call degrades the listing rather than losing it', async () => {
+      server.use(branchesOk(), banksFail())
+      const listing = await bankService.getBankListing()
 
-    it(
-      pin(DEFECTS.A13, 'a failed /api/banks call still resolves as a complete-looking listing'),
-      async () => {
-        server.use(branchesOk(), banksFail())
-        const listing = await bankService.getBankListing()
-
-        expect(
-          listing,
-          'A13 has been fixed at the inner call -- getBankListing no longer resolves when ' +
-            '/api/banks fails. Delete this pin and un-skip the test above.',
-        ).toHaveLength(2)
+      expect(
+        listing,
+        'The enrichment call failing now loses the whole listing. One missing column is the ' +
+          'intended degradation; a blank page is not.',
+      ).toHaveLength(2)
 
         // This is the damage, asserted rather than described -- and it is worse
         // than "the codes are blank". When the banks call fails, `banksResult`
@@ -131,35 +128,24 @@ describe('bankService.getBankNames -- the first swallow', () => {
     expect(await bankService.getBankNames()).toEqual(['Absa Bank', 'Standard Bank'])
   })
 
-  it.skip(
-    disabled(DEFECTS.A13, 'a failed bank-name fetch must not read as "there are no banks"'),
-    async () => {
-      server.use(banksFail())
-      await expect(bankService.getBankNames()).rejects.toThrow()
-    },
-  )
-
-  it(pin(DEFECTS.A13, 'a failed bank-name fetch still returns an empty list'), async () => {
+  // ✅ A13's PAIR, FLIPPED BY 06.1a. The pin that asserted an empty list is deleted; this is the
+  // standard-facing test it was blocking.
+  it('a failed bank-name fetch does NOT read as "there are no banks"', async () => {
     server.use(banksFail())
-    expect(
-      await bankService.getBankNames(),
-      'A13 has been fixed at getBankNames. Delete this pin and un-skip the test above.',
-    ).toEqual([])
+    await expect(bankService.getBankNames()).rejects.toThrow()
   })
 
-  it('CANNOT distinguish "the backend is down" from "there are no banks"', async () => {
-    // The register row in one assertion. Both calls return exactly the same
-    // value, so no caller -- and no screen -- can tell the two apart. This is
-    // what makes it a CONFIDENT WRONG ANSWER rather than merely a missing
-    // error path.
+  it('CAN distinguish "the backend is down" from "there are no banks"', async () => {
+    // 🔑 INVERTED, NOT DELETED -- the same fact stated the right way round, which is what would
+    // notice a regression. It used to assert `whenDown === whenEmpty`, i.e. that the two were
+    // INDISTINGUISHABLE, and that assertion was the register row in one line. Now one rejects and
+    // the other resolves empty, and this is the test that fails if the `.catch` ever comes back.
     server.use(banksFail())
-    const whenDown = await bankService.getBankNames()
+    await expect(bankService.getBankNames()).rejects.toThrow()
 
     server.resetHandlers()
     server.use(http.get('*/api/banks', () => HttpResponse.json([])))
-    const whenEmpty = await bankService.getBankNames()
-
-    expect(whenDown).toEqual(whenEmpty)
+    expect(await bankService.getBankNames()).toEqual([])
   })
 })
 

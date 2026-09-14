@@ -1,5 +1,9 @@
-import { Download, FileText, ChevronDown, ChevronRight, Search, X } from "lucide-react";
+import { Download, FileText, ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useMemo } from "react";
+import PageTitle from '../../components/common/PageTitle';
+import Sheet from '../../components/common/Sheet.jsx';
+import DataState from '../../components/common/DataState.jsx';
+import { Button, TextInput } from '../../components/form';
 
 export default function AffiliationsOtherTradeUnions() {
   const [expandedFolders, setExpandedFolders] = useState({});
@@ -152,79 +156,97 @@ export default function AffiliationsOtherTradeUnions() {
   }, [fileStructure, searchQuery]);
 
   return (
-    <div className="p-6 text-gray-900 dark:text-gray-100">
-      <h2 className="text-3xl text-center mb-2 text-cyan-700 dark:text-cyan-400">
-        Affiliations & Other Trade Unions
-      </h2>
-      <p className="text-center text-gray-600 dark:text-gray-400 mb-2">
-        COSATU congress documents, membership figures, trade union constitutions, and international affiliations
-      </p>
-      <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
+    <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+      <PageTitle
+        title="Affiliations & Other Trade Unions"
+        subtitle="COSATU congress documents, membership figures, trade union constitutions, and international affiliations"
+      />
+      <p className="mt-3 mb-6 text-sm text-ink-muted">
         {totalFiles} documents in {Object.keys(fileStructure).length} categories
       </p>
 
-      <div className="max-w-4xl mx-auto mb-6">
-        <div className="relative">
-          <Search size={18} className="absolute left-3 top-3 text-gray-400 dark:text-gray-500" />
-          <input
-            type="text"
-            placeholder="Search documents and folders..."
+      <div className="mb-6 max-w-xl">
+        {/* 🔴 THE CLEAR BUTTON HAD NO ACCESSIBLE NAME -- an `<X>` icon and
+            nothing else. `TextInput kind="search"` also brings the search
+            keyboard and the "Search" return key on a phone, and the 16px rule. */}
+        <div className="flex items-end gap-2">
+          <TextInput
+            label="Search"
+            kind="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            placeholder="Search documents and folders..."
+            className="flex-1"
           />
           {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-            >
-              <X size={18} />
-            </button>
+            <Button variant="ghost" onClick={() => setSearchQuery("")}>Clear</Button>
           )}
         </div>
-        {searchQuery && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+        {searchQuery && Object.keys(filteredStructure).length > 0 && (
+          <p className="text-sm text-ink-muted mt-2">
             Found {Object.keys(filteredStructure).length} categories with {Object.values(filteredStructure).reduce((sum, files) => sum + files.length, 0)} matching documents
           </p>
         )}
       </div>
 
-      <div className="max-w-4xl mx-auto">
-        {Object.entries(filteredStructure).map(([folder, files]) => (
-          <div key={folder} className="mb-2">
+      <div className="max-w-4xl">
+        {/* 🔴 A SEARCH THAT MATCHED NOTHING LEFT THE PAGE BLANK. The list simply stopped
+            rendering, and the only signal was the "Found 0 …" line above -- which itself only
+            appears while a search is typed, and which reads as a fact about the archive rather
+            than about the query. A blank page with a filled search box is the shape a user
+            reads as "broken", and there was no way out of it but to clear the field by hand. */}
+        {Object.keys(filteredStructure).length === 0 ? (
+          <Sheet>
+            <DataState
+              state="empty"
+              title={searchQuery ? "Nothing matches that search." : "Nothing here yet."}
+              message={searchQuery ? "Try fewer words, or clear the search to see everything again." : null}
+              action={searchQuery
+                ? <Button variant="default" onClick={() => setSearchQuery("")}>Clear the search</Button>
+                : null}
+            />
+          </Sheet>
+        ) : (
+          <Sheet className="divide-y divide-line">
+            {Object.entries(filteredStructure).map(([folder, files]) => (
+          <div key={folder}>
             <button
+              type="button"
               onClick={() => toggleFolder(folder)}
-              className="w-full flex items-center gap-2 p-3 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-700 text-left"
+              aria-expanded={Boolean(expandedFolders[folder])}
+              className="touch-target flex w-full items-center gap-2.5 px-5 py-3.5 text-left transition-colors duration-(--duration-instant) hover-hover:hover:bg-surface-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-ring"
             >
               {expandedFolders[folder] ? (
-                <ChevronDown size={18} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                <ChevronDown size={18} className="text-brand-ink flex-shrink-0" />
               ) : (
-                <ChevronRight size={18} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                <ChevronRight size={18} className="text-brand-ink flex-shrink-0" />
               )}
               <span className="font-semibold text-sm">{folder}</span>
-              <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">({files.length})</span>
+              <span className="ml-auto text-xs text-ink-muted">({files.length})</span>
             </button>
 
             {expandedFolders[folder] && (
-              <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-300 dark:border-gray-600 pl-4">
+              <div className="border-t border-line bg-surface-2/60 py-1.5 pl-[38px] pr-3 sm:pl-[46px]">
                 {files.map((file, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-900 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    className="flex items-center justify-between rounded-md px-3 py-1.5 transition-colors hover-hover:hover:bg-surface"
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <FileText size={16} className="text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                      <FileText size={16} className="text-brand-ink flex-shrink-0" />
                       <span className="text-sm truncate">{file}</span>
                     </div>
-                    <button className="ml-2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors flex-shrink-0">
-                      <Download size={16} className="text-cyan-600 dark:text-cyan-400" />
-                    </button>
+                    <Button size="icon" variant="ghost" aria-label={`Download ${file}`} className="ml-2 shrink-0">
+                      <Download size={16} aria-hidden="true" className="text-brand-ink" />
+                    </Button>
                   </div>
                 ))}
               </div>
             )}
           </div>
-        ))}
+            ))}
+          </Sheet>
+        )}
       </div>
     </div>
   );

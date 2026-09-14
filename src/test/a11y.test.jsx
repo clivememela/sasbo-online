@@ -2,14 +2,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
-import { axe } from 'vitest-axe'
 
-import { DEFECTS, disabled, pin } from './knownDefects'
 import MembersPage from '../pages/members/Members'
 import CaptureMember from '../pages/members/CaptureMember'
 import BankListing from '../pages/bank_branch/BankListing'
 import { renderWithProviders } from './renderWithProviders'
-import { AXE_RULES, expectNoA11yViolations } from './assertions'
+import { expectNoA11yViolations } from './assertions'
 import { server } from './msw/server'
 import { smokeHandlers } from './msw/smokeLayer'
 import { pageFixtures } from './msw/pageFixtures'
@@ -37,14 +35,14 @@ beforeEach(() => {
 })
 
 describe('accessibility', () => {
-  it.skip(disabled(DEFECTS.A28, 'the Members list must have no violations'), async () => {
+  it('the Members list has no violations', async () => {
     const { container } = renderWithProviders(<MembersPage />)
-    await screen.findByText(/No Sasbo members match/i)
+    await screen.findByText(/No members match these criteria/i)
     await expectNoA11yViolations(container)
   })
 
-  it.skip(
-    disabled(DEFECTS.A28, 'the Members list must have no violations with rows rendered'),
+  it(
+    'the Members list has no violations with rows rendered',
     async () => {
       // The empty table and the populated table are different DOM. Scanning
       // only the empty one would miss every violation that lives in a row.
@@ -61,32 +59,19 @@ describe('accessibility', () => {
     },
   )
 
-  it(
-    pin(DEFECTS.A28, 'the Members list still has exactly one violation, and it is select-name'),
-    async () => {
-      // Pinned NARROWLY, on purpose. Asserting "there is at least one
-      // violation" would stay green if five more appeared; asserting the exact
-      // set means a NEW violation reddens this test too, and the message says
-      // which. The pin is a defect record, not a licence.
-      const { container } = renderWithProviders(<MembersPage />)
-      await screen.findByText(/No Sasbo members match/i)
-
-      // AXE_RULES, not an inline copy. This file's own header says the rule
-      // config must live only in `expectNoA11yViolations` "so it cannot be
-      // re-enabled in one file and forgotten in another" -- and then restated it
-      // here. This pin needs the raw violation ids rather than a pass/fail, so
-      // it calls `axe` directly, but it takes the shared config to do it.
-      const results = await axe(container, { rules: AXE_RULES })
-      const ids = (results.violations ?? []).map((v) => v.id).sort()
-
-      expect(
-        ids,
-        'The Members list violation set has changed. If it is now empty, A28 is fixed -- ' +
-          'delete this pin and un-skip the two tests above. If it grew, a NEW ' +
-          'accessibility defect has been introduced and needs its own row.',
-      ).toEqual(['select-name'])
-    },
-  )
+  /**
+   * 🔴 A28's PIN WAS HERE, AND IT IS DELETED RATHER THAN EDITED.
+   *
+   * It asserted the violation set was exactly `['select-name']`. The tempting change was
+   * `.toEqual([])` -- one character, same file, and completely wrong: a pin records a
+   * defect, so when the defect goes the pin goes with it. Editing it would have turned a
+   * record of something broken into a duplicate of the two tests above, which already
+   * assert no violations by discovery rather than by list.
+   *
+   * The fix is in `Members.jsx`: the "Identity Type" filter is `SelectInput` now, which
+   * carries a real `<label htmlFor>`. See `knownDefects.js` for the retirement note and
+   * for the SECOND site the register never named.
+   */
 
   it('the CaptureMember form has no violations', async () => {
     const { container } = renderWithProviders(<CaptureMember />)
@@ -116,6 +101,18 @@ describe('the a11y gate can actually fail', () => {
     // block above. A gate that has never been seen to fail is not a gate.
     const { container } = renderWithProviders(
       <div>
+        {/* 🔑 THE ONE PLACE IN THIS REPOSITORY WHERE MISSING `alt` IS THE POINT, so the
+            lint rule and this test assert opposite things and the test is the stronger of
+            the two. `jsx-a11y/alt-text` reads this as the defect it is designed to catch;
+            what it cannot see is that the defect is the FIXTURE. Disabled here, at the one
+            site, with the reason -- never at config level, because a rule switched off for
+            the file would then be off for every real `<img>` a future test renders, which
+            is exactly the masking L20 describes.
+
+            It cannot hide a genuine regression either: the assertions below REQUIRE axe to
+            report `image-alt` here, so an `alt` added to quieten the linter turns this test
+            red rather than green. */}
+        {/* eslint-disable-next-line jsx-a11y/alt-text -- deliberately invalid: this is the gate's own reddening fixture, and the assertions below require it to fail */}
         <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" />
         <input type="text" />
       </div>,

@@ -1,5 +1,6 @@
 import process from 'node:process'
 import { availableParallelism } from 'node:os'
+import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -32,6 +33,17 @@ if (isVitest) {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+
+  // `@/` -> `src/`. Added by 03.1 because shadcn's generated components import
+  // through it, and because the alternative -- `../../../components/ui/x` from a
+  // page three directories deep -- is how imports quietly stop being moved.
+  // It is mirrored in jsconfig.json so the editor resolves it too; the two must
+  // agree, and Vite's copy is the one that decides whether the build works.
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
 
   // Everything below is read by Vitest only. `vite build` ignores the `test`
   // key entirely -- proven in this phase by running `npm run build` and

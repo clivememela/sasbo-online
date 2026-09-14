@@ -8,7 +8,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { expectErrorState } from '../../test/assertions'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
-import { DEFECTS, disabled, pin } from '../../test/knownDefects'
+import { setupUser } from '../../test/user'
 
 /**
  * THE THREE-STATE RULE, TESTED WHERE IT IS CLAIMED.
@@ -20,9 +20,15 @@ import { DEFECTS, disabled, pin } from '../../test/knownDefects'
  * screen, which is exactly why nobody notices.
  *
  * This is the flagship list page of the application, so it is where the rule
- * matters most. Measured 2026-09-05: it has NEITHER a loading state nor an
- * error state (register A27). The mount effect's entire failure handling is
- * `console.error`, and `membersList` simply stays `[]`.
+ * matters most.
+ *
+ * ✅ **A27 IS CLOSED, by `04.2`.** When these were written the page had NEITHER a loading
+ * state nor an error state: the mount effect's entire failure handling was `console.error`
+ * and `membersList` simply stayed `[]`. The register now renders through the `Table`
+ * primitive, whose four data states are separate branches by construction. The three pins
+ * that recorded the defect are deleted, the two standard-facing tests below are un-skipped,
+ * and the "cannot be told apart" case is INVERTED rather than removed -- it is the
+ * assertion that would notice the day someone reintroduced the old shape.
  *
  * Every assertion about the failed state goes through `expectErrorState` from
  * `src/test/assertions.js` rather than being hand-rolled here. A second
@@ -31,8 +37,10 @@ import { DEFECTS, disabled, pin } from '../../test/knownDefects'
  * author remembered both halves of it.
  */
 
-/** The empty state's own words. The whole defect turns on this string. */
-const EMPTY_TEXT = /No Sasbo members match the specified query definitions/i
+/** The empty state's own words. The whole defect turned on this string. */
+// card.html's own sentence for the empty register; the search-shaped variant reads
+// "No member matches “…”" and is not this test's subject.
+const EMPTY_TEXT = /No members match these criteria/i
 
 const MEMBERS = [
   {
@@ -47,17 +55,19 @@ const MEMBERS = [
 const membersRespond = (body, status = 200) =>
   http.get('*/api/members', () => HttpResponse.json(body, { status }))
 
+/** A slow answer, so the loading state is observable rather than a race. */
+const membersRespondSlowly = () =>
+  http.get('*/api/members', async () => {
+    await new Promise((r) => setTimeout(r, 50))
+    return HttpResponse.json(MEMBERS)
+  })
 
-/**
- * The page's ENTIRE failure handling is `console.error`, so it is also the
- * only observable signal that a rejection has been processed. The pins below
- * wait on it before asserting, which is what stops them asserting the loading
- * render by accident.
- */
 let consoleError
 
 describe('the Members list', () => {
   beforeEach(() => {
+    // Still spied: the page logs the failure as well as showing it, and an unmocked
+    // console.error would be real noise on a green run.
     consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     server.use(...pageFixtures)
   })
@@ -84,107 +94,70 @@ describe('the Members list', () => {
   })
 
   describe('the LOADING state', () => {
-    it.skip(
-      disabled(DEFECTS.A27, 'the list must say it is loading before it says it is empty'),
-      async () => {
-        // Written to the standard: a request that has not answered yet is not
-        // an answer. Today the page renders its empty table synchronously on
-        // mount, so the FIRST thing every user sees, every time, is "no
-        // members" -- which then flickers into data.
-        server.use(
-          http.get('*/api/members', async () => {
-            await new Promise((r) => setTimeout(r, 50))
-            return HttpResponse.json(MEMBERS)
-          }),
-        )
-        renderWithProviders(<MembersPage />)
-
-        expect(screen.getByRole('status')).toBeInTheDocument()
-        expect(screen.queryByText(EMPTY_TEXT)).not.toBeInTheDocument()
-      },
-    )
-
-    it(pin(DEFECTS.A27, 'the list still shows "no members" before the request answers'), () => {
-      server.use(
-        http.get('*/api/members', async () => {
-          await new Promise((r) => setTimeout(r, 50))
-          return HttpResponse.json(MEMBERS)
-        }),
-      )
+    it('says it is loading before it says it is empty', async () => {
+      // A request that has not answered yet is not an answer. The page used to render
+      // its empty table synchronously on mount, so the FIRST thing every user saw,
+      // every time, was "no members" -- which then flickered into data.
+      server.use(membersRespondSlowly())
       renderWithProviders(<MembersPage />)
 
-      // Synchronously, before anything has answered.
-      expect(
-        screen.queryByText(EMPTY_TEXT),
-        'A27 has been fixed at the loading state -- the page no longer claims to be empty ' +
-          'while it is still fetching. Delete this pin and un-skip the test above.',
-      ).toBeInTheDocument()
+      expect(screen.getByRole('status')).toBeInTheDocument()
+      expect(screen.queryByText(EMPTY_TEXT)).not.toBeInTheDocument()
+
+      // ...and it does eventually finish. Without this the test above would also pass
+      // against a page that renders a spinner and never anything else -- which is A22's
+      // shape, one row over.
+      expect(await screen.findByText(/Testperson/)).toBeInTheDocument()
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
     })
   })
 
   describe('the FAILED state', () => {
-    it.skip(
-      disabled(DEFECTS.A27, 'a failed fetch must show an error with a retry, not "no members"'),
-      async () => {
-        server.use(membersRespond({ status: 500, error: 'Internal Server Error' }, 500))
-        renderWithProviders(<MembersPage />)
+    it('shows an error with a retry, not "no members"', async () => {
+      server.use(membersRespond({ status: 500, error: 'Internal Server Error' }, 500))
+      renderWithProviders(<MembersPage />)
 
-        // Both halves, through the shared helper: the error affordance is
-        // present AND the empty-state text is absent.
-        const { retry } = await expectErrorState({ emptyText: EMPTY_TEXT })
-        expect(retry, 'a failed list must offer a way to try again').not.toBeNull()
-      },
-    )
+      // 🔑 WAIT FIRST. `expectErrorState` queries SYNCHRONOUSLY -- it checks both halves
+      // of the rule at the instant it is called, which is what makes it a rule and not a
+      // poll. Called straight after render it asserts about the LOADING screen, where
+      // there is legitimately no error affordance yet, and reports the confident-wrong-
+      // answer failure for a page that is behaving perfectly.
+      await screen.findByRole('alert')
 
-    it(
-      pin(DEFECTS.A27, 'a failed fetch still renders as "there are no members"'),
-      async () => {
-        server.use(membersRespond({ status: 500, error: 'Internal Server Error' }, 500))
-        renderWithProviders(<MembersPage />)
+      // Both halves, through the shared helper: the error affordance is
+      // present AND the empty-state text is absent.
+      const { retry } = await expectErrorState({ emptyText: EMPTY_TEXT })
+      expect(retry, 'a failed list must offer a way to try again').not.toBeNull()
+    })
 
-        // WAIT FOR THE FAILURE TO HAVE BEEN HANDLED FIRST.
-        //
-        // An earlier version of this pin asserted the empty text immediately.
-        // It passed -- and it would have passed against a page with a perfect
-        // error state, because the empty table is ALSO what renders at t=0
-        // before any request has answered. The assertion was true of the
-        // loading render, not of the failed one, so it could not fail.
-        //
-        // Found by running this phase's second reddening change: an error
-        // state was added to the page on purpose, and this pin stayed green.
-        // That is the "assertion that cannot fail" the plans warn about, and
-        // the only reason it was caught is that the change was actually RUN
-        // rather than reasoned about.
-        //
-        // `console.error` is the page's entire failure handling, so it is also
-        // the only observable signal that the rejection has been processed.
-        await waitFor(() =>
-          expect(consoleError).toHaveBeenCalledWith(
-            expect.stringContaining('Failed fetching records array'),
-            expect.anything(),
-          ),
-        )
+    it('the retry actually re-runs the request, and recovers', async () => {
+      // 🔑 AN ERROR STATE WITH A DEAD BUTTON IS STILL A DEAD END, and that is invisible
+      // from the outside: the affordance is there, it has the right name, and pressing
+      // it does nothing. The assertion above cannot tell those apart -- this can.
+      const user = setupUser()
+      server.use(membersRespond({ status: 500 }, 500))
+      renderWithProviders(<MembersPage />)
 
-        // NOW the assertion means something: the failure has been handled, and
-        // the screen still states a fact about the union.
-        expect(
-          screen.getByText(EMPTY_TEXT),
-          'A27 has been fixed at the failed state. Delete this pin, un-skip the test ' +
-            'above, and close the row.',
-        ).toBeInTheDocument()
+      await screen.findByRole('alert')
+      const { retry } = await expectErrorState({ emptyText: EMPTY_TEXT })
 
-        // And there is nothing at all to distinguish it.
-        expect(screen.queryByRole('alert')).toBeNull()
-        expect(screen.queryByRole('button', { name: /retry|try again|reload/i })).toBeNull()
-      },
-    )
+      server.use(membersRespond(MEMBERS))
+      await user.click(retry)
 
-    it('CANNOT be told apart from a genuinely empty list', async () => {
-      // The register row in one assertion, and the reason this is a defect
-      // rather than a missing nicety: the two screens are identical.
+      expect(await screen.findByText(/Testperson/)).toBeInTheDocument()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+
+    it('CAN be told apart from a genuinely empty list', async () => {
+      // 🔴 THE INVERSION. This case used to assert the two screens were IDENTICAL, with a
+      // message saying "if these now differ, check A27". They differ. It is kept, the
+      // right way round, because it is the one assertion that compares the two screens
+      // against each other rather than each against a fixture -- so it is what would
+      // notice the day a well-meaning change made a failed fetch fall back to `[]` again.
       server.use(membersRespond({ status: 500 }, 500))
       const failed = renderWithProviders(<MembersPage />)
-      await screen.findByText(EMPTY_TEXT)
+      await screen.findByRole('alert')
+      await expectErrorState({ emptyText: EMPTY_TEXT })
       const whenDown = failed.container.textContent
       failed.unmount()
 
@@ -196,28 +169,44 @@ describe('the Members list', () => {
 
       expect(
         whenDown,
-        'The two screens now differ, which means the application has started ' +
-          'distinguishing "the backend is down" from "there are no members". Check A27.',
-      ).toBe(whenEmpty)
+        'The backend being down and the union having no members render the same screen ' +
+          'again. That is A27 exactly: an administrator reads "no members" as a fact ' +
+          'about the union rather than a fact about the server.',
+      ).not.toBe(whenEmpty)
     })
   })
 
   describe('the network never being reached at all', () => {
-    it(pin(DEFECTS.A27, 'a network failure is also reported as "no members"'), async () => {
+    it('is reported as a failure too, not as "no members"', async () => {
+      // A rejected fetch and a 500 arrive at the page by different paths -- one throws
+      // before there is a response to read -- and only one of them was ever exercised.
       server.use(http.get('*/api/members', () => HttpResponse.error()))
       renderWithProviders(<MembersPage />)
 
-      // Same discipline as the pin above: wait until the rejection has
-      // actually been handled, or this asserts the loading render instead.
-      await waitFor(() =>
-        expect(consoleError).toHaveBeenCalledWith(
-          expect.stringContaining('Failed fetching records array'),
-          expect.anything(),
-        ),
-      )
+      await screen.findByRole('alert')
+      const { retry } = await expectErrorState({ emptyText: EMPTY_TEXT })
+      expect(retry).not.toBeNull()
 
-      expect(screen.getByText(EMPTY_TEXT)).toBeInTheDocument()
-      expect(screen.queryByRole('alert')).toBeNull()
+      /*
+       * 🔑 THE ASSERTION CHANGED SHAPE IN `06.1b`, AND IT GOT STRICTER RATHER THAN LOOSER.
+       *
+       * It used to require `console.error('Failed fetching records array', err)` -- a bare
+       * call with the whole rejection as its second argument. EH-D10 replaced every such
+       * call with one sink, because `06.1a` had just made every rejection carry `body`, the
+       * server's parsed envelope: on a member endpoint, that is the member. So a test
+       * demanding the old call was requiring the leak.
+       *
+       * What is asserted now is BOTH halves -- that the failure is still reported at all,
+       * which is what the old test was for, and that what is reported is the redacted line.
+       */
+      await waitFor(() => expect(consoleError).toHaveBeenCalled())
+
+      const [tag, line] = consoleError.mock.calls.at(-1)
+      expect(tag).toBe('[sasbo]')
+      expect(line).toMatchObject({ context: 'Members.loadMembers', kind: 'network' })
+      // The whole emitted line, not field by field: a sink that copied `body` wholesale
+      // under a key this test did not think to check would pass a narrower assertion.
+      expect(JSON.stringify(line)).not.toMatch(/membershipNumber|identityNumber|surname/i)
     })
   })
 })

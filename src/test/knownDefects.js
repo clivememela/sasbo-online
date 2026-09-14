@@ -91,15 +91,21 @@ export const DEFECTS = {
       'repair that activates untested behaviour.',
   ),
 
-  A11: define(
-    'A11',
-    'no error boundary -- one render error blanks the whole application',
-    'There is no ErrorBoundary, componentDidCatch or errorElement anywhere in ' +
-      'client/src, across every route in App.jsx. The three-state rule covers a failed ' +
-      'FETCH; nothing covers a failed RENDER. A single throwing component takes the ' +
-      'entire shell with it and the user gets a white screen with no message and no ' +
-      'way back.',
-  ),
+// A11 is RETIRED, 2026-09-09, by the design arc's 03.1.
+//
+// It read: "no error boundary -- one render error blanks the whole application".
+// `ErrorBoundary` now sits beside the <Outlet> in both layouts, so a throwing page is
+// a broken panel and the shell survives. Its pin was deleted and its standard-facing
+// test un-skipped in the same commit -- flipped, not repaired (BR-5) -- and
+// `src/test/errorBoundary.test.jsx` is now the regression pair rather than the record
+// of a defect.
+//
+// It is removed rather than marked closed because this file's population IS the set of
+// open rows: `defectPopulation.test.js` requires every entry here to have a live pin,
+// and a "closed" entry with no pin is exactly the shape that guard exists to reject.
+//
+// ⚠️ What is NOT closed with it: `06.1` owns the DESIGNED failed state. The boundary's
+// fallback today is plain and deliberately says so.
 
 // A12 is deliberately NOT a row here, and that is a CORRECTION to the register
 // rather than an omission.
@@ -126,24 +132,51 @@ export const DEFECTS = {
 // ever does start resolving an error envelope, it reddens there and names the
 // method.
 
-  A13: define(
-    'A13',
-    'bankService turns a failed request into an empty list',
-    'getBankNames catches and returns [] after logging; getBankListing swallows the ' +
-      'inner /api/banks failure with .catch(() => []). "There are no banks" and "the ' +
-      'backend is down" become the same screen. bank is the reference domain for both ' +
-      'the server coverage phase and the e2e reference journey, so this is the pattern ' +
-      'every other domain is told to copy.',
-  ),
+// A13 is RETIRED, 2026-09-10, by the design arc's 06.1a.
+//
+// It read: "bankService turns a failed request into an empty list". `getBankNames` ended in
+// `.catch(err => { console.error(...); return [] })`, so a 500, a network failure and a
+// non-JSON body ALL resolved with an empty array -- and eight consumers across seven screens
+// then rendered "no banks". A down backend and a database with no banks in it were the same
+// screen, and the only trace was a console line no user sees. bank being the reference domain
+// is what made it worse: it was the pattern every other domain was told to copy.
+//
+// It is on `requestJson` now (conventions.md §16) and REJECTS on all three cases, so an empty
+// array means the server genuinely returned no banks. Closed under BR-12, with the owner's nod
+// recorded in the 2026-09-09 dialog.
+//
+// Its two pins were deleted and its entry removed from the errorContract's BREACHES map in the
+// same commit -- flipped, not repaired (contract 4).
+//
+// ⚠️ What is NOT closed with it: `getBankListing`'s INNER `/api/banks` lookup still falls back
+// to `[]`, and that is deliberate and now documented at the site. It is an ENRICHMENT (it
+// supplies the universal branch codes); losing it empties one column rather than the page, which
+// is EH-D9's "partial failure stays partial" and not this row's defect. The PRIMARY call rejects.
 
-  A14: define(
-    'A14',
-    'no request timeout anywhere -- a hung backend spins forever',
-    'Zero AbortController, zero signal:, zero timeout in src/services/. The three-state ' +
-      'rule covers loading, empty and failed. A request that never resolves is none of ' +
-      'them: it renders the loading state indefinitely, which an administrator reads as ' +
-      '"the system is slow" rather than "it is down".',
-  ),
+// A14 is RETIRED, 2026-09-10, by the design arc's 06.1a.
+//
+// It read: "no request timeout anywhere -- a hung backend spins forever". Zero
+// AbortController, zero `signal:`, zero timeout of any kind across `src/services/`. It was the
+// failure mode with the longest time to detection in this application precisely because it
+// looks like the system working: an administrator reads a permanent spinner as "slow" rather
+// than "down", so nobody is called and nothing is escalated.
+//
+// Every service now threads an `AbortSignal` through `requestJson`, with the ceilings published
+// in conventions.md §16 -- 10s reads, 20s writes, and a "taking longer than expected" notice at
+// 5s that belongs to the component. A deadline we imposed rejects as `kind: 'timeout'`,
+// retryable; a caller superseding its own request is `kind: 'abort'` and is not a failure at all.
+//
+// 🔑 ITS STATIC HALF IS WHY THIS ROW COULD NOT BE SPLIT, and it shaped the commit. That pin
+// scanned `src/services/*.js` for `AbortController|signal:|AbortSignal|setTimeout` and asserted
+// the match list was EMPTY -- so a ceiling on SOME services would have failed the scan without
+// closing the row. The ceiling therefore landed across all eight services at once.
+//
+// Both pins deleted, the standard-facing test un-skipped, and the static assertion INVERTED
+// rather than deleted: it now requires the service layer to still be able to express a ceiling,
+// so a refactor that quietly drops the signal threading turns it red and names the row.
+//
+// 📨 The diff shape is owed to the Capture Member arc, whose own copy of this pin flips when the
+// branches meet. Their session was offline when this landed; recorded in repoState.md.
 
   A23: define(
     'A23',
@@ -156,17 +189,29 @@ export const DEFECTS = {
       'it addresses.',
   ),
 
-  A25: define(
-    'A25',
-    'jobGradeService.getByBank can never report a failure',
-    'It was written with a deliberate graceful fallback to the static ' +
-      'JOB_GRADE_OPTIONS when the API is unavailable. JOB_GRADE_OPTIONS was later ' +
-      'EMPTIED -- grades now come from the backend per bank -- so the fallback silently ' +
-      'became a swallow: every failure resolves as [], which the UI renders as "this ' +
-      'bank has no job grades". Neither change was wrong on its own. The defect is what ' +
-      'they became together, which is why it survived both reviews. Measured 2026-09-04: ' +
-      'the method resolves [] on a 500, on a network failure and on a non-JSON body.',
-  ),
+// A25 is RETIRED, 2026-09-10, by the design arc's 06.1b.
+//
+// It read: "jobGradeService.getByBank can never report a failure". The method ended in
+// `.catch(() => JOB_GRADE_OPTIONS)`, written as a graceful degradation and genuinely one until
+// JOB_GRADE_OPTIONS was EMPTIED -- after which every 500, dropped connection and HTML gateway
+// page resolved as `[]` and both callers rendered "No job grades available". Neither change was
+// wrong alone; the defect is what they became together, which is why it survived two reviews.
+//
+// 🔑 THE ROW'S OWN CRITERION IS WHY IT COULD NOT RIDE 06.1a WITH A13, A14 AND A24: "the method
+// rejects AND the caller renders an error". Deleting the catch alone would have rejected into
+// `CaptureMember` and `Members`, neither of which had an error state for a reference list -- an
+// unhandled rejection where a quiet fallback used to be, which is a worse application and not a
+// closed row. Both clauses landed in one commit: the catch is gone, `JOB_GRADE_OPTIONS` is gone
+// from the service and from both callers, and each caller's Job Grade field renders the failure
+// with a retry (EH-D9, per-panel: the other eight fetches on the capture form keep working).
+//
+// Its three pins were deleted and its three standard-facing cases un-skipped in the same commit
+// -- flipped, not repaired (BR-5): the method's entry in `BREACHES` is removed, so the ordinary
+// CASE 2 / 3 / 4 assertions now apply to it by discovery, and it joins the population of
+// `what a rejection carries`.
+//
+// Removed rather than marked closed, for the reason A11 records: this file's population IS the
+// set of open rows.
 
   A26: define(
     'A26',
@@ -179,33 +224,43 @@ export const DEFECTS = {
       '2026-09-04.',
   ),
 
-  A27: define(
-    'A27',
-    'the Members list has no loading state and no error state -- only "no members"',
-    'Its mount effect is four fetches whose failure handling is console.error and ' +
-      'nothing else. membersList stays [], so a backend that is DOWN renders the empty ' +
-      'state: "No Sasbo members match the specified query definitions." An administrator ' +
-      'reads that as a fact about the union rather than a fact about the server, and ' +
-      'there is no retry affordance because there is nothing that knows a request ' +
-      'failed. There is no loading state either -- the page renders its empty table ' +
-      'immediately on mount, so the first thing every user sees is "no members", every ' +
-      'time. This is the three-state rule failing at the layer the rule is written ' +
-      'about, and it is the client counterpart of the service-layer swallows A12/A13. ' +
-      'Measured 2026-09-05.',
-  ),
+// A27 is RETIRED, 2026-09-10, by the design arc's 04.2.
+//
+// It read: "the Members list has no loading state and no error state -- only 'no
+// members'". The register now renders through the `Table` primitive, whose four data
+// states are separate branches by construction: `loading` is a live status row, `error`
+// carries the message AND a retry that re-runs the fetch, and `error` can never render as
+// `empty`. The page tracks one `listState` value rather than two booleans, so the illegal
+// fourth combination cannot be reached.
+//
+// Its three pins were deleted and its two standard-facing tests un-skipped in the same
+// commit -- flipped, not repaired (BR-5). The "CANNOT be told apart" test was INVERTED
+// rather than deleted: it now asserts the two screens DIFFER, which is the same fact
+// stated the right way round and the thing that would notice a regression.
+//
+// Removed rather than marked closed, for the reason A11 records: this file's population
+// IS the set of open rows.
+//
+// ⚠️ What is NOT closed with it: `06.1b` owns generalising these states across the
+// remaining list screens, and the shared error CONTRACT. This closes the row on the
+// surface the row was written about.
 
-  A28: define(
-    'A28',
-    'the Members "Identity Type" filter is a select with no accessible name',
-    'axe rates it CRITICAL. Every neighbouring filter is a TextInput or a ' +
-      'SearchableSelect, and both of those set aria-label on the control. This one was ' +
-      'hand-rolled as a plain div with a <span>Identity Type</span> above a bare ' +
-      '<select> -- a span is not a label, so nothing associates the two ' +
-      'programmatically. Sighted users see a heading; a screen-reader user reaches a ' +
-      'dropdown announced only as "combo box", with no way to know what it filters. The ' +
-      'fix is one aria-label, or using the SelectInput component the codebase already ' +
-      'has. Found 2026-09-05 by the a11y gate on its first run.',
-  ),
+// A28 is RETIRED, 2026-09-10, by the design arc's 04.2.
+//
+// It read: "the Members 'Identity Type' filter is a select with no accessible name",
+// which axe rated CRITICAL. It was a bare <select> under a <span>Identity Type</span> --
+// a span is not a label, so nothing associated the two and a screen-reader user reached a
+// dropdown announced only as "combo box". It is now `SelectInput`, which carries a real
+// <label htmlFor> through `Field`.
+//
+// Its pin was deleted and both standard-facing a11y tests un-skipped in the same commit.
+// ⚠️ The FIX went in with the flip and the ASSERTION was never touched -- the pin
+// asserted `['select-name']` exactly, and it is gone rather than edited to expect `[]`.
+//
+// 🔑 It had a SECOND site the register never named: the BEC committee <select> in the
+// member dialog had the same defect, and the a11y gate could not see it because that gate
+// scans the LIST page. Found by sweeping the class rather than fixing the list
+// (contract 17), and fixed in the same commit through `Field`.
 
   B6: define(
     'B6',
@@ -224,16 +279,30 @@ export const DEFECTS = {
       'safe today, and this one is asserted, not assumed.',
   ),
 
-  A24: define(
-    'A24',
-    'error detail does not survive the service layer',
-    'Every service throws new Error(`HTTP ${status}`), discarding validationErrors -- ' +
-      'the one part of the Spring envelope that is stable and field-addressable. So a ' +
-      'form cannot show "idNumber: must be 13 digits" even though the server sent ' +
-      'exactly that, and the user is told only that something went wrong. The status ' +
-      'code is discarded with it, so a caller cannot distinguish a 400 it caused from ' +
-      'a 500 it did not.',
-  ),
+// A24 is RETIRED, 2026-09-10, by the design arc's 06.1a.
+//
+// It read: "error detail does not survive the service layer". Every service threw
+// `new Error(\`HTTP ${status}: ${statusText}\`)`, discarding `validationErrors` -- the one part
+// of the Spring envelope that is stable and field-addressable -- so a form could not show
+// "identityNumber: must be 13 digits" even though the server had sent exactly that. The status
+// went with it, so a caller could not tell a 400 it caused from a 500 it did not. And
+// `statusText` is the EMPTY STRING over HTTP/2, which every deployment of this application uses:
+// the whole of a failed capture's diagnosis was `HTTP 500:` with nothing after the colon.
+//
+// A QUIETER HALF, worth recording because it is the part a reader would not predict: three
+// modules (recruiter, recruitmentChannel, subscriptions) did `Promise.reject(msg)` with the raw
+// response TEXT, so a caller's ordinary `catch (e) { e.message }` was `undefined` and even the
+// free-text message was lost by anyone handling the failure the normal way.
+//
+// Every service is on `requestJson` now and rejects with an `Error` carrying `message`, `status`,
+// `validationErrors`, `kind` and `retryable` (conventions.md §16). The helper itself came verbatim
+// from the Capture Member arc's `phase/capture-member` f020af9 -- deliberately, because two error
+// paths in one service layer is worse than either -- and this arc added `kind`, `retryable` and
+// the ceiling.
+//
+// Its two pins were deleted and the standard-facing test un-skipped, plus three new live
+// assertions: the closed `kind` vocabulary over the whole discovered population, and that a 5xx is
+// retryable while a 4xx is not (so no retry button lies).
 
   A1: define(
     'A1',
@@ -277,9 +346,12 @@ export const DEFECTS = {
       'it. The `?.length > 0` guard beside the call does NOT protect, and that is the ' +
       'whole trap: a non-empty string has a length, so the guard passes and the call ' +
       'throws "cosatuPositions.join is not a function". The detail view does not render ' +
-      'at all for any member whose positions are set. With A11 -- no error boundary -- ' +
-      'that takes the whole shell, so the user gets a white screen. ' +
-      'Verified 2026-09-08 from both sides: the DTO field type and the call site.',
+      'at all for any member whose positions are set. ' +
+      'Verified 2026-09-08 from both sides: the DTO field type and the call site. ' +
+      '\u26a0\ufe0f The BLAST RADIUS shrank on 2026-09-09 and the defect did not: this used to take ' +
+      'the whole shell with it (old row A11, no boundary anywhere). With ErrorBoundary now ' +
+      'beside the outlet it is a broken panel with a way back -- still a member whose record ' +
+      'cannot be opened, and still this row.',
   ),
 
   A38: define(
