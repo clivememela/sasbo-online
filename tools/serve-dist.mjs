@@ -85,6 +85,24 @@ const members = Array.from({ length: 60 }, (_, i) => ({
   cosatuPositions: ['PEC'],
 }));
 
+/*
+ * 🔴 ONE ROW AT EVERY CAP. The register's column ladder promises that its columns FIT, and the widths it steps
+ * at were measured against this data -- whose longest member line, "Adv ABC Van der Merwe", is far short of the
+ * width the member cell allows. A real roll has longer names, so a ladder measured on this data clipped Status
+ * at widths where this data fitted. Row 8 carries the longest value each capped column can show, so every
+ * sweep measures the worst case the caps permit, and `overflowProbe`'s register check holds it there.
+ */
+Object.assign(members[7], {
+  title: 'Adv',
+  initials: 'NTN',
+  surname: 'Van der Merwe-Mokoena',
+  firstNames: 'Nomvula Thandeka Ntombifuthi',
+  employeeNumber: 'E001234567',
+  bankName: 'The Standard Bank of South Africa Limited',
+  branch: 'Johannesburg Central Business District Branch',
+  status: 'Suspended',
+});
+
 const bankRows = Array.from({ length: 40 }, (_, i) => ({
   id: i + 1,
   bankName: banks[i % banks.length],

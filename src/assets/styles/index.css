@@ -676,15 +676,31 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
 /* ── The register is a CONTAINER (card.css R-RESP-L) ──────────────────────────
    Docking the panel from 1280 narrows the register to ~560-740px, so the viewport
    stopped predicting how much room the table has. Columns respond to the register,
-   not the window: each step is the width at which the NEXT column stops fitting. */
+   not the window: each step is the width at which the NEXT column stops fitting.
+
+   🔴 THE STEPS WERE MEASURED FOR A PANEL THAT WAS ALWAYS DOCKED, AND ON NAMES SHORTER THAN THE
+   CAPS ALLOW. Ruling ② lets the record collapse, and with it closed at 1280 -- the owner's
+   machine -- the register was 968px: past the old 900px step, so six columns drew where six
+   cannot fit, and the table ran 103px past its own sheet with Status cut to "STA". Docked, it ran
+   past at 1349-1366 and 1536-1680. No instrument saw it, because the overflow was inside the
+   table's own scroller; `overflowProbe` (tools/probe.mjs) now measures every register's scroller.
+
+   📐 EACH STEP IS WHERE THE NEXT COLUMN STOPS FITTING, measured in `06.3` by holding the register
+   at an exact width with each column set forced on, over the stub's row at every cap
+   (tools/serve-dist.mjs) -- Member at 13rem, Bank and Branch at their fluid caps (Members.jsx).
+   Three columns fit from 516px, four from 660, five from 904, six from 1,110; each step sits 8px
+   above its fit. What the steps must keep is ruling ②: four columns with the record docked at
+   1440 (the register 680px) and six with it closed (1,128px).
+
+   ⚠️ IN REM, BECAUSE WHAT THEY MEASURE IS IN REM. The caps and the text grow with the root font
+   size and a px step does not: at a 125% root font (WCAG 1.4.4) on a 1024px screen the px steps
+   let the table run 8px past its sheet -- caught by `edges.mjs` ②. A container query resolves
+   `rem` against the root's computed size, so 69.875 / 57 / 41.75rem are the measured 1118 / 912 /
+   668px at the default root, and grow with it. */
 .register { container-type: inline-size; container-name: register; }
-@container register (max-width: 900px) { .register [data-fit="wide"] { display: none; } }
-@container register (max-width: 740px) { .register [data-fit="medium"] { display: none; } }
-/* The mock's 600 holds, and it was measured rather than trusted: at 1349 (the common laptop
-   with the panel docked) the register is 605px, and the four remaining columns need 598 with
-   the Bank column truncated at 10rem (Members.jsx) -- at 11rem they needed 614 and the Status
-   chip scrolled off the right edge on exactly the machine most of the union's staff use. */
-@container register (max-width: 600px) { .register [data-fit="narrow"] { display: none; } }
+@container register (max-width: 69.875rem) { .register [data-fit="wide"] { display: none; } }
+@container register (max-width: 57rem) { .register [data-fit="medium"] { display: none; } }
+@container register (max-width: 41.75rem) { .register [data-fit="narrow"] { display: none; } }
 
 /* ── The topbar is a CONTAINER too, and for the same reason the register is ──────
    🔴 THE CURRENT PAGE'S CRUMB WAS PAINTING UNDERNEATH THE SEARCH BOX. The topbar is
@@ -801,7 +817,41 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
   .register td[data-col="membershipNumber"] { grid-area: number; }
   .register td[data-col="employeeNumber"] { grid-area: employee; justify-self: end; }
   .register td[data-col="bankName"] { grid-area: bank; max-width: none; }
-  .register td[data-col="branch"] { grid-area: branch; justify-self: end; text-align: right; }
+  .register td[data-col="branch"] { grid-area: branch; justify-self: end; text-align: right; max-width: none; }
+  .register tr[data-row] > td:first-child { padding-left: 0; }
+}
+
+/* ── The register narrower than its three essential columns ────────────────────────
+   The ladder hides columns down to Membership, Member and Status, and then has nothing left
+   to give -- and those three need 516px at the default text size and 642px at a 125% root
+   font. Enlarged text grows the rail and the page padding while the record panel still docks
+   by the viewport, so at 1280 with a record open the register was 480px and Status was cut by
+   162px (and by 8px at 1024 with the record closed, which `edges.mjs` ② caught). Below the width
+   three columns need, the register takes the phone's arrangement whatever the viewport:
+   nothing hidden, nothing sideways. 33rem is that width with a margin, and it grows with the
+   text; at the default size no desktop register is ever that narrow, so this only ever answers
+   enlarged text.
+   ⚠️ THE SAME RULES AS THE PHONE BLOCK ABOVE, HELD IDENTICAL by `registerRows.structural.test.js`:
+   CSS cannot say "@media or @container" once, and two copies drift the day one is edited. */
+@container register (max-width: 33rem) {
+  .register thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .register table, .register tbody { display: block; }
+  .register tr[data-row] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) fit-content(45%);
+    grid-template-areas: "member status" "number employee" "bank branch";
+    gap: 1px 12px;
+    padding: 12px 16px;
+  }
+  .register tr[data-row] > td { display: block !important; border: 0; padding: 1px 0; white-space: normal; font-size: var(--text-sm); }
+  .register tr[data-row] > td[data-expander], .register tr[data-detail] { display: none !important; }
+  .register td[data-col="member"] { grid-area: member; max-width: none; }
+  .register td[data-col="member"] > span { max-width: none; }
+  .register td[data-col="status"] { grid-area: status; justify-self: end; }
+  .register td[data-col="membershipNumber"] { grid-area: number; }
+  .register td[data-col="employeeNumber"] { grid-area: employee; justify-self: end; }
+  .register td[data-col="bankName"] { grid-area: bank; max-width: none; }
+  .register td[data-col="branch"] { grid-area: branch; justify-self: end; text-align: right; max-width: none; }
   .register tr[data-row] > td:first-child { padding-left: 0; }
 }
 

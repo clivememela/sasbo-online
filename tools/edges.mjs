@@ -195,6 +195,26 @@ try {
     await settle();
   });
 
+  // -------------------------------------------- ②b 125% root font, a record docked
+  // 🔴 THE CASE ② NEVER SAW. Enlarged text grows the rail and the page padding, but the record
+  // panel docks by the VIEWPORT, so the register between them narrows past the width its three
+  // essential columns need: at 1280 it was 480px and Status was cut by 162px, while ② -- which
+  // measures with no record open -- passed. So the record is docked at each laptop width it docks
+  // at, and a record that never opened is a width NOT measured, never a clean one.
+  console.log('\n②b root font-size 125%, a record docked');
+  for (const width of [1280, 1366, 1440, 1536]) {
+    await metrics(width);
+    if (!await land('/members') || !await waitFor(`document.querySelectorAll('tr[data-row]').length > 1`)) { missed += 1; continue; }
+    await evaluate(`document.documentElement.style.fontSize = '125%'; true`);
+    const docked = await evaluate(clickByText('[data-row-action]', '/open the record for/i')) === true
+      && await waitFor(`!!document.querySelector('[data-testid="member-panel"][data-open="true"] .mcard')`)
+      && await settle();
+    if (!docked) { missed += 1; continue; }
+    record('125% docked', `${width}px /members`, await evaluate(overflowProbe(width)));
+    swept += 1;
+  }
+  console.log('  1280 · 1366 · 1440 · 1536');
+
   // ------------------------------------------------- ③ forced-colors: active
   console.log('\n③ forced-colors: active — Windows High Contrast');
   await send('Emulation.setEmulatedMedia', {

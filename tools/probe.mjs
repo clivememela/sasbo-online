@@ -135,12 +135,32 @@ export const overflowProbe = (requested) => `(() => {
       offenders.push(Math.round(r.right) + 'px w=' + Math.round(r.width) + ' ' + el.tagName.toLowerCase() + (cls ? '.' + cls : ''));
     }
   }
+  // 🔴 A REGISTER PROMISES MORE THAN A PAGE DOES. The scroller rule above lets anything inside a
+  // horizontal scroller run wide, which is right for a listing built to scroll -- and it made this
+  // probe blind to the register, whose column ladder promises that its columns FIT and that Status
+  // never yields (index.css \`.register\`; Table.jsx \`fit\`). At 1280 with the record closed, the members
+  // table ran 103px past its own sheet, Status cut to "STA", and every sweep here reported 0. So each
+  // register's scroller is measured on its own, and its count travels with the number.
+  const registerOverflows = [...document.querySelectorAll('.register')].map((reg) => {
+    const scroller = [reg, ...reg.querySelectorAll('*')].find((n) => {
+      const o = overflowXOf(n);
+      return o === 'auto' || o === 'scroll';
+    });
+    return scroller ? scroller.scrollWidth - scroller.clientWidth : 0;
+  });
+  // An offender like any other, so every consumer's existing verdict counts it without a second
+  // rule to remember: matrix and edges both fail on \`offenderCount\`.
+  for (const px of registerOverflows) {
+    if (px > 1) offenders.push('.register table runs ' + px + 'px past its own sheet');
+  }
   return {
     requested: asked,
     innerWidth: window.innerWidth,
     scrollWidth: document.documentElement.scrollWidth,
     offenders: offenders.slice(0, 10),
     offenderCount: offenders.length,
+    registerCount: registerOverflows.length,
+    registerOverflow: registerOverflows.length ? Math.max(...registerOverflows) : 0,
     // 🔑 THE POPULATION TRAVELS WITH THE VERDICT, ALWAYS. "This page does not overflow" and
     // "this page is empty" are the same sentence otherwise, and an empty page is the most
     // reliably non-overflowing page there is. Carrying the count means every consumer can

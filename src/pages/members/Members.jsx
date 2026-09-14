@@ -846,8 +846,10 @@ export default function Members() {
             priority: "essential",
             // The two-line member cell -- `Ms NT Mokoena` over `Nomvula Thandeka`. Both lines
             // truncate at the same width, and the full names are one click away on the card.
+            // 13rem, not 14: the cap is what the column ladder must fit (index.css `.register`),
+            // and at 14rem a real long name put Status past the sheet with the record docked at 1440.
             cell: (m) => (
-                <span className="block max-w-[14rem]">
+                <span className="block max-w-[13rem]">
                     <span className="block truncate text-base font-semibold leading-tight text-ink">
                         {[m.title, m.initials, m.surname].filter(Boolean).join(" ") || "—"}
                     </span>
@@ -868,9 +870,11 @@ export default function Members() {
             // 1349 (the register 605px, four columns fitting in 598) and then conceded that
             // width everywhere else: at 1440 the register is 680 and four names still
             // truncated with ~20px going spare. `cqw` reads the `.register` container the
-            // column ladder already measures, so the cap grows with the space and the floor
-            // is the measurement that made Status fit on the laptop.
-            className: "max-w-[clamp(10rem,26cqw,18rem)]",
+            // column ladder already measures, so the cap grows with the space.
+            // ⚠️ 9rem / 21cqw / 16rem since `06.3`, measured on a row at every cap: at 10rem /
+            // 26cqw a real long name and bank put Status past the sheet with the record docked
+            // at 1440, where the owner's ruling keeps four columns (index.css `.register`).
+            className: "max-w-[clamp(9rem,21cqw,16rem)]",
             cell: (m) => m.bankName || "—",
         },
         {
@@ -878,7 +882,13 @@ export default function Members() {
             header: "Branch",
             priority: "secondary",
             fit: "medium",
-            cell: (m) => <span className="text-ink-muted">{m.branch || "—"}</span>,
+            // Capped like Bank, and for Bank's reason: an uncapped branch sets the width the column
+            // ladder has to fit, so one real branch longer than the synthetic data's longest would
+            // move the width at which Status is cut. Truncated here and whole in the cell's title --
+            // which Table writes only for a STRING cell, so the muted ink moves to the cell's class.
+            truncate: true,
+            className: "text-ink-muted max-w-[clamp(9rem,22cqw,15rem)]",
+            cell: (m) => m.branch || "—",
         },
         {
             key: "status",
