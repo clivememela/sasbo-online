@@ -717,6 +717,58 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
 .topbar { container-type: inline-size; container-name: topbar; }
 @container topbar (max-width: 660px) { .crumb-lead { display: none; } }
 
+/* ── The figure strip follows the width it is given (ruling ③; FigureStrip.jsx) ───────────
+   Five EQUAL columns, because five figures packed into the first 560px of a rule running 1128px
+   looked, in the owner's word, "squashed" (2026-09-10). Equal columns are still not tiles: no
+   box, no fill, no radius -- one continuous ruled line, evenly divided.
+   🔴 AND THREE WHEN FIVE DO NOT FIT, which is the comp's own answer (card.css:463) asked of the
+   STRIP's width rather than the viewport's. Docking the record panel at 1280 leaves the strip
+   ~560px wide on the owner's laptop, where "Updated today" ran 15px past the strip's own rule
+   (`06.3`, measured). Two on a phone, flush to the page's gutter. */
+.figure-strip { container: figures / inline-size; }
+.figure-strip > dl { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+@container figures (max-width: 660px) {
+  .figure-strip > dl { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .figure-strip > dl > div { border-right-width: 0; }
+  .figure-strip > dl > div:nth-child(3n + 1) { padding-left: 0; }
+}
+@container figures (max-width: 460px) {
+  .figure-strip > dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .figure-strip > dl > div { padding-left: 0; padding-right: 0; }
+}
+
+/* ── The criteria row holds one line where the comp does (Criteria.jsx) ─────────────────
+   card.css `.crit` is `flex: 0 1 140px; min-width: 120px`, and on the comp's narrowest docked
+   register three of them, More criteria and Clear share a line. Docking at 1280 leaves a row the
+   comp never had, and More criteria and Clear were orphaned onto a second line, left-aligned under
+   Bank -- on the owner's own screen (`06.3`).
+   🔑 THE BASIS, NOT THE FLOOR. Flex breaks a line on each item's BASIS and only shrinks after, so a
+   lower `min-width` moved nothing. Measured with a record docked: the row is 605.3px at 1349 and
+   616.9 at 1366, where a 120px basis fits (596.2px needed); and 558.4px at 1280, where it takes a
+   110px basis and an 8px gap (542.2px, and "All banks" still has 60px inside its control). A
+   hidden criterion's count badge adds ~29px, and in that state the pair may wrap -- that is the
+   honest outcome. A phone's criteria keep their full size and wrap two to a line. */
+.criteria-row { container: criteria / inline-size; }
+@media (min-width: 1024px) {
+  @container criteria (max-width: 620px) {
+    .criteria-row .criterion { min-width: 104px; flex-basis: 120px; }
+  }
+  @container criteria (max-width: 580px) {
+    .criteria-items { column-gap: 8px; }
+    .criteria-row .criterion { min-width: 104px; flex-basis: 110px; }
+  }
+}
+
+/* ── The card's foot keeps the comp's one baseline on the owner's laptop (MembershipCard.jsx) ──
+   Measured at 1280 with a record docked: the card's interior is 317.6px, and its three foot groups
+   (113 · 98.3 · 67.5px) with the comp's 22px gaps need 322.8 -- so "Absa Bank" fell to a line of its
+   own by 5px (`06.3`). A card that narrow closes the gaps to 16px (310.8px). At 1349 the interior is
+   339.7px and the comp's 22px fit as drawn. */
+.mcard { container: mcard / inline-size; }
+@container mcard (max-width: 330px) {
+  .mcard-foot { column-gap: 16px; }
+}
+
 /* ── The register on a phone (card.css `@media (max-width: 760px)`) ──────────────
    The head goes to screen readers only and every row becomes a small card of its own:
    the member over their number, the status at the top right, the bank and the branch
@@ -729,7 +781,14 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
   .register table, .register tbody { display: block; }
   .register tr[data-row] {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    /* 🔴 THE RIGHT COLUMN IS CAPPED, AND card.css's `1fr auto` IS NOT. One column holds the status,
+       the employee number AND the branch, so a long branch -- "Pietermaritzburg & Midlands
+       Branch" -- set it to its full width and squeezed the member's own name to "Synthetic
+       Testpe…" in that row alone (`06.3`, mobile.png). The mock's branches were all short. The
+       column is now its content's width but never past 45% -- `fit-content`, not `minmax`: a
+       `minmax(auto, 45%)` track GROWS to its 45% in every row, and the first version of this fix
+       took that width from every member and bank that had fitted before. */
+    grid-template-columns: minmax(0, 1fr) fit-content(45%);
     grid-template-areas: "member status" "number employee" "bank branch";
     gap: 1px 12px;
     padding: 12px 16px;
@@ -742,7 +801,7 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
   .register td[data-col="membershipNumber"] { grid-area: number; }
   .register td[data-col="employeeNumber"] { grid-area: employee; justify-self: end; }
   .register td[data-col="bankName"] { grid-area: bank; max-width: none; }
-  .register td[data-col="branch"] { grid-area: branch; justify-self: end; }
+  .register td[data-col="branch"] { grid-area: branch; justify-self: end; text-align: right; }
   .register tr[data-row] > td:first-child { padding-left: 0; }
 }
 

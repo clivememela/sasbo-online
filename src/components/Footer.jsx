@@ -11,7 +11,7 @@
 export default function Footer() {
   return (
     <footer className="mt-auto border-t border-line bg-surface/80 p-4 text-center text-sm text-ink-muted backdrop-blur-sm">
-      <p>© 2026 SASBO - The Finance Union</p>
+      <p>© 2026 SASBO — The Finance Union</p>
     </footer>
   );
 }

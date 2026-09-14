@@ -776,6 +776,7 @@ export function Recruiters() {
                     totalPages={totalPages}
                     onPageChange={setPage}
                     count={filtered.length}
+                    error={listState === 'error'}
                     start={(page - 1) * PAGE_SIZE + 1}
                     end={Math.min(page * PAGE_SIZE, filtered.length)}
                     noun="recruiters"

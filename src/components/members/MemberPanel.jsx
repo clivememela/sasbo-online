@@ -218,8 +218,11 @@ export default function MemberPanel({ member, open, onClose, children, footer })
             </div>
 
             <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface px-6 py-3">
+              {/* The comp's foot says when the record last changed. With no date to say, it says
+                  nothing: its old fallback repeated the membership number already stamped on the
+                  card a few inches above (`06.3`). */}
               <p className="text-[12.5px] text-ink-muted">
-                {updated ? `Updated ${formatDateLong(updated)}` : member?.membershipNumber ? `Membership no. ${member.membershipNumber}` : ''}
+                {updated ? `Updated ${formatDateLong(updated)}` : ''}
               </p>
               {footer && <div className="flex flex-wrap items-center gap-2">{footer}</div>}
             </footer>

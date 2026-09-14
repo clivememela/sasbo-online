@@ -1,6 +1,6 @@
 // @vitest-environment jsdom -- renders the member register in each of its three states
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 
 import MembersPage from './Members'
@@ -79,6 +79,17 @@ describe('the Members list', () => {
 
       expect(await screen.findByText(EMPTY_TEXT)).toBeInTheDocument()
     })
+
+    it('and its foot and figures say the same thing', async () => {
+      // The PRESENCE half of K1's case below: the same two locators, seen to match when "no
+      // members" is the truth. Their absence under a failure proves nothing without this (T37).
+      server.use(membersRespond([]))
+      renderWithProviders(<MembersPage />)
+
+      await screen.findByText(EMPTY_TEXT)
+      expect(screen.getByText(/^No members match$/)).toBeInTheDocument()
+      expect(within(screen.getByTestId('figure-strip')).getAllByText('0').length).toBeGreaterThan(0)
+    })
   })
 
   describe('the LOADED state', () => {
@@ -103,6 +114,8 @@ describe('the Members list', () => {
 
       expect(screen.getByRole('status')).toBeInTheDocument()
       expect(screen.queryByText(EMPTY_TEXT)).not.toBeInTheDocument()
+      // K1: nor does it print a row of zeros while it waits.
+      expect(within(screen.getByTestId('figure-strip')).queryByText('0')).not.toBeInTheDocument()
 
       // ...and it does eventually finish. Without this the test above would also pass
       // against a page that renders a spinner and never anything else -- which is A22's
@@ -128,6 +141,20 @@ describe('the Members list', () => {
       // present AND the empty-state text is absent.
       const { retry } = await expectErrorState({ emptyText: EMPTY_TEXT })
       expect(retry, 'a failed list must offer a way to try again').not.toBeNull()
+    })
+
+    it('says nothing about the count while the register cannot be reached', async () => {
+      // 🔴 K1 (`06.3`), found by a capture of the running app, not by this file. The error state
+      // above was right and the sheet around it was not: the pager's foot said "No members match"
+      // and the figure strip printed a row of zeros, so the page still told an administrator the
+      // union was empty -- two lines under the sentence saying the server had not answered.
+      // `expectErrorState` looks for the EMPTY STATE's words, which neither of them prints.
+      server.use(membersRespond({ status: 500 }, 500))
+      renderWithProviders(<MembersPage />)
+      await screen.findByRole('alert')
+
+      expect(screen.queryByText(/no members match/i)).not.toBeInTheDocument()
+      expect(within(screen.getByTestId('figure-strip')).queryByText('0')).not.toBeInTheDocument()
     })
 
     it('the retry actually re-runs the request, and recovers', async () => {

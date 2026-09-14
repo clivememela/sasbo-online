@@ -172,6 +172,7 @@ export default function BankBranch() {
           totalPages={totalPages}
           onPageChange={setPage}
           count={filteredBanks.length}
+          error={listState === 'error'}
           start={startIndex + 1}
           end={endIndex}
           noun="branches"

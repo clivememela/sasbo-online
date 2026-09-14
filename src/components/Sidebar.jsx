@@ -211,8 +211,14 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
 
             `content-start` alone is the whole fix. It stops the stretch `flex: 1` would cause,
             the rows are their own 36px, the gap is the mock's 2px, and the pitch is identical
-            on every route because nothing is being divided. */}
-        <div className="scroll-quiet grid content-start gap-0.5 overflow-y-auto [&>*]:self-start">
+            on every route because nothing is being divided.
+
+            🔑 `flex-1` IS THE OTHER HALF OF `.nav { flex: 1 }`, AND IT LEFT WITH THE STRETCH
+            (`06.3`). The comp's foot sits at the bottom of the rail on every screen because the
+            list takes the height between the wordmark and the foot. Without it the foot rode
+            under the list -- 515px down on Members, 447 on Home -- and moved whenever a section
+            opened. `flex-1` gives the list that height; `content-start` keeps the rows out of it. */}
+        <div className="scroll-quiet grid min-h-0 flex-1 content-start gap-0.5 overflow-y-auto [&>*]:self-start">
           {navItems.map((item) => (
             <SidebarItem
               key={item.href}

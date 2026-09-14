@@ -766,7 +766,9 @@ export default function Members() {
     };
 
     const formatBackendDate = (dateVal) => {
-        if (!dateVal) return "-";
+        // Empty, not "-": `Detail` prints the record's own "—" for a value that is not there,
+        // and a hyphen beside it read as a different mark for the same absence (`06.3`).
+        if (!dateVal) return "";
         if (Array.isArray(dateVal)) {
             const [year, month, day] = dateVal;
             return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -922,7 +924,7 @@ export default function Members() {
                 refuses the alternative by name ("hero-metric tiles, dashboards of same-size
                 cards"). Counted from the register the page already holds, so it can never
                 disagree with the rows below it. */}
-            <FigureStrip className="mx-7 mt-5 max-lg:mx-4" {...registerFigures} />
+            <FigureStrip className="mx-7 mt-5 max-lg:mx-4" {...registerFigures} state={listState === "ready" ? "ready" : listState} />
 
             {/* 🔍 THE CRITERIA ROW -- card.css `.criteria`. Three labelled fields printed on
                 the page, "More criteria" beside them, Clear at the end. This page had FIFTEEN
@@ -1081,6 +1083,7 @@ export default function Members() {
                         start={startIndex + 1}
                         end={endIndex}
                         noun="members"
+                        error={listState === "error"}
                         loading={listState === "loading"}
                         /* 🔴 THE KEYBOARD LEGEND MOVED HERE FROM THE RECORD PANEL'S EMPTY
                            STATE. It always described THIS surface -- ↑ and ↓ move the
@@ -1324,7 +1327,7 @@ export default function Members() {
                                         now. The I.D.-derived case stays read-only text: it is
                                         computed from the identity number, not typed. */}
                                     {editForm.identityType === "I.D. Number" ? (
-                                        <Detail label="Date of Birth" value={formatDate(editForm.dateOfBirth)} isEditing={isEditing} disabled onChange={handleEditChange("dateOfBirth")} />
+                                        <Detail label="Date of Birth" value={editForm.dateOfBirth ? formatDate(editForm.dateOfBirth) : ""} isEditing={isEditing} disabled onChange={handleEditChange("dateOfBirth")} />
                                     ) : isEditing ? (
                                         <DateField
                                             label="Date of Birth"
@@ -1582,9 +1585,9 @@ export default function Members() {
                                             <div className="space-y-3">
                                                 <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted">Core Appointments</h4>
                                                 <Detail label="Shop Steward status" value={selectedMember.isShopSteward ? "Yes" : "No"} isEditing={false} />
-                                                {selectedMember.isShopSteward && <Detail label="Election Date" value={selectedMember.shopStewardElectionDate || "-"} isEditing={false} />}
+                                                {selectedMember.isShopSteward && <Detail label="Election Date" value={selectedMember.shopStewardElectionDate} isEditing={false} />}
                                                 <Detail label="BEC Member status" value={selectedMember.isBec ? "Yes" : "No"} isEditing={false} />
-                                                {selectedMember.isBec && <Detail label="Assigned BEC Committee" value={SASBO_BEC_BRANCHES.find(b => b.id === selectedMember.becCommitteeId)?.name || selectedMember.becCommitteeName || "-"} isEditing={false} />}
+                                                {selectedMember.isBec && <Detail label="Assigned BEC Committee" value={SASBO_BEC_BRANCHES.find(b => b.id === selectedMember.becCommitteeId)?.name || selectedMember.becCommitteeName} isEditing={false} />}
                                             </div>
                                             <div className="space-y-3 pt-4 md:pt-0">
                                                 <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted">Specialized Assignments</h4>
@@ -1604,8 +1607,8 @@ export default function Members() {
                                                     <Detail label="COSATU Member" value={selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true ? "Yes" : "No"} isEditing={false} />
                                                     {(selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true) && (
                                                         <div className="grid grid-cols-1 gap-3 mt-2">
-                                                            <Detail label="COSATU Local" value={selectedMember.cosatuLocal || "-"} isEditing={false} />
-                                                            <Detail label="Region within Local" value={selectedMember.cosatuRegion || "-"} isEditing={false} />
+                                                            <Detail label="COSATU Local" value={selectedMember.cosatuLocal} isEditing={false} />
+                                                            <Detail label="Region within Local" value={selectedMember.cosatuRegion} isEditing={false} />
                                                             <Detail label="Positions Held" value={selectedMember.cosatuPositions?.length > 0 ? selectedMember.cosatuPositions.join(", ") : "None"} isEditing={false} />
                                                         </div>
                                                     )}

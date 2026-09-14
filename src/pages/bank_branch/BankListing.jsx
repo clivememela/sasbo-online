@@ -167,6 +167,7 @@ export default function BankListing() {
           totalPages={totalPages}
           onPageChange={setPage}
           count={filteredRows.length}
+          error={Boolean(error)}
           start={startIndex + 1}
           end={endIndex}
           noun="banks"

@@ -518,20 +518,30 @@ export default function DateField({
     }
   };
 
+  /*
+   * 📐 THE DAYS SPAN THE PICKER, AS `datepicker.css` LAYS THEM OUT: `.dp__week` is `repeat(7, 1fr)`,
+   * and a day is 38px tall in the popover and 44px in the phone's sheet. They were fixed 36px
+   * squares in a flex row, so the sheet's month header ran the width of the phone while its days
+   * stopped at 252px (`06.3`, date-sheet-phone-light.png) -- and 36px is under the 44px target the
+   * approved sheet promises.
+   */
   const renderDayGrid = () => (
     <div
       role="grid"
       aria-label={`${MONTHS_LONG[cursor.m - 1]} ${cursor.y}`}
-      className="p-2"
+      className={isSheet ? 'px-4 py-2' : 'p-2'}
     >
-      <div role="row" className="flex">
+      <div role="row" className="grid grid-cols-7">
         {WEEKDAYS.map((day) => (
           <span
             key={day.short}
             role="columnheader"
             aria-label={day.long}
             title={day.long}
-            className="w-9 text-center text-2xs font-semibold uppercase tracking-wide text-ink-muted"
+            className={cn(
+              'text-center font-semibold uppercase tracking-wide text-ink-muted',
+              isSheet ? 'h-7 text-xs leading-7' : 'h-6 text-2xs leading-6',
+            )}
           >
             {day.short}
           </span>
@@ -539,7 +549,7 @@ export default function DateField({
       </div>
 
       {gridDays.map((week) => (
-        <div key={`${week[0].y}-${week[0].m}-${week[0].d}`} role="row" className="flex">
+        <div key={`${week[0].y}-${week[0].m}-${week[0].d}`} role="row" className="grid grid-cols-7 gap-0.5">
           {week.map((day) => {
             const outside = day.m !== cursor.m;
             const unavailable = Boolean(outOfRange(day));
@@ -567,7 +577,8 @@ export default function DateField({
                   if (!unavailable) commit(day);
                 }}
                 className={cn(
-                  'size-9 rounded-md text-sm text-ink',
+                  'w-full rounded-md text-ink',
+                  isSheet ? 'h-11 text-[15px]' : 'h-[38px] text-sm',
                   'hover-hover:hover:bg-surface-2',
                   FOCUS_RING,
                   outside && 'text-ink-muted',

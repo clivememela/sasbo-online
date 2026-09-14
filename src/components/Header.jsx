@@ -118,7 +118,7 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
         "sticky top-0 z-10 grid h-15 shrink-0 items-center gap-3 border-b border-line bg-surface px-4 text-ink",
         "topbar",
         "grid-cols-[auto_minmax(0,1fr)_auto]",
-        "lg:grid-cols-[auto_minmax(220px,440px)_1fr] lg:gap-5 lg:px-7",
+        "lg:grid-cols-[max-content_minmax(220px,440px)_1fr] lg:gap-5 lg:px-7",
       )}
     >
       <div className="flex min-w-0 items-center gap-2">
@@ -161,7 +161,15 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
             gives up a single character of where you are. The old squeeze cannot come back
             because the thing it squeezed is the thing that now yields last. The search's
             ceiling comes down 520 → 440 in the same breath: at 1280, on the deepest route in
-            the application, the difference is exactly what the trail needed. */}
+            the application, the difference is exactly what the trail needed.
+
+            🔴 AND IT STILL TRUNCATED -- THE GRID DID IT, NOT THE CRUMBS (`06.3`, measured). An
+            `auto` track whose item has `min-w-0` has a minimum of zero, so the grid shared its
+            free space EVENLY between the trail and the search: at 1440 with a record open the
+            trail was handed 118 of the 120px it needed ("Ho… › Membe…"), at 1280 57 of 58
+            ("Membe…"). The trail's track is `max-content` now, so it is always its own width,
+            the search gives way toward its 220px floor first, and where even that cannot fit,
+            the `topbar` container query has already dropped the crumbs ahead of the page. */}
         <div className="hidden min-w-0 min-[1101px]:block">
           <Breadcrumbs />
         </div>

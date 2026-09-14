@@ -405,7 +405,7 @@ export default function CaptureMember() {
                 </div>
             )}
 
-            <div className="relative mt-2 max-w-4xl rounded-lg bg-surface shadow-(--shadow-1)">
+            <div className="relative mt-2 rounded-lg bg-surface shadow-(--shadow-1)">
                 {showSavedNotification && (
                     <div role="status" className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-lg border border-status-active-dot bg-status-active-bg px-4 py-2 text-status-active shadow-(--shadow-2)">
                         <CheckCircle2 size={18} aria-hidden="true" />
