@@ -4,7 +4,7 @@
  * The matrix measures 25 routes at six widths and finds nothing. That is a statement about
  * six numbers. This file covers the rest of what `05.1` asks for:
  *
- *   ① THE EDGE SWEEP — every breakpoint ±1px, on every route. Assert only, no screenshots.
+ *   ① THE EDGE SWEEP — both sides of every breakpoint, on every route. Assert only, no screenshots.
  *      🔴 A LAYOUT BUG LIVES ON ONE SIDE OF A BREAKPOINT, AND THE MATRIX SAMPLES NEITHER
  *      SIDE. Its widths are 320 · 390 · 768 · 1024 · 1349 · 1440. Two of those sit exactly
  *      ON a breakpoint, where the rule being tested has just switched — so the matrix reads
@@ -20,30 +20,92 @@
  *      same (it will not) but that nothing DISAPPEARS: a control whose only affordance is a
  *      background colour becomes invisible, and this app has several.
  *
- *   ④ RESIZE MID-DIALOG — the state check. A dialog laid out at 1440 and then dragged to
- *      390 is not the same as a dialog opened at 390: the second is what every test does,
- *      and the first is what a user with a phone in landscape does when they rotate it.
+ *   ④ RESIZE MID-STATE — the state check. A record or a dialog laid out at 1440 and then dragged
+ *      to 390 is not the same as one opened at 390: the second is what every test does, and the
+ *      first is what a user does when they narrow a window with a member open. R-RESP-O's rule:
+ *      the panel keeps its member across dock ↔ drawer, and a dialog stays whole and on screen.
  *
  *   node tools/edges.mjs <baseUrl>
  */
-import { writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-import { launch, sleep } from './cdp.mjs';
+import { launch } from './cdp.mjs';
 
-import { ROUTES, overflowProbe, pageReady, populationComplaints, storeTheme } from './probe.mjs';
+import {
+  ROUTES, SETTLED, clickByText, overflowProbe, pageReady, populationComplaints, routeComplaints, storeTheme,
+} from './probe.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://127.0.0.1:4319';
 
 /**
- * The breakpoints this design actually has, each ±1.
- *
- * ⚠️ 760 IS THIS APP'S OWN, not Tailwind's. `index.css` carries
- * `@media (max-width: 760px)` for the 16px field rule and the touch-target pseudo-element,
- * and a bare-`@media` breakpoint is exactly the kind that gets forgotten — it is in none of
- * Tailwind's tooling and matches no `sm:`/`md:` prefix anyone greps for.
+ * The two widths that straddle a width query: the last at which it is false, and the first at
+ * which it is true (or the other way round). Which side of the number the flip sits on depends on
+ * how the query is WRITTEN, and that is the whole reason this is a function.
  */
-const BREAKPOINTS = [640, 760, 768, 1024, 1280, 1536];
-const EDGE_WIDTHS = BREAKPOINTS.flatMap((bp) => [bp - 1, bp + 1]);
+const straddle = (op, value, unit) => {
+  const px = Math.round(parseFloat(value) * (unit === 'px' ? 1 : 16));
+  if (op === 'min' || op === '>=' || op === '<') return [px - 1, px];
+  if (op === 'max' || op === '<=' || op === '>') return [px, px + 1];
+  throw new Error(`a width query compared with "${op}", which this does not know how to straddle`);
+};
+
+/**
+ * The breakpoints this design actually has — READ OFF THE BUILD, not remembered.
+ *
+ * 🔴 THE LIST USED TO BE TYPED HERE, AND IT WAS WRONG IN FOUR PLACES. `[640, 760, 768, 1024,
+ * 1280, 1536]` swept each ±1, so it measured 639 and 641 but never 640 — the first width at which
+ * `sm:` applies — and 759 and 761 but never 760, the last width at which the phone rules of
+ * `@media (max-width: 760px)` hold. And the topbar's `min-[1101px]:` crumbs and `Header`'s
+ * `matchMedia('(max-width: 639px)')` were in no list at all. A breakpoint lives where the RULE
+ * flips, and a list typed from memory drifts the moment someone writes a new one.
+ *
+ * So the edges come from every `@media` in the stylesheets the build emitted and every
+ * `matchMedia` in the source, and each is swept on the two widths that straddle its own flip.
+ * Container queries are not here on purpose: they answer to their container, not to the viewport.
+ */
+const discoverBreakpoints = () => {
+  const found = new Map();
+  const read = (query) => {
+    const note = ([below, above]) => {
+      const key = `${below}/${above}`;
+      if (!found.has(key)) found.set(key, new Set());
+      found.get(key).add(query.trim());
+    };
+    for (const [, op, value, unit] of query.matchAll(/\((min|max)-width\s*:\s*([\d.]+)(px|rem|em)\)/g)) note(straddle(op, value, unit));
+    for (const [, op, value, unit] of query.matchAll(/\(width\s*(>=|<=|>|<)\s*([\d.]+)(px|rem|em)\)/g)) note(straddle(op, value, unit));
+  };
+
+  const stylesheets = readdirSync('dist/assets').filter((f) => f.endsWith('.css'));
+  for (const file of stylesheets) {
+    for (const [, query] of readFileSync(join('dist/assets', file), 'utf8').matchAll(/@media([^{]+)\{/g)) read(query);
+  }
+  // The breakpoints no stylesheet can see: a component that asks the viewport itself.
+  const sources = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return sources(path);
+    return /\.(jsx?|mjs)$/.test(entry.name) && !entry.name.includes('.test.') ? [path] : [];
+  });
+  for (const file of sources('src')) {
+    for (const [, query] of readFileSync(file, 'utf8').matchAll(/matchMedia\(\s*['"`]([^'"`]+)['"`]\s*\)/g)) read(query);
+  }
+  return { found, stylesheets: stylesheets.length };
+};
+
+let BREAKPOINTS;
+let stylesheetCount;
+try {
+  ({ found: BREAKPOINTS, stylesheets: stylesheetCount } = discoverBreakpoints());
+} catch (e) {
+  console.error(`edges: could not read the build's breakpoints (${e.message}) — build the client first, and run from its root`);
+  process.exit(1);
+}
+// 🔑 THE DISCOVERY HAS A FLOOR, BECAUSE A SCAN THAT READS NOTHING SWEEPS NOTHING AND PASSES.
+if (!stylesheetCount || BREAKPOINTS.size < 4) {
+  console.error(`edges: read ${BREAKPOINTS.size} breakpoints from ${stylesheetCount} stylesheets in dist/assets — the scan is not seeing the build`);
+  process.exit(1);
+}
+const EDGE_WIDTHS = [...new Set([...BREAKPOINTS.keys()].flatMap((key) => key.split('/').map(Number)))].sort((a, b) => a - b);
 
 /*
  * 🔴 `metrics()` USED TO LIVE HERE, WITH A DIFFERENT ANSWER TO "IS THIS A PHONE".
@@ -70,13 +132,21 @@ try {
   cdp = await launch('edges');
   const { send, evaluate, metrics, waitFor, assertBuiltClient } = cdp;
 
-  console.log('identity OK — entry script', await assertBuiltClient(baseUrl));
+  // 🔴 THE BREAKPOINTS WERE READ FROM `dist/`, SO THE SERVER HAS TO BE SERVING `dist/`. An edge
+  // list taken from one build and swept against another is T23 wearing a new hat.
+  const served = await assertBuiltClient(baseUrl);
+  const built = readFileSync('dist/index.html', 'utf8').match(/assets\/(index-[A-Za-z0-9_-]+\.js)/)?.[1];
+  if (served !== built) {
+    throw new Error(`the server at ${baseUrl} serves ${served}, but dist/ holds ${built} — the breakpoints were read from a different build than the one being swept`);
+  }
+  console.log('identity OK — entry script', served, '= dist/');
 
-  /** Navigate and wait until the page is genuinely ready to measure. */
+  /** Navigate and wait until the page is genuinely ready — and still — to measure. */
   const land = async (route) => {
     await send('Page.navigate', { url: baseUrl + route });
-    return waitFor(pageReady);
+    return await waitFor(pageReady) && await waitFor(SETTLED, { tries: 120, awaitPromise: true });
   };
+  const settle = () => waitFor(SETTLED, { tries: 120, awaitPromise: true });
 
   let swept = 0;
   let missed = 0;
@@ -111,7 +181,8 @@ try {
   await evaluate(storeTheme(false));
 
   // ---------------------------------------------------------------- ① edge sweep
-  console.log(`\n① edge sweep — ${ROUTES.length} routes × ${EDGE_WIDTHS.length} widths (${BREAKPOINTS.join(', ')} ±1)`);
+  console.log(`\n① edge sweep — ${ROUTES.length} routes × ${EDGE_WIDTHS.length} widths, straddling ${BREAKPOINTS.size} breakpoints read off the build`);
+  for (const [pair, queries] of BREAKPOINTS) console.log(`    ${pair.padEnd(10)} ${[...queries].slice(0, 3).join(' · ')}`);
   await sweep('edge', EDGE_WIDTHS);
   if (missed) console.log(`  ⚠ ${missed} route×width combinations never became ready`);
   console.log(`  swept ${swept}`);
@@ -121,7 +192,7 @@ try {
   await sweep('125%', [390, 1024], async () => {
     await evaluate(`document.documentElement.style.fontSize = '125%'; true`);
     // The reflow is not instant, and measuring before it lands measures the old layout.
-    await sleep(120);
+    await settle();
   });
 
   // ------------------------------------------------- ③ forced-colors: active
@@ -170,49 +241,65 @@ try {
   // only affordance was a background fill — and not the rendered result. The rendered
   // result needs a real Windows session, and that is P8's, on `devicePass.md`.
 
-  // ------------------------------------------------------ ④ resize mid-dialog
-  console.log('\n④ resize mid-dialog — laid out wide, then narrowed');
-  await metrics(1440, 900);
+  // ------------------------------------------------------ ④ resize mid-state
+  console.log('\n④ resize mid-state — laid out wide, then narrowed');
   const resized = [];
-  if (await land('/members')) {
-    for (let i = 0; i < 80; i++) {
-      if (await evaluate(`document.querySelectorAll('tbody tr').length > 1`) === true) break;
-      await sleep(150);
+  const ROWS = `document.querySelectorAll('tr[data-row]').length > 1`;
+  const RECORD_OPEN = `!!document.querySelector('[data-testid="member-panel"][data-open="true"] .mcard')`;
+  /** On screen after the resize: its left edge in view, and no wider than the phone. */
+  const onScreen = (selector) => `(() => {
+    const el = document.querySelector(${JSON.stringify(selector)});
+    if (!el) return false;
+    const box = el.getBoundingClientRect();
+    return box.left >= -1 && box.right <= 391 && box.width <= 391;
+  })()`;
+
+  /**
+   * Lay a state out at 1440, narrow the viewport to 390 WITHOUT re-mounting, and measure.
+   *
+   * 🔴 THE RESIZE IS THE TEST. React does not re-mount on a viewport change, so any layout the
+   * surface computed once — a measured position, a captured width, a class chosen at open —
+   * survives into a viewport it was never meant for.
+   */
+  const acrossTheEdge = async ({ label, route, open, isOpen, box, same }) => {
+    await metrics(1440, 900);
+    if (!await land(route) || !await waitFor(ROWS)) { resized.push(`${route} never showed real rows`); return; }
+    if (await evaluate(open) !== true || !await waitFor(isOpen) || !await settle()) {
+      resized.push(`${label} never opened at 1440, so nothing was resized`);
+      return;
     }
-    const opened = await evaluate(`(() => {
-      const b = [...document.querySelectorAll('button')].find((n) => /open the record for/i.test(n.getAttribute('aria-label') || ''));
-      if (!b) return false;
-      b.click();
-      return true;
-    })()`);
-    await sleep(600);
-    const isOpen = await evaluate(`!!document.querySelector('[role="dialog"]')`);
-    if (!opened || !isOpen) {
-      resized.push('the dialog never opened at 1440, so nothing was resized');
-    } else {
-      // 🔴 THE RESIZE IS THE TEST. React does not re-mount on a viewport change, so any
-      // layout the dialog computed once — a measured position, a captured width — survives
-      // into a viewport it was never meant for.
-      await metrics(390, 844);
-      await sleep(700);
-      const r = await evaluate(overflowProbe(390));
-      const stillOpen = await evaluate(`!!document.querySelector('[role="dialog"]')`);
-      const reachable = await evaluate(`(() => {
-        const d = document.querySelector('[role="dialog"]');
-        if (!d) return false;
-        const box = d.getBoundingClientRect();
-        // Its top-left must be on screen, and it must not be wider than the phone.
-        return box.left >= -1 && box.top >= -1 && box.width <= 391;
-      })()`);
-      record('resize', '1440 → 390 /members dialog', r, { stillOpen, reachable });
-      if (!stillOpen) resized.push('the dialog vanished when the viewport narrowed');
-      if (!reachable) resized.push('the dialog is off-screen or wider than the viewport after the resize');
-    }
-  } else {
-    resized.push('/members never became ready');
-  }
+    const before = same ? await evaluate(same) : null;
+    await metrics(390, 844);
+    if (!await settle()) resized.push(`${label} never settled after the resize`);
+    const r = await evaluate(overflowProbe(390));
+    const stillOpen = await evaluate(isOpen);
+    const reachable = await evaluate(onScreen(box));
+    const unchanged = same ? await evaluate(same) === before : true;
+    record('resize', `1440 → 390 ${label}`, r, { stillOpen, reachable, unchanged });
+    if (!stillOpen) resized.push(`${label} closed when the viewport narrowed`);
+    if (!reachable) resized.push(`${label} is off-screen or wider than the viewport after the resize`);
+    if (!unchanged) resized.push(`${label} showed different content after the resize`);
+  };
+
+  // The record: DOCKED at 1440, a DRAWER at 390, and the same member on both sides of the change.
+  await acrossTheEdge({
+    label: 'the member record',
+    route: '/members',
+    open: clickByText('[data-row-action]', '/open the record for/i'),
+    isOpen: RECORD_OPEN,
+    box: '[data-testid="member-panel"]',
+    same: `document.querySelector('[data-testid="member-panel"] .mcard-name')?.textContent ?? null`,
+  });
+  // A dialog, which is still a dialog at both widths.
+  await acrossTheEdge({
+    label: 'the recruiters dialog',
+    route: '/recruiters',
+    open: clickByText('button', '/show the members recruited/i'),
+    isOpen: `!!document.querySelector('[role="dialog"]')`,
+    box: '[role="dialog"]',
+  });
   for (const line of resized) console.log(`  ⚠ ${line}`);
-  if (!resized.length) console.log('  the dialog survived the resize, on screen and within the viewport');
+  if (!resized.length) console.log('  the record and the dialog both survived the resize, on screen and within the viewport');
 
   writeFileSync('reports/edges.json', JSON.stringify(findings, null, 2));
 
@@ -223,6 +310,8 @@ try {
   // measurement -- see `pageReady` in probe.mjs for the five conditions a bare shell met.
   const populationIssues = populationComplaints(findings);
   for (const complaint of populationIssues) console.log(`  POPULATION  ${complaint}`);
+  const routeIssues = routeComplaints();
+  for (const complaint of routeIssues) console.log(`  ROUTES  ${complaint}`);
   const bad = findings.filter((f) => f.overflows);
   console.log(`\n${findings.length} measurements, ${bad.length} overflowing`);
   for (const f of bad.slice(0, 30)) {
@@ -230,7 +319,7 @@ try {
     console.log(`      scroll=${f.scrollWidth} asked=${f.requested} offenders=${f.offenderCount}`);
     for (const o of f.offenders.slice(0, 4)) console.log(`      ${o}`);
   }
-  if (bad.length || invisible.length || resized.length || missed || populationIssues.length) process.exitCode = 1;
+  if (bad.length || invisible.length || resized.length || missed || populationIssues.length || routeIssues.length) process.exitCode = 1;
 } catch (e) {
   console.error('edges failed:', e.message);
   process.exitCode = 1;

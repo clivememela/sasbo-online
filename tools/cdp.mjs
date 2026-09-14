@@ -50,6 +50,7 @@ const PORTS = Object.freeze({
   tokens: 9650,
   probe: 9700,
   motion: 9750,
+  review: 9800,
 });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -103,13 +104,29 @@ export async function launch(tag, { flags = [] } = {}) {
 
   let id = 0;
   const pending = new Map();
+  /*
+   * CDP EVENTS, for the one kind of tool that needs them: request interception. The stub server
+   * answers every `/api/` path the same way every time, so a register whose fetch FAILS, HANGS or
+   * comes back EMPTY cannot be reached through it -- and those are the states A27 is about. An
+   * event with no listener is dropped, exactly as every event was before this existed.
+   */
+  const listeners = new Map();
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
     if (m.id && pending.has(m.id)) {
       const p = pending.get(m.id);
       pending.delete(m.id);
       m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result);
+      return;
     }
+    if (m.method) for (const fn of listeners.get(m.method) ?? []) fn(m.params);
+  };
+
+  /** Subscribe to a CDP event. Returns the unsubscribe. */
+  const on = (method, fn) => {
+    if (!listeners.has(method)) listeners.set(method, new Set());
+    listeners.get(method).add(fn);
+    return () => listeners.get(method).delete(fn);
   };
 
   const send = (method, params = {}) =>
@@ -161,10 +178,13 @@ export async function launch(tag, { flags = [] } = {}) {
     });
   };
 
-  /** Poll an expression until it is `true`. Returns whether it ever was. */
-  const waitFor = async (expression, { tries = 80, every = 150 } = {}) => {
+  /**
+   * Poll an expression until it is `true`. Returns whether it ever was. `awaitPromise` for an
+   * expression that resolves to its answer (`SETTLED`, in probe.mjs).
+   */
+  const waitFor = async (expression, { tries = 80, every = 150, awaitPromise = false } = {}) => {
     for (let i = 0; i < tries; i++) {
-      if (await evaluate(expression) === true) return true;
+      if (await evaluate(expression, { awaitPromise }) === true) return true;
       await sleep(every);
     }
     return false;
@@ -177,7 +197,15 @@ export async function launch(tag, { flags = [] } = {}) {
    */
   const assertBuiltClient = async (baseUrl) => {
     await send('Page.navigate', { url: `${baseUrl}/login` });
-    await sleep(800);
+    // 🔴 A CONDITION, NOT THE FIXED 800ms THIS WAS. On a cold Chrome under memory pressure the
+    // document had not finished parsing its head after 800ms, so the entry script was not there
+    // yet and a server that was serving perfectly was refused as "not the built client"
+    // (2026-09-14, `06.3`). The href clause stops `about:blank` answering for the page.
+    const arrived = await waitFor(
+      `location.href.startsWith(${JSON.stringify(baseUrl)}) && document.readyState !== 'loading'`,
+      { tries: 100 },
+    );
+    if (!arrived) throw new Error(`${baseUrl}/login never finished loading — is the server up?`);
     const entry = await evaluate(
       "document.querySelector('script[type=module]')?.src || location.href",
     );
@@ -192,7 +220,7 @@ export async function launch(tag, { flags = [] } = {}) {
     chrome.kill();
   };
 
-  return { send, evaluate, metrics, waitFor, assertBuiltClient, close, port, sleep };
+  return { send, evaluate, metrics, waitFor, assertBuiltClient, close, port, sleep, on };
 }
 
 export { sleep };

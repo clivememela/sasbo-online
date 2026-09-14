@@ -23,8 +23,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { launch, sleep } from './cdp.mjs';
-import { ROUTES as ALL_ROUTES, overflowProbe, pageReady, populationComplaints, storeTheme, themeDimensionComplaints, themeReadout } from './probe.mjs';
+import { launch } from './cdp.mjs';
+import { ROUTES as ALL_ROUTES, SETTLED, overflowProbe, pageReady, populationComplaints, routeComplaints, storeTheme, themeDimensionComplaints, themeReadout } from './probe.mjs';
 
 const args = process.argv.slice(2);
 const baseUrl = args[0] ?? 'http://127.0.0.1:4319';
@@ -94,8 +94,9 @@ try {
         // 350, which is exactly the rate at which a timeout gets averaged into a clean
         // result. The budget is generous, and running out of it is now a REPORTED FAILURE
         // rather than a measurement.
-        const ready = await waitFor(pageReady, { tries: 120 });
-        await sleep(250);
+        // Ready, and then STILL: a row's entrance or a panel's slide measured mid-flight is a
+        // layout nobody sees (T5). This was a fixed 250ms -- a guess about the machine.
+        const ready = await waitFor(pageReady, { tries: 120 }) && await waitFor(SETTLED, { tries: 120, awaitPromise: true });
 
         // 🔑 THE READOUT AND THE PROBE IN ONE EVALUATE, ON ONE TICK. They are two pure reads
         // of the same settled page, and taking them separately was both a wasted round-trip
@@ -148,8 +149,11 @@ for (const r of bad.slice(0, 40)) {
 // 175 measured twice.
 const populationIssues = populationComplaints(rows);
 for (const complaint of populationIssues) console.log(`  POPULATION  ${complaint}`);
+// "Every route" is held against the router -- unless a subset was asked for by name.
+const routeIssues = flag('--routes') ? [] : routeComplaints();
+for (const complaint of routeIssues) console.log(`  ROUTES  ${complaint}`);
 const themeComplaints = themeDimensionComplaints(rows);
 for (const complaint of themeComplaints) console.log(`  THEME  ${complaint}`);
 console.log(`body background by theme: ${[...new Set(rows.map((r) => `${r.theme}=${r.theme_bg}`))].sort().join('  ')}`);
 
-if (failures || themeComplaints.length || populationIssues.length) process.exitCode = 1;
+if (failures || themeComplaints.length || populationIssues.length || routeIssues.length) process.exitCode = 1;

@@ -5,7 +5,7 @@
  * and finds no overflow — and the widest tables in this application are not on screen when
  * it looks. `LocationListing`'s ELEVEN-column table renders only after a search;
  * `AcbDebits`' results table only after a member is found; the date sheet and the member
- * dialog only after something is opened. Those are the surfaces most likely to overflow a
+ * record only after something is opened. Those are the surfaces most likely to overflow a
  * 390px phone, and the matrix's clean run says nothing whatsoever about them.
  *
  * ⚠️ THIS IS `07.2`'s PROBLEM ARRIVING EARLY. That unit is *"state-gated surfaces"* and it
@@ -16,125 +16,111 @@
  * reason *"jsdom has no layout; the sheet branch IS driven and asserted, but 'one-handed
  * reach' is not a jsdom question"* — and it was deferred here. This is the first time that
  * sheet has been laid out at 390 real pixels.
+ *
+ * 🔄 RE-AIMED AT THE CARD SHELL, 2026-09-14 (`06.3`). The member record stopped being a dialog
+ * when the Card arrangement landed (`3bbeb04`) — it is the shell's third column, a drawer below
+ * `xl` — and main's merge (`91668e8`) removed the Structures tab this file drove on Capture. Three
+ * of the six cases were asserting a dialog, or a tab, that no longer exists. And the ACB case typed
+ * into `document.querySelector('input')`, which is now the TOPBAR's search: typing there takes you
+ * to the register, so the case had stopped measuring ACB Debits at all.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 
-import { launch, sleep } from './cdp.mjs';
+import { launch } from './cdp.mjs';
 
-import { overflowProbe, pageReady, populationComplaints, storeTheme, themeDimensionComplaints, themeReadout } from './probe.mjs';
+import {
+  SETTLED, clickByText, mouseDownOn, overflowProbe, pageReady, populationComplaints, storeTheme,
+  themeDimensionComplaints, themeReadout,
+} from './probe.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://127.0.0.1:4319';
 const shotsDir = process.argv[3];
 
-/**
- * Press a control that opens on `mousedown`, and say whether it was found.
- *
- * 🔴 `element.click()` DISPATCHES A `click` EVENT AND NOTHING ELSE. It does not synthesise
- * the mouse sequence a real press produces, so a control wired to `onMouseDown` never
- * hears it. `DateField` is wired that way on purpose — *"the whole field is the trigger"*,
- * the owner's complaint about the control it replaces being that only the icon opened it —
- * and the driver reported the step as simply not landing, which reads exactly like a
- * missing control. It was the driver. Playwright's `page.click()` is unaffected; this is a
- * property of raw CDP `Runtime.evaluate`, so it bites here and not in the journeys.
- */
-const mouseDownOn = (selector, pattern) => `(() => {
-  const re = ${pattern};
-  const el = [...document.querySelectorAll(${JSON.stringify(selector)})]
-    .find((n) => re.test((n.labels?.[0]?.textContent || n.getAttribute('aria-label') || '').trim()));
-  if (!el) return false;
-  for (const type of ['pointerdown', 'mousedown', 'mouseup', 'click']) {
-    el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
-  }
-  return true;
-})()`;
-
-/** Click the first element whose visible text matches, and say whether anything matched. */
-const clickByText = (selector, pattern) => `(() => {
-  const re = ${pattern};
-  const el = [...document.querySelectorAll(${JSON.stringify(selector)})]
-    .find((n) => re.test((n.getAttribute('aria-label') || n.textContent || '').trim()));
-  if (!el) return false;
-  el.click();
-  return true;
-})()`;
+/** Real rows. A skeleton row is `data-skeleton`, never `data-row` (Table.jsx). */
+const ROWS = `document.querySelectorAll('tr[data-row]').length > 1`;
+const RECORD_OPEN = `!!document.querySelector('[data-testid="member-panel"][data-open="true"] .mcard')`;
+const OPEN_FIRST_MEMBER = {
+  what: 'open the first member',
+  run: clickByText('[data-row-action]', '/open the record for/i'),
+  until: RECORD_OPEN,
+};
 
 /**
  * Each state, and the drive that reaches it.
  *
- * 🔑 EVERY STEP RETURNS WHETHER IT LANDED, and a step that did not land FAILS the case
- * rather than being skipped. A driver that silently no-ops measures the page it was
- * already on and reports it clean — which is this arc's recurring species with a browser
- * attached.
+ * 🔑 EVERY STEP RETURNS WHETHER IT LANDED, AND SAYS WHAT LANDING LOOKS LIKE. A step whose action
+ * did not land, or whose `until` never came true, FAILS the case rather than being skipped. A
+ * driver that silently no-ops measures the page it was already on and reports it clean — which
+ * is this arc's recurring species with a browser attached. (`until` replaces the fixed 600ms that
+ * sat between steps, which was a guess about how busy the machine is.)
  */
 const STATES = [
   {
-    name: 'members — record dialog open',
+    name: 'members — record drawer open',
     route: '/members',
-    ready: `document.querySelectorAll('tbody tr').length > 1`,
+    ready: ROWS,
+    steps: [OPEN_FIRST_MEMBER],
+  },
+  {
+    name: 'members — record drawer, Sasbo Structures tab',
+    route: '/members',
+    ready: ROWS,
     steps: [
-      { what: 'open the first member', run: clickByText('button', '/open the record for/i') },
-      { what: 'the dialog is present', run: `!!document.querySelector('[role="dialog"]')` },
+      OPEN_FIRST_MEMBER,
+      {
+        what: 'switch to Structures',
+        run: clickByText('[data-testid="member-panel"] button', '/Sasbo Structures/i'),
+        until: `/Sasbo Structures/.test(document.querySelector('[data-testid="member-panel"] button[aria-current="true"]')?.textContent || '')`,
+      },
     ],
   },
   {
-    name: 'members — record dialog, Sasbo Structures tab',
-    route: '/members',
-    ready: `document.querySelectorAll('tbody tr').length > 1`,
+    // 🔄 RE-HOMED FROM CAPTURE. This case opened the Election Date on Capture's Structures tab,
+    // which main removed (`4a7a67b`); Capture's one remaining date sits behind an Elected Recruiter
+    // answer whose question main removed with it (F-P48), so no person can open it. The organiser
+    // report has four dates and is the form filled standing up, on a phone — the case the P3
+    // deferral was about.
+    name: 'organiser report — the date sheet (P3 deferral)',
+    route: '/reports/organizer-report',
+    ready: `!!document.querySelector('input[aria-expanded]')`,
     steps: [
-      { what: 'open the first member', run: clickByText('button', '/open the record for/i') },
-      { what: 'switch to Structures', run: clickByText('button', '/Sasbo Structures/i') },
-    ],
-  },
-  {
-    name: 'capture — the date sheet (P3 deferral)',
-    route: '/members/capture',
-    ready: `[...document.querySelectorAll('button')].some(b => /Sasbo Structures/i.test(b.textContent || ''))`,
-    steps: [
-      { what: 'open the Structures tab', run: clickByText('button', '/Sasbo Structures/i') },
-      // The sheet only exists once the flow that owns a date is switched on.
-      { what: 'answer Shop Steward = Yes', run: `(() => {
-          const sel = [...document.querySelectorAll('select')].find(s => /Shop Steward/i.test(s.labels?.[0]?.textContent || ''));
-          if (!sel) return false;
-          const set = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
-          set.call(sel, 'Y'); sel.dispatchEvent(new Event('change', { bubbles: true })); return true;
-        })()` },
-      // The trigger is the FIELD, not a button beside it: the input carries
-      // `role="combobox"`, and the calendar icon is `aria-hidden` with `tabIndex={-1}`
-      // because it is decoration. Looking for a `<button>` here found the tab strip and
-      // the save bar and nothing else.
-      { what: 'open the date picker', run: mouseDownOn('input[aria-expanded]', '/Election Date/i') },
-      // 🔑 THE SHEET, NOT MERELY A PANEL. `aria-modal` is `true` only on the bottom-sheet
-      // branch — the popover sets it `false` — so this is what distinguishes "the picker
-      // opened" from "the picker opened in its PHONE form", which is the P3 box.
-      { what: 'the bottom sheet is up', run: `!!document.querySelector('[role="dialog"][aria-modal="true"]')` },
+      {
+        // The trigger is the FIELD, not a button beside it: the input carries
+        // `role="combobox"`, and the calendar icon is `aria-hidden` with `tabIndex={-1}`
+        // because it is decoration.
+        what: 'open a date field',
+        run: mouseDownOn('input[aria-expanded]', '/date/i'),
+        // 🔑 THE SHEET, NOT MERELY A PANEL. `aria-modal` is `true` only on the bottom-sheet
+        // branch — the popover sets it `false` — so this is what distinguishes "the picker
+        // opened" from "the picker opened in its PHONE form", which is the P3 box.
+        until: `!!document.querySelector('[role="dialog"][aria-modal="true"]')`,
+      },
     ],
   },
   {
     name: 'locations — the 11-column listing',
     route: '/reports/locations',
-    ready: `[...document.querySelectorAll('button')].some(b => /^Search$/i.test((b.textContent || '').trim()))`,
+    ready: `[...document.querySelectorAll('main button')].some(b => /^Search$/i.test((b.textContent || '').trim()))`,
     steps: [
-      { what: 'run the search', run: clickByText('button', '/^Search$/i') },
-      { what: 'the listing rendered', run: `!!document.querySelector('table')` },
+      { what: 'run the search', run: clickByText('main button', '/^Search$/i'), until: `!!document.querySelector('main table tbody tr')` },
     ],
   },
   {
     name: 'acb debits — the results table',
     route: '/admin/acb/debits',
-    ready: `!!document.querySelector('input')`,
+    // `main input`, never the first input in the document: that is the topbar's search.
+    ready: `!!document.querySelector('main input')`,
     steps: [
-      { what: 'type a surname', run: `(() => { const i = document.querySelector('input'); if (!i) return false; const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set; s.call(i,'Nkosi'); i.dispatchEvent(new Event('input',{bubbles:true})); return true; })()` },
-      { what: 'run the search', run: clickByText('button', '/^Search$/i') },
-      { what: 'results rendered', run: `document.querySelectorAll('tbody tr').length > 1` },
+      { what: 'type a surname', run: `(() => { const i = document.querySelector('main input'); if (!i) return false; const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set; s.call(i,'Nkosi'); i.dispatchEvent(new Event('input',{bubbles:true})); return true; })()` },
+      { what: 'run the search', run: clickByText('main button', '/^Search$/i'), until: ROWS },
     ],
   },
   {
     name: 'recruiters — the member list dialog',
     route: '/recruiters',
-    ready: `document.querySelectorAll('tbody tr').length > 1`,
+    ready: ROWS,
     steps: [
-      { what: 'open the first channel', run: clickByText('button', '/show the members recruited/i') },
-      { what: 'the dialog is present', run: `!!document.querySelector('[role="dialog"]')` },
+      { what: 'open the first channel', run: clickByText('button', '/show the members recruited/i'), until: `!!document.querySelector('[role="dialog"]')` },
     ],
   },
 ];
@@ -192,7 +178,6 @@ try {
       // makes the theme correct from the first frame. See `probe.mjs`.
       await evaluate(storeTheme(theme === 'dark'));
       await send('Page.navigate', { url: baseUrl + state.route });
-      await waitFor(pageReady);
 
       // 🔴 WAIT FOR WHAT THIS STATE NEEDS, not for a fixed number of milliseconds.
       // The first run reached 4 of 12, and the pattern gave the cause away: two cases
@@ -200,28 +185,27 @@ try {
       // members request was still in flight, so there was no row to click. A fixed sleep
       // makes the result depend on how busy the machine is, which is the definition of a
       // flaky measurement.
-      if (state.ready) {
-        if (!await waitFor(state.ready)) {
-          // No theme readout: a state that never became ready was never painted, and a row
-          // with a placeholder colour would poison the theme canary below.
-          //
-          // 🔴 IT STILL CARRIES AN `elements` COUNT, AND IT USED NOT TO. This path hand-listed
-          // eight fields and omitted that one — the single key `populationComplaints` reads —
-          // so an unreached state fell straight out of the population canary and the run came
-          // back clean about a row that had measured nothing. One row builder now, so a field
-          // added to the measured row cannot go missing from this one.
-          results.push(unreachedRow(state, theme, 'never became ready: ' + state.ready));
-          continue;
-        }
+      if (!await waitFor(pageReady) || (state.ready && !await waitFor(state.ready))) {
+        // No theme readout: a state that never became ready was never painted, and a row
+        // with a placeholder colour would poison the theme canary below.
+        //
+        // 🔴 IT STILL CARRIES AN `elements` COUNT, AND IT USED NOT TO. This path hand-listed
+        // eight fields and omitted that one — the single key `populationComplaints` reads —
+        // so an unreached state fell straight out of the population canary and the run came
+        // back clean about a row that had measured nothing. One row builder now, so a field
+        // added to the measured row cannot go missing from this one.
+        results.push(unreachedRow(state, theme, 'never became ready: ' + (state.ready ?? 'pageReady')));
+        continue;
       }
-      await sleep(300);
 
       const missed = [];
       for (const step of state.steps) {
-        const ok = await evaluate(step.run);
-        if (ok !== true) missed.push(step.what);
-        await sleep(600);
+        if (await evaluate(step.run) !== true) { missed.push(step.what); break; }
+        if (step.until && !await waitFor(step.until)) { missed.push(`${step.what} (it landed and never took effect)`); break; }
       }
+      // Measured once the page has stopped moving: the drawer slides in over 380ms, and a probe
+      // taken mid-slide sees a panel half off the right edge and calls it overflow (T5).
+      if (!missed.length && !await waitFor(SETTLED, { tries: 120, awaitPromise: true })) missed.push('the page never settled');
 
       // 🔑 READ THE THEME AT THE MOMENT THE PAGE IS MEASURED. Taken on arrival it read
       // `rgba(0, 0, 0, 0)` for both themes -- the stylesheet had not applied yet -- and the

@@ -9,6 +9,8 @@
  * One copy, imported by all three, is the only version of this that stays true.
  */
 
+import { readFileSync } from 'node:fs';
+
 /**
  * Every route the responsive tools sweep.
  *
@@ -26,6 +28,60 @@ export const ROUTES = [
   '/archives', '/archives/affiliations-other-trade-unions', '/archives/finance-houses',
   '/archives/research-information',
 ];
+
+/**
+ * 🔑 THE LIST ABOVE IS HELD AGAINST `App.jsx`, NOT REMEMBERED. "Every route" is a completeness
+ * claim, and the floors doctrine is explicit that a completeness claim is asserted against the
+ * set's own discovery: a route added to the router and not to this list is a route the matrix, the
+ * edge sweep and the motion proof all skip, inside runs that each say "every route".
+ *
+ * Returns complaints; empty means the list is the router's.
+ */
+export function routeComplaints(appFile = 'src/App.jsx') {
+  let source;
+  try {
+    source = readFileSync(appFile, 'utf8');
+  } catch (e) {
+    return [`cannot read ${appFile} to hold the route list against it (${e.message}) -- run from the client root`];
+  }
+  const routed = new Set();
+  for (const [, path, element] of source.matchAll(/<Route\s+path="([^"]+)"\s+element=\{<(\w+)/g)) {
+    // A redirect is not a page, and "/" is the layout the pages sit inside.
+    if (element === 'Navigate' || path === '/') continue;
+    routed.add(`/${path.replace(/^\//, '')}`);
+  }
+  if (routed.size < 20) return [`read only ${routed.size} routes from ${appFile} -- the scan is not seeing the router`];
+  const listed = new Set(ROUTES);
+  return [
+    ...[...routed].filter((r) => !listed.has(r)).map((r) => `${r} is routed in App.jsx and swept by nothing`),
+    ...[...listed].filter((r) => !routed.has(r)).map((r) => `${r} is swept and no longer routed`),
+  ];
+}
+
+/**
+ * The page has finished ARRIVING -- evaluate with `awaitPromise`.
+ *
+ * 🔴 IT REPLACES FIXED SLEEPS, WHICH WERE GUESSES ABOUT HOW FAST THIS MACHINE IS. The record
+ * drawer slides in over 380ms, the card lands over 580ms and its sweep ends at 1.35s, and a probe
+ * or a shutter inside them sees a panel half off the right edge (and calls it overflow) or a card
+ * in mid-air (T5). So: fonts, every visible image DECODED (`complete` is metadata, not pixels), no
+ * finite animation or transition running, then two frames.
+ *
+ * 🔑 INFINITE ANIMATIONS ARE EXCLUDED, AND THAT IS NOT A LOOPHOLE. A skeleton's shimmer and a
+ * spinner never finish by design; waiting on them would wait forever on exactly the loading state.
+ */
+export const SETTLED = `(async () => {
+  await document.fonts.ready;
+  const shown = [...document.images].filter((img) => img.getClientRects().length > 0);
+  // A broken image is photographed broken -- that is the truth about the page -- so a rejected
+  // decode is not a reason to wait.
+  await Promise.all(shown.map((img) => img.decode().catch(() => null)));
+  const moving = document.getAnimations().filter((a) =>
+    (a.pending || a.playState === 'running') && a.effect?.getComputedTiming().iterations !== Infinity);
+  if (moving.length) return false;
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  return true;
+})()`;
 
 /**
  * What the page is wider than the REQUESTED viewport by, and which elements do it.
@@ -291,3 +347,40 @@ export function themeDimensionComplaints(rows) {
   }
   return complaints;
 }
+
+/*
+ * THE TWO DRIVERS, SHARED. They lived in `states.mjs` until `review.mjs` needed them too, and a
+ * second copy of a driver drifts exactly the way three copies of the overflow probe did.
+ */
+
+/**
+ * Press a control that opens on `mousedown`, and say whether it was found.
+ *
+ * 🔴 `element.click()` DISPATCHES A `click` EVENT AND NOTHING ELSE. It does not synthesise
+ * the mouse sequence a real press produces, so a control wired to `onMouseDown` never
+ * hears it. `DateField` is wired that way on purpose — *"the whole field is the trigger"*,
+ * the owner's complaint about the control it replaces being that only the icon opened it —
+ * and the driver reported the step as simply not landing, which reads exactly like a
+ * missing control. It was the driver. Playwright's `page.click()` is unaffected; this is a
+ * property of raw CDP `Runtime.evaluate`, so it bites here and not in the journeys.
+ */
+export const mouseDownOn = (selector, pattern) => `(() => {
+  const re = ${pattern};
+  const el = [...document.querySelectorAll(${JSON.stringify(selector)})]
+    .find((n) => re.test((n.labels?.[0]?.textContent || n.getAttribute('aria-label') || '').trim()));
+  if (!el) return false;
+  for (const type of ['pointerdown', 'mousedown', 'mouseup', 'click']) {
+    el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+  }
+  return true;
+})()`;
+
+/** Click the first element whose visible text matches, and say whether anything matched. */
+export const clickByText = (selector, pattern) => `(() => {
+  const re = ${pattern};
+  const el = [...document.querySelectorAll(${JSON.stringify(selector)})]
+    .find((n) => re.test((n.getAttribute('aria-label') || n.textContent || '').trim()));
+  if (!el) return false;
+  el.click();
+  return true;
+})()`;

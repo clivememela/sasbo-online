@@ -42,9 +42,9 @@
  *
  *   node tools/motion.mjs <baseUrl>
  */
-import { launch, sleep } from './cdp.mjs';
+import { launch } from './cdp.mjs';
 
-import { ROUTES, pageReady, storeTheme } from './probe.mjs';
+import { ROUTES, SETTLED, pageReady, routeComplaints, storeTheme } from './probe.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://127.0.0.1:4319';
 
@@ -179,8 +179,9 @@ try {
     for (const route of ROUTES) {
       if (!await land(route)) { missed += 1; continue; }
       // Entrance transitions settle before anything is read (T4/T5): a value read
-      // mid-transition is whatever it happened to be passing through.
-      await sleep(150);
+      // mid-transition is whatever it happened to be passing through. A condition, not the
+      // fixed 150ms this was.
+      if (!await waitFor(SETTLED, { tries: 120, awaitPromise: true })) { missed += 1; continue; }
 
       const c = await evaluate(motionCensus);
       totals.examined += c.examined;
@@ -263,6 +264,12 @@ try {
 
   if (missed) {
     console.log(`  ⚠ ${missed} route loads never became ready and were NOT measured`);
+    failures += 1;
+  }
+
+  // "Every route" is held against the router, not against this file's memory of it.
+  for (const complaint of routeComplaints()) {
+    console.log(`  ✗ ROUTES  ${complaint}`);
     failures += 1;
   }
 } finally {

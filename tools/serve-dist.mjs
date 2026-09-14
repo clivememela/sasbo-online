@@ -23,7 +23,7 @@
  * against three-character names proves nothing about a column that has to hold
  * "Pietermaritzburg & Midlands Branch".
  */
-import { createReadStream, statSync } from 'node:fs';
+import { createReadStream, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 
@@ -131,8 +131,11 @@ const API = {
     phone: '0110000000', memberId: i + 1, roleId: 1, isElectedRep: i % 2 === 0,
     electionDate: '2024-06-01', recruiterTypeId: 1, structureIds: [],
   })),
-  '/api/roles': [{ id: 1, name: 'Lead Recruiter' }, { id: 2, name: 'Standard Recruiter' }],
-  '/api/structures': [{ id: 1, name: 'INC / IC', parentId: null, children: [] }],
+  // `recruiterService.getRoles()` and `.getStructures()`. These were `/api/roles` and
+  // `/api/structures`, which nothing calls, so both lists were being answered by `/api/members`
+  // -- see `stubDrift` below.
+  '/api/members/userRoles': [{ id: 1, name: 'Lead Recruiter' }, { id: 2, name: 'Standard Recruiter' }],
+  '/api/members/structures/tree': [{ id: 1, name: 'INC / IC', parentId: null, children: [] }],
   '/api/provinces': ['Gauteng', 'Western Cape', 'KwaZulu-Natal'].map((name, i) => ({ id: i + 1, name })),
   '/api/areas': ['Gauteng South', 'Western Cape'].map((name, i) => ({ id: i + 1, name })),
   '/api/districts': [{ id: 1, name: 'Synthetic District' }],
@@ -143,7 +146,6 @@ const API = {
     status: ['ACTIVE', 'PENDING', 'CANCELLED', 'INACTIVE'][i % 4],
     registrationDate: '2023-01-15',
   })),
-  '/api/locations': bankRows.slice(0, 6).map((b) => ({ ...b, members: members.slice(0, 12) })),
 };
 
 /**
@@ -154,6 +156,70 @@ const API = {
  * also makes "longest match first" a property of a value rather than a claim in a comment.
  */
 const API_KEYS = Object.keys(API).sort((a, b) => b.length - a.length);
+
+/**
+ * 🔴 A STUB THAT ANSWERS FOR THE WRONG PATH IS SILENT -- AND IT HAPPENED.
+ *
+ * Matching is by prefix (see below), so when the client moved `getRoles()` to
+ * `/api/members/userRoles` and `getStructures()` to `/api/members/structures/tree`, both were
+ * answered by `/api/members`: sixty members handed to a roles picker and to a structure tree.
+ * Nothing 501'd, because something matched -- and the keys the client had moved away from sat
+ * in this table answering nothing. Found 2026-09-14, by `06.3`.
+ *
+ * So the table is checked against the paths the services actually call, once, before serving:
+ * every service path must be answered by a key that covers its whole fixed part, and every key
+ * must be called by something. Either failure refuses to serve, because a sweep over the wrong
+ * stubs measures pages nobody will ever see.
+ *
+ * ⚠️ IT READS `apiUrl('<literal>')` IN `src/services`, the same net `apiContract.test.js` casts,
+ * so it has to be run from the client's root -- which is where every measurement runs from.
+ */
+/**
+ * Service paths deliberately NOT stubbed, each with its reason -- and each asserted to still be
+ * called, because an exception list nobody checks against the code rots in silence (T34).
+ */
+const NOT_STUBBED = {
+  // A2, pinned in `apiContract.test.js`: the server has no such route, and no screen imports the
+  // service that calls it. A stub here would measure against an endpoint production does not have.
+  '/api/debounce': 'A2',
+};
+
+const stubDrift = () => {
+  let files;
+  try {
+    files = readdirSync('src/services').filter((f) => f.endsWith('.js') && !f.includes('.test.'));
+  } catch (e) {
+    throw new Error(`serve-dist runs from the client root, and cannot read src/services here (${e.message})`);
+  }
+  const called = new Set();
+  for (const file of files) {
+    // `/api/[a-z]`: a doc comment's `apiUrl('/api/...')` is an example, not a call.
+    for (const [, literal] of readFileSync(join('src/services', file), 'utf8').matchAll(/apiUrl\(\s*[`'"](\/api\/[a-z][^`'"]*)[`'"]/g)) {
+      // The fixed part: everything before the first interpolation or query string.
+      called.add(literal.split('${')[0].split('?')[0]);
+    }
+  }
+  if (called.size < 10) {
+    return [`read only ${called.size} service paths from src/services -- the scan is not seeing the services`];
+  }
+
+  const problems = [];
+  for (const path of [...called].sort()) {
+    if (path in NOT_STUBBED) continue;
+    const key = API_KEYS.find((k) => path.startsWith(k));
+    if (!key) problems.push(`${path} has no stub at all`);
+    // What is left over may only be the slash in front of an id. Anything else is a path this
+    // key was never written for.
+    else if (!['', '/'].includes(path.slice(key.length))) problems.push(`${path} is answered by the shorter stub ${key}`);
+  }
+  for (const key of API_KEYS) {
+    if (![...called].some((path) => path.startsWith(key))) problems.push(`${key} is stubbed and no service calls it`);
+  }
+  for (const path of Object.keys(NOT_STUBBED)) {
+    if (!called.has(path)) problems.push(`${path} is excused from stubbing and no service calls it any more -- drop the excuse`);
+  }
+  return problems;
+};
 
 /**
  * Payloads serialised once at startup.
@@ -226,6 +292,13 @@ const server = createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
   createReadStream(join(ROOT, 'index.html')).pipe(res);
 });
+
+const drift = stubDrift();
+if (drift.length) {
+  console.error('⚠ the stub table has drifted from what the services call -- refusing to serve:');
+  for (const line of drift) console.error(`    ${line}`);
+  process.exit(1);
+}
 
 // 🔴 EXPLICITLY 127.0.0.1, NOT `localhost` AND NOT THE DEFAULT (T23).
 server.listen(PORT, '127.0.0.1', () => {
