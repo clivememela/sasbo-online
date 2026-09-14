@@ -6,7 +6,7 @@ import { jobGradeService } from "../../services/jobGradeService.js";
 import { bankService } from "../../services/bankService.js";
 import PageTitle from "../../components/common/PageTitle";
 import {
-    Button, CheckboxGroup, DateField, PositionTreeSelect, SearchableSelect, SelectInput, TextInput,
+    Button, DateField, PositionTreeSelect, SearchableSelect, SelectInput, TextInput,
 } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
@@ -20,30 +20,6 @@ import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState";
 import { cn } from "../../lib/utils";
 import useReferenceData from "../../hooks/useReferenceData.js";
-
-// 44 Unique SASBO Branches for Primary Selection Dropdown
-const SASBO_BRANCHES = [
-    "Absa Johannesburg Central", "Absa Pretoria", "Absa Cape Town", "Absa Durban", "Absa Gqeberha",
-    "Standard Bank Gauteng South", "Standard Bank KZN", "Standard Bank Western Cape", "Standard Bank Eastern Cape",
-    "Nedbank Wits & Pretoria", "Nedbank Coastal", "Capitec Western Cape", "Capitec Gauteng", "FNB Corporate HQ",
-    "FNB Regional West", "FNB Eastern Cape", "FNB KZN Area", "Discovery Bank National", "TymeBank Johannesburg",
-    "African Bank Midrand", "Bidvest Bank Regional", "Albaraka Bank National", "Mercantile Bank Central",
-    "HBZ Bank South Africa", "Sasfin Bank Gauteng", "Grindrod Bank Coastal", "Investec Sandton", "Investec Cape Town",
-    "SARB Pretoria HQ", "SARB Johannesburg", "SARB Cape Town Branch", "SARB Durban Branch", "Finbond National",
-    "Ubank Mining Belt North", "Ubank Mining Belt South", "Postbank Free State", "Postbank Limpopo",
-    "Land Bank Head Office", "Development Bank SA", "SNG Grant Thornton", "Santam Johannesburg",
-    "Old Mutual Financial Services", "Hollard Insurance Group", "Regent Insurance National"
-];
-
-// BEC Structure Representative Options (Multiple Selection Allowed)
-const STRUCTURE_REP_OPTIONS = [
-    "INC / IC", "NCF / SJC", "VP", "President", "MANCOM", "Resolutions Committee"
-];
-
-// BEC Executive Positions (Only One Position Allowed)
-const BEC_EXECUTIVE_POSITIONS = [
-    "Chairperson", "Deputy Chairperson", "Secretary", "Deputy Secretary", "Treasurer"
-];
 
 const FIELD_TO_TAB_MAP = {
     title: "personal",
@@ -64,9 +40,6 @@ const FIELD_TO_TAB_MAP = {
     paymentType: "employment",
     bankAccountNumber: "employment",
     debitDay: "employment",
-    shopStewardElectionDate: "structures",
-    becBranchName: "structures",
-    becExecutivePosition: "structures"
 };
 
 
@@ -130,7 +103,6 @@ export default function CaptureMember() {
         repElectionDay: "",
         repElectionMonth: "",
         repElectionYear: "",
-        electedRep: "N",
         remarks: "",
         remarks2: "",
         remarks3: "",
@@ -144,22 +116,6 @@ export default function CaptureMember() {
         homeLoanReducedRateOption: "N",
         structure1: "",
 
-        // Exact Flow diagram state bindings
-        isShopSteward: "N",
-        shopStewardElectionDate: "",
-        isBecMember: "N",
-        becBranchName: "", // Choice among the 44 unique branches
-        isBecRecruiter: "N",
-        isBecStructureRep: "N",
-        selectedBecStructures: [], // Array for MULTIPLE STRUCTURES ALLOWED
-        isBecExecutive: "N",
-        becExecutivePosition: "", // Single Selection Allowed
-
-        // COSATU Structure
-        isCosatu: "N",
-        isCosatuLocal: "",
-        isCosatuRegional: "",
-        cosatuPositions: [] // Multi-select: PEC, CEC, Treasurer, Chairperson, Secretary
     });
 
     const [fieldErrors, setFieldErrors] = useState({});
@@ -213,29 +169,6 @@ export default function CaptureMember() {
                 updatedForm.initials = autoInitials;
             }
 
-            if (field === "isShopSteward" && value === "N") {
-                updatedForm.shopStewardElectionDate = "";
-            }
-            if (field === "isBecMember" && value === "N") {
-                updatedForm.becBranchName = "";
-                updatedForm.isBecRecruiter = "N";
-                updatedForm.isBecStructureRep = "N";
-                updatedForm.selectedBecStructures = [];
-                updatedForm.isBecExecutive = "N";
-                updatedForm.becExecutivePosition = "";
-            }
-            if (field === "isBecStructureRep" && value === "N") {
-                updatedForm.selectedBecStructures = [];
-            }
-            if (field === "isBecExecutive" && value === "N") {
-                updatedForm.becExecutivePosition = "";
-            }
-            if (field === "isCosatu" && value === "N") {
-                updatedForm.cosatuLocal = "";
-                updatedForm.cosatuRegion = "";
-                updatedForm.cosatuPositions = [];
-            }
-
             return updatedForm;
         });
 
@@ -279,11 +212,6 @@ export default function CaptureMember() {
         }
     };
 
-    // `handleStructureCheckboxChange` lived here until `05.4`: eighteen lines of per-checkbox
-    // add/remove bookkeeping that nothing had called since `04.2` gave the BEC structures a
-    // real `CheckboxGroup`, which owns the toggle and hands back the whole next selection.
-    // It survived because `no-unused-vars` was the only thing that could see it was dead.
-
     const validateFormBeforeSave = () => {
         const errors = {};
 
@@ -309,17 +237,6 @@ export default function CaptureMember() {
             const validDays = ["20", "25", "31", 20, 25, 31];
             if (!validDays.includes(form.debitDay)) {
                 errors.debitDay = "Debit day must be one of 20, 25 or 31 when payment type is 'Debit Order'";
-            }
-        }
-
-        if (form.isShopSteward === "Y" && !form.shopStewardElectionDate) {
-            errors.shopStewardElectionDate = "Shop Steward Election Date is required";
-        }
-
-        if (form.isBecMember === "Y") {
-            if (!form.becBranchName) errors.becBranchName = "BEC branch committee selection is required";
-            if (form.isBecExecutive === "Y" && !form.becExecutivePosition) {
-                errors.becExecutivePosition = "An Executive position assignment must be declared";
             }
         }
 
@@ -404,11 +321,16 @@ export default function CaptureMember() {
     // Fetch job grades for the selected bank whenever bankName changes.
     useEffect(() => {
         let cancelled = false;
+
+        // 🛠️ IMMEDIATELY clear out any previously selected Job Grade when Bank changes
+        setForm(prev => ({ ...prev, jobGrade: "" }));
+
         const fetchGrades = async () => {
             if (!form.bankName) {
+                // No bank, no grades: grades are per bank, so an empty list is the honest
+                // answer. The job grade itself was already cleared at the top of this effect.
                 setJobGradeOptions([]);
                 setJobGradeError(null);
-                setForm(prev => ({ ...prev, jobGrade: "" }));
                 setJobGradeLoading(false);
                 return;
             }
@@ -531,7 +453,7 @@ export default function CaptureMember() {
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`touch-target inline-flex items-center gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-sm font-medium transition-[color,box-shadow] duration-(--duration-instant) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring ${activeTab === tab.id ? "font-semibold text-brand-ink shadow-[inset_0_-2px_0_var(--color-brand)]" : "text-ink-muted shadow-[inset_0_-2px_0_transparent] hover-hover:hover:text-ink"}`}
                             >
-                                <span title={tab.full}>{tab.label}</span>
+                                <span>{tab.label}</span>
                                 {tabsWithErrors.has(tab.id) && (
                                     <>
                                         {/* The asterisk was the ONLY signal that a tab held
@@ -629,160 +551,11 @@ export default function CaptureMember() {
                             </>
                         )}
 
-                        {activeTab === "structures" && (
-                            <>
-                                <SectionTitle title="SASBO Hierarchy Core Alignment Matrix" />
-
-                                {/* Flow node 1: Shop Steward? */}
-                                <Field
-                                    label="Shop Steward?"
-                                    value={form.isShopSteward}
-                                    onChange={handleChange("isShopSteward")}
-                                    options={yesNoOptions}
-                                />
-
-                                {form.isShopSteward === "Y" && (
-                                    <div className="md:col-span-2 rounded-lg border border-line bg-surface-2 p-4">
-                                        <Field
-                                            label="Enter Shop Steward Election Date"
-                                            value={form.shopStewardElectionDate}
-                                            onChange={handleChange("shopStewardElectionDate")}
-                                            error={fieldErrors.shopStewardElectionDate}
-                                            type="date"
-                                            required
-                                        />
-                                    </div>
-                                )}
-
-                                {/* COSATU Structure */}
-                                <Field
-                                    label="COSATU Member?"
-                                    value={form.isCosatu}
-                                    onChange={handleChange("isCosatu")}
-                                    options={yesNoOptions}
-                                />
-
-                                {form.isCosatu === "Y" && (
-                                    <div className="md:col-span-2 mt-2 space-y-4 border-l border-line pl-4">
-                                        <p className="text-xs font-bold uppercase tracking-wide text-accent-ink">COSATU Structure</p>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <Field
-                                                label="Local?"
-                                                value={form.isCosatuLocal}
-                                                onChange={handleChange("isCosatuLocal")}
-                                                options={yesNoOptions}
-                                            />
-                                            <Field
-                                                label="Regional?"
-                                                value={form.isCosatuRegional}
-                                                onChange={handleChange("isCosatuRegional")}
-                                                options={yesNoOptions}
-                                            />
-                                        </div>
-                                        {/* 🔴 THE `<label>` OVER THIS GROUP NAMED NOTHING --
-                                            no `htmlFor`, and there is no single control to
-                                            point one at -- so a screen-reader user met five
-                                            checkboxes with no idea what question they
-                                            answered. `CheckboxGroup` is a real <fieldset>
-                                            with a <legend>, which is the element pair that
-                                            exists for exactly this. */}
-                                        <CheckboxGroup
-                                            legend="COSATU Positions — Multiple Allowed"
-                                            options={["PEC", "CEC", "Treasurer", "Chairperson", "Secretary"]}
-                                            labelFor={(pos) =>
-                                                pos === "PEC" ? "PEC (Provincial Executive Committee)" :
-                                                pos === "CEC" ? "CEC (Central Executive Committee)" : pos}
-                                            selected={form.cosatuPositions || []}
-                                            onToggle={(next) => setForm(prev => ({ ...prev, cosatuPositions: next }))}
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Flow node 2: BEC? */}
-                                <Field
-                                    label="BEC Member?"
-                                    value={form.isBecMember}
-                                    onChange={handleChange("isBecMember")}
-                                    options={yesNoOptions}
-                                />
-
-                                {form.isBecMember === "Y" && (
-                                    <div className="md:col-span-2 mt-2 space-y-6 border-l border-line pl-4">
-
-                                        {/* Flow node 3: 44 BEC Committees (Single Selection branch selector) */}
-                                        <Field
-                                            label="Select primary BEC Committee (44 Unique Branches Available)"
-                                            value={form.becBranchName}
-                                            onChange={handleChange("becBranchName")}
-                                            options={SASBO_BRANCHES}
-                                            error={fieldErrors.becBranchName}
-                                            searchable
-                                            required
-                                        />
-
-                                        {/* Flow node 4: BEC Recruiter? */}
-                                        <Field
-                                            label="BEC Recruiter?"
-                                            value={form.isBecRecruiter}
-                                            onChange={handleChange("isBecRecruiter")}
-                                            options={yesNoOptions}
-                                        />
-
-                                        {/* Flow node 5: BEC Structure Representative? */}
-                                        <Field
-                                            label="BEC Structure Representative?"
-                                            value={form.isBecStructureRep}
-                                            onChange={handleChange("isBecStructureRep")}
-                                            options={yesNoOptions}
-                                        />
-
-                                        {form.isBecStructureRep === "Y" && (
-                                            <CheckboxGroup
-                                                legend="Select BEC Structure(s) — multiple allowed"
-                                                options={STRUCTURE_REP_OPTIONS}
-                                                selected={form.selectedBecStructures}
-                                                onToggle={(next) => setForm(prev => ({ ...prev, selectedBecStructures: next }))}
-                                            />
-                                        )}
-
-                                        {/* Flow node 6: BEC Executive? */}
-                                        <Field
-                                            label="BEC Executive?"
-                                            value={form.isBecExecutive}
-                                            onChange={handleChange("isBecExecutive")}
-                                            options={yesNoOptions}
-                                        />
-
-                                        {form.isBecExecutive === "Y" && (
-                                            <div className="rounded-lg border border-line bg-surface-2 p-4">
-                                                <Field
-                                                    label="Select BEC Executive Position - ONLY ONE POSITION ALLOWED"
-                                                    value={form.becExecutivePosition}
-                                                    onChange={handleChange("becExecutivePosition")}
-                                                    options={BEC_EXECUTIVE_POSITIONS}
-                                                    error={fieldErrors.becExecutivePosition}
-                                                    required
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </>
-                        )}
-
                         {activeTab === "representatives" && (
                             <>
                                 <Field label="Recruiter" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} options={reps.map(r => r.name).filter(Boolean)} searchable />
                                 <Field label="Area's Recruiter" value={form.areasRep} onChange={handleChange("areasRep")} options={reps.map(r => r.name).filter(Boolean)} searchable />
-                                <SectionTitle title="Elected Recruiter" />
-                                <Field label="Elected Recruiter (Y/N)" value={form.electedRep} onChange={(e) => {
-                                    const val = e.target.value;
-                                    setForm(prev => ({
-                                        ...prev,
-                                        electedRep: val,
-                                        ...(val === 'N' ? { repElectionDay: '', repElectionMonth: '', repElectionYear: '', structureIds: [] } : {})
-                                    }));
-                                }} options={yesNoOptions} />
+
                                 {form.electedRep === 'Y' && (
                                     <>
                                         <RepElectionDatePicker form={form} setForm={setForm} />
@@ -797,19 +570,6 @@ export default function CaptureMember() {
                                         </div>
                                     </>
                                 )}
-                            </>
-                        )}
-                        {activeTab === "history" && (
-                            <>
-                                <Field label="Remarks / Comments" value={form.remarks} onChange={handleChange("remarks")} className="md:col-span-2" />
-                                <Field label="2nd Remarks Field" value={form.remarks2} onChange={handleChange("remarks2")} className="md:col-span-2" />
-                                <Field label="MEMNET Member (Y/N)" value={form.memnetMember} onChange={handleChange("memnetMember")} options={yesNoOptions} />
-                                <Field label="Print Label for Postage (Y/N)" value={form.printLabelForPostage} onChange={handleChange("printLabelForPostage")} options={yesNoOptions} />
-                                <Field label="Suspension Code" value={form.suspensionCode} onChange={handleChange("suspensionCode")} options={suspensionCodeOptions} />
-                                <Field label="Use Alternate Address (Y/N)" value={form.useAltAddress} onChange={handleChange("useAltAddress")} options={yesNoOptions} />
-                                <Field label="Deduct Subscriptions through ACB (Y/N)" value={form.deductACB} onChange={handleChange("deductACB")} options={yesNoOptions} />
-                                <Field label="Print Membership Cards (Y/N)" value={form.printMembershipCards} onChange={handleChange("printMembershipCards")} options={yesNoOptions} />
-                                <Field label="Home Loan Reduced Rate (Y/N)" value={form.homeLoanReducedRateOption} onChange={handleChange("homeLoanReducedRateOption")} options={yesNoOptions} />
                             </>
                         )}
                     </div>

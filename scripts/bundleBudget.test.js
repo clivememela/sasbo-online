@@ -154,6 +154,37 @@ describe('the bundle budget can fail', () => {
     expect(status).toBe(1)
   })
 
+  /**
+   * 🔑 DOCUMENTS ARE MEASURED ON THEIR OWN ROW, AND THIS PAIR IS WHAT KEEPS THAT HONEST.
+   *
+   * The membership application PDF is 487.6 KiB, and counted inside `all assets` it put a
+   * healthy build 350 KiB over its ceiling. The script now sums documents separately. A
+   * split like that has two ways to go wrong -- documents could leak back into `total`, or
+   * the new row could quietly never fail -- so each half is proved on its own.
+   */
+  it('passes a realistic build carrying a large form PDF -- documents are not page weight', () => {
+    const { status, out } = budgetAgainst((dir) => {
+      const dist = realisticBuild(dir)
+      writeFileSync(join(dist, 'assets', 'Membership Application-hash.pdf'), 'd'.repeat(500 * 1024))
+    })
+
+    expect(out, 'a 500 KiB document must not push `all assets` over its ceiling').not.toMatch(/OVER +all assets/)
+    expect(out).toMatch(/OK +documents/)
+    expect(status, `expected a clean exit, got ${status}:
+${out}`).toBe(0)
+  })
+
+  it('FAILS when the documents themselves are over their own ceiling', () => {
+    const { status, out } = budgetAgainst((dir) => {
+      const dist = realisticBuild(dir)
+      writeFileSync(join(dist, 'assets', 'scan-hash.pdf'), 'd'.repeat(700 * 1024))
+    })
+
+    expect(out, 'excluding documents from the total must not exempt them from any limit')
+      .toMatch(/OVER +documents/)
+    expect(status).toBe(1)
+  })
+
   it('FAILS rather than passes when dist/ is absent entirely', () => {
     const { status, out } = budgetAgainst(() => {})
 

@@ -113,9 +113,9 @@ const openTab = async (user, label) => {
 }
 
 const choosePayroll = async (user) => {
-  await openTab(user, /Employment/i)
+  await openTab(user, /Employment & Bank/i)
   await user.selectOptions(labelled('Payment Type'), 'Payroll')
-  await openTab(user, /Personal/i)
+  await openTab(user, /Personal Information/i)
 }
 
 describe('CaptureMember round-trips its fields', () => {
@@ -263,89 +263,5 @@ describe('the identity-type vocabulary', () => {
       'A7 has been fixed -- the form now refuses a passport capture with no date of ' +
         'birth. Delete this pin, un-skip the test above, and close the row.',
     ).toBeFalsy()
-  })
-
-  /**
-   * 🔴 THE COSATU LOCAL AND REGION NEVER REACH THE MEMBER RECORD, and the form
-   * and the schema do not even agree on what those two fields MEAN.
-   *
-   * A NEW defect -- the COSATU block is two days old -- and found by writing this
-   * test rather than by reading the diff. ⚠️ The first draft of this comment was
-   * itself wrong in a way worth keeping: it said the form collects free-text
-   * names under mismatched keys. Running it corrected that to something sharper.
-   *
-   * Two separate mistakes, stacked:
-   *
-   *   ① THE NAMES DISAGREE. The form's state keys are `isCosatuLocal` and
-   *     `isCosatuRegional`; the DTO declares `cosatuLocal` and `cosatuRegion`.
-   *     `memberService.createMember` submits the form object verbatim, so both
-   *     values arrive under names the server has never heard of, are ignored as
-   *     unknown properties, and the capture reports success.
-   *
-   *   ② THE MEANINGS DISAGREE, which no rename would fix. The form asks two
-   *     YES/NO questions -- the fields are labelled "Local?" and "Regional?" and
-   *     are fed `YES_NO_OPTIONS`. The columns V19 created are `VARCHAR(255)`
-   *     described in that migration as "the Local the member belongs to (free
-   *     text)" and "the Region the member belongs to (free text)". So the screen
-   *     collects a flag where the database wants a NAME. Align the keys and the
-   *     result is `cosatu_local = 'Y'`, which answers a question nobody asked.
-   *
-   * 🔑 ① IS A31's DEFECT CLASS -- a field that reads but does not write, which the
-   * standards name the most expensive kind in a data-capture system. A31 is six
-   * fields with no column at all; this is two fields WITH columns, wired to the
-   * wrong names. ② is the more interesting half, because it means the fix is a
-   * decision about what the form should ask, not an edit.
-   *
-   * ⚠️ AND THE MISMATCH ALSO BREAKS THE RESET, in the opposite direction. Setting
-   * "COSATU Member?" back to "N" clears `cosatuLocal` and `cosatuRegion` -- the
-   * DTO names, which no input ever writes -- and leaves `isCosatuLocal` and
-   * `isCosatuRegional` holding what the user chose. A member who is NOT in COSATU
-   * still submits COSATU answers.
-   *
-   * NOT FIXED HERE: `CaptureMember.jsx` is the incumbent's runtime code, so this
-   * arc asserts rather than repairs. `isCosatu` and `cosatuPositions` ARE named
-   * correctly and do persist, which is why this pins two fields and not four.
-   * Reported to the owner for a register id rather than allocated one here -- the
-   * register is a shared namespace and the arc that owns this screen is mid-flight
-   * in it.
-   */
-  it('🔴 submits the COSATU Local and Regional answers under names the server drops', async () => {
-    const user = setupUser()
-    renderWithProviders(<CaptureMember />)
-
-    await fill(user, 'First Name(s)', 'Synthetic')
-    await fill(user, 'Surname', 'Testperson')
-    await choosePayroll(user)
-    await user.selectOptions(labelled('Identity Type'), 'I.D. Number')
-    await fill(user, 'I.D. Number', '9001010000080')
-
-    // The COSATU panel is gated on the Y/N above it, so the flag is set first.
-    await openTab(user, /Structures/i)
-    await user.selectOptions(labelled('COSATU Member?'), 'Y')
-    await user.selectOptions(labelled('Local?'), 'Y')
-    await user.selectOptions(labelled('Regional?'), 'Y')
-
-    await openTab(user, /Personal/i)
-    await save(user)
-
-    await waitFor(() => expect(posted).toBeDefined())
-
-    // The wire, which is the only place either mistake is visible.
-    expect(
-      posted.cosatuLocal,
-      'the COSATU Local now reaches the server under the name the DTO declares. If ' +
-        'that was deliberate, check what it CARRIES too -- the column wants the name ' +
-        'of a Local, and this form asks a yes/no question. Then close the register row.',
-    ).toBeUndefined()
-    expect(posted.cosatuRegion).toBeUndefined()
-
-    // And where the two answers actually went, so a failure names the cause
-    // rather than only the symptom.
-    expect(posted.isCosatuLocal).toBe('Y')
-    expect(posted.isCosatuRegional).toBe('Y')
-
-    // The two fields that ARE wired correctly, asserted in the same test so the
-    // contrast is visible: this is a two-field defect, not a four-field one.
-    expect(posted.isCosatu).toBe('Y')
   })
 })

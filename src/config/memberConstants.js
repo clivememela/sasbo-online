@@ -39,27 +39,26 @@ export const REP_OPTIONS = [
 ];
 
 /*
- * THE FIVE SECTIONS OF A MEMBER'S RECORD, and the words for them.
+ * THE CAPTURE FORM'S TABS -- and only the capture form's.
  *
- * 🔴 THE LABELS ARE SHORT BECAUSE ONE OF THE TWO SCREENS THAT SHOWS THEM IS A 400px COLUMN.
- * Docked, the record panel is at most 448px wide, and "Personal Information · Employment &
- * Bank · Membership & Subscriptions · Recruitment Channel · Sasbo Structures" is 762px of
- * tabs -- so the strip wrapped to three rows, and when it was made to scroll instead it cut
- * a word in half, which the owner saw and called wrong (2026-09-10). Each label is now the
- * noun that matters; the qualifier was doing no work the fields under the tab do not do.
- * `full` keeps the long form as the control's `title`.
+ * 🔑 THIS IS A CLOSED LIST WITH TWO THINGS HOLDING IT. `memberConstants.test.js` pins these
+ * labels exactly, and the automation suite's capture catalogue drives each tab BY LABEL
+ * (`pages/MemberCapturePage.js`), so renaming one here without moving that suite breaks its
+ * scenarios. That is why these stay the long phrases: this is a wide form and they fit.
  *
- * 🔑 AND THERE IS ONE LIST, NOT TWO. `Members.jsx` carried its own copy of this array, so
- * the register's record and the capture form could name the same five sections differently
- * and nothing would notice. They read the same list now.
+ * 🔴 THE RECORD PANEL KEEPS ITS OWN LIST, AND FOR A PRODUCT REASON. The design branch had
+ * briefly made `Members.jsx` read this constant too, on the argument that two lists could
+ * drift. Main then removed "Sasbo Structures" from CAPTURE (client 4a7a67b) while keeping it
+ * on the member's RECORD -- so the two lists are meant to differ, and one shared list would
+ * have taken the Structures tab off every member's record. See `RECORD_TABS` in
+ * `Members.jsx`.
  */
 export const MEMBER_TABS = [
-  { id: 'personal', label: 'Personal', full: 'Personal Information' },
-  { id: 'employment', label: 'Employment', full: 'Employment & Bank' },
-  { id: 'membership', label: 'Membership', full: 'Membership & Subscriptions' },
-  { id: 'representatives', label: 'Recruitment', full: 'Recruitment Channel' },
-  { id: 'structures', label: 'Structures', full: 'Sasbo Structures' },
-  // { id: 'history', label: 'History', full: 'History & Remarks' },
+  { id: 'personal', label: 'Personal Information' },
+  { id: 'employment', label: 'Employment & Bank' },
+  { id: 'membership', label: 'Membership & Subscriptions' },
+  { id: 'representatives', label: 'Recruitment Channel' },
+  // { id: 'history', label: 'History & Remarks' },
 ];
 
 export const DEBIT_DAY_OPTIONS = ['20', '25', '31'];

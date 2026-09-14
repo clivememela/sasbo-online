@@ -104,6 +104,14 @@ const CEILINGS = {
   // the same headroom over the measured figure that 70 kept over 60.
   css: 80 * KB,
   total: 900 * KB,
+  // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
+  // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
+  // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to
+  // 1251 KiB. Checked before splitting: nothing from src/test/ is in the product, and the
+  // growth is one file a visitor downloads only by opening that form -- it is not page weight,
+  // so folding it into `total` would have forced a ceiling too loose to notice real bloat.
+  // It still has a ceiling of its own: a second form, or a far larger scan, is still noticed.
+  documents: 600 * KB,
 }
 
 // Floors come from the registry; CEILINGS stay local -- a ceiling is not a
@@ -154,7 +162,10 @@ const entryJs = (() => {
 
 const js = sum((f) => f.endsWith('.js'))
 const css = sum((f) => f.endsWith('.css'))
-const total = sum(() => true)
+// Downloadable documents are measured on their own row -- see `CEILINGS.documents`.
+const isDocument = (f) => /\.pdf$/i.test(f)
+const total = sum((f) => !isDocument(f))
+const documents = sum(isDocument)
 
 const fmt = (n) => `${(n / KB).toFixed(2)} KiB`
 
@@ -171,6 +182,8 @@ const rows = [
   ['javascript', js, FLOORS.BUNDLE_JS_BYTES, CEILINGS.js, fmt],
   ['css', css, FLOORS.BUNDLE_CSS_BYTES, CEILINGS.css, fmt],
   ['all assets', total, FLOORS.BUNDLE_TOTAL_BYTES, CEILINGS.total, fmt],
+  // Floor 0: shipping no documents at all is a legitimate build, unlike shipping no code.
+  ['documents', documents, 0, CEILINGS.documents, fmt],
   // 🔑 The count catches what the byte floors cannot: one large asset copied
   // into an otherwise empty dist/ clears every byte floor while shipping no
   // application at all.

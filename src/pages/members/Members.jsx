@@ -17,7 +17,6 @@ import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS,
-  MEMBER_TABS,
 } from "../../config/memberConstants.js";
 import {
     validateSAID, validateEmail, formatDate, extractDateOfBirthFromSAID, extractGenderFromSAID
@@ -78,8 +77,29 @@ const FILTER_FIELDS = [
     "phone", "personalEmail", "workEmail", "status", "race",
 ];
 
-// The five sections of a member's record, named once in `memberConstants.js`.
-const TABS = MEMBER_TABS;
+/*
+ * THE FIVE SECTIONS OF A MEMBER'S RECORD -- this panel's own list, not the capture form's.
+ *
+ * 🔴 IT IS SEPARATE FROM `MEMBER_TABS` ON PURPOSE. Main removed "Sasbo Structures" from the
+ * capture form (client 4a7a67b) and kept it here on the record, so the two screens are meant
+ * to list different sections. The design branch had briefly pointed this panel at the capture
+ * constant; taking main's shorter list through it would have silently removed the Structures
+ * tab from every member's record, and switched `TAB_PLACE` off with it.
+ *
+ * 📐 `label` is what the strip SHOWS -- short, because the docked panel is a 400px column and
+ * the full phrases are 762px of tabs (the owner, 2026-09-10). `full` is the tab's accessible
+ * NAME, so a screen reader and the automation suite (`openModalTab('Employment & Bank')`)
+ * still address each tab by the phrase that names it. The visible word is always contained in
+ * the full phrase, which is what WCAG 2.5.3 asks of a label that differs from its name.
+ */
+const RECORD_TABS = [
+    { id: "personal", label: "Personal", full: "Personal Information" },
+    { id: "employment", label: "Employment", full: "Employment & Bank" },
+    { id: "membership", label: "Membership", full: "Membership & Subscriptions" },
+    { id: "representatives", label: "Recruitment", full: "Recruitment Channel" },
+    { id: "structures", label: "Structures", full: "Sasbo Structures" },
+];
+const TABS = RECORD_TABS;
 
 /*
  * 🗣️ WHERE EACH OF THE FIVE SECTIONS SITS IN THE RECORD'S TAB STRIP -- the owner's
@@ -104,8 +124,8 @@ const TABS = MEMBER_TABS;
  *
  * It is a list rather than three conditionals because it is one composition, and a
  * composition is easier to check when you can see it. It applies only at five sections --
- * `MEMBER_TABS` carries a sixth commented out, and six fill a 3x2 grid with nothing to
- * balance, so they fall back to the plain left-aligned flow.
+ * a sixth would fill a 3x2 grid with nothing left to balance, so any other count falls back
+ * to the plain left-aligned flow.
  */
 const TAB_PLACE = TABS.length === 5
   ? [
@@ -428,10 +448,19 @@ export default function Members() {
     }, [selectedMember]);
 
     useEffect(() => {
+        /*
+         * 🔴 THE GRADE IS NOT CLEARED HERE, AND MAIN'S e56dbe4 CLEARED IT HERE. An effect on
+         * `editForm.bankName` cannot tell a user changing the bank from the form being LOADED
+         * with a member -- opening a record copies the member in, `bankName` goes from nothing
+         * to their bank, and the reset blanked the grade the record panel then displayed as
+         * "—" for every member. The clear lives in `handleEditChange` now, on the bank field's
+         * own change, which only a person can cause. Proved by `Members.jobGrade.test.jsx`:
+         * ① reddened on the merged code, and ③ holds that a real change of bank still clears it.
+         */
         if (!editForm.bankName) {
+            // No bank, no grades: grades are per bank, so an empty list is the honest answer.
             setJobGradeOptions([]);
             setJobGradeError(null);
-            setEditForm(prev => ({ ...prev, jobGrade: "" }));
             return;
         }
 
@@ -445,6 +474,7 @@ export default function Members() {
                 setJobGradeError(error);
             });
     }, [editForm.bankName, jobGradeAttempt]);
+
 
     const handleEditToggle = () => {
         setIsEditing((editing) => {
@@ -473,6 +503,12 @@ export default function Members() {
 
         setEditForm((prev) => {
             const next = { ...prev, [field]: value };
+
+            // Main's intent (e56dbe4), in the one place it can be told apart from a record
+            // loading: a grade belongs to a bank, so choosing a DIFFERENT bank clears it.
+            if (field === "bankName" && value !== prev.bankName) {
+                next.jobGrade = "";
+            }
 
             if (field === "firstNames") {
                 next.initials = value
@@ -1234,7 +1270,10 @@ export default function Members() {
                                             : "text-ink-muted shadow-[inset_0_-2px_0_transparent] hover-hover:hover:text-ink",
                                     )}
                                 >
-                                    <span title={tab.full}>{tab.label}</span>
+                                    {/* Shown short, named in full -- see `RECORD_TABS`. Not `aria-label`: that would
+                                        also silence the "has errors" text a screen reader gets below. */}
+                                    <span aria-hidden="true">{tab.label}</span>
+                                    <span className="sr-only">{tab.full}</span>
                                     {isEditing && tabsWithErrors.has(tab.id) && (
                                         <>
                                             <span aria-hidden="true" className="text-status-suspended font-extrabold text-sm">*</span>
@@ -1358,8 +1397,11 @@ export default function Members() {
 
                             {activeTab === "representatives" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
-                                    <Detail label="Assigned Lead Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={isEditing} options={roles.map(r => r.name)} onChange={handleEditChange("recruitmentRepresentativeName")} />
-                                    <Detail label="Regional Area Representative" value={editForm.areasRep} isEditing={isEditing} options={roles.map(r => r.name)} onChange={handleEditChange("areasRep")} />
+                                    {/* Main (client bf547c1, 4a7a67b): renamed to the words the union uses, and
+                                        read-only on the record -- a recruiter is assigned where the member is
+                                        captured, not reassigned from here. */}
+                                    <Detail label="Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={isEditing} disabled={true} />
+                                    <Detail label="Area's Recruiter" value={editForm.areasRep} isEditing={isEditing} disabled={true} />
                                 </div>
                             )}
 
