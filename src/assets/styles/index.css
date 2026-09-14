@@ -919,4 +919,9 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
   ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
   :root.vt-soft::view-transition-new(root) { mask-image: none; -webkit-mask-image: none; }
   .mcard-sweep { display: none; }
+  /* card.css:492, transcribed: under reduced motion the card still ARRIVES, as a 200ms fade. The
+     surface rule (REDUCED MOTION, above) stops every keyframe animation, which snapped the card in --
+     and the posture keeps opacity. This one fade is named back; it outranks the surface rule's
+     `!important` duration on specificity. `tools/motion.mjs` reads it off the running animations. */
+  .panel-arriving .mcard { animation: fade-in 200ms ease-out both !important; }
 }

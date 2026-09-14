@@ -40,11 +40,22 @@
  * — either way the "clean" result is about nothing. `matrix.mjs` ran clean and half-blind for a
  * whole phase on exactly that shape.
  *
+ * ---
+ *
+ * 🎬 THE TWO AUTHORED MOMENTS, DRIVEN RATHER THAN READ AT REST (`06.3`). The route passes read
+ * pages that have settled, so they never see the two things the posture lets past the budget:
+ * the card landing when a member is chosen, and the theme's pour. Both exist only while they run
+ * — the landing for 900ms after a choice, the pour for 1.2s after a click — so each is triggered
+ * under both settings and the browser's own list of running animations is read while it runs,
+ * with the same instrument-first rule: the moment must be SEEN with motion on before its absence
+ * under reduce means anything. The first run found the card snapping in under reduce, where
+ * card.css:492 keeps its arrival as a 200ms fade.
+ *
  *   node tools/motion.mjs <baseUrl>
  */
 import { launch } from './cdp.mjs';
 
-import { ROUTES, SETTLED, pageReady, routeComplaints, storeTheme } from './probe.mjs';
+import { ROUTES, SETTLED, clickByText, pageReady, routeComplaints, storeTheme } from './probe.mjs';
 
 const baseUrl = process.argv[2] ?? 'http://127.0.0.1:4319';
 
@@ -147,6 +158,61 @@ const motionCensus = `(() => {
   return { examined, animating, spatialCount, spatialSites, keptSites, runningAnimations, overBudget, slowSites };
 })()`;
 
+/**
+ * The animations a moment is running, read from the browser's own list WHILE they run. Polls a
+ * frame at a time, because the moment's animations are created a frame or two after the act that
+ * starts it, and stops at the first reading that finds any.
+ *
+ * `moves` means a keyframe carries a spatial property and `fades` that one carries opacity — read
+ * off the keyframes themselves, not the animation's name, so a renamed keyframe cannot hide a move.
+ */
+const runningCensus = (filter) => `(async () => {
+  const spatial = new Set(${JSON.stringify(SPATIAL)});
+  const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+  const read = () => document.getAnimations().filter((a) => a.effect && (${filter})).map((a) => {
+    const keys = new Set(a.effect.getKeyframes().flatMap((k) => Object.keys(k)));
+    const target = a.effect.target;
+    const classes = target && typeof target.className === 'string' ? target.className.split(/\\s+/) : [];
+    return {
+      name: a.animationName || '(script)',
+      card: classes.includes('mcard'),
+      pseudo: a.effect.pseudoElement || '',
+      duration: Number(a.effect.getComputedTiming().duration) || 0,
+      moves: [...keys].some((k) => spatial.has(k)),
+      fades: keys.has('opacity'),
+    };
+  });
+  let found = [];
+  for (let i = 0; i < 40 && !found.length; i += 1) {
+    found = read();
+    if (!found.length) await frame();
+  }
+  // The state half of the posture: whatever else happens, the thing the user asked for happened.
+  const ground = getComputedStyle(document.body).backgroundColor;
+  return { found, groundChanged: window.__groundBefore !== undefined && ground !== window.__groundBefore };
+})()`;
+
+/** ③ choosing a member: the animations inside the arriving record panel. */
+const ARRIVAL = runningCensus(`a.effect.target && a.effect.target.closest && a.effect.target.closest('.panel-arriving')`);
+/** ④ switching the theme: the view transition's pseudo-element animations. */
+const POUR = runningCensus(`String(a.effect.pseudoElement || '').startsWith('::view-transition')`);
+
+const chooseMember = clickByText('[data-row-action]', '/open the record for/i');
+const switchTheme = `(() => {
+  window.__groundBefore = getComputedStyle(document.body).backgroundColor;
+  return ${clickByText('button[aria-pressed]', '/^Appearance/')};
+})()`;
+
+/** One line per distinct animation: name, how many, duration, and whether it moves or fades. */
+const summarise = (found) => {
+  const groups = new Map();
+  for (const a of found) {
+    const key = `${a.name} ${a.pseudo} ${Math.round(a.duration * 100) / 100}ms${a.moves ? ' moves' : ''}${a.fades ? ' fades' : ''}`;
+    groups.set(key, (groups.get(key) ?? 0) + 1);
+  }
+  return [...groups].map(([key, n]) => (n > 1 ? `${key} ×${n}` : key));
+};
+
 let cdp;
 let failures = 0;
 let missed = 0;
@@ -209,7 +275,38 @@ try {
   const normal = await pass('① emulation OFF — the baseline this arc actually ships', false);
   const reduced = await pass('② prefers-reduced-motion: reduce — TOGGLED, not assumed', true);
 
+  /**
+   * Trigger a moment on the register, under one setting, and read what runs. Light theme and a
+   * settled register first, so every reading starts from the same page.
+   */
+  const drive = async (reduce, act, census) => {
+    await send('Emulation.setEmulatedMedia', {
+      features: reduce ? [{ name: 'prefers-reduced-motion', value: 'reduce' }] : [],
+    });
+    await evaluate(storeTheme(false));
+    if (!await land('/members')
+      || !await waitFor(`document.querySelectorAll('tr[data-row]').length > 0`)
+      || !await waitFor(SETTLED, { tries: 120, awaitPromise: true })) { missed += 1; return null; }
+    if (!await evaluate(act)) { missed += 1; return null; }
+    const { result, exceptionDetails } = await send('Runtime.evaluate', { expression: census, awaitPromise: true, returnByValue: true });
+    if (exceptionDetails) { missed += 1; return null; }
+    return result.value;
+  };
+
+  const moments = {
+    arrival: { normal: await drive(false, chooseMember, ARRIVAL), reduced: await drive(true, chooseMember, ARRIVAL) },
+    pour: { normal: await drive(false, switchTheme, POUR), reduced: await drive(true, switchTheme, POUR) },
+  };
+  for (const [label, moment] of [['③ choosing a member', moments.arrival], ['④ switching the theme', moments.pour]]) {
+    console.log(`\n${label}`);
+    for (const [setting, reading] of [['motion on', moment.normal], ['reduce', moment.reduced]]) {
+      const lines = reading ? summarise(reading.found) : ['NOT MEASURED — the page or the act failed'];
+      console.log(`  ${setting}: ${lines.length ? lines.join(' · ') : 'no animation ran'}`);
+    }
+  }
+
   await send('Emulation.setEmulatedMedia', { features: [] });
+  await evaluate(storeTheme(false));
 
   console.log('\n─── verdict ───');
 
@@ -262,8 +359,59 @@ try {
     console.log('  ✓ every transition is inside the 400ms budget');
   }
 
+  // ④ THE AUTHORED MOMENTS. Seen with motion on first, or their absence under reduce is about
+  // nothing. Moving is read off the keyframes, and 1ms is the line: the surface rule leaves every
+  // keyframe animation alive at 0.01ms, so `animationend` still fires, and that is not movement.
+  const { arrival, pour } = moments;
+  if (arrival.normal && arrival.reduced) {
+    const landing = arrival.normal.found.find((a) => a.card && a.moves);
+    if (!landing) {
+      console.log('  ✗ VACUOUS: choosing a member with motion on ran no moving animation on the card');
+      failures += 1;
+    } else {
+      console.log(`  ✓ choosing a member plays the authored moment — ${landing.name}, ${Math.round(landing.duration)}ms on the card`);
+      const moving = arrival.reduced.found.filter((a) => a.moves && a.duration > 1);
+      if (moving.length) {
+        console.log(`  ✗ under reduce, the arrival still moves: ${[...new Set(moving.map((a) => a.name))].join(', ')}`);
+        failures += 1;
+      } else {
+        console.log('  ✓ under reduce, nothing in the arrival moves');
+      }
+      // card.css:492 — the comp keeps the card's arrival as a fade, because the posture keeps opacity.
+      const fade = arrival.reduced.found.find((a) => a.card && a.fades && !a.moves && a.duration >= 100);
+      if (!fade) {
+        console.log('  ✗ under reduce, the card snaps in — the comp fades it (card.css:492, fade-in .2s)');
+        failures += 1;
+      } else {
+        console.log(`  ✓ under reduce, the card still arrives as a fade — ${fade.name}, ${Math.round(fade.duration)}ms`);
+      }
+    }
+  }
+  if (pour.normal && pour.reduced) {
+    const iris = pour.normal.found.find((a) => a.duration >= 1000);
+    if (!iris || !pour.normal.groundChanged) {
+      console.log('  ✗ VACUOUS: switching the theme with motion on showed no pour, or no change of theme');
+      failures += 1;
+    } else {
+      console.log(`  ✓ switching the theme pours — ${iris.pseudo}, ${Math.round(iris.duration)}ms`);
+      const animating = pour.reduced.found.filter((a) => a.duration > 1);
+      if (animating.length) {
+        console.log(`  ✗ under reduce, the theme still pours: ${[...new Set(animating.map((a) => a.pseudo))].join(', ')}`);
+        failures += 1;
+      } else {
+        console.log('  ✓ under reduce, no view transition animates');
+      }
+      if (!pour.reduced.groundChanged) {
+        console.log('  ✗ under reduce, the theme did NOT change — the posture keeps state');
+        failures += 1;
+      } else {
+        console.log('  ✓ under reduce, the theme still changes — the state is kept');
+      }
+    }
+  }
+
   if (missed) {
-    console.log(`  ⚠ ${missed} route loads never became ready and were NOT measured`);
+    console.log(`  ⚠ ${missed} route loads or moments never became ready and were NOT measured`);
     failures += 1;
   }
 
