@@ -38,6 +38,8 @@ export default function PositionTreeSelect({
   placeholder = 'Select...',
   levelLabels,
   loading = false,
+  loadError = null,
+  onRetryLoad,
   disabled = false,
 }) {
   // id -> { node, ancestors }, for resolving a pre-selection back into a cascade.
@@ -123,7 +125,10 @@ export default function PositionTreeSelect({
     [selectionsByLevel, onChange],
   );
 
-  if (structures.length === 0 && !loading) return null;
+  // 🔴 A TREE THAT FAILED TO ARRIVE IS NOT "NO TREE" (`06.4`). This returned null for a failure too, so the
+  // Structures field vanished from the recruiter dialogs and nothing said a list was missing. It renders its
+  // first level now, and that level says the choices could not be loaded, with the retry.
+  if (structures.length === 0 && !loading && !loadError) return null;
 
   /** The caption for a depth: the caller's vocabulary, then the parent's name, then a number. */
   const captionFor = (level) => {
@@ -151,6 +156,8 @@ export default function PositionTreeSelect({
           optionLabel="name"
           placeholder={placeholder}
           loading={loading && level === 0}
+          loadError={level === 0 ? loadError : null}
+          onRetryLoad={onRetryLoad}
           disabled={disabled}
         />
       ))}

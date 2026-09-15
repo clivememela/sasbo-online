@@ -12,6 +12,7 @@ import StatusChip from "../../components/common/StatusChip.jsx";
 import TableScroller from "../../components/table/TableScroller.jsx";
 import DataState from "../../components/common/DataState.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
+import reportError from "../../lib/reportError.js";
 
 // 🔴 `text-sm` WAS 13px, WHICH IS THE iOS ZOOM TRAP, AND THE 16px CHECK COULD NOT SEE
 // IT. That check matches `text-sm` on the TAG; these classes arrive through this variable,
@@ -39,7 +40,13 @@ export default function Subscriptions() {
         isCoreBanking: '',
     });
     const [allSubscriptions, setAllSubscriptions] = useState([]);
-    const [loading, setLoading] = useState(false);
+    // 🔴 IT STARTED `false`, SO THE FIRST FRAME SAID "No subscriptions match your search." -- a confident
+    // empty answer to a request not yet sent (`06.4`). The mount effect sets it too; this is the frame before.
+    const [loading, setLoading] = useState(true);
+    // 🔴 A FAILED SAVE IS NOT A FAILED LOAD. It went into `error`, which replaced the whole list with "We could
+    // not load the subscriptions." -- the rows that had loaded vanished, and the change that failed was never
+    // mentioned (`06.4`). It is its own notice now, and the row stays open with the change in it.
+    const [saveError, setSaveError] = useState(null);
     const [error, setError] = useState(null);
     // Bumped by the retry control, and a dependency of the load effect, so "try again"
     // re-runs exactly the effect that failed rather than duplicating its body.
@@ -94,19 +101,22 @@ export default function Subscriptions() {
 
     const handleCancel = (e) => {
         e.stopPropagation();
+        setSaveError(null);
         setEditingId(null);
         setEditData({});
     };
 
     const handleSave = async (e) => {
         e.stopPropagation();
+        setSaveError(null);
         try {
             await subscriptionsService.update(editingId, editData);
             setAllSubscriptions(prev => prev.map(s => s.id === editingId ? { ...editData } : s));
             setEditingId(null);
             setEditData({});
         } catch (err) {
-            setError(String(err));
+            reportError('Subscriptions.save', err);
+            setSaveError({ bankName: editData.bankName, error: err });
         }
     };
 
@@ -123,6 +133,7 @@ export default function Subscriptions() {
                     value={filters.bankName}
                     onChange={(v) => setFilters(prev => ({ ...prev, bankName: v }))}
                     placeholder="All banks"
+                    {...refs.field('banks')}
                     options={[{ value: '', label: 'All banks' }, ...bankNames.map(b => ({ value: b, label: b }))]}
                 />
                 <SelectInput
@@ -151,15 +162,18 @@ export default function Subscriptions() {
                     </div>
                 )}
 
-                {/* The fourth state: the list loaded, its filter's options did not. */}
-                {!error && refs.state !== 'loading' && refs.state !== 'ready' && (
+                {/* The fourth state -- the list loaded, its filter's options did not -- is the Bank field's own
+                    now (`06.4`): the field says it could not be loaded and offers the retry where the choice is
+                    made, so the sheet no longer repeats it. */}
+                {saveError && (
                     <div className="mx-5 mt-4 rounded-lg bg-surface-2 p-3">
                         <DataState
-                            state="partial"
+                            state="error"
+                            layout="row"
                             compact
-                            onRetry={refs.retry}
-                            title="The bank filter has no options."
-                            message="The bank list did not load. The subscriptions below are complete and can still be filtered by the other fields."
+                            error={saveError.error}
+                            title={`The changes to ${saveError.bankName || 'this subscription'} were not saved.`}
+                            message="The row is still open with your changes. Check them and save again."
                         />
                     </div>
                 )}

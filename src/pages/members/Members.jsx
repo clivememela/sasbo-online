@@ -101,6 +101,9 @@ const RECORD_TABS = [
 ];
 const TABS = RECORD_TABS;
 
+/** A record field's value, or "Not on file" when the record holds none -- never an invented default. */
+const notOnFile = (value) => (value === null || value === undefined || String(value).trim() === "" ? "Not on file" : value);
+
 /*
  * 🗣️ WHERE EACH OF THE FIVE SECTIONS SITS IN THE RECORD'S TAB STRIP -- the owner's
  * arrangement, settled over three rounds on 2026-09-10:
@@ -1041,8 +1044,10 @@ export default function Members() {
                         layout="row"
                         compact
                         onRetry={refs.retry}
-                        title="Some option lists are missing."
-                        message={`${refs.failed.join(' and ')} did not load, so the edit panel cannot offer them. The register below is up to date.`}
+                        // 🔴 "THE REGISTER BELOW IS UP TO DATE" WAS SAID WHATEVER THE REGISTER HAD DONE (`06.4`) -- while it was
+                        // loading, and when it had failed as well -- and the sentence began in lowercase, "banks did not load".
+                        title={refs.state === "error" ? "None of the edit panel’s option lists could be loaded." : "Some option lists are missing."}
+                        message={`${refs.failed.join(" and ").replace(/^./, (c) => c.toUpperCase())} did not load, so the edit panel cannot offer them.${listState === "ready" ? " The register below is complete." : ""}`}
                     />
                 </div>
             )}
@@ -1081,7 +1086,13 @@ export default function Members() {
                                 ? "Try the membership number, which is unique, or clear the search to see the whole register."
                                 : "Clear the criteria to see the whole register, or capture a new member."
                         }
-                        emptyAction={<Button onClick={handleClear}>Clear</Button>}
+                        // 🔴 "Clear" WAS OFFERED WHEN NOTHING WAS SET, AND DID NOTHING (`06.4`). A register that is empty with no
+                        // search and no criteria has nothing to clear; what there is to do is capture a member.
+                        emptyAction={
+                            query || Object.values(filters).some((value) => String(value ?? "").trim() !== "")
+                                ? <Button onClick={handleClear}>Clear</Button>
+                                : <Button variant="primary" onClick={() => navigate("/members/capture")}>Capture member</Button>
+                        }
                     />
 
                     {/* card.css `.pager`: "Showing 1–14 of 2 418 · Page 1 of 173", Previous and Next. */}
@@ -1403,8 +1414,10 @@ export default function Members() {
                                     <Detail label="Date Joined Sasbo" value={formatBackendDate(selectedMember.joinDate)} isEditing={false} />
                                     <Detail label="Account Membership Status" value={editForm.status} isEditing={isEditing} options={statusOptions} onChange={handleEditChange("status")} />
                                     <h4 className="col-span-full mt-1.5 border-t border-line pt-[18px] text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Sasbo Subscription Fee Details</h4>
-                                    <Detail label="Monthly Subscription (ZAR)" value={selectedMember.monthlySubscription || "182.77"} isEditing={false} />
-                                    <Detail label="Billing Frequency" value={selectedMember.subscriptionFrequency || "Monthly"} isEditing={false} />
+                                    {/* 🔴 A MEMBER WITH NO SUBSCRIPTION ON FILE WAS SHOWN R182.77, MONTHLY (`06.4`) -- two invented
+                                        facts about their money, printed as if the record held them. The absence is said instead. */}
+                                    <Detail label="Monthly Subscription (ZAR)" value={notOnFile(selectedMember.monthlySubscription)} isEditing={false} />
+                                    <Detail label="Billing Frequency" value={notOnFile(selectedMember.subscriptionFrequency)} isEditing={false} />
                                 </div>
                             )}
 

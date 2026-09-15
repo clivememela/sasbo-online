@@ -18,7 +18,6 @@ import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderF
     formatDate } from "../../utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState";
-import { cn } from "../../lib/utils";
 import useReferenceData from "../../hooks/useReferenceData.js";
 
 const FIELD_TO_TAB_MAP = {

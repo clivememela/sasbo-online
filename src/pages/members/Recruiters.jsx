@@ -734,7 +734,9 @@ export function Recruiters() {
                         message={
                             refs.state === 'error'
                                 ? 'The filters and forms below have no options to offer until this succeeds.'
-                                : `${refs.failed.join(', ')} did not load. Everything else on this page is up to date.`
+                                // 🔴 "EVERYTHING ELSE ON THIS PAGE IS UP TO DATE" WAS SAID WHATEVER THE RECRUITER LIST HAD DONE (`06.4`)
+                                // -- while it was loading, and when it had failed as well. It is said once the list has loaded.
+                                : `${refs.failed.join(', ').replace(/^./, (c) => c.toUpperCase())} did not load.${listState === 'ready' ? ' The recruiter list below is complete.' : ''}`
                         }
                     />
                 </div>
@@ -743,13 +745,13 @@ export function Recruiters() {
                 the register as the sheet beneath them with its pager at the foot. */}
             <Criteria className="mt-5">
                 <TextInput className={CRITERION_WIDE} label="Recruiter Name" value={filters.repName} onChange={handleFilter('repName')} placeholder="Any" />
-                <SearchableSelect className={CRITERION} label="Bank" value={filters.bankName} onChange={handleFilter('bankName')} placeholder="All banks"
+                <SearchableSelect className={CRITERION} label="Bank" value={filters.bankName} onChange={handleFilter('bankName')} placeholder="All banks" {...refs.field('banks')}
                                   options={[{ value: '', label: 'All banks' }, ...BANK_NAMES.map(b => ({ value: b, label: b }))]} />
-                <SearchableSelect className={CRITERION} label="Branch" value={filters.branch} onChange={handleFilter('branch')} placeholder="Any"
+                <SearchableSelect className={CRITERION} label="Branch" value={filters.branch} onChange={handleFilter('branch')} placeholder="Any" {...refs.field('banks')}
                                   options={[{ value: '', label: 'All branches' }, ...BRANCHES.map(b => ({ value: b, label: b }))]} />
-                <SearchableSelect className={CRITERION} label="Province" value={filters.province} onChange={handleFilter('province')} placeholder="Any"
+                <SearchableSelect className={CRITERION} label="Province" value={filters.province} onChange={handleFilter('province')} placeholder="Any" {...refs.field('provinces')}
                                   options={[{ value: '', label: 'All provinces' }, ...PROVINCES.map(p => ({ value: p, label: p }))]} />
-                <SearchableSelect className={CRITERION} label="Area" value={filters.area} onChange={handleFilter('area')} placeholder="Any"
+                <SearchableSelect className={CRITERION} label="Area" value={filters.area} onChange={handleFilter('area')} placeholder="Any" {...refs.field('banks')}
                                   options={[{ value: '', label: 'All areas' }, ...AREAS.map(a => ({ value: a, label: a }))]} />
                 <Button variant="ghost" onClick={handleClear}>Clear</Button>
             </Criteria>
@@ -1002,6 +1004,7 @@ export function Recruiters() {
                                 <SelectInput
                                     label="Recruiter Type"
                                     value={editRepFields.recruiterTypeId ?? ''}
+                                    {...refs.field('recruitment channels')}
                                     placeholder="Select recruitment channel..."
                                     options={RECRUITMENT_CHANNELS.map(rt => ({ value: rt.id, label: rt.name }))}
                                     onChange={(next) => setEditRepFields(p => ({ ...p, recruiterTypeId: next ? Number(next) : null }))}
@@ -1009,6 +1012,7 @@ export function Recruiters() {
                                 <SelectInput
                                     label="Role"
                                     value={editRepFields.roleId ?? ''}
+                                    {...refs.field('roles')}
                                     placeholder="Select role..."
                                     options={ROLES.map(r => ({ value: r.id, label: r.name }))}
                                     onChange={(next) => setEditRepFields(p => ({ ...p, roleId: next ? Number(next) : null }))}
@@ -1031,6 +1035,9 @@ export function Recruiters() {
                                     label="Structures / Positions"
                                     structures={STRUCTURES_TREE}
                                     selectedIds={editRepFields.structureIds || []}
+                                    loading={refs.loading}
+                                    loadError={refs.field('structures').loadError}
+                                    onRetryLoad={refs.retry}
                                     onChange={(ids) => setEditRepFields(p => ({ ...p, structureIds: ids }))}
                                     placeholder="Select positions..."
                                 />
@@ -1145,6 +1152,7 @@ export function Recruiters() {
                                     label="Recruiter Type"
                                     required
                                     value={newRepDetails.recruiterTypeId ?? ''}
+                                    {...refs.field('recruitment channels')}
                                     placeholder="Select recruiter type..."
                                     options={RECRUITMENT_CHANNELS.map(rt => ({ value: rt.id, label: rt.name }))}
                                     onChange={(next) => setNewRepDetails(p => ({ ...p, recruiterTypeId: next ? Number(next) : null }))}
@@ -1152,6 +1160,7 @@ export function Recruiters() {
                                 <SelectInput
                                     label="Role"
                                     value={newRepDetails.roleId ?? ''}
+                                    {...refs.field('roles')}
                                     placeholder="Select role..."
                                     options={ROLES.map(r => ({ value: r.id, label: r.name }))}
                                     onChange={(next) => setNewRepDetails(p => ({ ...p, roleId: next ? Number(next) : null }))}
@@ -1174,6 +1183,9 @@ export function Recruiters() {
                                     label="Structures / Positions"
                                     structures={STRUCTURES_TREE}
                                     selectedIds={newRepDetails.structureIds}
+                                    loading={refs.loading}
+                                    loadError={refs.field('structures').loadError}
+                                    onRetryLoad={refs.retry}
                                     onChange={(ids) => setNewRepDetails(p => ({ ...p, structureIds: ids }))}
                                     placeholder="Select positions..."
                                 />
@@ -1332,7 +1344,7 @@ function DRow({ label, value, className = '' }) {
     return (
         <div>
             <p className="text-2xs font-bold uppercase tracking-wider text-ink-muted">{label}</p>
-            <p className={`text-sm font-semibold text-ink ${className}`}>{value || '—'}</p>
+            <p className={`text-sm font-semibold text-ink ${className}`}>{value === 0 ? '0' : value || '—'}</p>
         </div>
     );
 }
