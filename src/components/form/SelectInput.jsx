@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
-import DataState from '../common/DataState';
+import LoadFailureFrame from './LoadFailureFrame';
+import { choicePlaceholder } from './choicePlaceholder';
 import Field, { controlClasses } from './Field';
 import { asOptionValue, findOption, normaliseOptions } from './options';
 
@@ -72,7 +73,7 @@ export default function SelectInput({
   // The placeholder is a real, non-selectable `<option value="">` rather than a CSS
   // trick, so the control has something to show before a choice is made and cannot be
   // submitted back into the placeholder by keyboard.
-  const placeholderText = loading ? 'Loading…' : failed ? 'Unavailable' : isEmpty ? emptyLabel : placeholder;
+  const placeholderText = choicePlaceholder({ loading, failed, isEmpty }, emptyLabel, placeholder);
 
   const control = (
     <Field label={label} required={required} error={error} hint={hint} className={failed ? undefined : className}>
@@ -122,11 +123,9 @@ export default function SelectInput({
     </Field>
   );
 
-  if (!failed) return control;
   return (
-    <div className={cn('flex flex-col gap-1', className)}>
+    <LoadFailureFrame failed={failed} className={className} label={label} loadError={loadError} onRetryLoad={onRetryLoad}>
       {control}
-      <DataState state="error" compact error={loadError} onRetry={onRetryLoad} title={`${label} could not be loaded.`} />
-    </div>
+    </LoadFailureFrame>
   );
 }

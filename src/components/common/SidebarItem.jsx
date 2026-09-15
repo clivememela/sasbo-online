@@ -25,7 +25,7 @@ const ACTIVE = "bg-surface font-semibold text-brand-ink shadow-(--shadow-1)";
    never generates (`dynamicUtilities.test.js`). */
 const INDENT = ["pl-10", "pl-14", "pl-[4.5rem]"];
 
-export default function SidebarItem({ item, isActive, hasActiveSubItem, expandedItems, onToggle, onClick, selectedCardHref, depth = 0 }) {
+export default function SidebarItem({ item, isActive, expandedItems, onToggle, onClick, selectedCardHref, depth = 0 }) {
   const location = useLocation();
   const Icon = item.icon;
   const hasSubItems = item.subItems && item.subItems.length > 0;
@@ -146,9 +146,7 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
           ))}
         </div>
       )}
-      {/* `hasActiveSubItem` keeps the section's meaning for callers; the mock lifts only
-          the row you are ON, and the open section above it says the rest. */}
-      {hasActiveSubItem && null}
+
     </div>
   );
 }

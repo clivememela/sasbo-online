@@ -7,7 +7,7 @@ import Modal from "../../components/overlay/Modal.jsx";
 import { memberService } from "../../services/memberService.js";
 import { validateSAID } from "../../utils/validateSAID.js";
 import Table from '../../components/table/Table.jsx';
-import Sheet from '../../components/common/Sheet.jsx';
+import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import StatusChip from '../../components/common/StatusChip.jsx';
 import reportError from '../../lib/reportError.js';
 
@@ -177,7 +177,7 @@ export default function AcbDebits() {
     ], [loadingId, selectedMember, handleSelectMember]);
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+        <Page>
             <PageTitle title="Manage Debits" subtitle="Capture Resubmission Debits" />
 
             {/* 🔴 WHAT THE `alert()` BECAME. Focused rather than `role="alert"`: the
@@ -326,6 +326,6 @@ export default function AcbDebits() {
                     </Sheet>
                 )}
             </div>
-        </div>
+        </Page>
     );
 }

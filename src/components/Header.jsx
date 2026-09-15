@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, Menu, Search } from "lucide-react";
 import Breadcrumbs from "./common/Breadcrumbs";
 import Button from "./form/Button";
 import { MENU_BUTTON_ID, SIDEBAR_ID } from "./shellIds";
 import { cn } from "../lib/utils";
+import useMediaQuery from "../hooks/useMediaQuery";
 
 /**
  * THE TOPBAR. card.html's `.topbar`, and it is 60px.
@@ -64,19 +65,7 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
    * 640px is Tailwind's `sm`, the same boundary the topbar's own ⌘K hint appears at, so the
    * two changes happen together rather than a step apart.
    */
-  const [narrow, setNarrow] = useState(() =>
-    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      ? window.matchMedia('(max-width: 639px)').matches
-      : false);
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return;
-    const query = window.matchMedia('(max-width: 639px)');
-    const onChange = (event) => setNarrow(event.matches);
-    setNarrow(query.matches);
-    query.addEventListener('change', onChange);
-    return () => query.removeEventListener('change', onChange);
-  }, []);
+  const narrow = useMediaQuery('(max-width: 639px)');
 
   useEffect(() => {
     const onKeyDown = (event) => {

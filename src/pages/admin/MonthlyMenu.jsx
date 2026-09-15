@@ -7,7 +7,7 @@ import {
 import { useOutletContext } from 'react-router-dom';
 import NavigationCard from '../../components/common/NavigationCard.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
-import Sheet from '../../components/common/Sheet.jsx';
+import Sheet, { Page } from '../../components/common/Sheet.jsx';
 
 /*
  * 🔴 NINE ROWS, NINE DEAD ENDS -- the worst state a landing surface can be in, and the last
@@ -37,7 +37,7 @@ export default function MonthlyMenu() {
     const { setSelectedCardHref, setSideBarOpen } = useOutletContext() || {};
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+        <Page>
             <PageTitle title="Monthly Menu" subtitle="Select options below" />
             {/* 📐 A SHEET OF ROWS, like every other menu page -- Home, Admin, ACB, Daily Menu,
                 Maintenance, Archive Search and Report Options all render this exact shape.
@@ -56,6 +56,6 @@ export default function MonthlyMenu() {
                     />
                 ))}
             </Sheet>
-        </div>
+        </Page>
     );
 }

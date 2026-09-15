@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import reportError from '../lib/reportError';
+import { ERROR_KINDS } from '../services/parseApiError.js';
 
 /**
  * THE REFERENCE LISTS A SCREEN NEEDS, AND WHICH OF THEM DID NOT ARRIVE. `06.1b`, EH-D9.
@@ -108,7 +109,7 @@ export default function useReferenceData(loaders) {
         // "leaves the entry exactly as it was"). This wrote `[]` for it, so a list that had
         // loaded read as a list with nothing in it -- the lie this hook exists to prevent. The
         // entry is left out of `nextData`, and the merge below keeps what was there.
-        if (result.reason?.kind === 'abort') return;
+        if (result.reason?.kind === ERROR_KINDS.ABORT) return;
 
         nextData[name] = [];
         nextFailed.push(name);

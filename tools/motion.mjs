@@ -90,6 +90,10 @@ const motionCensus = `(() => {
   let runningAnimations = 0;
   let overBudget = 0;
   const slowSites = [];
+  // One label for an element, for both lists below. It was written twice, and the first copy's regex had lost its
+  // backslash inside this template literal, so it split class names on the letter "s".
+  const nameOf = (el) => el.tagName.toLowerCase() +
+    (typeof el.className === 'string' && el.className ? '.' + el.className.split(/\\s+/)[0] : '');
 
   for (const el of document.querySelectorAll('*')) {
     const r = el.getBoundingClientRect();
@@ -123,9 +127,7 @@ const motionCensus = `(() => {
     const longest = Math.max(...durations, 0) * 1000;
     if (longest > 400) {
       overBudget += 1;
-      const name = el.tagName.toLowerCase() +
-        (typeof el.className === 'string' && el.className ? '.' + el.className.split(/\s+/)[0] : '');
-      if (slowSites.length < 8) slowSites.push(name + ' ' + Math.round(longest) + 'ms');
+      if (slowSites.length < 8) slowSites.push(nameOf(el) + ' ' + Math.round(longest) + 'ms');
     }
 
     // \`transitionProperty\` is what the browser will interpolate. \`none\` means it will not,
@@ -140,9 +142,7 @@ const motionCensus = `(() => {
     const movesSpatially = live.some((p) => p === 'all' || spatial.includes(p));
     if (movesSpatially) {
       spatialCount += 1;
-      const name = el.tagName.toLowerCase() +
-        (typeof el.className === 'string' && el.className ? '.' + el.className.split(/\\s+/)[0] : '');
-      if (spatialSites.length < 6) spatialSites.push(name + ' [' + live.join(' ') + ']');
+      if (spatialSites.length < 6) spatialSites.push(nameOf(el) + ' [' + live.join(' ') + ']');
     }
     if (live.some((p) => p === 'all' || kept.includes(p))) keptSites += 1;
 
@@ -288,9 +288,14 @@ try {
       || !await waitFor(`document.querySelectorAll('tr[data-row]').length > 0`)
       || !await waitFor(SETTLED, { tries: 120, awaitPromise: true })) { missed += 1; return null; }
     if (!await evaluate(act)) { missed += 1; return null; }
-    const { result, exceptionDetails } = await send('Runtime.evaluate', { expression: census, awaitPromise: true, returnByValue: true });
-    if (exceptionDetails) { missed += 1; return null; }
-    return result.value;
+    // A census that throws is a reading that did not happen, counted as missed -- caught here, visibly, rather than by
+    // going around `evaluate` (cdp.mjs: "a tool that wants to tolerate an exception can catch it").
+    try {
+      return await evaluate(census, { awaitPromise: true });
+    } catch {
+      missed += 1;
+      return null;
+    }
   };
 
   const moments = {

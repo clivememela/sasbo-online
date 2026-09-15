@@ -2,7 +2,7 @@ import {
     LucideMenu, LucideFile, LucideConstruction
 } from 'lucide-react';
 import NavigationCard from '../../components/common/NavigationCard';
-import Sheet from '../../components/common/Sheet.jsx';
+import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import PageTitle from '../../components/common/PageTitle';
 
 const cards = [
@@ -25,11 +25,11 @@ const cards = [
 
 export default function Admin() {
     return (
-        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+        <Page>
             <PageTitle title="Admin Membership" subtitle="Select options below" />
             <Sheet className="mt-6 max-w-4xl divide-y divide-line">
                 {cards.map((card) => <NavigationCard key={card.href} {...card} />)}
             </Sheet>
-        </div>
+        </Page>
     );
 }

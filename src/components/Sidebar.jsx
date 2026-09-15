@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import Logo from "./common/Logo";
 import SidebarItem from "./common/SidebarItem";
 import ThemeToggle from "./common/ThemeToggle";
@@ -41,7 +41,7 @@ const findAncestors = (items, target, path = []) => {
  * phone treatment (R-RESP) rather than the mock's 68px icon rail; the mock only ever
  * specified a desk.
  */
-export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
+function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
   const location = useLocation();
   const [expandedItems, setExpandedItems] = useState({});
   const [prevSelectedCardHref, setPrevSelectedCardHref] = useState(null);
@@ -260,3 +260,10 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
     </>
   );
 }
+
+/*
+ * Memoised because the topbar's search lives in `AppLayout`, so every keystroke re-renders the shell, and the rail's
+ * props never change with it. The route and the theme still reach it through context. Its props must stay stable: an
+ * inline callback passed here would quietly undo this.
+ */
+export default memo(Sidebar);

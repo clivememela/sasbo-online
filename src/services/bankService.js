@@ -195,8 +195,8 @@ export const bankService = {
    * succeeded. Rejecting because the server chose not to echo the row back would turn a saved
    * change into a reported failure, which is worse than the row it is filed under.
    *
-   * So it is classified as a BODY-LESS WRITE (`parseBody: false`) — the same treatment the three
-   * DELETEs get and for the same reason — and the optimistic `{ ...data, id }` result stays. What
+   * So it goes through `requestOptionalJson`, which resolves on an empty 2xx and parses a body when the server sends
+   * one: the echo is returned when there is one, and the optimistic `{ ...data, id }` result when there is not. What
    * changes is the FAILURE path: a 4xx/5xx now rejects with the server's own message, `status`
    * and `validationErrors` instead of the string `'Failed to update bank'`.
    *

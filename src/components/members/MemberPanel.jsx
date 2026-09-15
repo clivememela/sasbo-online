@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
 import { formatDateLong } from '../../lib/format';
+import { personName } from '../../lib/names.js';
 import Button from '../form/Button';
 import MembershipCard from './MembershipCard';
 import { PANEL_SLOT_ID } from '../shellIds';
@@ -224,7 +225,7 @@ export default function MemberPanel({ member, open, onClose, children, footer })
 
               {member && (
                 <MembershipCard
-                  name={[member.firstNames, member.surname].filter(Boolean).join(' ') || '—'}
+                  name={personName(member) || '—'}
                   membershipNumber={member.membershipNumber}
                   status={member.status}
                   since={member.joinDate}

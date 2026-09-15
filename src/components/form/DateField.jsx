@@ -6,13 +6,13 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
 import Field, { controlClasses } from './Field';
+import useMediaQuery from '../../hooks/useMediaQuery';
 import {
   ageInWords,
   compareDates,
@@ -129,44 +129,8 @@ function readBound(bound) {
   return parseDate(bound);
 }
 
-/**
- * 🔑 `useSyncExternalStore`, NOT an effect. A media query is an external store, which is
- * exactly what this hook is for: no synchronous `setState` inside an effect (which the
- * `react-hooks` rules flag, and rightly — it is a second render every mount), and no
- * window between the first paint and the listener attaching where the value can be stale.
- * The server snapshot is `false`, so a non-browser render gets the popover, not the sheet.
- */
-// ⚠️ NOT CACHED IN A MODULE-LEVEL MAP, and the refactor pass proposed exactly that.
-// `getSnapshot` runs at least once per render, so a form with three date fields re-parses
-// this query on every keystroke -- a real, if small, waste. Caching the MediaQueryList by
-// query string fixes it and was tried: it makes the component's viewport behaviour
-// UNSTUBBABLE, because the cache outlives a test that replaces `window.matchMedia`, and
-// `DateField.test.jsx`'s bottom-sheet case went red. DECLINED: one `matchMedia` parse per
-// render is not worth a component that cannot be driven into its ≤760px state, which is
-// the state the whole sheet contract lives in (contract ⑤).
-function useMediaQuery(query) {
-  const subscribe = useCallback(
-    (onChange) => {
-      if (typeof window === 'undefined' || !window.matchMedia) return () => {};
-      const list = window.matchMedia(query);
-      // `addListener` is the Safari < 14 spelling, and this back office runs on old iPads.
-      if (list.addEventListener) {
-        list.addEventListener('change', onChange);
-        return () => list.removeEventListener('change', onChange);
-      }
-      list.addListener(onChange);
-      return () => list.removeListener(onChange);
-    },
-    [query],
-  );
-
-  const getSnapshot = useCallback(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return false;
-    return window.matchMedia(query).matches;
-  }, [query]);
-
-  return useSyncExternalStore(subscribe, getSnapshot, () => false);
-}
+// `useMediaQuery` lived here until the topbar needed the same answer; it is src/hooks/useMediaQuery.js now, with the
+// reasons it is a store and not an effect, and why it is not cached.
 
 export default function DateField({
   label,

@@ -18,6 +18,7 @@ import DataState from '../../components/common/DataState.jsx';
 import useReferenceData from '../../hooks/useReferenceData.js';
 import reportError from '../../lib/reportError.js';
 import { cn } from '../../lib/utils';
+import { formalName } from '../../lib/names.js';
 
 const PAGE_SIZE = 20;
 
@@ -447,7 +448,7 @@ export function Recruiters() {
             const cleanData = sanitizeMemberPayload(member, { areasRep: selectedRep.name });
             await memberService.updateMember(cleanData);
             await refreshAll();
-            succeed(`${[member.title, member.initials, member.surname].filter(Boolean).join(' ') || 'That member'} was added to ${selectedRep?.name ?? 'this recruiter'}.`);
+            succeed(`${formalName(member) || 'That member'} was added to ${selectedRep?.name ?? 'this recruiter'}.`);
         } catch (err) {
             fail(`That member could not be assigned to ${selectedRep?.name ?? 'this recruiter'}. ${err?.message || ''}`.trim());
         } finally {
@@ -470,7 +471,7 @@ export function Recruiters() {
             const cleanData = sanitizeMemberPayload(member, { areasRep: '' });
             await memberService.updateMember(cleanData);
             await refreshAll();
-            succeed(`${[member.title, member.initials, member.surname].filter(Boolean).join(' ') || 'That member'} was removed from ${selectedRep?.name ?? 'the recruiter'}.`);
+            succeed(`${formalName(member) || 'That member'} was removed from ${selectedRep?.name ?? 'the recruiter'}.`);
         } catch (err) {
             fail(`That member could not be removed from the recruiter. ${err?.message || ''}`.trim());
         } finally {
@@ -717,14 +718,10 @@ export function Recruiters() {
                     aria-labelledby="recruiters-notice-title"
                     className={cn(
                         "mt-4 flex items-start gap-2 rounded-lg border p-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring",
-                        notice.tone === 'ok'
-                            ? "border-status-active-dot bg-status-active-bg text-status-active"
-                            : "border-status-suspended-dot bg-status-suspended-bg text-status-suspended",
+                        noticeTone(notice.tone),
                     )}
                 >
-                    {notice.tone === 'ok'
-                        ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
-                        : <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />}
+                    <NoticeIcon tone={notice.tone} />
                     <p id="recruiters-notice-title" className="flex-1">{notice.message}</p>
                     <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dismiss</Button>
                 </div>
@@ -746,7 +743,7 @@ export function Recruiters() {
             {(refs.state === 'partial' || refs.state === 'error') && (
                 <div className="mt-4 rounded-lg bg-surface shadow-(--shadow-1)">
                     <DataState
-                        state={refs.state === 'error' ? 'error' : 'partial'}
+                        state={refs.state}
                         layout="row"
                         compact
                         onRetry={refs.retry}
@@ -1062,9 +1059,7 @@ export function Recruiters() {
                                     label="Structures / Positions"
                                     structures={STRUCTURES_TREE}
                                     selectedIds={editRepFields.structureIds || []}
-                                    loading={refs.loading}
-                                    loadError={refs.field('structures').loadError}
-                                    onRetryLoad={refs.retry}
+                                    {...refs.field('structures')}
                                     onChange={(ids) => setEditRepFields(p => ({ ...p, structureIds: ids }))}
                                     placeholder="Select positions..."
                                 />
@@ -1212,9 +1207,7 @@ export function Recruiters() {
                                     label="Structures / Positions"
                                     structures={STRUCTURES_TREE}
                                     selectedIds={newRepDetails.structureIds}
-                                    loading={refs.loading}
-                                    loadError={refs.field('structures').loadError}
-                                    onRetryLoad={refs.retry}
+                                    {...refs.field('structures')}
                                     onChange={(ids) => setNewRepDetails(p => ({ ...p, structureIds: ids }))}
                                     placeholder="Select positions..."
                                 />
@@ -1373,6 +1366,22 @@ function Section({ title, children }) {
 }
 
 /**
+ * What a notice wears for its tone. The page's notice and `DialogNotice` spelt out the same two tones and the same two
+ * icons, character for character; the frame around each differs, and stays with it.
+ */
+function noticeTone(tone) {
+    return tone === 'ok'
+        ? 'border-status-active-dot bg-status-active-bg text-status-active'
+        : 'border-status-suspended-dot bg-status-suspended-bg text-status-suspended';
+}
+
+function NoticeIcon({ tone }) {
+    return tone === 'ok'
+        ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
+        : <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />;
+}
+
+/**
  * A failure said INSIDE the dialog it happened in. `06.4`.
  *
  * `role="alert"` rather than the page notice's focus: the dialog owns focus, and pulling it out of a form
@@ -1383,16 +1392,9 @@ function DialogNotice({ notice, onDismiss }) {
     return (
         <div
             role={notice.tone === 'ok' ? 'status' : 'alert'}
-            className={cn(
-                'mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm',
-                notice.tone === 'ok'
-                    ? 'border-status-active-dot bg-status-active-bg text-status-active'
-                    : 'border-status-suspended-dot bg-status-suspended-bg text-status-suspended',
-            )}
+            className={cn('mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm', noticeTone(notice.tone))}
         >
-            {notice.tone === 'ok'
-                ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
-                : <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />}
+            <NoticeIcon tone={notice.tone} />
             <p className="flex-1">{notice.message}</p>
             <Button size="sm" variant="ghost" onClick={onDismiss}>Dismiss</Button>
         </div>

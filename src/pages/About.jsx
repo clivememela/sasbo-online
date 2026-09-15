@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 
 import PageTitle from '../components/common/PageTitle';
+import { Page } from '../components/common/Sheet.jsx';
 
 /**
  * The union's public channels. Module scope, not inline in the render: it is a constant,
@@ -50,7 +51,7 @@ const SOCIAL_CHANNELS = [
  */
 export default function About() {
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+    <Page>
       <PageTitle title="About Us" subtitle="SASBO — The Finance Union" />
 
       {/* 📱 R-RESP-O: a readable measure. `max-w-4xl` at this type size runs to roughly
@@ -227,6 +228,6 @@ export default function About() {
           </ul>
         </section>
       </div>
-    </div>
+    </Page>
   );
 }

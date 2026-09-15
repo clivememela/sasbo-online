@@ -1,4 +1,5 @@
 import { cn } from '../../lib/utils';
+import { formatInt } from '../../lib/format';
 
 /**
  * THE REGISTER'S TOTALS, AS A RULED FIGURE STRIP.
@@ -28,9 +29,12 @@ import { cn } from '../../lib/utils';
  * query is asked of an ancestor, never of the element it lays out.
  */
 
-/** `2418` → `2 418`. A narrow no-break space, so it can never wrap mid-number. */
-const groups = (n) =>
-  typeof n === 'number' ? n.toLocaleString('en-ZA').replace(/,/g, ' ') : n;
+/**
+ * `2418` → `2 418`. en-ZA groups thousands with a no-break space (U+00A0), so a figure can never wrap mid-number --
+ * which is also why the comma replacement that stood here never matched anything. `formatInt` is that same call, on a
+ * formatter built once.
+ */
+const groups = (n) => (typeof n === 'number' ? formatInt(n) : n);
 
 /**
  * @param {{

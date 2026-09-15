@@ -21,6 +21,9 @@ import reportError from "../../lib/reportError.js";
 // the utility exists.
 const inputCls = 'w-full px-2 py-1 rounded border border-line-strong bg-surface-2 text-ink field-text';
 
+/** A head cell of this hand-built table -- the same classes as `RecruitmentChannel.jsx`'s `HEAD_CELL`. */
+const HEAD_CELL = 'whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5';
+
 /**
  * The bank list behind this screen's filter. `06.1b`, EH-D9.
  *
@@ -148,8 +151,8 @@ export default function Subscriptions() {
             <Sheet className="mt-4">
 
                 {/* 🔴 IT WAS A BARE `Error: {String(err)}` BANNER WITH NO WAY OUT. Two things
-                    changed: the sentence is the server's own rather than a stringified
-                    Error, and there is a retry -- an error state whose only affordance is
+                    changed: the sentence is written for the person reading it rather than a
+                    stringified Error, and there is a retry -- an error state whose only affordance is
                     reloading the page is a dead end (EH-D4). */}
                 {error && (
                     <div className="mx-5 mt-4 rounded-lg bg-surface-2 p-3">
@@ -208,12 +211,12 @@ export default function Subscriptions() {
                         <caption className="sr-only">Bank subscriptions and their debit details</caption>
                         <thead className="sticky top-0 bg-surface-2 z-10">
                             <tr>
-                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Bank Name</th>
-                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">ACB Debit Day</th>
-                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Amount</th>
-                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Core Banking</th>
-                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Status</th>
-                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Registration Date</th>
+                                <th className={HEAD_CELL}>Bank Name</th>
+                                <th className={HEAD_CELL}>ACB Debit Day</th>
+                                <th className={HEAD_CELL}>Amount</th>
+                                <th className={HEAD_CELL}>Core Banking</th>
+                                <th className={HEAD_CELL}>Status</th>
+                                <th className={HEAD_CELL}>Registration Date</th>
                                 <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-center text-xs font-semibold uppercase tracking-[0.08em] text-head-ink">Actions</th>
                             </tr>
                         </thead>

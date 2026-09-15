@@ -69,7 +69,7 @@
      shell opening or closing -- and at `--duration-base` it arrived faster than the eye
      tracks it, which reads as a jump rather than as a panel. It gets its own token so the
      component, the scrim and the record inside it cannot drift out of step with each other.
-     `MemberPanel`'s `PANEL_MS` is this number; they are commented at both ends. */
+     `Members.jsx`'s `PANEL_MS` is this number; they are commented at both ends. */
   --duration-panel: 380ms;
   --duration-pour: 1200ms;
 

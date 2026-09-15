@@ -11,8 +11,8 @@ import DataState from '../../components/common/DataState.jsx';
 import reportError from '../../lib/reportError.js';
 
 /*
- * 📐 THE CHROME OF AN IN-ROW EDITOR -- one constant, and the same one `Subscriptions.jsx:21`
- * uses. These two inputs are not fields on a form; they are a cell that becomes a control for
+ * 📐 THE CHROME OF AN IN-ROW EDITOR -- one constant, with the same classes as `Subscriptions.jsx`'s
+ * `inputCls`. These two inputs are not fields on a form; they are a cell that becomes a control for
  * as long as a rename lasts. So they take the compact chrome rather than `TextInput`'s label
  * block, which would double the row's height mid-edit. The page's own search, which IS a
  * field, went the other way: it is a `TextInput` inside a `Criteria` row now.

@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 import { useNavigate, useLocation, useOutletContext } from "react-router-dom";
 import {
     LucideUserRoundPlus, AlertCircle, CircleCheck, Printer, SlidersHorizontal,
-    Download, Pencil, Check,
+    Pencil, Check,
 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { recruiterService } from "../../services/recruiterService.js";
@@ -34,6 +34,7 @@ import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
 import { parseDate, sameDate, today } from "../../lib/format.js";
 import { cn } from "../../lib/utils";
+import { personName } from "../../lib/names.js";
 
 const PAGE_SIZE = memberService.getPageSize();
 
@@ -754,9 +755,11 @@ export default function Members() {
      * `isEditing`. Every one of those ways out comes through here now: an edit with changes asks first, an edit
      * without them simply ends, and the record that opens next opens to be read.
      */
-    const recordDirty = isEditing && editBaseline !== null && JSON.stringify(editForm) !== editBaseline;
     const [pendingLeave, setPendingLeave] = useState(null);
-    const guard = useRef({ recordDirty: false, isEditing: false, selectedId: null, baseline: null });
+    // The ways out read the record as of the last commit, and ask whether it changed only when one is taken --
+    // `recordIsDirty`, below the component. Serialising the whole form on every render to fill a ref nothing
+    // renders was work every keystroke paid for.
+    const guard = useRef({ isEditing: false, selectedId: null, baseline: null, editForm: null });
 
     const endEdit = useCallback(() => {
         const { baseline } = guard.current;
@@ -768,13 +771,13 @@ export default function Members() {
     }, []);
 
     const requestOpenRecord = useCallback((member) => {
-        const { recordDirty: dirty, isEditing: editing, selectedId } = guard.current;
+        const { isEditing: editing, selectedId } = guard.current;
         // The member already open, chosen again: there is nothing to switch to, and nothing to throw away.
         if (member?.id != null && member.id === selectedId) {
             if (!editing) openRecord(member);
             return;
         }
-        if (dirty) {
+        if (recordIsDirty(guard.current)) {
             setPendingLeave({ member });
             return;
         }
@@ -783,7 +786,7 @@ export default function Members() {
     }, [openRecord, endEdit, setPendingLeave]);
 
     const requestCloseRecord = useCallback(() => {
-        if (guard.current.recordDirty) {
+        if (recordIsDirty(guard.current)) {
             setPendingLeave({ close: true });
             return;
         }
@@ -792,7 +795,7 @@ export default function Members() {
     }, [closeRecord, endEdit, setPendingLeave]);
 
     useEffect(() => {
-        guard.current = { recordDirty, isEditing, selectedId: selectedMember?.id ?? null, baseline: editBaseline };
+        guard.current = { isEditing, selectedId: selectedMember?.id ?? null, baseline: editBaseline, editForm };
         leaveRef.current = requestCloseRecord;
     });
 
@@ -1084,7 +1087,7 @@ export default function Members() {
                 refuses the alternative by name ("hero-metric tiles, dashboards of same-size
                 cards"). Counted from the register the page already holds, so it can never
                 disagree with the rows below it. */}
-            <FigureStrip className="mx-7 mt-5 max-lg:mx-4" {...registerFigures} state={listState === "ready" ? "ready" : listState} />
+            <FigureStrip className="mx-7 mt-5 max-lg:mx-4" {...registerFigures} state={listState} />
 
             {/* 🔍 THE CRITERIA ROW -- card.css `.criteria`. Three labelled fields printed on
                 the page, "More criteria" beside them, Clear at the end. This page had FIFTEEN
@@ -1527,7 +1530,7 @@ export default function Members() {
                             {activeTab === "employment" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
                                     <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="identifier" />
-                                    <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} options={bankOptions} loadError={refs.field('banks').loadError} onRetryLoad={refs.retry} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
+                                    <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} {...refs.field('banks')} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
                                     <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
                                     <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGrade} onChange={handleEditChange("jobGrade")} disabled={!editForm.bankName} loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
                                     <Detail label="Bank Branch" value={editForm.branch} isEditing={isEditing} options={branchOptions} error={fieldErrors.branch} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("branch")} />
@@ -1666,7 +1669,7 @@ export default function Members() {
                                                             setEditForm(prev => ({ ...prev, isBecRecruiter: isYes, ...(!isYes ? { becRecruiterRole: "" } : {}) }));
                                                         }} />
                                                         {editForm.isBecRecruiter && (
-                                                            <Detail label="BEC Recruiter Role" value={editForm.becRecruiterRole} isEditing={true} options={roles.map(r => r.name)} loadError={refs.field('lead recruiters').loadError} onRetryLoad={refs.retry} onChange={(e) => setEditForm(prev => ({ ...prev, becRecruiterRole: e.target.value }))} />
+                                                            <Detail label="BEC Recruiter Role" value={editForm.becRecruiterRole} isEditing={true} {...refs.field('lead recruiters')} options={roles.map(r => r.name)} onChange={(e) => setEditForm(prev => ({ ...prev, becRecruiterRole: e.target.value }))} />
                                                         )}
                                                     </div>
 
@@ -1824,7 +1827,7 @@ export default function Members() {
                 open={Boolean(pendingLeave)}
                 onOpenChange={closeOn(() => setPendingLeave(null))}
                 title="Discard your changes?"
-                description={`The changes to ${[selectedMember?.firstNames, selectedMember?.surname].filter(Boolean).join(" ") || "this record"} have not been saved.`}
+                description={`The changes to ${personName(selectedMember) || "this record"} have not been saved.`}
                 confirmLabel="Discard changes"
                 cancelLabel="Keep editing"
                 onConfirm={discardAndLeave}
@@ -1846,6 +1849,11 @@ export default function Members() {
  * when there are not, and a definition-list entry when reading. `useId` inside `Field`
  * makes the collision impossible rather than unlikely.
  */
+/** An edit with changes: the form no longer serialises to the record it started from. */
+function recordIsDirty({ isEditing, baseline, editForm }) {
+    return isEditing && baseline !== null && JSON.stringify(editForm) !== baseline;
+}
+
 function Detail({ label, value, isEditing, onChange, className = "", options = null, kind = "text", error = null, disabled = false, required = false, loadError = null, onRetryLoad }) {
     if (!isEditing) {
         /* card.css `.field`: the label in small capitals, the value in ink, no box around

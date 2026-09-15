@@ -2,7 +2,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Loader2, X } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
-import DataState from '../common/DataState';
+import LoadFailureFrame from './LoadFailureFrame';
+import { choicePlaceholder } from './choicePlaceholder';
 import Field, { controlClasses } from './Field';
 import { asOptionValue, findOption, normaliseOptions } from './options';
 
@@ -213,7 +214,7 @@ export default function SearchableSelect({
   // Loop-invariant: the same for every option row. Computed once rather than twice per row,
   // which on a several-hundred-entry bank list was 2N string coercions per render.
   const currentValue = asOptionValue(value);
-  const shownPlaceholder = loading ? 'Loading…' : failed ? 'Unavailable' : isEmpty ? emptyLabel : placeholder;
+  const shownPlaceholder = choicePlaceholder({ loading, failed, isEmpty }, emptyLabel, placeholder);
 
   const control = (
     <Field label={label} required={required} error={error} hint={hint} className={failed ? undefined : className}>
@@ -349,11 +350,9 @@ export default function SearchableSelect({
     </Field>
   );
 
-  if (!failed) return control;
   return (
-    <div className={cn('flex flex-col gap-1', className)}>
+    <LoadFailureFrame failed={failed} className={className} label={label} loadError={loadError} onRetryLoad={onRetryLoad}>
       {control}
-      <DataState state="error" compact error={loadError} onRetry={onRetryLoad} title={`${label} could not be loaded.`} />
-    </div>
+    </LoadFailureFrame>
   );
 }
