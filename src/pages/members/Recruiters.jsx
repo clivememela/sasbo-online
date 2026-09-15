@@ -100,11 +100,21 @@ export function Recruiters() {
     const noticeRef = useRef(null);
     const fail = useCallback((message) => setNotice({ tone: 'error', message }), []);
 
+    /*
+     * 🔴 EVERY `fail()` ON THIS SCREEN HAPPENS WITH A DIALOG OPEN (`06.4`), and the notice rendered on the
+     * page -- under the dialog's scrim. A recruiter that could not be created, a member that could not be
+     * assigned, details that could not be saved: each was announced where nobody could see it, and the
+     * dialog looked exactly as if nothing had been tried. While a dialog is open the notice is the
+     * dialog's (`DialogNotice`); when it closes, an unresolved notice is still on the page.
+     */
+    const dialogOpen = Boolean(selectedRep || selectedRepDetail || showAddRep || selectedMember);
+
     // Focus it once it EXISTS -- the same shape as `Auth` and `Members`, and for the same
     // reason: the element is not in the document at the moment the handler sets the state.
+    // Also when a dialog closes over an unresolved notice, which is the moment it mounts here.
     useEffect(() => {
-        if (notice) noticeRef.current?.focus();
-    }, [notice]);
+        if (notice && !dialogOpen) noticeRef.current?.focus();
+    }, [notice, dialogOpen]);
 
     const refreshAll = useCallback(() => {
         setListState((current) => (current === 'ready' ? 'ready' : 'loading'));
@@ -693,7 +703,7 @@ export function Recruiters() {
                 page-level live region on top means two announcements for one failure.
                 Dismissible, because unlike a validation summary this describes something
                 that already happened and the member may simply want it out of the way. */}
-            {notice && (
+            {notice && !dialogOpen && (
                 <div
                     ref={noticeRef}
                     tabIndex={-1}
@@ -826,6 +836,7 @@ export function Recruiters() {
                         </>
                     }
                 >
+                        <DialogNotice notice={notice} onDismiss={() => setNotice(null)} />
                         <div className="flex items-center justify-between pb-4">
                             <div>
                                 <div className="flex items-center gap-2">
@@ -908,6 +919,7 @@ export function Recruiters() {
                     size="lg"
                     footer={<Button onClick={handleCloseAddMember}>Cancel</Button>}
                 >
+                        <DialogNotice notice={notice} onDismiss={() => setNotice(null)} />
                         <div className="pb-3">
                             <TextInput
                                 label="Search members"
@@ -946,6 +958,7 @@ export function Recruiters() {
                     description={selectedRepDetail.name}
                     size="md"
                 >
+                        <DialogNotice notice={notice} onDismiss={() => setNotice(null)} />
                         <div className="flex items-center justify-end gap-2 pb-4">
                             <div className="flex items-center gap-2">
                                 {!editingRep && (
@@ -1113,6 +1126,7 @@ export function Recruiters() {
                         </>
                     }
                 >
+                        <DialogNotice notice={notice} onDismiss={() => setNotice(null)} />
                         {newRepMember && (
                             <div className="mt-3 px-4 py-3 rounded-lg bg-brand-soft border border-brand-ring flex items-center justify-between shrink-0">
                                 <div>
@@ -1252,7 +1266,10 @@ export function Recruiters() {
                                 </Section>
                                 <Section title="Recruiters">
                                     <DRow label="Area's Rep" value={selectedMember.areasRep} />
-                                    <DRow label="Recruitment Rep" value={selectedMember.recruitmentRep} />
+                                    {/* 🔴 IT READ `recruitmentRep`, WHICH THE API DOES NOT SEND (`06.4`): `MemberDto` carries
+                                        `recruitmentRepresentativeId` and `recruitmentRepresentativeName`, so this row was a dash for
+                                        every member -- on the screen whose subject is who recruited whom. */}
+                                    <DRow label="Recruitment Rep" value={selectedMember.recruitmentRepresentativeName} />
                                     <DRow label="Elected Rep" value={selectedMember.electedRep} />
                                     <DRow label="Election Date" value={[selectedMember.repElectionDay, selectedMember.repElectionMonth, selectedMember.repElectionYear].filter(Boolean).join('/') || '—'} />
                                     <DRow label="Remarks" value={selectedMember.remarks} />
@@ -1336,6 +1353,23 @@ function Section({ title, children }) {
         <div className="space-y-3">
             <h4 className="border-b border-line pb-1 text-xs font-bold uppercase tracking-widest text-brand-ink">{title}</h4>
             {children}
+        </div>
+    );
+}
+
+/**
+ * A failure said INSIDE the dialog it happened in. `06.4`.
+ *
+ * `role="alert"` rather than the page notice's focus: the dialog owns focus, and pulling it out of a form
+ * the user is still filling in would be worse than the silence this replaces.
+ */
+function DialogNotice({ notice, onDismiss }) {
+    if (!notice) return null;
+    return (
+        <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended">
+            <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
+            <p className="flex-1">{notice.message}</p>
+            <Button size="sm" variant="ghost" onClick={onDismiss}>Dismiss</Button>
         </div>
     );
 }

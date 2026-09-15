@@ -80,4 +80,70 @@ describe('Recruiters', () => {
       expect(within(count.parentElement.parentElement).getByText('Phone').nextElementSibling).toHaveTextContent('—')
     })
   })
+
+  describe('④ a failure inside a dialog', () => {
+    const CANDIDATE = { id: 21, membershipNumber: 'M0021', initials: 'S', surname: 'Candidate', status: 'Active', bankName: 'Synthetic Bank' }
+    const REFUSAL = 'Choose a recruiter type before making this member a recruiter.'
+
+    async function refuseInAddRecruiter(user) {
+      server.use(http.get('*/api/members', () => HttpResponse.json([CANDIDATE])))
+      renderWithProviders(<Recruiters />)
+      await user.click(await screen.findByRole('button', { name: /Add Recruiter/ }))
+      const dialog = await screen.findByRole('dialog', { name: 'Add Recruiter' })
+      await user.type(within(dialog).getByLabelText('Search members'), 'Candidate')
+      const [choose] = await within(dialog).findAllByRole('button', { name: /^Choose .* as the recruiter$/ })
+      await user.click(choose)
+      await user.click(within(dialog).getByRole('button', { name: /Make Recruiter/ }))
+      return dialog
+    }
+
+    it('is said in the dialog -- not on the page behind its scrim', async () => {
+      // 🔴 `fail()` set the page's notice, which rendered under the open dialog: the refusal happened and
+      // the dialog in front of the user said nothing.
+      const user = setupUser()
+      const dialog = await refuseInAddRecruiter(user)
+
+      expect(within(dialog).getByRole('alert')).toHaveTextContent(REFUSAL)
+    })
+
+    it('the must-pass: close the dialog, and the notice is still on the page', async () => {
+      const user = setupUser()
+      const dialog = await refuseInAddRecruiter(user)
+      await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+      expect(await screen.findByText(REFUSAL)).toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: 'Add Recruiter' })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('⑤ who recruited a member', () => {
+    it('reads the recruiter the API names -- not a dash for every member', async () => {
+      // 🔴 The row read `recruitmentRep`, which `MemberDto` does not carry; the API sends
+      // `recruitmentRepresentativeName`. The Remarks row is the must-pass: an absent value is still a dash.
+      const RECRUITED = {
+        id: 31,
+        membershipNumber: 'M0031',
+        initials: 'S',
+        surname: 'Recruited',
+        status: 'Active',
+        recruitmentRepresentativeId: 5,
+        recruitmentRepresentativeName: 'Synthetic Channel',
+      }
+      server.use(
+        http.get('*/api/recruitment-channels', () => HttpResponse.json([CHANNEL])),
+        http.get('*/api/members', () => HttpResponse.json([RECRUITED])),
+      )
+      const user = setupUser()
+      renderWithProviders(<Recruiters />)
+
+      const [channel] = await screen.findAllByRole('button', { name: /Synthetic Channel — show the members recruited/ })
+      await user.click(channel)
+      const [member] = await screen.findAllByRole('button', { name: /M0031 — open the record for/ })
+      await user.click(member)
+
+      const rep = await screen.findByText('Recruitment Rep')
+      expect(rep.nextElementSibling).toHaveTextContent('Synthetic Channel')
+      expect(within(rep.parentElement.parentElement).getByText('Remarks').nextElementSibling).toHaveTextContent('—')
+    })
+  })
 })
