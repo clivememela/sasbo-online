@@ -342,7 +342,8 @@ export default function ResearchInformation() {
                     <div key={subcategory} className="mb-2">
                       <button
                         onClick={() => toggleSubFolder(`${category}-${subcategory}`)}
-                        className="w-full flex items-center gap-2 rounded-md px-3 py-1.5 transition-colors hover-hover:hover:bg-surface text-left"
+                        // `touch-size`: the year rows ("2017 (4)") offered a 31px target under touch emulation (`07.2`).
+                        className="touch-size w-full flex items-center gap-2 rounded-md px-3 py-1.5 transition-colors hover-hover:hover:bg-surface text-left"
                       >
                         {expandedFolders[`${category}-${subcategory}`] ? (
                           <ChevronDown size={16} className="text-brand-ink flex-shrink-0" />

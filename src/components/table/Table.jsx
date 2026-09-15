@@ -189,7 +189,9 @@ export default function Table({
   // row, and the expander cell's once rather than once per row and per skeleton.
   const rowClasses = [false, true].map((selected) =>
     cn(
-      '[content-visibility:auto] [contain-intrinsic-size:auto_var(--size-row)]',
+      // `touch-size`: a 44px row on a coarse pointer, so a row's expander and its action never land on the next row's
+      // (`07.2`; the row rule is in index.css, because a row's height is set through its cells).
+      'touch-size [content-visibility:auto] [contain-intrinsic-size:auto_var(--size-row)]',
       'transition-colors duration-(--duration-instant)',
       onRowSelect && 'cursor-pointer',
       selected ? 'bg-brand-soft' : 'hover-hover:hover:bg-surface-2',

@@ -244,6 +244,13 @@ describe('SearchableSelect — accessibility, both themes', () => {
 })
 
 describe('SearchableSelect — the 16px rule, mutation-checked', () => {
+  // `07.2`: the combobox is an <input>, which draws no ::after, so `touch-target` gives it nothing. See
+  // TextInput.test.jsx for the rule; the browser half is tools/surfaces.mjs.
+  it('the control wears touch-size, so a coarse pointer gets a 44px target', () => {
+    renderWithProviders(<SearchableSelect label="Bank Name" value="" onChange={() => {}} options={BANKS} />)
+    expect(screen.getByRole('combobox', { name: 'Bank Name' }).className).toMatch(/\btouch-size\b/)
+  })
+
   it('the control wears field-text, and so does every option row', async () => {
     const user = setupUser()
     renderWithProviders(<SearchableSelect label="Bank Name" value="" onChange={() => {}} options={BANKS} />)

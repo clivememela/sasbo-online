@@ -113,7 +113,8 @@ const FOCUS_RING = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-b
 
 // The month and year grids are the same control with different contents.
 const OPTION_BUTTON = [
-  'touch-target rounded-md px-2 py-2 text-sm text-ink',
+  // `touch-size`, not an overlay: a 44px square on each 36px cell lay across its neighbours (`07.2`, the second sweep).
+  'touch-size rounded-md px-2 py-2 text-sm text-ink',
   'hover-hover:hover:bg-surface-2',
   FOCUS_RING,
   'disabled:cursor-not-allowed disabled:opacity-40',
@@ -610,7 +611,7 @@ export default function DateField({
           type="button"
           onClick={() => step(-1)}
           aria-label={`Previous ${stepUnit}`}
-          className={cn('touch-target rounded-md p-1.5 text-ink-muted hover-hover:hover:bg-surface-2', FOCUS_RING)}
+          className={cn('touch-size rounded-md p-1.5 text-ink-muted hover-hover:hover:bg-surface-2', FOCUS_RING)}
         >
           <ChevronLeft aria-hidden="true" className="size-4" />
         </button>
@@ -620,7 +621,7 @@ export default function DateField({
             type="button"
             aria-expanded={view === 'months'}
             onClick={() => setView(view === 'months' ? 'days' : 'months')}
-            className={cn('touch-target inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-sm font-medium text-ink hover-hover:hover:bg-surface-2', FOCUS_RING)}
+            className={cn('touch-size inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-sm font-medium text-ink hover-hover:hover:bg-surface-2', FOCUS_RING)}
           >
             {MONTHS_LONG[cursor.m - 1]}
             <ChevronDown aria-hidden="true" className="size-3.5" />
@@ -635,7 +636,7 @@ export default function DateField({
                 setView('years');
               }
             }}
-            className={cn('touch-target inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-sm font-medium text-ink hover-hover:hover:bg-surface-2', FOCUS_RING)}
+            className={cn('touch-size inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-sm font-medium text-ink hover-hover:hover:bg-surface-2', FOCUS_RING)}
           >
             {view === 'years' ? `${yearBase}–${yearBase + YEARS_PER_PAGE - 1}` : cursor.y}
             <ChevronDown aria-hidden="true" className="size-3.5" />
@@ -646,7 +647,7 @@ export default function DateField({
           type="button"
           onClick={() => step(1)}
           aria-label={`Next ${stepUnit}`}
-          className={cn('touch-target rounded-md p-1.5 text-ink-muted hover-hover:hover:bg-surface-2', FOCUS_RING)}
+          className={cn('touch-size rounded-md p-1.5 text-ink-muted hover-hover:hover:bg-surface-2', FOCUS_RING)}
         >
           <ChevronRight aria-hidden="true" className="size-4" />
         </button>

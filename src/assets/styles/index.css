@@ -678,6 +678,31 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
   opacity: 0.5;
 }
 
+/* 🔴 touch-size — THE 44px RULE FOR WHAT `touch-target` CANNOT REACH (`07.2`).
+
+   `touch-target` grows a control's HIT AREA with an ::after overlay, and a replaced element -- an input, a select, a
+   textarea -- draws no ::after at all. Measured under real touch emulation (tools/surfaces.mjs), every text field and
+   select in the application offered a 38px target while wearing `touch-target`. The topbar search's target is its
+   38px label. And the rail's 36px rows, each with a 24px disclosure beside it, cannot take an overlay without one
+   control's square landing on its neighbour. So on a coarse pointer these GROW to 44px instead.
+
+   Desk density is untouched: a fine pointer never matches. Unlayered, like `touch-target`'s rule, so it wins over a
+   fixed `h-9` or `h-[38px]` utility. Below the token layer's marker on purpose: `gen_theme.py` rewrites everything
+   above it. */
+@media (pointer: coarse) {
+  .touch-size {
+    height: auto;
+    min-height: var(--size-touch);
+    /* And WIDE enough: two 28px icon buttons side by side, each with a 44px overlay, put each one's square on the
+       other ("crowded", the second sweep). Grown to real 44px boxes they abut instead of overlapping. */
+    min-width: var(--size-touch);
+  }
+  /* A table row ignores min-height; its height is set through its cells, and a cell's height is its minimum. */
+  tr.touch-size > td {
+    height: var(--size-touch);
+  }
+}
+
 /* The global search is 14px on a desk and 16px wherever iOS would zoom it (card.css:453). */
 @utility search-text {
   font-size: var(--text-base);

@@ -167,7 +167,7 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
           <a
             href="/home"
             aria-label="SASBO Online home"
-            className="flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+            className="touch-size flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
           >
             <Logo className="size-10 shrink-0 object-contain" />
             <span className="grid min-w-0 leading-[1.15]">
@@ -243,7 +243,8 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
                 key={item.href}
                 to={item.href}
                 className={cn(
-                  "flex h-9 items-center gap-3 rounded-lg px-2.5 text-sm font-medium text-nav-ink",
+                  // `touch-size`: the rail's foot takes the same 44px rows on a coarse pointer as the list (`07.2`).
+                  "touch-size flex h-9 items-center gap-3 rounded-lg px-2.5 text-sm font-medium text-nav-ink",
                   "transition-[background-color,color] duration-(--duration-instant)",
                   "hover-hover:hover:bg-nav-hover hover-hover:hover:text-ink",
                   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",

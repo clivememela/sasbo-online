@@ -333,7 +333,8 @@ export default function SearchableSelect({
                     }}
                     onMouseEnter={() => setActiveIndex(index)}
                     className={cn(
-                      'field-text cursor-pointer px-3 py-2 text-ink',
+                      // `touch-size`: each option is 44px on a coarse pointer -- the second sweep measured them at 39 (`07.2`).
+                      'field-text touch-size cursor-pointer px-3 py-2 text-ink',
                       entry.disabled && 'cursor-not-allowed opacity-50',
                       index === activeIndex && 'bg-brand-soft text-brand-ink',
                       entry.value === currentValue && 'font-medium text-brand-ink',

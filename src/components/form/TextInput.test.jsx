@@ -166,6 +166,32 @@ describe('TextInput — the 16px rule, mutation-checked', () => {
     }
   })
 
+  /**
+   * 🔴 THE 44px RULE, FOR A CONTROL THAT CANNOT CARRY `touch-target` (`07.2`). That utility grows a hit area with an
+   * `::after` overlay, and an input or a textarea is a REPLACED element: it draws no `::after`. Measured under real
+   * touch emulation, every text field in the application offered a 38px target while wearing `touch-target`.
+   * `touch-size` grows the control itself to 44px on a coarse pointer, and only there.
+   *
+   * The same two halves as the 16px rule above: this asserts the mechanism; `tools/surfaces.mjs` measures the target
+   * a finger gets, in a browser, under `Emulation.setTouchEmulationEnabled`.
+   */
+  it('every control wears touch-size, so a coarse pointer gets a 44px target', () => {
+    renderWithProviders(
+      <div>
+        <TextInput label="One" value="" onChange={() => {}} />
+        <TextInput label="Two" value="" onChange={() => {}} multiline />
+      </div>,
+    )
+
+    for (const label of ['One', 'Two']) {
+      expect(
+        screen.getByLabelText(label).className,
+        `"${label}" does not carry \`touch-size\`. An input draws no ::after, so \`touch-target\` cannot give it a ` +
+          `44px target on a phone.`,
+      ).toMatch(/\btouch-size\b/)
+    }
+  })
+
   it('a kind sets the keyboard, the autofill and the return key together — or throws', () => {
     // The other half of the same convention: `fieldKinds` refuses an unknown kind rather
     // than degrading to plain text, because a typo'd kind that silently behaves like

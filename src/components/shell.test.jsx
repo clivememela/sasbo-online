@@ -304,6 +304,27 @@ describe('the shell — every id relationship RESOLVES, `05.4`', () => {
   })
 })
 
+describe('the shell — a coarse pointer gets a 44px target, `07.2`', () => {
+  beforeEach(() => {
+    server.use(...smokeHandlers)
+  })
+
+  it('the topbar search and every rail row wear touch-size', async () => {
+    appRoute()
+    await screen.findByRole('button', { name: /open navigation menu/i })
+
+    // Measured under real touch emulation: the search offered a 38px target -- its whole label, since a tap on the
+    // label focuses the field -- and the drawer's rows were 36px apart with a 24px disclosure in each, so a 44px
+    // square around one control landed on its neighbour. `touch-size` grows each to 44px on a coarse pointer only.
+    const search = screen.getByRole('searchbox')
+    expect(search.closest('label').className).toMatch(/\btouch-size\b/)
+
+    const rail = screen.getByRole('navigation', { name: /main/i })
+    const home = within(rail).getByRole('link', { name: /^home$/i })
+    expect(home.parentElement.className).toMatch(/\btouch-size\b/)
+  })
+})
+
 describe('the shell — BR-18, the banner is not the page heading', () => {
   beforeEach(() => {
     server.use(...smokeHandlers)

@@ -263,7 +263,9 @@ export default function DataState({
 
   const details = isFailure && detail && (
     <details className="text-xs text-ink-muted">
-      <summary className="cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring">
+      {/* `touch-size`: measured under real touch emulation this disclosure offered a 49×15 target (`07.2`). An overlay
+          was tried first and put its square on the Try again beside it; grown to a real 44px box, the two abut. */}
+      <summary className="touch-size cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring">
         Details
       </summary>
       <p className="mt-1">{detail}</p>

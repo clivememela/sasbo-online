@@ -19,7 +19,8 @@ import reportError from "../../lib/reportError.js";
 // so four controls sat under the floor while the measurement read zero. `field-text` is
 // the design's size on a fine pointer and 16px on a coarse one, which is the whole reason
 // the utility exists.
-const inputCls = 'w-full px-2 py-1 rounded border border-line-strong bg-surface-2 text-ink field-text';
+// `touch-size`: an in-row input is a replaced element, so it GROWS to 44px on a coarse pointer (`07.2`; index.css).
+const inputCls = 'w-full px-2 py-1 rounded border border-line-strong bg-surface-2 text-ink field-text touch-size';
 
 /** A head cell of this hand-built table -- the same classes as `RecruitmentChannel.jsx`'s `HEAD_CELL`. */
 const HEAD_CELL = 'whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5';

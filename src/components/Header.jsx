@@ -166,7 +166,8 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
 
       <label
         className={cn(
-          "flex h-[38px] min-w-0 items-center gap-2.5 rounded-[10px] border border-line-strong bg-surface-2 px-3",
+          // `touch-size`: the label is the search's target -- a tap on it focuses the field -- and 44px on a coarse pointer.
+          "touch-size flex h-[38px] min-w-0 items-center gap-2.5 rounded-[10px] border border-line-strong bg-surface-2 px-3",
           "transition-[border-color,box-shadow,background-color] duration-(--duration-instant)",
           "focus-within:border-brand focus-within:bg-surface focus-within:shadow-[0_0_0_3px_var(--color-brand-ring)]",
         )}

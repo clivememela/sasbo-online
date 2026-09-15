@@ -119,7 +119,7 @@ export default function OfflineBanner({ lastNetworkFailureAt = null, onRetry }) 
             setReconnected(false);
             onRetry();
           }}
-          className="shrink-0 rounded-lg border border-status-suspended-dot px-3 py-1 font-medium hover-hover:hover:bg-status-suspended-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+          className="touch-target shrink-0 rounded-lg border border-status-suspended-dot px-3 py-1 font-medium hover-hover:hover:bg-status-suspended-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
         >
           Try again
         </button>
@@ -133,7 +133,7 @@ export default function OfflineBanner({ lastNetworkFailureAt = null, onRetry }) 
           // genuinely offline is a banner that lies about a fact that is still true; the
           // `offline` event is what set it and the `online` event is what clears it.
         }}
-        className="shrink-0 rounded-lg px-2 py-1 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+        className="touch-target shrink-0 rounded-lg px-2 py-1 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
       >
         Dismiss
       </button>

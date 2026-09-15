@@ -73,7 +73,8 @@ export default function SidebarItem({ item, isActive, expandedItems, onToggle, o
           made real: the link navigates, the button expands, and each says what it is. */}
       <div
         className={cn(
-          "flex items-center rounded-lg pr-1.5",
+          // `touch-size`: 44px rows on a coarse pointer, so the link's target and its disclosure's never land on a neighbour.
+          "touch-size flex items-center rounded-lg pr-1.5",
           depth === 0 ? "h-9 pl-2.5 text-sm font-medium" : cn("h-8 text-[13.5px] font-medium", INDENT[Math.min(depth - 1, INDENT.length - 1)]),
           ROW,
           highlighted ? ACTIVE : RESTING,

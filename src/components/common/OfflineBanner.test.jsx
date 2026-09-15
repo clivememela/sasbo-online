@@ -27,6 +27,18 @@ afterEach(() => {
 })
 
 describe('OfflineBanner', () => {
+  it('`07.2`: both of its buttons give a coarse pointer a 44px target', () => {
+    // Measured under real touch emulation, *Dismiss* offered a 63×27 target. Both buttons wear `touch-target`, the
+    // utility that adds a 44px hit area on a coarse pointer without growing the button.
+    setBrowserOnline(true)
+    render(<OfflineBanner lastNetworkFailureAt={Date.now()} onRetry={() => {}} />)
+    fire('online')
+
+    for (const name of [/try again/i, /dismiss/i]) {
+      expect(screen.getByRole('button', { name }).className).toMatch(/\btouch-target\b/)
+    }
+  })
+
   it('renders nothing at all when the connection is fine', () => {
     // The must-pass half. Every assertion below would also pass against a banner that was
     // permanently visible, and a permanent banner is one people stop reading.

@@ -72,7 +72,8 @@ export default function ThemeToggle({ variant = 'nav', compact = false, classNam
       onClick={onClick}
       aria-pressed={darkMode}
       className={cn(
-        'flex h-9 w-full items-center gap-3 rounded-lg px-2.5 text-left text-base font-medium text-nav-ink',
+        // `touch-size`: a 44px row on a coarse pointer, like the rail rows above it (`07.2`).
+        'touch-size flex h-9 w-full items-center gap-3 rounded-lg px-2.5 text-left text-base font-medium text-nav-ink',
         'transition-[background-color,color] duration-(--duration-instant)',
         'hover-hover:hover:bg-nav-hover hover-hover:hover:text-ink',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',

@@ -524,7 +524,7 @@ export default function FinanceHouses() {
                         type="button"
                         onClick={() => toggleSubFolder(`${bank}-${category}`)}
                         aria-expanded={Boolean(expandedFolders[`${bank}-${category}`])}
-                        className="touch-target w-full flex items-center gap-2 rounded-md px-3 py-1.5 transition-colors hover-hover:hover:bg-surface text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+                        className="touch-size w-full flex items-center gap-2 rounded-md px-3 py-1.5 transition-colors hover-hover:hover:bg-surface text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
                       >
                         {expandedFolders[`${bank}-${category}`] ? (
                           <ChevronDown size={16} className="text-brand-ink flex-shrink-0" />
