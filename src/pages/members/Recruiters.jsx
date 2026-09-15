@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useRef, useState, useEffect, useCallback } from 'react';
-import { AlertCircle, ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
 import Pager from '../../components/common/Pager.jsx';
@@ -99,6 +99,9 @@ export function Recruiters() {
     const [notice, setNotice] = useState(null);
     const noticeRef = useRef(null);
     const fail = useCallback((message) => setNotice({ tone: 'error', message }), []);
+    // 🔴 `06.5`: AN ACTION THAT WORKED SAID NOTHING. A member added or removed, a recruiter created, its details saved --
+    // each changed a list, often one behind the dialog, without a word. The same notice says so, as a status.
+    const succeed = useCallback((message) => setNotice({ tone: 'ok', message }), []);
 
     /*
      * 🔴 EVERY `fail()` ON THIS SCREEN HAPPENS WITH A DIALOG OPEN (`06.4`), and the notice rendered on the
@@ -113,7 +116,8 @@ export function Recruiters() {
     // reason: the element is not in the document at the moment the handler sets the state.
     // Also when a dialog closes over an unresolved notice, which is the moment it mounts here.
     useEffect(() => {
-        if (notice && !dialogOpen) noticeRef.current?.focus();
+        // A failure takes focus; a confirmation is announced where it appears and leaves focus where the user is.
+        if (notice?.tone === 'error' && !dialogOpen) noticeRef.current?.focus();
     }, [notice, dialogOpen]);
 
     const refreshAll = useCallback(() => {
@@ -443,12 +447,13 @@ export function Recruiters() {
             const cleanData = sanitizeMemberPayload(member, { areasRep: selectedRep.name });
             await memberService.updateMember(cleanData);
             await refreshAll();
+            succeed(`${[member.title, member.initials, member.surname].filter(Boolean).join(' ') || 'That member'} was added to ${selectedRep?.name ?? 'this recruiter'}.`);
         } catch (err) {
             fail(`That member could not be assigned to ${selectedRep?.name ?? 'this recruiter'}. ${err?.message || ''}`.trim());
         } finally {
             setSaving(false);
         }
-    }, [selectedRep, refreshAll, fail]);
+    }, [selectedRep, refreshAll, fail, succeed]);
 
     // 🔴 `03.4`: both of this file's `window.confirm()` calls become ConfirmDialogs. The
     // second one is the reason it matters: it sets EVERY member of a recruiter to Inactive,
@@ -465,6 +470,7 @@ export function Recruiters() {
             const cleanData = sanitizeMemberPayload(member, { areasRep: '' });
             await memberService.updateMember(cleanData);
             await refreshAll();
+            succeed(`${[member.title, member.initials, member.surname].filter(Boolean).join(' ') || 'That member'} was removed from ${selectedRep?.name ?? 'the recruiter'}.`);
         } catch (err) {
             fail(`That member could not be removed from the recruiter. ${err?.message || ''}`.trim());
         } finally {
@@ -502,7 +508,7 @@ export function Recruiters() {
             setNewRepMember(null);
             setNewRepDetails({ roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] });
             setSelectedRep({ id: createdRep?.id, name: repName });
-            setNotice(null);
+            succeed(`${repName} is a recruiter now.`);
         } catch (err) {
             fail(`That recruiter could not be created. ${err?.message || ''}`.trim());
         } finally {
@@ -707,10 +713,18 @@ export function Recruiters() {
                 <div
                     ref={noticeRef}
                     tabIndex={-1}
+                    {...(notice.tone === 'ok' && { role: 'status' })}
                     aria-labelledby="recruiters-notice-title"
-                    className="mt-4 flex items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                    className={cn(
+                        "mt-4 flex items-start gap-2 rounded-lg border p-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring",
+                        notice.tone === 'ok'
+                            ? "border-status-active-dot bg-status-active-bg text-status-active"
+                            : "border-status-suspended-dot bg-status-suspended-bg text-status-suspended",
+                    )}
                 >
-                    <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
+                    {notice.tone === 'ok'
+                        ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
+                        : <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />}
                     <p id="recruiters-notice-title" className="flex-1">{notice.message}</p>
                     <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dismiss</Button>
                 </div>
@@ -1093,6 +1107,7 @@ export function Recruiters() {
                                                     setSelectedRepDetail(d => ({ ...d, ...editRepFields }));
                                                     if (selectedRep?.id === selectedRepDetail.id) setSelectedRep(r => ({ ...r, ...editRepFields }));
                                                     setEditingRep(false);
+                                                    succeed('Those recruiter details are saved.');
                                                 } catch (err) {
                                                     fail(`Those recruiter details could not be saved. ${err?.message || ''}`.trim());
                                                 } finally {
@@ -1366,8 +1381,18 @@ function Section({ title, children }) {
 function DialogNotice({ notice, onDismiss }) {
     if (!notice) return null;
     return (
-        <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended">
-            <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
+        <div
+            role={notice.tone === 'ok' ? 'status' : 'alert'}
+            className={cn(
+                'mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm',
+                notice.tone === 'ok'
+                    ? 'border-status-active-dot bg-status-active-bg text-status-active'
+                    : 'border-status-suspended-dot bg-status-suspended-bg text-status-suspended',
+            )}
+        >
+            {notice.tone === 'ok'
+                ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
+                : <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />}
             <p className="flex-1">{notice.message}</p>
             <Button size="sm" variant="ghost" onClick={onDismiss}>Dismiss</Button>
         </div>

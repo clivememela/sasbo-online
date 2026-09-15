@@ -146,4 +146,40 @@ describe('Recruiters', () => {
       expect(within(rep.parentElement.parentElement).getByText('Remarks').nextElementSibling).toHaveTextContent('—')
     })
   })
+
+  describe('⑥ an action that worked says so', () => {
+    // 🔴 `06.5`, F-P55: adding a member to a recruiter changed the list behind the dialog and said nothing. The failure
+    // case is the must-pass -- a confirmation that replaced the failure notice would pass the first case alone.
+    const CANDIDATE = { id: 41, membershipNumber: 'M0041', initials: 'S', surname: 'Candidate', status: 'Active', bankName: 'Synthetic Bank' }
+
+    async function addTheCandidate(user) {
+      server.use(
+        http.get('*/api/recruitment-channels', () => HttpResponse.json([CHANNEL])),
+        http.get('*/api/members', () => HttpResponse.json([CANDIDATE])),
+      )
+      renderWithProviders(<Recruiters />)
+      const [channel] = await screen.findAllByRole('button', { name: /Synthetic Channel — show the members recruited/ })
+      await user.click(channel)
+      await user.click(await screen.findByRole('button', { name: /Add Member/ }))
+      const [add] = await screen.findAllByRole('button', { name: 'Add S Candidate to this recruiter' })
+      await user.click(add)
+      return screen.findByRole('dialog', { name: 'Synthetic Channel' })
+    }
+
+    it('adding a member to a recruiter says who was added', async () => {
+      server.use(http.put('*/api/members/:id', async ({ request }) => HttpResponse.json(await request.json())))
+      const dialog = await addTheCandidate(setupUser())
+
+      const said = await within(dialog).findByText('S Candidate was added to Synthetic Channel.')
+      expect(said.closest('[role="status"]')).not.toBeNull()
+    })
+
+    it('the must-pass: an add that failed still says so, as a failure', async () => {
+      server.use(http.put('*/api/members/:id', boom))
+      const dialog = await addTheCandidate(setupUser())
+
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(/could not be assigned/)
+      expect(within(dialog).queryByText(/was added to/)).not.toBeInTheDocument()
+    })
+  })
 })
