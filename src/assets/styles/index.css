@@ -128,7 +128,7 @@
 
   /* The metal card (component tokens) */
   --card-metal-a: oklch(32.6% 0.052 215);  /* gradient start */
-  --card-metal-b: oklch(53.2% 0.088 209);  /* gradient mid */
+  --card-metal-b: oklch(40.7% 0.067 211);  /* gradient mid -- deepened for AA, P7 (card.css says why) */
   --card-metal-c: oklch(37.7% 0.061 211);  /* gradient end */
   --card-engrave: oklch(97.9% 0.008 197);  /* engraved text */
   --card-engrave-gold: oklch(88.8% 0.102 93);  /* engraved name */
@@ -139,12 +139,12 @@
      make it read as metal rather than as a teal rectangle: `04.x` defined the
      gradient and the engraving and stopped there, so the card had tokens and no
      component. Added when the component was finally built. */
-  --card-gloss: rgba(255, 255, 255, 0.16);   /* the light coming over the top-left */
+  --card-gloss: rgba(255, 255, 255, 0.08);   /* the light coming over the top-left */
   --card-shade: rgba(0, 0, 0, 0.22);         /* the shadow gathering bottom-right */
   --card-edge-top: rgba(255, 255, 255, 0.2); /* the milled top edge */
   --card-edge-bottom: rgba(0, 0, 0, 0.3);    /* and the bottom one */
-  --card-text-2: rgba(242, 250, 250, 0.66);  /* secondary engraving */
-  --card-chip-bg: rgba(255, 255, 255, 0.1);
+  --card-text-2: rgba(242, 250, 250, 0.9);  /* secondary engraving */
+  --card-chip-bg: rgba(255, 255, 255, 0.04);
   --card-chip-suspended: #FFC4C4;
   --card-chip-pending: #F5E2A8;
   --card-chip-muted: rgba(242, 250, 250, 0.75);
@@ -224,7 +224,7 @@
 
   /* The metal card (component tokens) */
   --card-metal-a: oklch(36.4% 0.058 212);
-  --card-metal-b: oklch(58.2% 0.096 209);
+  --card-metal-b: oklch(44.0% 0.072 211);
   --card-metal-c: oklch(41.4% 0.067 211);
   --card-engrave: oklch(97.9% 0.008 197);
   --card-engrave-gold: oklch(89.7% 0.096 93);
@@ -232,12 +232,12 @@
   --card-chip-ring: rgba(243, 220, 146, 0.5);
   /* The card's material treatments hold in dark: the mock's own dark theme keeps
      them, because the card is lit by its own gradient rather than by the page. */
-  --card-gloss: rgba(255, 255, 255, 0.14);
+  --card-gloss: rgba(255, 255, 255, 0.07);
   --card-shade: rgba(0, 0, 0, 0.3);
   --card-edge-top: rgba(255, 255, 255, 0.16);
   --card-edge-bottom: rgba(0, 0, 0, 0.4);
-  --card-text-2: rgba(242, 250, 250, 0.66);
-  --card-chip-bg: rgba(255, 255, 255, 0.1);
+  --card-text-2: rgba(242, 250, 250, 0.9);
+  --card-chip-bg: rgba(255, 255, 255, 0.04);
   --card-chip-suspended: #FFC4C4;
   --card-chip-pending: #F5E2A8;
   --card-chip-muted: rgba(242, 250, 250, 0.75);
