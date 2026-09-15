@@ -19,6 +19,7 @@ import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderF
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState";
 import useReferenceData from "../../hooks/useReferenceData.js";
+import { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
 
 const FIELD_TO_TAB_MAP = {
     title: "personal",
@@ -119,6 +120,17 @@ export default function CaptureMember() {
 
     const [fieldErrors, setFieldErrors] = useState({});
     const [showSavedNotification, setShowSavedNotification] = useState(false);
+    /*
+     * 🔴 SAVE STAYED PRESSABLE WHILE THE MEMBER WAS BEING SAVED, AND CANCEL DISCARDED WITHOUT ASKING (`06.5`, the
+     * `06.3` critique, F-P55). `Button` has a `loading` state for exactly this -- its own comment names a submit
+     * that stays clickable as how duplicate records happen -- and this form never used it: a second press while the
+     * first request ran sent the member again. Cancel was `history.back()`, so a half-captured member went with one
+     * click. `pristineForm` is the form as it opened; Cancel asks only when the form no longer matches it.
+     */
+    const [saving, setSaving] = useState(false);
+    const [savedName, setSavedName] = useState("");
+    const [pristineForm] = useState(() => JSON.stringify(form));
+    const [confirmDiscard, setConfirmDiscard] = useState(false);
     /*
      * ✅ THE FOUR SILENT MOUNT LOADS, REPLACED BY ONE SET (EH-D9).
      *
@@ -257,6 +269,7 @@ export default function CaptureMember() {
     }, [saveNotice]);
 
     const handleSave = () => {
+        if (saving) return;
         const clientSideErrors = validateFormBeforeSave();
         const mergedErrors = { ...fieldErrors, ...clientSideErrors };
 
@@ -279,15 +292,26 @@ export default function CaptureMember() {
         }
 
         setSaveNotice(null);
+        setSaving(true);
         memberService.createMember(form)
             .then(() => {
+                setSavedName([form.firstNames, form.surname].filter(Boolean).join(" "));
                 setShowSavedNotification(true);
                 setTimeout(() => setShowSavedNotification(false), 3000);
             })
             .catch((err) => setSaveNotice({
                 kind: "failed",
                 messages: [`This member was not saved. ${err?.message || "Please try again."}`],
-            }));
+            }))
+            .finally(() => setSaving(false));
+    };
+
+    const handleCancel = () => {
+        if (JSON.stringify(form) !== pristineForm) {
+            setConfirmDiscard(true);
+            return;
+        }
+        window.history.back();
     };
 
     const tabs = MEMBER_TABS;
@@ -405,10 +429,19 @@ export default function CaptureMember() {
             )}
 
             <div className="relative mt-2 rounded-lg bg-surface shadow-(--shadow-1)">
+                {/* 🔴 IT SAID "Member captured successfully!" AT THE TOP OF A LONG FORM, WHERE NOBODY PRESSING SAVE AT THE
+                    BOTTOM COULD SEE IT (`06.5`). It is the world's toast now, fixed above the action bar as the record's
+                    own is, and it names who was captured.
+                    ⚠️ THE SENTENCE IS KEPT WORD FOR WORD, IN ITS OWN ELEMENT: the automation arc's `MemberCapturePage`
+                    waits for `getByText('Member captured successfully!')`. The name is a second element beside it. */}
                 {showSavedNotification && (
-                    <div role="status" className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-lg border border-status-active-dot bg-status-active-bg px-4 py-2 text-status-active shadow-(--shadow-2)">
-                        <CheckCircle2 size={18} strokeWidth={1.75} aria-hidden="true" />
-                        <span className="text-sm font-medium">Member captured successfully!</span>
+                    <div
+                        role="status"
+                        className="kind-in fixed bottom-[84px] left-1/2 z-50 flex -translate-x-1/2 items-center gap-2.5 rounded-[10px] bg-ink px-3.5 py-2.5 text-[13.5px] font-medium text-bg shadow-(--shadow-2)"
+                    >
+                        <CheckCircle2 size={16} strokeWidth={1.75} aria-hidden="true" className="text-brand" />
+                        <span>Member captured successfully!</span>
+                        {savedName && <span className="font-normal opacity-80">{savedName}</span>}
                     </div>
                 )}
 
@@ -593,9 +626,22 @@ export default function CaptureMember() {
                     puts the primary action on the right for a mouse while leaving it first
                     in the tab order -- the order the two audiences each expect. */}
                 <div className="sticky bottom-0 z-10 flex flex-row-reverse justify-start gap-3 border-t border-line bg-surface px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                    <Button variant="primary" onClick={handleSave}>Save Member</Button>
-                    <Button onClick={() => window.history.back()}>Cancel</Button>
+                    <Button variant="primary" onClick={handleSave} loading={saving}>Save Member</Button>
+                    <Button onClick={handleCancel}>Cancel</Button>
                 </div>
+
+                <ConfirmDialog
+                    open={confirmDiscard}
+                    onOpenChange={closeOn(() => setConfirmDiscard(false))}
+                    title="Discard this member?"
+                    description="Nothing on this form has been saved."
+                    confirmLabel="Discard member"
+                    cancelLabel="Keep capturing"
+                    onConfirm={() => {
+                        setConfirmDiscard(false);
+                        window.history.back();
+                    }}
+                />
             </div>
         </div>
     );

@@ -219,14 +219,71 @@ const getInitialFilters = (locationState) => ({
     branch: locationState?.filters?.branch || "",
 });
 
+/*
+ * 🔴 THE SAVE CONFIRMATION SPOKE IN FIELD KEYS, AND PRINTED "No" AS "-" (`06.5`, the `06.3` critique, F-P55). It
+ * labelled each change from the shared `MEMBER_FIELD_LABEL_MAP`, which knows none of the record's Structures fields,
+ * so an administrator was asked to confirm `isCosatu: Y → N` and `becCommitteeId: - → bec-04`. It named fields
+ * differently from the form above it, printed `false` and an empty list as "-" or nothing, and reported an unchanged
+ * COSATU positions list as a change, because the record holds it as "PEC,CEC" and the form as an array.
+ *
+ * The form's own words come first here. The shared map, which the Capture Member arc also reads, is left as it is.
+ */
+const RECORD_FIELD_LABELS = {
+    firstNames: "First Name(s)",
+    identityType: "Identity Type",
+    identityNumber: "Identity Number",
+    phone: "Cellphone Number",
+    address: "Residential Address",
+    bankName: "Bank Where Employed",
+    employmentType: "Employment Type",
+    branch: "Bank Branch",
+    debitDay: "Debit Day",
+    bankAddress: "Bank Work Address",
+    status: "Account Membership Status",
+    isShopSteward: "Shop Steward",
+    shopStewardElectionDate: "Shop Steward Election Date",
+    isBec: "BEC Member",
+    becCommitteeId: "BEC Committee",
+    isBecRecruiter: "BEC Recruiter",
+    becRecruiterRole: "BEC Recruiter Role",
+    isBecStructureRep: "BEC Structure Representative",
+    becStructures: "BEC Structures Represented",
+    isBecExecutive: "BEC Executive",
+    becExecutivePosition: "BEC Executive Position",
+    isCosatu: "COSATU Member",
+    cosatuLocal: "COSATU Local",
+    cosatuRegion: "Region within Local",
+    cosatuPositions: "COSATU Positions",
+};
+
+/** Never listed: identifiers, and a name the form derives from a field that is listed (the committee's id). */
+const UNLISTED_KEYS = ["id", "membershipNumber", "memberId", "becCommitteeName"];
+
+/** A value as the form holds it, for comparing: a yes/no flag as a boolean, a list as its joined text. */
+const comparable = (key, value) => {
+    if (key === "paymentType") return normalizePaymentType(value);
+    if (/^is[A-Z]/.test(key)) return value === true || value === "Y";
+    if (Array.isArray(value)) return value.join(",");
+    if (value === null || value === undefined) return "";
+    return value;
+};
+
+/** A value as a person reads it. */
+const readable = (key, value) => {
+    const shown = comparable(key, value);
+    if (typeof shown === "boolean") return shown ? "Yes" : "No";
+    if (key === "becCommitteeId") return SASBO_BEC_BRANCHES.find((branch) => branch.id === shown)?.name ?? (shown || "—");
+    if (key === "becStructures" || key === "cosatuPositions") return shown ? String(shown).split(",").join(", ") : "none";
+    return shown === "" ? "—" : String(shown);
+};
+
+const fieldLabel = (key) =>
+    RECORD_FIELD_LABELS[key] || MEMBER_FIELD_LABEL_MAP[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+
 const getChangedFields = (draft, original) => Object.keys(draft)
-    .filter((key) => !["id", "membershipNumber", "memberId"].includes(key))
-    .filter((key) => {
-        const draftValue = key === "paymentType" ? normalizePaymentType(draft[key]) : draft[key];
-        const originalValue = key === "paymentType" ? normalizePaymentType(original[key]) : original[key];
-        return draftValue !== originalValue;
-    })
-    .map((key) => `${MEMBER_FIELD_LABEL_MAP[key] || key}: ${original[key] || "-"} → ${draft[key] || "-"}`);
+    .filter((key) => !UNLISTED_KEYS.includes(key))
+    .filter((key) => comparable(key, draft[key]) !== comparable(key, original[key]))
+    .map((key) => `${fieldLabel(key)}: ${readable(key, original[key])} → ${readable(key, draft[key])}`);
 
 
 /**
@@ -265,6 +322,8 @@ export default function Members() {
      */
     const [panelClosing, setPanelClosing] = useState(false);
     const closeTimer = useRef(null);
+    // The guarded close, for the window-level Escape listener, which is registered once. Kept current by an effect.
+    const leaveRef = useRef(null);
 
     const openRecord = useCallback((member) => {
         if (closeTimer.current) {
@@ -290,6 +349,9 @@ export default function Members() {
     }, []);
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState({});
+    // The form as it stood when editing began, serialised: an edit has changes exactly when the form no longer
+    // serialises to it. Compared whole, so a field the member record never carried still counts once it is typed in.
+    const [editBaseline, setEditBaseline] = useState(null);
     const [activeTab, setActiveTab] = useState("personal");
     const [showSavedNotification, setShowSavedNotification] = useState(false);
     const [fieldErrors, setFieldErrors] = useState({});
@@ -421,6 +483,11 @@ export default function Members() {
             // dialog, a listbox -- is not a request to close the whole record. Without this
             // guard, Escape in the calendar of the edit form threw the member away.
             if (e.defaultPrevented || e.target?.closest?.('[role="dialog"], [role="listbox"]')) return;
+            // `06.5`: through the same guard as every other way out -- an edit with changes asks first.
+            if (leaveRef.current) {
+                leaveRef.current();
+                return;
+            }
             closeRecord();
             setIsEditing(false);
         };
@@ -480,13 +547,23 @@ export default function Members() {
 
 
     const handleEditToggle = () => {
-        setIsEditing((editing) => {
-            if (!editing) {
-                setEditForm({ ...selectedMember, paymentType: normalizePaymentType(selectedMember?.paymentType) });
-                setFieldErrors({});
-            }
-            return !editing;
-        });
+        if (isEditing) {
+            // Cancel is the one way out that is itself the discard, so it does not ask; it does put the record's own
+            // values back, so the page read after it is the record rather than the edit that was thrown away.
+            endEdit();
+            return;
+        }
+        const start = { ...selectedMember, paymentType: normalizePaymentType(selectedMember?.paymentType) };
+        // 🔴 THE SERVER SENDS COSATU POSITIONS AS ONE STRING ("PEC,CEC"), AND THIS COPIED IT RAW (`06.5`). The effect above
+        // makes it a list when the record loads; entering edit mode copied the record again and undid that, so the
+        // checkbox group was handed a string -- unticking a position threw, and ticking one saved the string's letters.
+        if (typeof start.cosatuPositions === "string") {
+            start.cosatuPositions = start.cosatuPositions.split(",").map((s) => s.trim()).filter(Boolean);
+        }
+        setEditForm(start);
+        setEditBaseline(JSON.stringify(start));
+        setFieldErrors({});
+        setIsEditing(true);
     };
 
     const handleEditChange = useCallback((field) => (event) => {
@@ -630,14 +707,25 @@ export default function Members() {
         setPendingSave(changes);
     };
 
+    /*
+     * 🔴 THE CONFIRMATION CLOSED BEFORE THE WRITE, AND NOTHING SHOWED WHILE IT RAN (`06.5`, F-P55). "Save changes"
+     * dismissed the dialog first and awaited the request after, so for the length of a slow save the record looked
+     * exactly as if nothing had been pressed -- and could be pressed again. The dialog stays open, its button busy,
+     * until the write has answered either way.
+     */
+    const [savingRecord, setSavingRecord] = useState(false);
+
     const commitSave = async () => {
-        setPendingSave(null);
+        if (savingRecord) return;
+        setSavingRecord(true);
         try {
             await memberService.updateMember(editForm);
             const refreshed = await memberService.getMembers();
             const list = Array.isArray(refreshed) ? refreshed : (refreshed.data || refreshed.members || []);
+            setPendingSave(null);
             setMembersList(list);
             setSelectedMember({ ...editForm });
+            setEditBaseline(null);
             setIsEditing(false);
             setSavedName([editForm.firstNames, editForm.surname].filter(Boolean).join(" "));
             setShowSavedNotification(true);
@@ -647,14 +735,74 @@ export default function Members() {
             // 06.1 owns the shared error CONTRACT; what this wave owes the screen is that
             // a failed save is visible on the screen the member is looking at, rather than
             // in a dialog they dismiss and a console they never open.
+            setPendingSave(null);
             setSaveNotice({
                 kind: "failed",
                 messages: ["We could not save these changes. Nothing was written — please try again."],
             });
+        } finally {
+            setSavingRecord(false);
         }
     };
 
     const [pendingSave, setPendingSave] = useState(null);
+
+    /*
+     * 🔴 AN EDIT WAS THROWN AWAY BY ANYTHING THAT CHANGED THE RECORD (`06.5`, the `06.3` critique, F-P55). Choosing
+     * another member, the close button, the scrim and Escape each replaced or cleared the record while the form held
+     * unsaved changes -- without a word -- and the next member opened already in edit mode, because nothing reset
+     * `isEditing`. Every one of those ways out comes through here now: an edit with changes asks first, an edit
+     * without them simply ends, and the record that opens next opens to be read.
+     */
+    const recordDirty = isEditing && editBaseline !== null && JSON.stringify(editForm) !== editBaseline;
+    const [pendingLeave, setPendingLeave] = useState(null);
+    const guard = useRef({ recordDirty: false, isEditing: false, selectedId: null, baseline: null });
+
+    const endEdit = useCallback(() => {
+        const { baseline } = guard.current;
+        if (baseline) setEditForm(JSON.parse(baseline));
+        setEditBaseline(null);
+        setIsEditing(false);
+        setSaveNotice(null);
+        setFieldErrors({});
+    }, []);
+
+    const requestOpenRecord = useCallback((member) => {
+        const { recordDirty: dirty, isEditing: editing, selectedId } = guard.current;
+        // The member already open, chosen again: there is nothing to switch to, and nothing to throw away.
+        if (member?.id != null && member.id === selectedId) {
+            if (!editing) openRecord(member);
+            return;
+        }
+        if (dirty) {
+            setPendingLeave({ member });
+            return;
+        }
+        endEdit();
+        openRecord(member);
+    }, [openRecord, endEdit, setPendingLeave]);
+
+    const requestCloseRecord = useCallback(() => {
+        if (guard.current.recordDirty) {
+            setPendingLeave({ close: true });
+            return;
+        }
+        endEdit();
+        closeRecord();
+    }, [closeRecord, endEdit, setPendingLeave]);
+
+    useEffect(() => {
+        guard.current = { recordDirty, isEditing, selectedId: selectedMember?.id ?? null, baseline: editBaseline };
+        leaveRef.current = requestCloseRecord;
+    });
+
+    const discardAndLeave = () => {
+        const leave = pendingLeave;
+        setPendingLeave(null);
+        endEdit();
+        if (leave?.member) openRecord(leave.member);
+        else closeRecord();
+    };
 
     // Same shape as `Auth`'s, and for the same reason: the summary does not exist yet when
     // the handler that sets it runs, so focusing it there is a silent no-op. `saveNotice`
@@ -805,7 +953,7 @@ export default function Members() {
                     <button
                         type="button"
                         data-row-action=""
-                        onClick={() => openRecord(member)}
+                        onClick={() => requestOpenRecord(member)}
                         // The number alone is not a name a screen-reader user can act on:
                         // "1002" says nothing about what pressing it does, and every row
                         // has one.
@@ -899,11 +1047,10 @@ export default function Members() {
             priority: "essential",
             cell: (member) => <StatusChip status={member.status} />,
         },
-    // `openRecord` is a `useCallback` with no dependencies, so this list is still stable and
-    // the columns are still built once -- it is named because the rule is right: a closure
-    // that is not declared is a closure nobody will remember to check when it stops being
-    // stable.
-    ], [openRecord]);
+    // `requestOpenRecord` reads the edit through a ref and depends only on stable callbacks, so this list is still
+    // stable and the columns are still built once -- it is named because the rule is right: a closure that is not
+    // declared is a closure nobody will remember to check when it stops being stable.
+    ], [requestOpenRecord]);
 
     return (
         /* 📐 card.html's `.main`, section by section: the page head, the ruled figure strip,
@@ -1075,7 +1222,7 @@ export default function Members() {
                         rows={visibleMembers}
                         rowKey="id"
                         selectedKey={selectedMember?.id}
-                        onRowSelect={openRecord}
+                        onRowSelect={requestOpenRecord}
                         enterKey={enterKey}
                         loading={listState === "loading"}
                         error={listState === "error" ? "The register could not be reached" : null}
@@ -1153,7 +1300,7 @@ export default function Members() {
             <MemberPanel
                 member={selectedMember}
                 open={Boolean(selectedMember) && !panelClosing}
-                onClose={closeRecord}
+                onClose={requestCloseRecord}
                 footer={
                     isEditing ? (
                         <>
@@ -1650,12 +1797,13 @@ export default function Members() {
 
             <ConfirmDialog
                 open={Boolean(pendingSave)}
-                onOpenChange={closeOn(() => setPendingSave(null))}
+                onOpenChange={closeOn(() => { if (!savingRecord) setPendingSave(null); })}
                 title="Save these changes?"
                 confirmLabel="Save changes"
                 cancelLabel="Keep editing"
                 destructive={false}
                 onConfirm={commitSave}
+                loading={savingRecord}
             >
                 {/* 🔑 The changes are a LIST now, not a string of bullets concatenated into
                     a browser dialog. A long list scrolls inside the modal body rather than
@@ -1671,6 +1819,16 @@ export default function Members() {
                     ))}
                 </ul>
             </ConfirmDialog>
+
+            <ConfirmDialog
+                open={Boolean(pendingLeave)}
+                onOpenChange={closeOn(() => setPendingLeave(null))}
+                title="Discard your changes?"
+                description={`The changes to ${[selectedMember?.firstNames, selectedMember?.surname].filter(Boolean).join(" ") || "this record"} have not been saved.`}
+                confirmLabel="Discard changes"
+                cancelLabel="Keep editing"
+                onConfirm={discardAndLeave}
+            />
         </div>
     );
 }
