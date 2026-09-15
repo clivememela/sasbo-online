@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Loader2, X } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
+import DataState from '../common/DataState';
 import Field, { controlClasses } from './Field';
 import { asOptionValue, findOption, normaliseOptions } from './options';
 
@@ -57,6 +58,11 @@ export default function SearchableSelect({
   loading = false,
   emptyLabel = 'No options available',
   noMatchLabel = 'No matches',
+  // The options could not be fetched -- a state of the CHOICES, not of the value (`error`). See
+  // `SelectInput`: a failed list renders as "Unavailable" with a compact error and a retry, never as
+  // an empty one (F-P54, `06.4`).
+  loadError = null,
+  onRetryLoad,
   clearable = true,
   className,
   ...rest
@@ -75,7 +81,8 @@ export default function SearchableSelect({
   );
 
   const selected = findOption(normalised, value);
-  const isEmpty = !loading && normalised.length === 0;
+  const failed = Boolean(loadError) && !loading;
+  const isEmpty = !loading && !failed && normalised.length === 0;
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -120,7 +127,7 @@ export default function SearchableSelect({
     listRef.current?.children?.[activeIndex]?.scrollIntoView?.({ block: 'nearest' });
   }, [open, activeIndex]);
 
-  const isDisabled = disabled || loading || isEmpty;
+  const isDisabled = disabled || loading || isEmpty || failed;
 
   const openList = useCallback(() => {
     if (isDisabled) return;
@@ -206,10 +213,10 @@ export default function SearchableSelect({
   // Loop-invariant: the same for every option row. Computed once rather than twice per row,
   // which on a several-hundred-entry bank list was 2N string coercions per render.
   const currentValue = asOptionValue(value);
-  const shownPlaceholder = loading ? 'Loading…' : isEmpty ? emptyLabel : placeholder;
+  const shownPlaceholder = loading ? 'Loading…' : failed ? 'Unavailable' : isEmpty ? emptyLabel : placeholder;
 
-  return (
-    <Field label={label} required={required} error={error} hint={hint} className={className}>
+  const control = (
+    <Field label={label} required={required} error={error} hint={hint} className={failed ? undefined : className}>
       {({ id, describedBy, invalid }) => (
         <div ref={containerRef} className="relative">
           <input
@@ -340,5 +347,13 @@ export default function SearchableSelect({
         </div>
       )}
     </Field>
+  );
+
+  if (!failed) return control;
+  return (
+    <div className={cn('flex flex-col gap-1', className)}>
+      {control}
+      <DataState state="error" compact error={loadError} onRetry={onRetryLoad} title={`${label} could not be loaded.`} />
+    </div>
   );
 }

@@ -148,10 +148,12 @@ export const DEFECTS = {
 // Its two pins were deleted and its entry removed from the errorContract's BREACHES map in the
 // same commit -- flipped, not repaired (contract 4).
 //
-// ⚠️ What is NOT closed with it: `getBankListing`'s INNER `/api/banks` lookup still falls back
-// to `[]`, and that is deliberate and now documented at the site. It is an ENRICHMENT (it
-// supplies the universal branch codes); losing it empties one column rather than the page, which
-// is EH-D9's "partial failure stays partial" and not this row's defect. The PRIMARY call rejects.
+// ✅ And the INNER `/api/banks` lookup, closed in `06.4` (F-P54). It fell back to `[]`, which was
+// called deliberate -- an ENRICHMENT, so losing it should empty one column rather than the page, EH-D9's
+// "partial failure stays partial". The degradation was right; its silence was not: Bank Listing printed
+// "-" for every code and answered a search by code with "no banks match". `getBankListingDetailed`
+// reports `codes: 'failed'` now, the page says the codes are missing, and
+// `noSwallowedRejection.structural.test.js` convicts any `.catch(() => [])` that comes back.
 
 // A14 is RETIRED, 2026-09-10, by the design arc's 06.1a.
 //

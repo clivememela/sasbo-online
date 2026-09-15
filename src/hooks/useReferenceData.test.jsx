@@ -36,6 +36,25 @@ function Probe({ loaders }) {
   )
 }
 
+/** Renders what `field(name)` hands a select, so each assertion reads one fact of it. */
+function FieldProbe({ loaders }) {
+  const refs = useReferenceData(loaders)
+  const banks = refs.field('banks')
+  const roles = refs.field('roles')
+  return (
+    <div>
+      <span data-testid="state">{refs.state}</span>
+      <span data-testid="banks-options">{banks.options.join('|')}</span>
+      <span data-testid="banks-error">{banks.loadError ? 'failed' : 'none'}</span>
+      <span data-testid="roles-error">{roles.loadError ? 'failed' : 'none'}</span>
+      <span data-testid="roles-retryable">{String(roles.loadError?.retryable)}</span>
+      <button type="button" onClick={roles.onRetryLoad}>
+        Retry roles
+      </button>
+    </div>
+  )
+}
+
 const http500 = () =>
   apiErrorFrom(
     new Response(JSON.stringify({ message: 'nope' }), {
@@ -140,6 +159,48 @@ describe('useReferenceData', () => {
 
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('ready'))
     expect(screen.getByTestId('failed')).toHaveTextContent('')
+  })
+
+  it('an abort on a later run keeps the list that had loaded -- it is not an empty list (06.4)', async () => {
+    // 🔴 EH-D3 says a superseded request "leaves the entry exactly as it was", and the hook wrote `[]`
+    // for it instead: a bank list that had arrived read as a list with nothing in it, reported `ready`
+    // -- the confident wrong answer this hook exists to prevent. It needs a list that loaded FIRST, which
+    // is why the test above, whose only run is the abort, could not see it.
+    const user = userEvent.setup()
+    const abort = networkError(new DOMException('superseded', 'AbortError'))
+    expect(abort.kind, 'the helper no longer produces `abort`; this test is now vacuous').toBe('abort')
+    const banks = vi.fn().mockResolvedValueOnce(['Absa', 'Nedbank']).mockRejectedValueOnce(abort)
+    const loaders = { banks, roles: vi.fn().mockResolvedValue(['Organiser']) }
+
+    render(<Probe loaders={loaders} />)
+    await waitFor(() => expect(screen.getByTestId('banks')).toHaveTextContent('Absa|Nedbank'))
+
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(banks).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('ready'))
+
+    expect(screen.getByTestId('banks')).toHaveTextContent('Absa|Nedbank')
+    expect(screen.getByTestId('failed')).toHaveTextContent('')
+  })
+
+  it('field(name) hands a select its options, its own failure and a retry -- and the failure is the rejection itself', async () => {
+    // 🔑 ONE SPREAD PER SELECT (F-P54). Every screen wired a list's options and dropped the other three
+    // facts, so a failed list rendered as "No options available". The rejection travels whole, so the
+    // select's retry is offered only where retrying could work (`retryable`); the loaded list reports none.
+    const user = userEvent.setup()
+    const roles = vi.fn().mockRejectedValueOnce(await http500()).mockResolvedValue(['Organiser'])
+    const loaders = { banks: vi.fn().mockResolvedValue(['Absa']), roles }
+
+    render(<FieldProbe loaders={loaders} />)
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('partial'))
+
+    expect(screen.getByTestId('banks-options')).toHaveTextContent('Absa')
+    expect(screen.getByTestId('banks-error')).toHaveTextContent('none')
+    expect(screen.getByTestId('roles-error')).toHaveTextContent('failed')
+    expect(screen.getByTestId('roles-retryable')).toHaveTextContent('true')
+
+    await user.click(screen.getByRole('button', { name: 'Retry roles' }))
+    await waitFor(() => expect(screen.getByTestId('roles-error')).toHaveTextContent('none'))
   })
 
   it('retry re-runs every loader and can recover the screen', async () => {

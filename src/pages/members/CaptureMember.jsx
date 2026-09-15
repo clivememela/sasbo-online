@@ -740,40 +740,11 @@ function Field({ label, value, onChange, className = "", options = null, type = 
                    error = null, disabled = false, searchable = false, note = null, kind, required = false,
                    loading = false, emptyLabel, loadError = null, onRetryLoad }) {
     /*
-     * 🔑 `loadError` IS NOT `error`, AND CONFLATING THEM IS THE BUG THIS PROP EXISTS TO AVOID.
-     *
-     *   `error`     the VALUE is wrong. "Enter a valid identity number." The user fixes it.
-     *   `loadError` the CHOICES are missing. The user cannot fix anything by typing; the
-     *               only useful action is to try the fetch again.
-     *
-     * Rendered as a validation message, a failed reference list would blame the member for a
-     * backend being down and offer them no way out -- so it renders as a compact `DataState`
-     * with a retry beneath the control instead (EH-D4: every error state carries a way out
-     * when one is honest, and `retryable` decides whether it is).
+     * 🔑 `loadError` IS NOT `error`. `error` says the VALUE is wrong and the user fixes it; `loadError`
+     * says the CHOICES never arrived, which nothing the user chooses repairs. This adapter used to render
+     * that state itself, as `Members`' `Detail` did -- two copies, for the only two fields that remembered.
+     * Since `06.4` it is the primitives' (`SelectInput`, `SearchableSelect`), and this passes the pair on.
      */
-    if (loadError) {
-        return (
-            <div className={cn("flex flex-col gap-1", className)}>
-                <SelectInput
-                    label={label}
-                    value={value}
-                    onChange={(next) => onChange?.({ target: { value: next } })}
-                    options={[]}
-                    disabled
-                    required={required}
-                    placeholder="Unavailable"
-                    emptyLabel="Unavailable"
-                />
-                <DataState
-                    state="error"
-                    compact
-                    error={loadError}
-                    onRetry={onRetryLoad}
-                    title={`${label} could not be loaded.`}
-                />
-            </div>
-        );
-    }
 
     const shared = {
         label,
@@ -796,6 +767,8 @@ function Field({ label, value, onChange, className = "", options = null, type = 
                 {...shared}
                 options={options}
                 loading={loading}
+                loadError={loadError}
+                onRetryLoad={onRetryLoad}
                 onChange={(next) => onChange?.({ target: { value: next } })}
                 placeholder="Search..."
             />
@@ -808,6 +781,8 @@ function Field({ label, value, onChange, className = "", options = null, type = 
                 {...shared}
                 options={options}
                 loading={loading}
+                loadError={loadError}
+                onRetryLoad={onRetryLoad}
                 onChange={(next) => onChange?.({ target: { value: next } })}
                 placeholder="Select..."
                 // The caller's wording, not a generic one. "No job grades available" tells

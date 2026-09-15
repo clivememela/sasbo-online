@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
+import DataState from '../common/DataState';
 import Field, { controlClasses } from './Field';
 import { asOptionValue, findOption, normaliseOptions } from './options';
 
@@ -23,7 +24,11 @@ import { asOptionValue, findOption, normaliseOptions } from './options';
  *              exact shape one control down (conventions §8).
  *   `empty`    the options arrived and there are none. Says so, and disables itself,
  *              rather than offering a dropdown that opens onto nothing.
- *   `error`    the options could not be fetched. Announced through `Field`.
+ *   `loadError` the options could not be fetched. NOT `error`, which says the VALUE is wrong
+ *              and is announced through `Field`: a failed list is nothing the user can fix by
+ *              choosing, so it renders as "Unavailable" with a compact error and, where one
+ *              could work, a retry beneath (EH-D4). Before `06.4` a failed list reached this
+ *              control as an empty one and read "No options available" (F-P54).
  *
  * ⚠️ `onChange` GIVES THE VALUE FIRST AND THE RECORD SECOND. The old signature was
  * `onChange(value)`, and every existing call site keeps working; `onChange(value, option)`
@@ -45,6 +50,8 @@ export default function SelectInput({
   disabled,
   loading = false,
   emptyLabel = 'No options available',
+  loadError = null,
+  onRetryLoad,
   className,
   ...rest
 }) {
@@ -53,8 +60,9 @@ export default function SelectInput({
     [options, optionValue, optionLabel],
   );
 
-  const isEmpty = !loading && normalised.length === 0;
-  const isDisabled = disabled || loading || isEmpty;
+  const failed = Boolean(loadError) && !loading;
+  const isEmpty = !loading && !failed && normalised.length === 0;
+  const isDisabled = disabled || loading || isEmpty || failed;
 
   const handleChange = (event) => {
     const next = event.target.value;
@@ -64,10 +72,10 @@ export default function SelectInput({
   // The placeholder is a real, non-selectable `<option value="">` rather than a CSS
   // trick, so the control has something to show before a choice is made and cannot be
   // submitted back into the placeholder by keyboard.
-  const placeholderText = loading ? 'Loading…' : isEmpty ? emptyLabel : placeholder;
+  const placeholderText = loading ? 'Loading…' : failed ? 'Unavailable' : isEmpty ? emptyLabel : placeholder;
 
-  return (
-    <Field label={label} required={required} error={error} hint={hint} className={className}>
+  const control = (
+    <Field label={label} required={required} error={error} hint={hint} className={failed ? undefined : className}>
       {({ id, describedBy, invalid }) => (
         <div className="relative">
           <select
@@ -95,7 +103,7 @@ export default function SelectInput({
                 {placeholderText ?? ''}
               </option>
             )}
-            {normalised.map((entry) => (
+            {(failed ? [] : normalised).map((entry) => (
               <option key={entry.value} value={entry.value} disabled={entry.disabled}>
                 {entry.label}
               </option>
@@ -112,5 +120,13 @@ export default function SelectInput({
         </div>
       )}
     </Field>
+  );
+
+  if (!failed) return control;
+  return (
+    <div className={cn('flex flex-col gap-1', className)}>
+      {control}
+      <DataState state="error" compact error={loadError} onRetry={onRetryLoad} title={`${label} could not be loaded.`} />
+    </div>
   );
 }

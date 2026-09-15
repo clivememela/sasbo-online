@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { WifiOff } from 'lucide-react';
+import { ServerCrash, WifiOff } from 'lucide-react';
 
 /**
  * OFFLINE IS A STATE, NOT A KIND OF ERROR. EH-D11, `06.1b`.
@@ -82,6 +82,15 @@ export default function OfflineBanner({ lastNetworkFailureAt = null, onRetry }) 
   if (!visible) return null;
 
   const offline = browserOffline || (failedRecently && !reconnected);
+  /*
+   * 🔴 K2 -- THE SENTENCE MUST NOT CLAIM WHAT THE BROWSER CANNOT KNOW. The banner rightly shows for a
+   * `network` rejection while `navigator.onLine` is true (the header above says why), but it said "You are
+   * offline" there too: to a user on working wifi whose server had refused the connection, and above a
+   * register that had just loaded when only the bank list failed (`06.3` critique, both captured). Only
+   * `navigator.onLine === false` is certain enough for "offline"; a rejection says the server could not be
+   * reached, and claims nothing about the rest of the page.
+   */
+  const unreachable = offline && !browserOffline;
 
   return (
     <div
@@ -91,11 +100,17 @@ export default function OfflineBanner({ lastNetworkFailureAt = null, onRetry }) 
       data-offline={offline ? 'true' : 'false'}
       className="mx-auto mb-4 flex max-w-6xl items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended"
     >
-      <WifiOff aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
+      {unreachable ? (
+        <ServerCrash aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
+      ) : (
+        <WifiOff aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
+      )}
       <p className="flex-1">
-        {offline
-          ? 'You are offline. Nothing on this page can be saved or refreshed until the connection is back.'
-          : 'The connection is back. Anything that failed while you were offline can be tried again.'}
+        {unreachable
+          ? 'SASBO Online could not reach its server just now. Anything that did not load can be tried again.'
+          : offline
+            ? 'You are offline. Nothing on this page can be saved or refreshed until the connection is back.'
+            : 'The connection is back. Anything that failed while you were offline can be tried again.'}
       </p>
       {!offline && onRetry && (
         <button

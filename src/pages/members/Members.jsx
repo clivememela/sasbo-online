@@ -1687,38 +1687,11 @@ function Detail({ label, value, isEditing, onChange, className = "", options = n
     }
 
     /*
-     * 🔑 `loadError` IS NOT `error`. `error` says the VALUE is wrong and the user can fix
-     * it by typing; `loadError` says the CHOICES never arrived, which no amount of typing
-     * repairs. Rendering the second as the first blames an administrator for a backend being
-     * down and offers them nothing to do about it -- so the failure gets its own compact
-     * state, with the retry that EH-D4 requires of every error state that can honestly offer
-     * one. (`Detail` is the read/edit twin of `CaptureMember`'s `Field`; the prop pair is
-     * deliberately named the same on both.)
+     * 🔑 `loadError` IS NOT `error` -- `error` says the VALUE is wrong, `loadError` that the CHOICES never
+     * arrived. `SelectInput` renders a failed list since `06.4`; this adapter carried its own copy of that
+     * state, as `CaptureMember`'s `Field` did, and now passes the pair on. (`Detail` is the read/edit twin
+     * of that `Field`; the props are deliberately named the same on both.)
      */
-    if (loadError) {
-        return (
-            <div className={cn("flex flex-col gap-1", className)}>
-                <SelectInput
-                    label={label}
-                    value={value}
-                    onChange={(next) => onChange?.({ target: { value: next } })}
-                    options={[]}
-                    disabled
-                    required={required}
-                    placeholder="Unavailable"
-                    emptyLabel="Unavailable"
-                />
-                <DataState
-                    state="error"
-                    compact
-                    error={loadError}
-                    onRetry={onRetryLoad}
-                    title={`${label} could not be loaded.`}
-                />
-            </div>
-        );
-    }
-
     if (options) {
         return (
             <SelectInput
@@ -1730,6 +1703,8 @@ function Detail({ label, value, isEditing, onChange, className = "", options = n
                 error={error || undefined}
                 disabled={disabled}
                 required={required}
+                loadError={loadError}
+                onRetryLoad={onRetryLoad}
                 className={className}
             />
         );

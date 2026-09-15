@@ -118,8 +118,16 @@ export default function AcbDebits() {
         setConfirmed(false);
         setLoadingId(m.id);
         memberService.getMemberById(m.id)
-            .then(full => { setSelectedMember(full); })
-            .catch(() => { setSelectedMember(m); })
+            .then(full => { setSelectedMember(full); setNotice(null); })
+            // 🔴 A FAILED RECORD FETCH USED TO OPEN THE REGISTER ROW AS IF IT WERE THE RECORD (`06.4`). The row
+            // is the list's summary: a banking field it does not carry printed "-", Confirm Details confirmed
+            // details nobody had loaded, and Edit Details seeded its form with blanks that Update would write.
+            // Now nothing is opened -- not this member, and not the one open before -- and the page says why.
+            .catch((err) => {
+                reportError('AcbDebits.loadMember', err);
+                setSelectedMember(null);
+                setNotice(`The banking details for ${m.membershipNumber || 'that member'} could not be loaded, so nothing is shown for them. Select the member again to try again.`);
+            })
             .finally(() => setLoadingId(null));
     }, [selectedMember]);
 

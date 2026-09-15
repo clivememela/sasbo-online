@@ -46,6 +46,28 @@ describe('OfflineBanner', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument()
   })
 
+  it('K2: on a rejection while the browser is online, it says the server could not be reached -- not that you are offline', () => {
+    // 🔴 `06.3` CRITIQUE, CAPTURED TWICE. A server that refused the connection, on working wifi, was told
+    // "You are offline" -- and so was a register that had just loaded, when only its bank list failed. The
+    // browser cannot tell a down server from a dropped connection, so the sentence must not pick one.
+    setBrowserOnline(true)
+    render(<OfflineBanner lastNetworkFailureAt={Date.now()} />)
+
+    const banner = screen.getByTestId('offline-banner')
+    expect(banner.textContent).toMatch(/could not reach its server/i)
+    expect(banner.textContent).not.toMatch(/you are offline/i)
+  })
+
+  it('K2, the must-pass: when the browser itself says offline, the banner still says so', () => {
+    setBrowserOnline(true)
+    render(<OfflineBanner />)
+    fire('offline')
+
+    const banner = screen.getByTestId('offline-banner')
+    expect(banner.textContent).toMatch(/you are offline/i)
+    expect(banner.textContent).not.toMatch(/could not reach its server/i)
+  })
+
   it('appears on the browser’s own `offline` event', () => {
     setBrowserOnline(true)
     render(<OfflineBanner />)

@@ -46,6 +46,25 @@ describe('SearchableSelect — the states', () => {
     expect(combobox).toHaveAttribute('placeholder', 'No options available')
   })
 
+  it('failed: the choices are unavailable, a retry is offered, and it is NOT the empty state above (F-P54)', async () => {
+    // The "empty" case above is this one's must-pass: the same `options={[]}`, and only `loadError`
+    // separates "there are none" from "we could not find out".
+    const user = setupUser()
+    const retry = vi.fn()
+    renderWithProviders(
+      <SearchableSelect label="Bank Name" value="" onChange={() => {}} options={[]} loadError="The banks list could not be loaded." onRetryLoad={retry} />,
+    )
+
+    const combobox = screen.getByRole('combobox', { name: 'Bank Name' })
+    expect(combobox).toBeDisabled()
+    expect(combobox).toHaveAttribute('placeholder', 'Unavailable')
+    expect(combobox).not.toHaveAttribute('placeholder', 'No options available')
+    expect(screen.getByText('Bank Name could not be loaded.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /try again/i }))
+    expect(retry).toHaveBeenCalledOnce()
+  })
+
   it('no matches is a different message from no options, and is not a selectable row', async () => {
     const user = setupUser()
     renderWithProviders(<SearchableSelect label="Bank Name" value="" onChange={() => {}} options={BANKS} />)

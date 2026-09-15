@@ -48,7 +48,12 @@ const getUniversalCode = (record) =>
   );
 
 export const bankService = {
-  getBankListing: () =>
+  /**
+   * The listing, and whether its universal branch codes arrived: `{ branches, codes: 'ready' | 'failed',
+   * codesError }`. The branches request REJECTS as every read does; the codes are an enrichment, so their
+   * failure degrades the listing instead -- and says so, for the page to say (`06.4`, F-P54).
+   */
+  getBankListingDetailed: () =>
     requestJson((signal) => fetch(apiUrl('/api/banks/branches'), {
       credentials: 'include',
       signal,
@@ -56,19 +61,22 @@ export const bankService = {
       .then(async (branchPayload) => {
         const branches = normalizeListPayload(branchPayload);
 
-        // 🔑 THE SECOND CALL IS AN ENRICHMENT, AND ITS FALLBACK IS DELIBERATE -- one of the very
-        // few places in this file where swallowing is correct. `/api/banks` supplies the universal
-        // branch codes; without them the listing still renders, with that one column empty. So a
-        // failure here degrades the row rather than losing the page, which is EH-D9's rule
-        // (partial failure stays partial) rather than A13's defect (failure indistinguishable from
-        // emptiness) -- the difference being that the PRIMARY call above now rejects properly.
-        const banksResult = await requestJson((signal) => fetch(apiUrl('/api/banks'), {
-          credentials: 'include',
-          signal,
-        })).then((banksPayload) => normalizeListPayload(banksPayload)).catch(() => []);
-
-        if (banksResult.length === 0) {
-          return branches;
+        // 🔑 THE SECOND CALL IS AN ENRICHMENT, AND ITS FAILURE DEGRADES THE LISTING -- SAID, NOT
+        // SWALLOWED (`06.4`, F-P54). `/api/banks` supplies the universal branch codes; without them every
+        // branch still lists, with that one column unknown. Until `06.4` the failure became `[]` here, so
+        // Bank Listing printed a dash for every code and a search by code said nothing matched: EH-D9's
+        // partial state, presented as a complete one. The outcome travels with the listing now.
+        let codes = 'ready';
+        let codesError = null;
+        let banksResult = [];
+        try {
+          banksResult = normalizeListPayload(await requestJson((signal) => fetch(apiUrl('/api/banks'), {
+            credentials: 'include',
+            signal,
+          })));
+        } catch (error) {
+          codes = 'failed';
+          codesError = error;
         }
 
         const universalCodeByBankName = new Map();
@@ -103,7 +111,10 @@ export const bankService = {
           }
         });
 
-        return branches.map((branch) => {
+        // Mapped whatever happened above, so every branch carries `universalBranchCode` -- '' when unknown.
+        // It used to return `branches` UNMAPPED when the codes were missing, so the key's very presence
+        // depended on a request the caller never made (bankService.test.js recorded it).
+        const mapped = branches.map((branch) => {
           const bankName = branch.bankName ?? branch.name ?? '';
           const exactKey = toNameKey(bankName);
           const comparableKey = toComparableNameKey(bankName);
@@ -125,7 +136,12 @@ export const bankService = {
               ?? '',
           };
         });
+
+        return { branches: mapped, codes, codesError };
       }),
+
+  /** The listing's rows alone, for the callers that want only them (Capture Member's branch list, the job-grade lookup). */
+  getBankListing: () => bankService.getBankListingDetailed().then(({ branches }) => branches),
 
   /**
    * 🔴 A13, AND THIS METHOD IS THE WHOLE REASON THAT ROW EXISTS. It ended in
