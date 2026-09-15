@@ -205,7 +205,8 @@ export function Recruiters() {
         }).sort((a, b) => {
             const nameA = a.name || "";
             const nameB = b.name || "";
-            return nameA.localeCompare(nameB)
+            // Numeric collation, so "Synthetic Channel 2" comes before "Synthetic Channel 10" (`06.3` critique).
+            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' })
         });
     }, [members, reps, BANK_META]);
 
@@ -598,9 +599,11 @@ export function Recruiters() {
 
     const repMemberColumns = useMemo(() => [
         memberColumn(setSelectedMember),
-        { key: 'name', header: 'Name', priority: 'essential', truncate: true, cell: fullName },
-        { key: 'bankName', header: 'Bank', priority: 'secondary', truncate: true, cell: (m) => m.bankName || '—' },
-        { key: 'branch', header: 'Branch', priority: 'secondary', truncate: true, cell: (m) => m.branch || '—' },
+        // Capped so the list fits its xl dialog whatever the names: 142 + 192 + 160 + 160 + 108 + 82 = 844px of
+        // the dialog's ~894. Truncated in the cell, whole in its title.
+        { key: 'name', header: 'Name', priority: 'essential', truncate: true, className: 'max-w-[12rem]', cell: fullName },
+        { key: 'bankName', header: 'Bank', priority: 'secondary', truncate: true, className: 'max-w-[10rem]', cell: (m) => m.bankName || '—' },
+        { key: 'branch', header: 'Branch', priority: 'secondary', truncate: true, className: 'max-w-[10rem]', cell: (m) => m.branch || '—' },
         { key: 'status', header: 'Status', priority: 'essential', cell: (m) => <StatusChip status={m.status} /> },
         {
             key: 'remove',
@@ -801,7 +804,9 @@ export function Recruiters() {
                     onOpenChange={closeOn(handleCloseRepModal)}
                     title={selectedRep.name}
                     description="Recruitment channel"
-                    size="lg"
+                    // xl, with the member list's text columns capped below: at lg (672px) its six columns
+                    // needed 858px and put Status and Remove off the right edge (the `06.3` critique).
+                    size="xl"
                     footer={
                         <>
                             <Button
@@ -821,7 +826,6 @@ export function Recruiters() {
                 >
                         <div className="flex items-center justify-between pb-4">
                             <div>
-                                <p className="text-xs uppercase tracking-wider font-bold text-ink-muted">Recruitment Channel</p>
                                 <div className="flex items-center gap-2">
                                     <h3 className="text-lg font-semibold text-brand-ink">{selectedRep.name}</h3>
                                     {/* 🔴 THE TOOLTIP WAS CSS-ONLY AND MOUSE-ONLY. A

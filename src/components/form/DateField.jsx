@@ -586,7 +586,7 @@ export default function DateField({
                   // Today is RINGED in accent; the choice is FILLED in brand. The mock is
                   // explicit that they are different marks, so that today still reads as
                   // today on the day it is also the selection.
-                  isToday && 'ring-1 ring-inset ring-accent',
+                  isToday && 'ring-1 ring-inset ring-accent-line',
                   isSelected && 'bg-brand font-medium text-on-brand',
                 )}
               >

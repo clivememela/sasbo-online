@@ -408,7 +408,7 @@ export default function CaptureMember() {
             <div className="relative mt-2 rounded-lg bg-surface shadow-(--shadow-1)">
                 {showSavedNotification && (
                     <div role="status" className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-lg border border-status-active-dot bg-status-active-bg px-4 py-2 text-status-active shadow-(--shadow-2)">
-                        <CheckCircle2 size={18} aria-hidden="true" />
+                        <CheckCircle2 size={18} strokeWidth={1.75} aria-hidden="true" />
                         <span className="text-sm font-medium">Member captured successfully!</span>
                     </div>
                 )}
@@ -425,7 +425,7 @@ export default function CaptureMember() {
                         className="m-4 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
                     >
                         <p id="capture-save-notice-title" className="flex items-center gap-2 font-medium">
-                            <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+                            <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.75} />
                             {saveNotice.kind === "invalid" ? "Fix these before saving" : "This member was not saved"}
                         </p>
                         <ul className="mt-1 list-disc pl-6">
@@ -434,17 +434,20 @@ export default function CaptureMember() {
                     </div>
                 )}
 
-                {/* 📱 R-RESP-J: A SCROLLABLE STRIP. Six tabs do not fit at 390px -- they
-                    wrapped into crushed rows, and the last two were effectively hidden.
-                    `overflow-x-auto` with `whitespace-nowrap` makes them reachable by
-                    swiping, which is how a phone expects to meet a row that is too long.
+                {/* 📱 R-RESP-J, REVISED IN `06.3`: THE TABS WRAP. The strip scrolled sideways
+                    when there were six tabs, because six wrapped into crushed rows. There are
+                    four now, and the scroll hid them instead: at 390px "Membership &
+                    Subscriptions" was cut to "Memb" and "Recruitment Channel" sat off screen
+                    with nothing to say it was there (the `06.3` critique). The comp's tab row
+                    wraps (card.css:357), and the owner's ruling ④ put every record tab on
+                    screen -- so these wrap, and each keeps its own underline.
 
                     ⚠️ Not `role="tab"`: the ARIA tabs pattern promises arrow-key
                     movement between tabs, which needs roving focus. `05.3` owns that, with
                     the shared hook RF already has on its list. `aria-current` says which
                     section is showing and promises nothing else. */}
                 <div className="border-b border-line bg-surface-2">
-                    <div className="flex -mb-px overflow-x-auto whitespace-nowrap px-6">
+                    <div className="flex flex-wrap -mb-px px-6">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
@@ -456,10 +459,10 @@ export default function CaptureMember() {
                                 <span>{tab.label}</span>
                                 {tabsWithErrors.has(tab.id) && (
                                     <>
-                                        {/* The asterisk was the ONLY signal that a tab held
+                                        {/* The mark -- a dot since `06.3`, because an asterisk already means "required" on this form -- was the ONLY signal that a tab held
                                             errors -- invisible to a screen reader, and to
                                             anyone who cannot distinguish the colour. */}
-                                        <span aria-hidden="true" className="text-status-suspended font-bold text-sm">*</span>
+                                        <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-status-suspended-dot" />
                                         <span className="sr-only">(has errors)</span>
                                     </>
                                 )}
@@ -485,6 +488,7 @@ export default function CaptureMember() {
                                     becomes the chosen type once there is one, which is what the
                                     member register does one screen over. */}
                                 <Field
+                                    kind="identifier"
                                     label={form.identityType || "Identity Number"}
                                     note={form.identityType ? null : "Choose an identity type first."}
                                     value={form.identityNumber}
@@ -511,9 +515,9 @@ export default function CaptureMember() {
                                 />
                                 <Field label="Race" value={form.race} onChange={handleChange("race")} options={raceOptions} />
                                 <EmailFields form={form} setForm={setForm} handleChange={handleChange} fieldErrors={fieldErrors} />
-                                <Field label="Cellphone Number" value={form.phone} onChange={handleChange("phone")} />
-                                <Field label="Work Tel" value={form.workTel} onChange={handleChange("workTel")} />
-                                <Field label="Home Tel" value={form.homeTel} onChange={handleChange("homeTel")} />
+                                <Field label="Cellphone Number" kind="tel" value={form.phone} onChange={handleChange("phone")} />
+                                <Field label="Work Tel" kind="tel" value={form.workTel} onChange={handleChange("workTel")} />
+                                <Field label="Home Tel" kind="tel" value={form.homeTel} onChange={handleChange("homeTel")} />
                                 <AddressAutocomplete label="Residential Address" value={form.address} onChange={handleChange("address")} placeholder="Start typing a residential address..." className="md:col-span-2" />
                             </>
                         )}
@@ -528,7 +532,7 @@ export default function CaptureMember() {
                         )}
                         {activeTab === "employment" && (
                             <>
-                                <Field label="Employee Number" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
+                                <Field label="Employee Number" kind="identifier" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
                                 <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
                                 <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} emptyLabel="No job grades available" loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
@@ -537,7 +541,7 @@ export default function CaptureMember() {
 
                                 {form.paymentType === "Debit Order" && (
                                     <>
-                                        <Field label="Bank Account Number" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} error={fieldErrors.bankAccountNumber} required />
+                                        <Field label="Bank Account Number" kind="identifier" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} error={fieldErrors.bankAccountNumber} required />
                                         <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={DEBIT_DAY_OPTIONS} />
                                     </>
                                 )}
@@ -589,7 +593,7 @@ export default function CaptureMember() {
                     🔑 SAVE IS FIRST IN THE DOM AND VISUALLY LAST. `flex-row-reverse`
                     puts the primary action on the right for a mouse while leaving it first
                     in the tab order -- the order the two audiences each expect. */}
-                <div className="sticky bottom-0 z-10 flex flex-row-reverse justify-start gap-3 border-t border-line bg-surface/95 px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm">
+                <div className="sticky bottom-0 z-10 flex flex-row-reverse justify-start gap-3 border-t border-line bg-surface px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                     <Button variant="primary" onClick={handleSave}>Save Member</Button>
                     <Button onClick={() => window.history.back()}>Cancel</Button>
                 </div>

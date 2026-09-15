@@ -305,10 +305,11 @@ export default function Table({
                     {visible.map((column, columnIndex) => (
                       <td key={column.key} data-col={column.key} data-fit={column.fit} className={cn(column.bodyClass, 'py-[15px]')}>
                         <span
-                          className={cn(
-                            'skeleton',
-                            columnIndex === visible.length - 1 && 'h-[22px] w-[72px] rounded-full',
-                          )}
+                          className="skeleton"
+                          // The status column's pill as a style, not utilities: `.skeleton` is unlayered, so it
+                          // beat `h-[22px] w-[72px] rounded-full` and drew the pill as a 12px bar (the `06.3`
+                          // critique) -- the fix FigureStrip's skeleton already took.
+                          style={columnIndex === visible.length - 1 ? { width: 72, height: 22, borderRadius: 9999 } : undefined}
                         />
                       </td>
                     ))}

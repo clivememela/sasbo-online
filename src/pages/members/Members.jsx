@@ -1561,7 +1561,7 @@ export default function Members() {
                                                 }} />
                                                 {(editForm.isCosatu === "Y" || editForm.isCosatu === true) && (
                                                     <div className="mt-4 space-y-4 border-l border-line pl-4">
-                                                        <p className="text-xs font-bold uppercase tracking-wide text-accent-ink">COSATU structure</p>
+                                                        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-accent-ink">COSATU structure</p>
                                                         {/* 🔴 BR-14 — THE TWO UNLABELLED CHECKBOXES ARE GONE, replaced
                                                             by the two labelled free-text fields `V19` actually
                                                             describes. What was here rendered `<label>` elements with
@@ -1593,14 +1593,14 @@ export default function Members() {
                                     ) : (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="space-y-3">
-                                                <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted">Core Appointments</h4>
+                                                <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Core Appointments</h4>
                                                 <Detail label="Shop Steward status" value={selectedMember.isShopSteward ? "Yes" : "No"} isEditing={false} />
                                                 {selectedMember.isShopSteward && <Detail label="Election Date" value={selectedMember.shopStewardElectionDate} isEditing={false} />}
                                                 <Detail label="BEC Member status" value={selectedMember.isBec ? "Yes" : "No"} isEditing={false} />
                                                 {selectedMember.isBec && <Detail label="Assigned BEC Committee" value={SASBO_BEC_BRANCHES.find(b => b.id === selectedMember.becCommitteeId)?.name || selectedMember.becCommitteeName} isEditing={false} />}
                                             </div>
                                             <div className="space-y-3 pt-4 md:pt-0">
-                                                <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted">Specialized Assignments</h4>
+                                                <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Specialized Assignments</h4>
                                                 {selectedMember.isBec && (
                                                     <>
                                                         <Detail label="BEC Recruiter" value={selectedMember.isBecRecruiter ? `Yes (${selectedMember.becRecruiterRole || 'Standard'})` : "No"} isEditing={false} />
@@ -1613,7 +1613,7 @@ export default function Members() {
                                                     inside `selectedMember.isBec &&`, so a COSATU member who was not
                                                     BEC had their COSATU record simply not shown. */}
                                                 <div className="pt-3 mt-3 border-t border-line">
-                                                    <h5 className="text-xs font-bold uppercase tracking-wider text-accent-ink mb-2">COSATU Structure</h5>
+                                                    <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-accent-ink">COSATU Structure</h5>
                                                     <Detail label="COSATU Member" value={selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true ? "Yes" : "No"} isEditing={false} />
                                                     {(selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true) && (
                                                         <div className="grid grid-cols-1 gap-3 mt-2">

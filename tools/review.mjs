@@ -133,6 +133,105 @@ const DAYS_SPAN_SHEET = `(() => {
     && cells.length >= 28 && cells.every((cell) => cell.getBoundingClientRect().height >= 44);
 })()`;
 
+// ── The 06.3 critique's fixes, each claimed before it was made ───────────────────────────────
+
+/** A colour string, as the browser resolves it, read back through a 1px canvas: [r, g, b, a]. */
+const PIXEL = `((colour) => {
+  const ctx = document.createElement('canvas').getContext('2d');
+  ctx.clearRect(0, 0, 1, 1);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+  ctx.fillStyle = colour;
+  ctx.fillRect(0, 0, 1, 1);
+  return [...ctx.getImageData(0, 0, 1, 1).data];
+})`;
+
+/**
+ * Today's ring is Card's gold -- the generated `@theme inline` alias made `ring-accent` the surface wash.
+ * The colour is read from `--tw-ring-color`, the variable Tailwind draws the ring with. The first version of this
+ * claim read the first colour in the computed shadow list, which is one of Tailwind's empty transparent layers:
+ * red before the fix and red after it, for a reason that had nothing to do with gold.
+ */
+const TODAY_RING_GOLD = `(() => {
+  const cell = [...document.querySelectorAll('[role="gridcell"]')].find((c) => /, today/i.test(c.getAttribute('aria-label') || ''));
+  if (!cell) return false;
+  const style = getComputedStyle(cell);
+  const colour = style.getPropertyValue('--tw-ring-color').trim();
+  if (!/inset/.test(style.boxShadow) || !colour) return false;
+  const [r, g, b, a] = ${PIXEL}(colour);
+  const max = Math.max(r, g, b);
+  return a > 0 && max > 0 && (max - Math.min(r, g, b)) / max >= 0.3 && r - b >= 40;
+})()`;
+
+/** Every Capture Member section tab on screen at a phone's width, none clipped by a scroller. */
+const CAPTURE_TABS_ON_SCREEN = `(() => {
+  const tabs = [...document.querySelectorAll('main button')].filter((b) => /^(Personal Information|Employment|Membership|Recruitment)/.test(b.textContent.trim()));
+  if (tabs.length < 4) return false;
+  return tabs.every((b) => {
+    const r = b.getBoundingClientRect();
+    let left = 0;
+    let right = window.innerWidth;
+    for (let p = b.parentElement; p; p = p.parentElement) {
+      if (['auto', 'scroll', 'hidden'].includes(getComputedStyle(p).overflowX)) {
+        const box = p.getBoundingClientRect();
+        left = Math.max(left, box.left);
+        right = Math.min(right, box.right);
+      }
+    }
+    return r.left >= left - 1 && r.right <= right + 1;
+  });
+})()`;
+
+/** The number fields ask a phone for the right keyboard. */
+const CAPTURE_KEYBOARDS = `(() => {
+  const input = (label) => {
+    const l = [...document.querySelectorAll('main label')].find((n) => n.textContent.replace(/\\*|\\(required\\)/g, '').trim() === label);
+    return l ? document.getElementById(l.htmlFor) : null;
+  };
+  const phones = ['Cellphone Number', 'Work Tel', 'Home Tel'].map(input);
+  const id = input('Identity Number');
+  return phones.every((el) => el && el.getAttribute('inputmode') === 'tel') && !!id && id.getAttribute('inputmode') === 'numeric';
+})()`;
+
+/** The sticky action bar is a surface, not glass: no backdrop blur, and a fully opaque ground. */
+const ACTION_BAR_OPAQUE = `(() => {
+  const save = [...document.querySelectorAll('main button')].find((b) => b.textContent.trim() === 'Save Member');
+  const bar = save && save.parentElement;
+  if (!bar) return false;
+  const s = getComputedStyle(bar);
+  return (!s.backdropFilter || s.backdropFilter === 'none') && ${PIXEL}(s.backgroundColor)[3] === 255;
+})()`;
+
+/** The recruiter's member list fits its dialog, so Status and Remove are on screen. */
+const DIALOG_TABLE_FITS = `(() => {
+  const dialog = document.querySelector('[role="dialog"]');
+  if (!dialog || !dialog.querySelector('table')) return false;
+  const scrollers = [...dialog.querySelectorAll('*')].filter((el) => ['auto', 'scroll'].includes(getComputedStyle(el).overflowX) && el.querySelector('table'));
+  return scrollers.length > 0 && scrollers.every((el) => el.scrollWidth <= el.clientWidth + 1);
+})()`;
+
+/** No eyebrow over the record's title: the contract refuses kickers above headings. */
+const NO_EYEBROW = `(() => {
+  const dialog = document.querySelector('[role="dialog"]');
+  return !!dialog && ![...dialog.querySelectorAll('p')].some((p) => p.textContent.trim().toLowerCase() === 'recruitment channel' && getComputedStyle(p).textTransform === 'uppercase');
+})()`;
+
+/** The skeleton's status is a 72x22 pill, not the 12px bar the unlayered `.skeleton` rule made of it. */
+const SKELETON_PILL = `(() => {
+  const pills = [...document.querySelectorAll('tr[data-skeleton] td:last-child .skeleton')];
+  return pills.length > 0 && pills.every((el) => {
+    const r = el.getBoundingClientRect();
+    return Math.abs(r.width - 72) <= 2 && Math.abs(r.height - 22) <= 2;
+  });
+})()`;
+
+/** Channel names sort as a person reads them: 2 before 10. */
+const NAMES_SORT_NATURALLY = `(() => {
+  const names = [...document.querySelectorAll('main tr[data-row] td[data-col="name"] button')].map((b) => b.textContent.trim());
+  if (names.length < 3) return false;
+  const natural = [...names].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+  return names.join('|') === natural.join('|');
+})()`;
+
 /** Ruling ⑤: the footer sits below the login card, never on it. */
 const FOOTER_CLEAR_OF_CARD = `(() => {
   const card = document.querySelector('form')?.closest('.rounded-card');
@@ -236,6 +335,7 @@ const SHOTS = [
     name: 'members-loading-desk', vp: 'desk', themes: LIGHT, route: '/members',
     intercept: { url: '*/api/members', mode: 'hang' },
     ready: `!!document.querySelector('tbody[aria-busy="true"] tr[data-skeleton]')`,
+    expect: SKELETON_PILL,
   },
   {
     name: 'members-partial-desk', vp: 'desk', themes: LIGHT, route: '/members',
@@ -251,13 +351,17 @@ const SHOTS = [
   // ── the screens that take the world by rule ─────────────────────────────────────────────
   { name: 'home-desk', vp: 'desk', themes: BOTH, route: '/home', ready: HEADING, expect: RAIL_FOOT_PINNED },
   { name: 'home-phone', vp: 'phone', themes: LIGHT, route: '/home', ready: HEADING },
-  { name: 'capture-desk', vp: 'desk', themes: BOTH, route: '/members/capture', ready: TEXT('Save Member') },
-  { name: 'capture-phone', vp: 'phone', themes: LIGHT, route: '/members/capture', ready: TEXT('Save Member') },
-  { name: 'recruiters-desk', vp: 'desk', themes: BOTH, route: '/recruiters', ready: ROWS },
+  { name: 'capture-desk', vp: 'desk', themes: BOTH, route: '/members/capture', ready: TEXT('Save Member'), expect: ACTION_BAR_OPAQUE },
+  {
+    name: 'capture-phone', vp: 'phone', themes: LIGHT, route: '/members/capture', ready: TEXT('Save Member'),
+    expect: { CAPTURE_TABS_ON_SCREEN, CAPTURE_KEYBOARDS, ACTION_BAR_OPAQUE },
+  },
+  { name: 'recruiters-desk', vp: 'desk', themes: BOTH, route: '/recruiters', ready: ROWS, expect: NAMES_SORT_NATURALLY },
   { name: 'recruiters-phone', vp: 'phone', themes: LIGHT, route: '/recruiters', ready: ROWS },
   {
     name: 'recruiters-dialog-desk', vp: 'desk', themes: LIGHT, route: '/recruiters', ready: ROWS,
     steps: [{ what: 'open a channel', run: clickByText('button', '/show the members recruited/i'), until: `!!document.querySelector('[role="dialog"]')` }],
+    expect: { DIALOG_TABLE_FITS, NO_EYEBROW },
   },
   { name: 'banks-desk', vp: 'desk', themes: BOTH, route: '/banks', ready: ROWS },
   { name: 'subscriptions-desk', vp: 'desk', themes: LIGHT, route: '/admin/maintenance/subscriptions', ready: `document.querySelectorAll('tbody tr:not([data-skeleton])').length > 1` },
@@ -265,7 +369,7 @@ const SHOTS = [
   {
     name: 'date-sheet-phone', vp: 'phone', themes: LIGHT, route: '/reports/organizer-report', ready: HEADING,
     steps: [{ what: 'open a date field', run: mouseDownOn('input[aria-expanded]', '/date/i'), until: `!!document.querySelector('[role="dialog"][aria-modal="true"]')` }],
-    expect: DAYS_SPAN_SHEET,
+    expect: { DAYS_SPAN_SHEET, TODAY_RING_GOLD },
   },
   { name: 'forms-desk', vp: 'desk', themes: LIGHT, route: '/reports/forms', ready: HEADING },
   { name: 'apply-desk', vp: 'desk', themes: LIGHT, route: '/members/apply', ready: HEADING },
@@ -498,7 +602,17 @@ if (rows.length) {
 }
 
 const population = populationComplaints(rows);
-const themes = themeDimensionComplaints(rows);
+/*
+ * 🔑 THE THEME CANARY ONLY WHERE BOTH THEMES WERE ASKED FOR. It proves the dark rows rendered differently from
+ * the light ones, and a subset of light-only shots (`--only date-sheet-phone`) has no dark rows to prove it
+ * with: it failed every such run as "unproven", however well its claims held. matrix.mjs drops its route check
+ * for a named subset for the same reason. The one check that still means something on a single theme -- a row
+ * measured before the stylesheet applied -- runs on every run.
+ */
+const bothThemes = ['light', 'dark'].every((theme) => selected.some((s) => s.themes.includes(theme)));
+const themes = bothThemes
+  ? themeDimensionComplaints(rows)
+  : rows.filter((r) => r.theme_bg === 'rgba(0, 0, 0, 0)').map((r) => `${r.name} was measured before the stylesheet applied`);
 for (const complaint of population) console.log(`  POPULATION  ${complaint}`);
 for (const complaint of themes) console.log(`  THEME  ${complaint}`);
 

@@ -389,6 +389,19 @@
    regeneration. Do not remove this line.
    ========================================================================== */
 
+/* ── Card's gold as a line: today's ring in the date picker ──────────────────────────
+   The generated layer names this gold `--color-accent`, then aliases shadcn's `accent` to
+   the surface wash in its `@theme inline` block -- and the later definition wins for
+   utilities, so `ring-accent` drew today's ring grey (the `06.3` critique, confirmed in the
+   built CSS). A name the generator does not use cannot be shadowed by it, and survives a
+   regeneration down here. The values are the generated layer's own gold, light and dark. */
+@theme {
+  --color-accent-line: oklch(68.0% 0.110 84);
+}
+.dark {
+  --color-accent-line: oklch(79.0% 0.110 87);
+}
+
 /* ==========================================================================
    THE AUTHORED MOMENT -- "the card is drawn from the wallet and laid on the desk".
 
