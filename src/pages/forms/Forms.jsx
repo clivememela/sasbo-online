@@ -5,6 +5,9 @@ import LocationListing from "../reports/LocationListing.jsx";
 import MembershipApplication from "./MembershipApplication.jsx";
 import {TextInput, Button, FilterForm, SearchableSelect} from "../../components/form";
 import { FileSearch } from "lucide-react";
+import PageTitle from '../../components/common/PageTitle';
+import Sheet from '../../components/common/Sheet.jsx';
+import DataState from '../../components/common/DataState.jsx';
 
 export function Forms(){
     const [filters, setFilters] = useState({
@@ -35,11 +38,17 @@ export function Forms(){
 
     const renderForm = () => {
         switch (filters.formType) {
+            // 🔴 `embedded`, BECAUSE THIS PICKER RENDERS WHOLE PAGES INSIDE A PAGE.
+            // Both of these are also routes of their own, so each brought its own page gutter
+            // and its own <h1> in here -- two <h1>s on `/reports/forms` the moment a form type
+            // was chosen, and 28px of padding inside 28px of padding. Embedded they are only
+            // their sheet, captioned by an <h2>, which is what `GeneralForm` and
+            // `LocationListing` in the same switch already were.
             case "Membership Application Form":
-                return <MembershipApplication />;
+                return <MembershipApplication embedded />;
             case "Branch Form (online)":
             case "Branch Form (offline)":
-                return <OrganizerReport />;
+                return <OrganizerReport embedded />;
             case "Location Listing":
             case "Bulk Listing":
                 return <LocationListing />;
@@ -51,39 +60,34 @@ export function Forms(){
     };
 
     return (
-        <div className="p-6 text-gray-900 dark:text-gray-100">
-            <h2 className="text-3xl text-center mb-4 text-cyan-700 dark:text-cyan-400">
-                Forms
-            </h2>
-            <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                Search and complete Forms
-            </p>
+        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+            <PageTitle title="Forms" subtitle="Search and complete Forms" />
             <FilterForm onSubmit={handleSubmit}>
                 <TextInput
-                    label="Bank Name"
+                    label="Bank"
                     value={filters.bankName}
                     onChange={handleInputChange("bankName")}
-                    placeholder="Search bank name"
+                    placeholder="Any"
                 />
                 <TextInput
                     label="Branch"
                     value={filters.branch}
                     onChange={handleInputChange("branch")}
-                    placeholder="Search branch"
+                    placeholder="Any"
                 />
                 <TextInput
                     label="Area"
                     value={filters.area}
                     onChange={handleInputChange("area")}
-                    placeholder="Search area"
+                    placeholder="Any"
                 />
                 <TextInput
-                    label="Random Access Number"
+                    label="Random access number"
                     value={filters.randomAccessNumber}
                     onChange={handleInputChange("randomAccessNumber")}
-                    placeholder="Search RAN"
+                    placeholder="Any"
                 />
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-2 basis-[220px]!">
                     <SearchableSelect
                         label="Form Type"
                         value={filters.formType}
@@ -91,19 +95,36 @@ export function Forms(){
                         options={formTypeOptions}
                     />
                 </div>
-                <div className="lg:col-span-1"></div>
-                <div className="flex items-end justify-end">
+
+                <div className="flex items-end basis-auto!">
                     <Button type="submit" variant="primary">
                         <FileSearch size={16} strokeWidth={2} />
                         Search Form
                     </Button>
                 </div>
             </FilterForm>
-            {filters.formType && (
-                <div className="max-w-6xl mx-auto mt-6">
-                    {renderForm()}
-                </div>
-            )}
+            {/* 🔴 `mx-auto` CENTRED THE FORM UNDER A LEFT-ALIGNED PAGE HEAD, so the
+                title sat at the page gutter and the sheet it introduced started 150px
+                to its right. Centring a body column under a left-aligned title is the
+                one typographic thing the mock never does. `max-w-4xl` is the width the
+                four things this switch can render already set for themselves. */}
+            {/* 🔴 BELOW THE CRITERIA THE PAGE WAS BARE GROUND. With no form type chosen --
+                which is how every visit starts -- a "Search Form" button sat above 650px of
+                empty `--bg` with no heading, no sentence and no way forward, and a page that
+                renders nothing reads as a page that failed. The mock never leaves the work
+                area empty: its sheet is always there and carries its own state. So this one
+                does too, and the resting state says the one thing the visitor needs. */}
+            <div className="mt-6 max-w-4xl">
+                {filters.formType ? renderForm() : (
+                    <Sheet>
+                        <DataState
+                            state="empty"
+                            title="Choose a form to begin."
+                            message="Pick a form type above and it opens here, ready to complete or print."
+                        />
+                    </Sheet>
+                )}
+            </div>
         </div>
     )
 }

@@ -364,7 +364,14 @@ export const navItems = [
       { title: "Capture Member", icon: LucideUserRoundPlus, href: "/members/capture" },
       // { title: 'Members', icon: LucideDoorOpen, href: '/archives', desc: 'Extract Members that have resigned Society' },
       // { title: 'Members', icon: LucideFile, href: '/archives', desc: 'BPS Paid Up Members' },
-      { title: 'Labels', icon: LucideTags, href: '/member/label', desc: 'Print Member Labels - Selection' }
+      // 🔴 NO `href`, AND THAT IS THE FIX RATHER THAN A REMOVAL. `/member/label` has never
+      // been a route: App.jsx declares none, there is no catch-all, and clicking this in the
+      // rail rendered a BLANK PAGE -- the shell with nothing in it, no error, no message.
+      // card.html's rail shows Labels under Members, so the entry belongs; what it must not
+      // do is promise a screen that does not exist. `SidebarItem` renders an entry with no
+      // href as a quiet, non-navigating label, which is what Maintenance > Bank/Branch has
+      // always been. It becomes a link again the day the route lands.
+      { title: 'Labels', icon: LucideTags, desc: 'Print Member Labels - Selection' }
     ]
   },
   {
@@ -392,5 +399,5 @@ export const navItems = [
 ];
 
 export const authItems = [
-  { title: "Logout", icon: LogOutIcon, href: "/login" },
+  { title: "Log out", icon: LogOutIcon, href: "/login" },
 ];

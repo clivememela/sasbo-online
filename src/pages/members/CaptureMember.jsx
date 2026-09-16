@@ -1,19 +1,25 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { useRef, useState, useEffect, useMemo } from "react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { recruiterService } from "../../services/recruiterService.js";
 import { jobGradeService } from "../../services/jobGradeService.js";
 import { bankService } from "../../services/bankService.js";
-import { Button, PositionTreeSelect } from "../../components/form";
+import PageTitle from "../../components/common/PageTitle";
+import {
+    Button, DateField, PositionTreeSelect, SearchableSelect, SelectInput, TextInput,
+} from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, YES_NO_OPTIONS,
-    SUSPENSION_CODE_OPTIONS, JOB_GRADE_OPTIONS, MEMBER_TABS,
+    SUSPENSION_CODE_OPTIONS, MEMBER_TABS,
     BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS
 } from "../../config/memberConstants.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
     formatDate } from "../../utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
+import DataState from "../../components/common/DataState";
+import { cn } from "../../lib/utils";
+import useReferenceData from "../../hooks/useReferenceData.js";
 
 const FIELD_TO_TAB_MAP = {
     title: "personal",
@@ -34,6 +40,28 @@ const FIELD_TO_TAB_MAP = {
     paymentType: "employment",
     bankAccountNumber: "employment",
     debitDay: "employment",
+};
+
+
+/**
+ * THE FOUR REFERENCE LISTS THIS FORM LOADS ON MOUNT. `06.1b`, EH-D9.
+ *
+ * 🔴 ALL FOUR SWALLOWED THEIR FAILURES -- two as `.catch(err => console.error(...))`, two
+ * as `.catch(() => setThing([]))`. On a capture form that is the worst place in the
+ * application for a silent empty list: an administrator who cannot find the member's bank
+ * does not conclude the server is down, they pick the closest bank they can see. The failure
+ * does not stop the work, it corrupts the record -- and the record is a person's union
+ * membership.
+ *
+ * 🔑 THE FIFTH LIST, JOB GRADES, IS NOT HERE and that is not an oversight. It depends on
+ * the chosen bank, so it is not a mount fetch at all; it has its own effect, its own error
+ * state and its own retry, and it is where A25 was closed.
+ */
+const REFERENCE_LOADERS = {
+    recruiters: () => recruiterService.getAll(),
+    structures: () => recruiterService.getStructures(),
+    'bank branches': () => bankService.getBankListing(),
+    banks: () => bankService.getBankNames(),
 };
 
 export default function CaptureMember() {
@@ -66,7 +94,6 @@ export default function CaptureMember() {
         branch: "",
         employmentType: "",
         ibtNo: "",
-        /*workIbtNo: "",*/
         paymentType: "Debit Order",
         debitDay: "20",
         bankAddress: "",
@@ -93,17 +120,18 @@ export default function CaptureMember() {
 
     const [fieldErrors, setFieldErrors] = useState({});
     const [showSavedNotification, setShowSavedNotification] = useState(false);
-    const [reps, setReps] = useState([]);
-    const [structures, setStructures] = useState([]);
-
-    useEffect(() => {
-        recruiterService.getAll()
-            .then(data => setReps(data || []))
-            .catch(err => console.error('Failed to fetch recruiters:', err));
-        recruiterService.getStructures()
-            .then(data => setStructures(data || []))
-            .catch(err => console.error('Failed to fetch structures:', err));
-    }, []);
+    /*
+     * ✅ THE FOUR SILENT MOUNT LOADS, REPLACED BY ONE SET (EH-D9).
+     *
+     * They were two effects and four swallowing catches, in two separate places in this
+     * file. One call, and -- the part that could not be done with four `useState`s -- a
+     * `partial` state that knows THREE OF FOUR ANSWERED and can say which one did not.
+     */
+    const refs = useReferenceData(REFERENCE_LOADERS);
+    const reps = refs.data.recruiters;
+    const structures = refs.data.structures;
+    const bankListing = refs.data['bank branches'];
+    const bankNames = refs.data.banks;
 
     const tabsWithErrors = useMemo(() => {
         const errorTabs = new Set();
@@ -215,6 +243,20 @@ export default function CaptureMember() {
         return errors;
     };
 
+    /**
+     * What the last save attempt said. Replaces this file's two `alert()` calls.
+     *
+     * Focused rather than `role="alert"`: the shared `Field` gives every inline message
+     * that role already, so a form failing six validations would queue seven
+     * announcements at once. findings.md F-P23.
+     */
+    const [saveNotice, setSaveNotice] = useState(null);
+    const saveNoticeRef = useRef(null);
+
+    useEffect(() => {
+        if (saveNotice) saveNoticeRef.current?.focus();
+    }, [saveNotice]);
+
     const handleSave = () => {
         const clientSideErrors = validateFormBeforeSave();
         const mergedErrors = { ...fieldErrors, ...clientSideErrors };
@@ -227,20 +269,26 @@ export default function CaptureMember() {
             const fallbackTabContext = FIELD_TO_TAB_MAP[firstFailedField] || "personal";
             setActiveTab(fallbackTabContext);
 
-            const errorSummaryList = Object.values(mergedErrors)
-                .map((errMsg) => `• ${errMsg}`)
-                .join("\n");
-
-            alert(`Please fix the following validation errors before saving:\n\n${errorSummaryList}`);
+            // 🔴 IT WAS AN `alert()` OF BULLETED LINES. A native modal blocks the thread,
+            // cannot be styled, is suppressible, and -- worst on a five-tab form -- it
+            // ARRIVES AND LEAVES: dismissing it returned the member to a form that looked
+            // unchanged, with the list of problems now only in their memory. The summary
+            // below stays on the screen, takes focus, and the tab switch above puts them
+            // on the tab holding the first bad field.
+            setSaveNotice({ kind: "invalid", messages: Object.values(mergedErrors) });
             return;
         }
 
+        setSaveNotice(null);
         memberService.createMember(form)
             .then(() => {
                 setShowSavedNotification(true);
                 setTimeout(() => setShowSavedNotification(false), 3000);
             })
-            .catch((err) => alert(`Failed to save member: ${err.message}`));
+            .catch((err) => setSaveNotice({
+                kind: "failed",
+                messages: [`This member was not saved. ${err?.message || "Please try again."}`],
+            }));
     };
 
     const tabs = MEMBER_TABS;
@@ -252,22 +300,23 @@ export default function CaptureMember() {
     const genderOptions = GENDER_OPTIONS;
     const yesNoOptions = YES_NO_OPTIONS;
     const suspensionCodeOptions = SUSPENSION_CODE_OPTIONS;
-    const [jobGradeOptions, setJobGradeOptions] = useState(JOB_GRADE_OPTIONS);
+    const [jobGradeOptions, setJobGradeOptions] = useState([]);
     const [jobGradeLoading, setJobGradeLoading] = useState(false);
-    const [bankListing, setBankListing] = useState([]);
-    const [bankNames, setBankNames] = useState([]);
-
-    // Load bank listing and bank names on mount so we can resolve a selected bank name to a bank code
-    useEffect(() => {
-        let mounted = true;
-        bankService.getBankListing()
-            .then(list => { if (mounted) setBankListing(list || []); })
-            .catch(() => { if (mounted) setBankListing([]); });
-        bankService.getBankNames()
-            .then(names => { if (mounted) setBankNames(names || []); })
-            .catch(() => { if (mounted) setBankNames([]); });
-        return () => { mounted = false; };
-    }, []);
+    /*
+     * ✅ A25's SECOND CLAUSE, `06.1b`. The register's criterion is "the method rejects AND
+     * the caller renders an error", and this is the caller half. `jobGradeService.getByBank`
+     * no longer swallows a failure into the (empty) static list, so a 500, a dropped
+     * connection or the ten-second ceiling arrives here as a rejection in §16's shape and
+     * this field says so, with a retry, instead of reading "No job grades available".
+     *
+     * 🔑 IT IS PER-PANEL, NOT PER-PAGE (EH-D9). Nine things load on this screen. A bank whose
+     * grades cannot be fetched must not blank a capture form the user has half filled in --
+     * the one field says what happened and the other eight keep working.
+     */
+    const [jobGradeError, setJobGradeError] = useState(null);
+    // Bumped by the retry control. It is a dependency of the fetch effect, so "try again"
+    // re-runs exactly the effect that failed rather than duplicating its body.
+    const [jobGradeAttempt, setJobGradeAttempt] = useState(0);
 
     // Fetch job grades for the selected bank whenever bankName changes.
     useEffect(() => {
@@ -278,12 +327,16 @@ export default function CaptureMember() {
 
         const fetchGrades = async () => {
             if (!form.bankName) {
-                setJobGradeOptions(JOB_GRADE_OPTIONS);
+                // No bank, no grades: grades are per bank, so an empty list is the honest
+                // answer. The job grade itself was already cleared at the top of this effect.
+                setJobGradeOptions([]);
+                setJobGradeError(null);
                 setJobGradeLoading(false);
                 return;
             }
 
             setJobGradeLoading(true);
+            setJobGradeError(null);
 
             // Try to resolve bank code locally from bankListing
             const normalized = String(form.bankName || '').trim().toLowerCase();
@@ -295,52 +348,127 @@ export default function CaptureMember() {
 
             try {
                 const grades = await jobGradeService.getByBank(bankIdentifier);
-                if (!cancelled) setJobGradeOptions(Array.isArray(grades) && grades.length ? grades : JOB_GRADE_OPTIONS);
-            } catch (e) {
-                if (!cancelled) setJobGradeOptions(JOB_GRADE_OPTIONS);
+                if (!cancelled) setJobGradeOptions(Array.isArray(grades) ? grades : []);
+            } catch (error) {
+                // ⚠️ AN ABORT IS NOT A FAILURE (§16, EH-D3). A superseded request is dropped
+                // silently: the state stays exactly as it was, and the field does not tell a
+                // user their bank list broke because they kept typing.
+                if (!cancelled && error?.kind !== 'abort') {
+                    setJobGradeOptions([]);
+                    setJobGradeError(error);
+                }
             } finally {
                 if (!cancelled) setJobGradeLoading(false);
             }
         };
         fetchGrades();
         return () => { cancelled = true; };
-    }, [form.bankName, bankListing]);
+    }, [form.bankName, bankListing, jobGradeAttempt]);
 
     return (
-        <div className="p-6 text-gray-900 dark:text-gray-100">
-            <h2 className="text-3xl text-center mb-4 text-cyan-700 dark:text-cyan-400">
-                Capture Member
-            </h2>
-            <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                Securely capture a new Sasbo member. Ensure all required personal,
-                employment, and banking information is accurately entered to maintain the integrity of our member database.
-            </p>
-            <div className="max-w-6xl mx-auto rounded-2xl shadow-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden relative">
+        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+            {/* BR-18: the page's only <h1>, from the shared component, so this route stops
+                being one of the nine with no heading of its own. */}
+            <PageTitle
+                title="Capture Member"
+                subtitle="Capture a new Sasbo member. Every required personal, employment and banking detail is checked before the record is saved."
+                className="mb-5"
+            />
+            {/* ✅ THE FOURTH STATE, ABOVE THE FORM RATHER THAN INSIDE IT (EH-D9).
+
+                Four reference lists fill this form's selectors. When some of them fail this
+                says WHICH, before the member starts typing -- because the alternative is an
+                administrator who fills in six tabs, reaches the bank field, finds it empty,
+                and has no way to know whether that is a broken server or a real answer.
+
+                🔴 IT IS A NOTICE, NOT A BLOCK. Everything that DID load still works, and a
+                capture form is the last place to throw away a half-finished form over one
+                dead endpoint. The retry re-runs only the lists that were asked for; nothing
+                the member has typed is touched. */}
+            {(refs.state === 'partial' || refs.state === 'error') && (
+                <div className="mb-4 rounded-lg bg-surface p-3 shadow-(--shadow-1)">
+                    <DataState
+                        state={refs.state === 'error' ? 'error' : 'partial'}
+                        compact
+                        onRetry={refs.retry}
+                        title={
+                            refs.state === 'error'
+                                ? 'None of this form’s option lists could be loaded.'
+                                : 'Some option lists are missing.'
+                        }
+                        message={
+                            refs.state === 'error'
+                                ? 'The selectors below have nothing to offer until this succeeds. Anything you have already typed is kept.'
+                                : `${refs.failed.join(', ')} did not load. Every other field on this form is ready.`
+                        }
+                    />
+                </div>
+            )}
+
+            <div className="relative mt-2 max-w-4xl rounded-lg bg-surface shadow-(--shadow-1)">
                 {showSavedNotification && (
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
-                        <CheckCircle2 size={18} />
+                    <div role="status" className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-lg border border-status-active-dot bg-status-active-bg px-4 py-2 text-status-active shadow-(--shadow-2)">
+                        <CheckCircle2 size={18} aria-hidden="true" />
                         <span className="text-sm font-medium">Member captured successfully!</span>
                     </div>
                 )}
-                {/* Tab Navigation */}
-                <div className="px-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
-                    <div className="flex -mb-px">
+
+                {/* 🔴 WHAT REPLACED THE `alert()`. It stays on screen, it takes focus, and
+                    the tab switch that runs beside it puts the member on the tab holding
+                    the first bad field -- so the list of problems and the fields that
+                    caused them are visible at the same time, which a modal made impossible. */}
+                {saveNotice && (
+                    <div
+                        ref={saveNoticeRef}
+                        tabIndex={-1}
+                        aria-labelledby="capture-save-notice-title"
+                        className="m-4 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                    >
+                        <p id="capture-save-notice-title" className="flex items-center gap-2 font-medium">
+                            <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+                            {saveNotice.kind === "invalid" ? "Fix these before saving" : "This member was not saved"}
+                        </p>
+                        <ul className="mt-1 list-disc pl-6">
+                            {saveNotice.messages.map((message) => <li key={message}>{message}</li>)}
+                        </ul>
+                    </div>
+                )}
+
+                {/* 📱 R-RESP-J: A SCROLLABLE STRIP. Six tabs do not fit at 390px -- they
+                    wrapped into crushed rows, and the last two were effectively hidden.
+                    `overflow-x-auto` with `whitespace-nowrap` makes them reachable by
+                    swiping, which is how a phone expects to meet a row that is too long.
+
+                    ⚠️ Not `role="tab"`: the ARIA tabs pattern promises arrow-key
+                    movement between tabs, which needs roving focus. `05.3` owns that, with
+                    the shared hook RF already has on its list. `aria-current` says which
+                    section is showing and promises nothing else. */}
+                <div className="border-b border-line bg-surface-2">
+                    <div className="flex -mb-px overflow-x-auto whitespace-nowrap px-6">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
+                                type="button"
+                                aria-current={activeTab === tab.id ? "true" : undefined}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`mr-4 inline-flex items-center gap-1 p-4 border-b-2 font-bold text-sm transition-colors ${activeTab === tab.id ? "border-cyan-600 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400" : "border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"}`}
+                                className={`touch-target inline-flex items-center gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-sm font-medium transition-[color,box-shadow] duration-(--duration-instant) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring ${activeTab === tab.id ? "font-semibold text-brand-ink shadow-[inset_0_-2px_0_var(--color-brand)]" : "text-ink-muted shadow-[inset_0_-2px_0_transparent] hover-hover:hover:text-ink"}`}
                             >
                                 <span>{tab.label}</span>
                                 {tabsWithErrors.has(tab.id) && (
-                                    <span className="text-red-500 font-bold animate-pulse text-sm" title="Contains required validation errors">*</span>
+                                    <>
+                                        {/* The asterisk was the ONLY signal that a tab held
+                                            errors -- invisible to a screen reader, and to
+                                            anyone who cannot distinguish the colour. */}
+                                        <span aria-hidden="true" className="text-status-suspended font-bold text-sm">*</span>
+                                        <span className="sr-only">(has errors)</span>
+                                    </>
                                 )}
                             </button>
                         ))}
                     </div>
                 </div>
                 {/* Body */}
-                <div className="px-6 py-8 overflow-y-auto max-h-[70vh] text-sm bg-white dark:bg-gray-800">
+                <div className="px-6 py-8 text-sm">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         {activeTab === "personal" && (
                             <>
@@ -349,8 +477,16 @@ export default function CaptureMember() {
                                 <Field label="First Name(s)" value={form.firstNames} onChange={handleChange("firstNames")} error={fieldErrors.firstNames} required />
                                 <Field label="Surname" value={form.surname} onChange={handleChange("surname")} error={fieldErrors.surname} required />
                                 <Field label="Identity Type" value={form.identityType} onChange={handleChange("identityType")} options={identityTypeOptions} error={fieldErrors.identityType} required />
+                                {/* 🔴 THE LABEL WAS AN INSTRUCTION: "Select Identity Type before
+                                    entering", set in the small capitals every label wears, so
+                                    the form appeared to shout a sentence at a field. A label
+                                    names the field; the instruction is a hint under it, and it
+                                    is only there while the field is actually shut. The name
+                                    becomes the chosen type once there is one, which is what the
+                                    member register does one screen over. */}
                                 <Field
-                                    label={form.identityType || "Select Identity Type before entering"}
+                                    label={form.identityType || "Identity Number"}
+                                    note={form.identityType ? null : "Choose an identity type first."}
                                     value={form.identityNumber}
                                     onChange={handleChange("identityNumber")}
                                     error={fieldErrors.identityNumber}
@@ -395,7 +531,7 @@ export default function CaptureMember() {
                                 <Field label="Employee Number" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
                                 <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
-                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} />
+                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} emptyLabel="No job grades available" loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
                                 <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
 
@@ -406,12 +542,11 @@ export default function CaptureMember() {
                                     </>
                                 )}
                                 {form.paymentType === "Payroll" && (
-                                    <div className="md:col-span-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-700 dark:text-blue-300">
-                                        ℹ️ Bank account details are not required for Payroll. Debit day is handled by payroll.
-                                    </div>
+                                    <p className="md:col-span-2 rounded-lg border border-line-strong bg-surface-2 p-3 text-sm text-ink-muted">
+                                        Bank account details are not required for Payroll. Debit day is handled by payroll.
+                                    </p>
                                 )}
                                 <Field label="IBT No." value={form.ibtNo} onChange={handleChange("ibtNo")} />
-                                {/*<Field label="Work IBT No." value={form.workIbtNo} onChange={handleChange("workIbtNo")} />*/}
                                 <AddressAutocomplete label="Bank Address" value={form.bankAddress} onChange={handleChange("bankAddress")} placeholder="Start typing a bank address..." className="md:col-span-2" />
                             </>
                         )}
@@ -439,8 +574,22 @@ export default function CaptureMember() {
                         )}
                     </div>
                 </div>
-                {/* Footer */}
-                <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                {/* 📱 R-RESP-J: SAVE IS A STICKY ACTION BAR NOW.
+                    This form is six tabs of fields and the body used to scroll inside its
+                    own `max-h-[70vh]` box, so on a phone Save sat below a scroller that
+                    was itself below the fold -- reachable only by scrolling the page to
+                    the bottom, past a panel that scrolls independently. The inner scroller
+                    is gone (the page scrolls, which is what a phone expects) and the bar
+                    is pinned to the bottom of the viewport.
+
+                    `pb-[env(safe-area-inset-bottom)]` is the half that only shows up on
+                    real hardware: without it the bar sits under the home indicator on an
+                    iPhone, and Save is a button you can see and cannot press.
+
+                    🔑 SAVE IS FIRST IN THE DOM AND VISUALLY LAST. `flex-row-reverse`
+                    puts the primary action on the right for a mouse while leaving it first
+                    in the tab order -- the order the two audiences each expect. */}
+                <div className="sticky bottom-0 z-10 flex flex-row-reverse justify-start gap-3 border-t border-line bg-surface/95 px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm">
                     <Button variant="primary" onClick={handleSave}>Save Member</Button>
                     <Button onClick={() => window.history.back()}>Cancel</Button>
                 </div>
@@ -450,15 +599,23 @@ export default function CaptureMember() {
 }
 
 const SectionTitle = ({ title }) => (
-    <div className="md:col-span-2 mt-4 border-b border-gray-200 dark:border-gray-700 pb-1 font-semibold text-cyan-700 dark:text-cyan-400">
+    <div className="md:col-span-2 mt-4 border-b border-line pb-1 font-semibold text-brand-ink">
         {title}
     </div>
 );
 
-const fieldCls = (error, disabled = false) =>
-    `w-full rounded-lg px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 ${
-        disabled ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed" : "bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white"} ${error ? "border-red-500 dark:border-red-400" : "border-gray-200 dark:border-gray-700"}`;
-
+/**
+ * The rep's election date.
+ *
+ * 🔴 IT WAS A NATIVE `<input type="date">` UNDER A `<label>` THAT NAMED NOTHING -- no
+ * `htmlFor`, so a screen-reader user reached an unnamed date box -- and it was the fourth
+ * of the four native date inputs P3 could not reach, because BR-10 owned this file until
+ * now. `DateField` is the approved picker: a real label, a keyboard grid, and the same
+ * behaviour on every browser instead of whatever the platform happens to supply.
+ *
+ * ⚠️ THE THREE-FIELD STORAGE IS UNCHANGED. The server keeps day, month and year as
+ * separate strings, and re-shaping that is a wire change, not a presentation one.
+ */
 function RepElectionDatePicker({ form, setForm }) {
     const dateValue =
         form.repElectionYear && form.repElectionMonth && form.repElectionDay
@@ -470,63 +627,7 @@ function RepElectionDatePicker({ form, setForm }) {
     };
     return (
         <div className="md:col-span-2">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                Election Date
-            </label>
-            <input
-                type="date"
-                value={dateValue}
-                onChange={handleDateChange}
-                className={fieldCls(null, false)}
-            />
-        </div>
-    );
-}
-
-function SearchableSelect({ value, onChange, options, error, disabled }) {
-    const [query, setQuery] = useState("");
-    const [open, setOpen] = useState(false);
-    const ref = React.useRef(null);
-    const filtered = options.filter((o) => o.toLowerCase().includes(query.toLowerCase()));
-    const handleSelect = (opt) => {
-        onChange({ target: { value: opt } });
-        setQuery("");
-        setOpen(false);
-    };
-    const handleClear = () => {
-        onChange({ target: { value: "" } });
-        setQuery("");
-    };
-    React.useEffect(() => {
-        const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
-    }, []);
-    return (
-        <div ref={ref} className="relative">
-            <input
-                type="text"
-                value={open ? query : value || ""}
-                onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-                onFocus={() => setOpen(true)}
-                placeholder="Search..."
-                disabled={disabled}
-                className={fieldCls(error, disabled)}
-            />
-            {value && !open && (
-                <button type="button" onClick={handleClear} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs">✕</button>
-            )}
-            {open && filtered.length > 0 && (
-                <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg text-sm">
-                    {filtered.map((opt) => (
-                        <li key={opt} role="option" aria-selected={false} onClick={() => handleSelect(opt)}
-                            className="px-4 py-2 cursor-pointer hover:bg-cyan-50 dark:hover:bg-cyan-900/30 text-gray-900 dark:text-white">
-                            {opt}
-                        </li>
-                    ))}
-                </ul>
-            )}
-            {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
+            <DateField label="Election Date" value={dateValue} max="today" hint="ago" onChange={handleDateChange} />
         </div>
     );
 }
@@ -553,99 +654,165 @@ function toggleWorkPreferred(setForm) {
     });
 }
 
+/**
+ * The two email addresses, each with a "preferred" tick beside it.
+ *
+ * The toggles keep their existing three-state behaviour exactly -- personal, work, both --
+ * because that is a data question the wire already answers. What changed is the chrome
+ * around them: `TextInput` supplies the label, the error wiring and the 16px-on-a-phone
+ * rule that the hand-rolled `fieldCls` did not.
+ */
 function EmailFields({ form, setForm, handleChange, fieldErrors }) {
+    /*
+     * 🔴 THE CHECKBOX SITS UNDER THE FIELD, NOT BESIDE IT. Outboard, it took its width out
+     * of the input: measured against the mock's strict two-column grid, PERSONAL EMAIL was
+     * 447px where SURNAME in the same column was 524, and WORK EMAIL 446 against FIRST
+     * NAME(S)' 525 -- three different widths down one column, which is the one thing a
+     * grid exists to prevent. Under the field it reads as what it is: a note about the
+     * value above it, in the same place `Field` puts a hint.
+     */
+    const preferred = (label, checked, onChange) => (
+        <label className="touch-target -mt-0.5 flex w-fit cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs text-ink-muted">
+            <input type="checkbox" checked={checked} onChange={onChange} className="size-3.5 accent-brand" />
+            {label}
+        </label>
+    );
+
     return (
         <>
-            <div>
-                <label htmlFor="personalEmail" className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                    Personal Email
-                </label>
-                <div className="flex items-center gap-2">
-                    <input
-                        id="personalEmail"
-                        type="email"
-                        value={form.personalEmail || ""}
-                        onChange={handleChange("personalEmail")}
-                        className={fieldCls(fieldErrors.personalEmail)}
-                    />
-                    <label htmlFor="prefPersonal" className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
-                        <input
-                            id="prefPersonal"
-                            type="checkbox"
-                            checked={form.preferredEmail === "personal" || form.preferredEmail === "both"}
-                            onChange={() => togglePersonalPreferred(setForm)}
-                            className="accent-cyan-600 w-4 h-4"
-                        />
-                        Preferred
-                    </label>
-                </div>
-                {fieldErrors.personalEmail && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{fieldErrors.personalEmail}</p>}
+            <div className="flex flex-col gap-1.5">
+                <TextInput
+                    label="Personal Email"
+                    kind="email"
+                    value={form.personalEmail || ""}
+                    onChange={handleChange("personalEmail")}
+                    error={fieldErrors.personalEmail || undefined}
+                />
+                {preferred("Preferred", form.preferredEmail === "personal" || form.preferredEmail === "both", () => togglePersonalPreferred(setForm))}
             </div>
-            <div>
-                <label htmlFor="workEmail" className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                    Work Email
-                </label>
-                <div className="flex items-center gap-2">
-                    <input
-                        id="workEmail"
-                        type="email"
-                        value={form.workEmail || ""}
-                        onChange={handleChange("workEmail")}
-                        className={fieldCls(fieldErrors.workEmail)}
-                    />
-                    <label htmlFor="prefWork" className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer">
-                        <input
-                            id="prefWork"
-                            type="checkbox"
-                            checked={form.preferredEmail === "work" || form.preferredEmail === "both"}
-                            onChange={() => toggleWorkPreferred(setForm)}
-                            className="accent-cyan-600 w-4 h-4"
-                        />
-                        Preferred
-                    </label>
-                </div>
-                {fieldErrors.workEmail && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{fieldErrors.workEmail}</p>}
+            <div className="flex flex-col gap-1.5">
+                <TextInput
+                    label="Work Email"
+                    kind="email"
+                    value={form.workEmail || ""}
+                    onChange={handleChange("workEmail")}
+                    error={fieldErrors.workEmail || undefined}
+                />
+                {preferred("Preferred", form.preferredEmail === "work" || form.preferredEmail === "both", () => toggleWorkPreferred(setForm))}
             </div>
         </>
     );
 }
 
+/**
+ * ONE FIELD OF THE CAPTURE FORM -- and this is where BR-4's four-way fracture ends.
+ *
+ * 🔴 WHAT WAS HERE. A private `Field` and a private `SearchableSelect`, both shadowing
+ * shared components of the same name, and a `fieldCls` restating the border, the focus
+ * ring and the disabled treatment the token layer already owns. Between them they carried
+ * four defects the shared primitives do not have:
+ *
+ *   1. THE ID WAS DERIVED FROM THE LABEL TEXT -- `label.toLowerCase().replace(/\s+/g,"-")`
+ *      -- so two fields with the same label produced two elements with the same id, and
+ *      the second label pointed at the first control. This form renders "Preferred" twice.
+ *   2. THE PRIVATE `SearchableSelect` WAS MOUSE-ONLY. Its options were `<li onClick>` with
+ *      `role="option"` and `aria-selected={false}` HARD-CODED on every one -- so it
+ *      announced a listbox in which nothing is ever selected, and no arrow key, Enter or
+ *      Escape did anything. The shared one is driven by `aria-activedescendant`.
+ *   3. EVERY CONTROL WAS `text-sm`, which this design renders at 13px -- under the 16px
+ *      floor, so iOS Safari zooms the page on focus and does not zoom back out. Fourteen
+ *      of the fifteen remaining offenders in the whole tree were in this file.
+ *      `controlClasses` uses `field-text`, which is 16px on a coarse pointer.
+ *   4. `type="date"` GAVE A NATIVE DATE INPUT, three of them, which is what P3's
+ *      "zero native date inputs" box could not close while BR-10 owned this file.
+ *
+ * 🔑 IT IS A THIN ADAPTER NOW, NOT A WRAPPER. It maps this form's call shape --
+ * `options`, `searchable`, `type`, `note` -- onto the shared primitives, so the ~90 call
+ * sites in this file did not each have to change. That is the whole point of BR-4
+ * converging rather than rewriting: the fracture closes without touching the form's logic,
+ * which is the Capture Member arc's.
+ */
 function Field({ label, value, onChange, className = "", options = null, type = "text",
-                   error = null, disabled = false, searchable = false, note = null, id, required = false, loading = false }) {
-    const fieldId = id || label.toLowerCase().replace(/\s+/g, "-");
-    return (
-        <div className={className}>
-            <label htmlFor={fieldId} className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                <span>{label} {required && <span className="text-red-500 font-bold">*</span>}</span>
-                {loading && (
-                    <svg className="w-4 h-4 animate-spin text-cyan-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25" />
-                        <path d="M22 12a10 10 0 00-10-10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-                    </svg>
-                )}
-            </label>
-            {note && <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">{note}</p>}
-            <div className="relative">
-                {options && searchable ? (
-                    <SearchableSelect value={value} onChange={onChange} options={options} error={error} disabled={disabled} />
-                ) : options ? (
-                    <select id={fieldId} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled}>
-                        <option value="">Select...</option>
-                        {options.length === 0 ? (
-                            <option value="" disabled>No job grades available</option>
-                        ) : (
-                            options.map((opt) => {
-                                const val = opt?.value !== undefined ? opt.value : opt;
-                                const lbl = opt?.label !== undefined ? opt.label : opt;
-                                return <option key={val} value={val}>{lbl}</option>;
-                            })
-                        )}
-                    </select>
-                ) : (
-                    <input id={fieldId} type={type} value={value || ""} onChange={onChange} className={fieldCls(error, disabled)} disabled={disabled} />
-                )}
-                {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
+                   error = null, disabled = false, searchable = false, note = null, kind, required = false,
+                   loading = false, emptyLabel, loadError = null, onRetryLoad }) {
+    /*
+     * 🔑 `loadError` IS NOT `error`, AND CONFLATING THEM IS THE BUG THIS PROP EXISTS TO AVOID.
+     *
+     *   `error`     the VALUE is wrong. "Enter a valid identity number." The user fixes it.
+     *   `loadError` the CHOICES are missing. The user cannot fix anything by typing; the
+     *               only useful action is to try the fetch again.
+     *
+     * Rendered as a validation message, a failed reference list would blame the member for a
+     * backend being down and offer them no way out -- so it renders as a compact `DataState`
+     * with a retry beneath the control instead (EH-D4: every error state carries a way out
+     * when one is honest, and `retryable` decides whether it is).
+     */
+    if (loadError) {
+        return (
+            <div className={cn("flex flex-col gap-1", className)}>
+                <SelectInput
+                    label={label}
+                    value={value}
+                    onChange={(next) => onChange?.({ target: { value: next } })}
+                    options={[]}
+                    disabled
+                    required={required}
+                    placeholder="Unavailable"
+                    emptyLabel="Unavailable"
+                />
+                <DataState
+                    state="error"
+                    compact
+                    error={loadError}
+                    onRetry={onRetryLoad}
+                    title={`${label} could not be loaded.`}
+                />
             </div>
-        </div>
-    );
+        );
+    }
+
+    const shared = {
+        label,
+        value,
+        onChange,
+        error: error || undefined,
+        disabled,
+        required,
+        hint: note || undefined,
+        className,
+    };
+
+    if (type === "date") {
+        return <DateField {...shared} max="today" />;
+    }
+
+    if (options && searchable) {
+        return (
+            <SearchableSelect
+                {...shared}
+                options={options}
+                loading={loading}
+                onChange={(next) => onChange?.({ target: { value: next } })}
+                placeholder="Search..."
+            />
+        );
+    }
+
+    if (options) {
+        return (
+            <SelectInput
+                {...shared}
+                options={options}
+                loading={loading}
+                onChange={(next) => onChange?.({ target: { value: next } })}
+                placeholder="Select..."
+                // The caller's wording, not a generic one. "No job grades available" tells
+                // a member the BANK has no grades on file; "No options available" tells
+                // them nothing they can act on, and it is the copy the suite pins.
+                emptyLabel={emptyLabel}
+            />
+        );
+    }
+
+    return <TextInput {...shared} kind={kind || "text"} />;
 }

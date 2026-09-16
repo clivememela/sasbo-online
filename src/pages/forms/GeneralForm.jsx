@@ -32,21 +32,28 @@ export default function GeneralForm({ filters }) {
     };
 
     return (
-        <div className="max-w-6xl mx-auto p-8 bg-white dark:bg-gray-800 shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
-            <div className="text-center mb-8 border-b-2 border-cyan-600 pb-4">
-                <h1 className="text-sm font-semibold text-cyan-700 dark:text-cyan-400 uppercase tracking-wide">
+        <div className="mt-5 rounded-lg bg-surface p-6 text-ink shadow-(--shadow-1)">
+            <div className="mb-6 border-b border-line pb-4 text-center">
+                {/* 🔴 An <h1> used as a `text-sm` caption -- N8's other half, and the
+                    same shape as `OrganizerReport`. This component renders INSIDE a page
+                    that already has its own title, so it was giving that route two <h1>s
+                    the moment `PageTitle` was promoted. */}
+                <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-muted">
                     SASBO — The Finance Union — General Form
-                </h1>
+                </h2>
             </div>
 
-            <div className="mb-8 p-4 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg border-l-4 border-cyan-500 text-sm leading-relaxed italic text-gray-700 dark:text-gray-300">
+            <div className="mb-6 rounded-lg bg-accent-soft px-3 py-2.5 text-sm leading-relaxed text-ink">
+                <span className="mb-0.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-ink">How to complete this form</span>
                 Please indicate below the title, initials and surname of every non-member of SASBO at the branch / department, as well as, after attempting to recruit the individual, provide one of the following indicators in the application column:{' '}
-                <span className="font-bold not-italic text-cyan-700 dark:text-cyan-300">
-                    'J' = Joined, 'NI' = Not Interested, 'NA' = Not Available, 'NT' = No Time to See.
+                {/* `not-italic` went with the italics it was undoing, and the emphasis is
+                    the world's semibold rather than bold. */}
+                <span className="font-semibold text-accent-ink">
+                    &lsquo;J&rsquo; = Joined, &lsquo;NI&rsquo; = Not Interested, &lsquo;NA&rsquo; = Not Available, &lsquo;NT&rsquo; = No Time to See.
                 </span>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8 p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8 p-4 border border-line rounded-lg bg-surface-2">
                 {[
                     { label: 'Bank',      field: 'bank' },
                     { label: 'IBT No',    field: 'ibtNo' },
@@ -63,9 +70,9 @@ export default function GeneralForm({ filters }) {
                 ))}
             </div>
 
-            <div className="hidden lg:grid lg:grid-cols-3 gap-8 mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <div className="hidden lg:grid lg:grid-cols-3 gap-8 mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                 {[0, 1, 2].map(i => (
-                    <div key={i} className={`flex gap-4 ${i > 0 ? 'border-l border-gray-300 dark:border-gray-600 pl-4' : ''}`}>
+                    <div key={i} className={`flex gap-4 ${i > 0 ? 'border-l border-line-strong pl-4' : ''}`}>
                         <span className="w-8">#</span>
                         <span className="flex-1">Name of Non-Member</span>
                         <span className="w-20">Indicator</span>
@@ -75,12 +82,19 @@ export default function GeneralForm({ filters }) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-1">
                 {nonMembers.map((member, idx) => (
-                    <div key={member.id} className="flex items-center gap-2 py-1 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                        <span className="w-8 text-xs font-medium text-gray-400 shrink-0">{member.id}.</span>
+                    <div key={member.id} className="flex items-center gap-2 py-1 border-b border-line hover-hover:hover:bg-surface-2/30 transition-colors">
+                        <span className="w-8 text-xs font-medium text-ink-muted shrink-0">{member.id}.</span>
+                        {/* 🔑 SIXTY CONTROLS WHOSE ONLY LABEL WAS A PLACEHOLDER. A
+                            placeholder disappears the moment anything is typed, and it is
+                            not an accessible name -- so this roster announced as sixty
+                            identical unnamed text boxes. The row NUMBER is what
+                            distinguishes them on screen, so it is what distinguishes them
+                            here too. */}
                         <input
                             type="text"
                             placeholder="Name"
-                            className="flex-1 bg-transparent border-none focus:outline-none text-sm py-1 text-gray-900 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600"
+                            aria-label={`Name of non-member ${member.id}`}
+                            className="flex-1 bg-transparent border-none focus:outline-none field-text py-1 text-ink placeholder-ink-faint"
                             value={member.name}
                             onChange={(e) => handleNonMemberChange(idx, 'name', e.target.value)}
                         />
@@ -88,7 +102,8 @@ export default function GeneralForm({ filters }) {
                             type="text"
                             placeholder="Ind."
                             maxLength={2}
-                            className="w-14 bg-transparent border-none focus:outline-none text-sm py-1 text-center text-gray-900 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 uppercase"
+                            aria-label={`Industry code for non-member ${member.id}`}
+                            className="w-14 bg-transparent border-none focus:outline-none field-text py-1 text-center text-ink placeholder-ink-faint uppercase"
                             value={member.indicator}
                             onChange={(e) => handleNonMemberChange(idx, 'indicator', e.target.value)}
                         />
@@ -96,7 +111,7 @@ export default function GeneralForm({ filters }) {
                 ))}
             </div>
 
-            <div className="mt-10 flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="mt-10 flex justify-end gap-3 pt-4 border-t border-line">
                 <Button variant="default">Save Draft</Button>
                 <Button variant="primary">Submit Form</Button>
             </div>

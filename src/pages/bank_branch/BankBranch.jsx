@@ -1,14 +1,37 @@
-import { useMemo, useState, useEffect } from "react";
-import { Printer } from "lucide-react";
+import { useCallback, useMemo, useState, useEffect } from "react";
+import { Plus, Printer } from "lucide-react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, SearchableSelect, Button } from "../../components/form";
 import BankBranchModal from "./BankBranchModal.jsx";
+import PageTitle from '../../components/common/PageTitle';
+import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
+import Pager from '../../components/common/Pager.jsx';
+import Sheet, { Page } from '../../components/common/Sheet.jsx';
+import Table from '../../components/table/Table.jsx';
+import reportError from '../../lib/reportError.js';
 
 const PAGE_SIZE = bankService.getPageSize();
 
 export default function BankBranch() {
   const [banks, setBanks] = useState([]);
-  useEffect(() => { bankService.getBanks().then(setBanks); }, []);
+
+  /**
+   * 🔴 THIS WAS `bankService.getBanks().then(setBanks)` WITH NO `.catch` AT ALL. A
+   * failed request became an unhandled rejection and the screen rendered "No banks match
+   * your search" -- a confident wrong answer with not even a console line behind it. A27
+   * is the same defect on the member register, and the plan predicted this: "A27 is
+   * probably one instance of a class."
+   */
+  const [listState, setListState] = useState('loading');
+
+  const loadBanks = useCallback(() => {
+    setListState('loading');
+    return bankService.getBanks()
+      .then((data) => { setBanks(data ?? []); setListState('ready'); })
+      .catch((err) => { reportError('BankBranch.load', err); setListState('error'); });
+  }, []);
+
+  useEffect(() => { loadBanks(); }, [loadBanks]);
   const [filters, setFilters] = useState({
     bankName: "",
     branch: "",
@@ -43,120 +66,118 @@ export default function BankBranch() {
     setPage(1);
   };
 
+  /**
+   * 🔴 NINE COLUMNS, IN A `grid-cols-9`, WITH `<div onClick>` ROWS. The header was nine
+   * `<div>`s with no relationship to the cells beneath them, so a screen-reader user got
+   * eighty-one unlabelled values in a row; and opening a branch to edit it was mouse-only.
+   *
+   * 📱 R-RESP-K IS DOING REAL WORK HERE. Nine columns at 390px is roughly 40px each --
+   * every value truncated to nothing. Two are essential and the other seven drop into the
+   * row's detail panel, so a phone shows a usable list instead of a wall of ellipses.
+   */
+  const bankColumns = useMemo(() => [
+    {
+      key: 'bankName',
+      header: 'Bank Name',
+      priority: 'essential',
+      truncate: true,
+      cell: (bank) => (
+        <button
+          type="button"
+          onClick={() => setSelectedBank(bank)}
+          aria-label={`${bank.bankName || 'This bank'} \u2014 open the ${bank.branchName || 'branch'} record`}
+          className="touch-target rounded-sm text-left font-medium text-brand-ink underline-offset-2 hover-hover:hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+        >
+          {bank.bankName}
+        </button>
+      ),
+    },
+    { key: 'bankAbbreviation', header: 'Abbreviation', priority: 'essential', cell: (b) => b.bankAbbreviation || '\u2014' },
+    { key: 'branchName', header: 'Branch', priority: 'secondary', truncate: true, cell: (b) => b.branchName || '\u2014' },
+    { key: 'area', header: 'Area', priority: 'secondary', truncate: true, cell: (b) => b.area || '\u2014' },
+    { key: 'randomAccessNumber', header: 'Random Access Number', priority: 'detail', cell: (b) => b.randomAccessNumber || '\u2014' },
+    { key: 'phoneNumber', header: 'Phone', priority: 'detail', cell: (b) => b.phoneNumber || '\u2014' },
+    { key: 'managerName', header: 'Manager', priority: 'detail', cell: (b) => b.managerName || '\u2014' },
+    { key: 'fax', header: 'Fax', priority: 'detail', cell: (b) => b.fax || '\u2014' },
+    { key: 'email', header: 'Email', priority: 'detail', truncate: true, cell: (b) => b.email || '\u2014' },
+  ], []);
+
   return (
-    <div className="p-6 text-gray-900 dark:text-gray-100">
-      <h2 className="text-3xl text-center mb-8 text-cyan-700 dark:text-cyan-400">Bank/Branch</h2>
-      <p className="max-w-3xl mx-auto text-center text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-        Access, manage, and track Sasbo member records across South Africa's leading financial institutions and branch networks.
-      </p>
-
-      <div className="max-w-6xl mx-auto p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-          <SearchableSelect
-            label="Bank Name"
-            value={filters.bankName}
-            onChange={handleInputChange("bankName")}
-            placeholder="All Banks"
-            options={[{ value: '', label: 'All Bank Branch' }, ...([...new Set(banks.map(b => b.bankName).filter(Boolean))].sort().map(b => ({ value: b, label: b })))]}
-          />
-          <TextInput
-            label="Branch"
-            value={filters.branch}
-            onChange={handleInputChange("branch")}
-            placeholder="Search branch"
-          />
-          <TextInput
-            label="Area"
-            value={filters.area}
-            onChange={handleInputChange("area")}
-            placeholder="Search area"
-          />
-          <TextInput
-            label="Random Access Number"
-            value={filters.randomAccessNumber}
-            onChange={handleInputChange("randomAccessNumber")}
-            placeholder="Search RAN"
-          />
-        </div>
-
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm no-print">
-          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
-            Showing {filteredBanks.length === 0 ? 0 : startIndex + 1}-{endIndex} of {filteredBanks.length} banks
-            {filteredBanks.length > 0 && (
-              <button
-                onClick={() => globalThis.print()}
-                title="Print results"
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition"
-              >
-                <Printer size={16} />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="primary" onClick={() => setShowAddBank(true)}>+ Add Bank/Branch</Button>
-            <Button
-              type="button"
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              disabled={page === 1}
-              variant="pagination"
-              className="rounded-full"
-            >
-              Prev
+    <Page>
+      <PageTitle
+        title="Bank / Branch"
+        subtitle="Every bank branch Sasbo members work from, with its area and random access number."
+        actions={
+          <>
+            <Button onClick={() => globalThis.print()} title="Print the listing, or save it as a PDF">
+              <Printer size={16} strokeWidth={1.75} aria-hidden="true" /> Print
             </Button>
-            <span className="text-gray-600 dark:text-gray-300">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              type="button"
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={page === totalPages}
-              variant="pagination"
-              className="rounded-full"
-            >
-              Next
+            <Button variant="primary" onClick={() => setShowAddBank(true)}>
+              <Plus size={16} strokeWidth={1.75} aria-hidden="true" /> Add Bank / Branch
             </Button>
-          </div>
-        </div>
+          </>
+        }
+      />
 
-        <div className="mt-4 overflow-hidden rounded-xl border border-transparent print-area">
-          <div className="grid grid-cols-9 gap-4 px-4 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300">
-            <div>Bank Name</div>
-            <div>Abbreviation</div>
-            <div>Branch</div>
-            <div>Area</div>
-            <div>Random Access Number</div>
-            <div>Phone</div>
-            <div>Manager</div>
-            <div>Fax</div>
-            <div>Email</div>
-          </div>
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {visibleBanks.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-gray-600 dark:text-gray-300">
-                No banks match your search.
-              </div>
-            ) : (
-              visibleBanks.map((bank) => (
-                <div
-                  key={bank.id}
-                  onClick={() => setSelectedBank(bank)}
-                  className="grid grid-cols-9 gap-4 px-4 py-3 text-sm bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition"
-                >
-                  <div className="">{bank.bankName}</div>
-                  <div className="font-semibold text-cyan-600 dark:text-cyan-400">{bank.bankAbbreviation}</div>
-                  <div>{bank.branchName}</div>
-                  <div>{bank.area}</div>
-                  <div>{bank.randomAccessNumber}</div>
-                  <div>{bank.phoneNumber}</div>
-                  <div>{bank.managerName}</div>
-                  <div>{bank.fax}</div>
-                  <div className="truncate" title={bank.email}>{bank.email}</div>
-                </div>
-              ))
-            )}
-          </div>
+      <Criteria className="mt-5">
+        <SearchableSelect
+          className={CRITERION_WIDE}
+          label="Bank"
+          value={filters.bankName}
+          onChange={handleInputChange("bankName")}
+          placeholder="All banks"
+          options={[{ value: '', label: 'All banks' }, ...([...new Set(banks.map(b => b.bankName).filter(Boolean))].sort().map(b => ({ value: b, label: b })))]}
+        />
+        <TextInput
+          className={CRITERION}
+          label="Branch"
+          value={filters.branch}
+          onChange={handleInputChange("branch")}
+          placeholder="Any"
+        />
+        <TextInput
+          className={CRITERION}
+          label="Area"
+          value={filters.area}
+          onChange={handleInputChange("area")}
+          placeholder="Any"
+        />
+        <TextInput
+          className={CRITERION}
+          label="Random access number"
+          kind="identifier"
+          value={filters.randomAccessNumber}
+          onChange={handleInputChange("randomAccessNumber")}
+          placeholder="Any"
+        />
+      </Criteria>
+
+      <Sheet className="mt-4">
+        <div className="print-area">
+          <Table
+            caption="Bank branches"
+            columns={bankColumns}
+            rows={visibleBanks}
+            rowKey="id"
+            loading={listState === 'loading'}
+            error={listState === 'error' ? 'We could not load the bank branches.' : null}
+            onRetry={loadBanks}
+            emptyTitle="No branches match these criteria"
+            emptyMessage="Try a different bank, branch or area."
+            dense
+          />
         </div>
-      </div>
+        <Pager
+          page={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          count={filteredBanks.length}
+          start={startIndex + 1}
+          end={endIndex}
+          noun="branches"
+          loading={listState === 'loading'}
+        />
+      </Sheet>
 
       {selectedBank && (
         <BankBranchModal
@@ -176,6 +197,6 @@ export default function BankBranch() {
         />
       )}
 
-    </div>
+    </Page>
   );
 }

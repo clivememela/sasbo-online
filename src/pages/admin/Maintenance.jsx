@@ -1,10 +1,10 @@
-import {
-    FileBadge, Landmark, LucideArrowUpDown, LucideBrushCleaning,
-    LucideCopyCheck, LucideFileText, LucideFileX,
-    LucideLocate, LucideMails,
-    LucideTable, LucideTreePalm, LucideUserKey, LucideUsers
-} from "lucide-react";
+// ⚠️ ONLY THE THREE ICONS THIS PAGE ACTUALLY RENDERS. Ten more were imported here and used
+// nowhere but inside the commented-out card blocks below -- so a grep for each name found two
+// hits and concluded it was live, while eslint (which reads code, not comments) called all ten
+// dead. eslint was right. Anyone restoring one of those cards restores its icon import with it.
+import { Landmark, LucideCopyCheck, LucideMails } from "lucide-react";
 import NavigationCard from '../../components/common/NavigationCard.jsx';
+import Sheet from '../../components/common/Sheet.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
 import {useOutletContext} from "react-router-dom";
 
@@ -99,9 +99,9 @@ export default function Maintenance() {
     const { setSelectedCardHref, setSideBarOpen } = useOutletContext() || {};
     return (
 
-        <div className="p-6 text-gray-900 dark:text-gray-100">
+        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
             <PageTitle title="Maintenance" subtitle="Select a function to maintain" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto text-center">
+            <Sheet className="mt-6 max-w-4xl divide-y divide-line">
                 {maintenance_cards.map((card) => (
                     <NavigationCard
                         key={`${card.href}-${card.title}`}
@@ -112,7 +112,7 @@ export default function Maintenance() {
                         }}
                     />
                 ))}
-            </div>
+            </Sheet>
         </div>
     );
 }

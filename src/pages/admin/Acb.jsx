@@ -3,6 +3,7 @@ import {
 } from 'lucide-react';
 import PageTitle from "../../components/common/PageTitle.jsx";
 import NavigationCard from "../../components/common/NavigationCard.jsx";
+import Sheet from '../../components/common/Sheet.jsx';
 
 const cards = [
     {
@@ -61,14 +62,17 @@ const cards = [
         color: 'text-red-600 dark:text-red-400'
     },*/
 ];
-console.log("Rendering Acb");
+
+// 🔴 `console.log("Rendering Acb")` WAS HERE, AT MODULE SCOPE -- so it fired once per
+// import rather than per render, which is not what its own text claimed, and it fired in
+// production. Debug output that outlived the debugging session.
 export default function Acb() {
     return (
-        <div className="p-6 text-gray-900 dark:text-gray-100">
+        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
             <PageTitle title="A.C.B Menu" subtitle="Select options below" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto text-center">
+            <Sheet className="mt-6 max-w-4xl divide-y divide-line">
                 {cards.map((card) => <NavigationCard key={card.href} {...card} />)}
-            </div>
+            </Sheet>
         </div>
     );
 }

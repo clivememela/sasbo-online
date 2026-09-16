@@ -26,3 +26,25 @@ dist-ssr
 *.sln
 *.sw?
 /.junie
+
+# Test output. Added with the reporters that write it, in the same commit --
+# an untracked reports/ directory appearing in someone else's working tree
+# after their first test run is a change to their workflow nobody asked for.
+#
+# 🔴 LEADING SLASH, and it matters far more than it looks. A bare `reports` matches a
+# directory of that name AT ANY DEPTH, so it also matched src/pages/reports/ -- and
+# Tailwind v4's automatic source detection SKIPS whatever .gitignore matches. Every
+# tracked file under src/pages/reports/ went unscanned, every utility class unique to
+# those files was absent from the built CSS, and OrganizerReport's section headings
+# rendered white on white: invisible. Found 2026-09-09 by the design arc's contrast
+# gate; register row A42.
+#
+# `git check-ignore <path>` says NOTHING for a TRACKED file, which is why this hid so
+# long -- the obvious command answers "not ignored". --no-index is the load-bearing
+# half. THE GUARD IS src/test/ignoredSources.test.js: it runs in `npm test` and goes
+# red if any tracked source file is shadowed again.
+#
+# The anchored form still ignores the test output at the repo root, which is all this
+# rule was ever for.
+/reports
+/coverage

@@ -1,9 +1,15 @@
-import { useState, useMemo, useEffect } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { AlertCircle, CheckCircle2, Search } from "lucide-react";
 import PageTitle from "../../components/common/PageTitle.jsx";
+import Criteria, { CRITERION, CRITERION_WIDE } from "../../components/common/Criteria.jsx";
 import { TextInput, Button } from "../../components/form";
+import Modal from "../../components/overlay/Modal.jsx";
 import { memberService } from "../../services/memberService.js";
 import { validateSAID } from "../../utils/validateSAID.js";
+import Table from '../../components/table/Table.jsx';
+import Sheet from '../../components/common/Sheet.jsx';
+import StatusChip from '../../components/common/StatusChip.jsx';
+import reportError from '../../lib/reportError.js';
 
 export default function AcbDebits() {
     const [membersList, setMembersList] = useState([]);
@@ -12,6 +18,11 @@ export default function AcbDebits() {
     const [searched, setSearched] = useState(false);
     const [selectedMember, setSelectedMember] = useState(null);
     const [loadingId, setLoadingId] = useState(null);
+    const [notice, setNotice] = useState(null);
+    const noticeRef = useRef(null);
+    useEffect(() => {
+        if (notice) noticeRef.current?.focus();
+    }, [notice]);
     const [confirmed, setConfirmed] = useState(false);
 
     // Edit modal state
@@ -19,7 +30,25 @@ export default function AcbDebits() {
     const [bankForm, setBankForm] = useState({});
     const [saving, setSaving] = useState(false);
 
-    useEffect(() => { memberService.getMembers().then(setMembersList); }, []);
+    /**
+     * 🔴 SAME SHAPE, SAME MISSING `.catch`. And it matters more here than on a listing:
+     * this screen is how a member's debit-order banking gets changed, so "no members match
+     * your search" against a down backend invites somebody to conclude the member is not
+     * on file.
+     *
+     * The table's states are gated on `searched` as well, because an untouched search box
+     * is not an empty result -- it is a question nobody has asked yet.
+     */
+    const [listState, setListState] = useState('loading');
+
+    const loadMembers = useCallback(() => {
+        setListState('loading');
+        return memberService.getMembers()
+            .then((data) => { setMembersList(data ?? []); setListState('ready'); })
+            .catch((err) => { reportError('AcbDebits.loadMembers', err); setListState('error'); });
+    }, []);
+
+    useEffect(() => { loadMembers(); }, [loadMembers]);
 
     const openEdit = () => {
         if (!selectedMember) return;
@@ -28,7 +57,6 @@ export default function AcbDebits() {
             branch: selectedMember.branch || "",
             bankAccountNumber: selectedMember.bankAccountNumber || "",
             ibtNo: selectedMember.ibtNo || "",
-            /*workIbtNo: selectedMember.workIbtNo || "",*/
             bankAddress: selectedMember.bankAddress || "",
             workBankAddress: selectedMember.workBankAddress || "",
             paymentType: selectedMember.paymentType || "",
@@ -47,8 +75,12 @@ export default function AcbDebits() {
             setSelectedMember(updated);
             setEditing(false);
         } catch (err) {
-            console.error(err);
-            alert('Failed to update banking details');
+            reportError('AcbDebits.updateBanking', err);
+            // 🔴 A BANKING CHANGE THAT FAILED, ANNOUNCED IN A DIALOG THE USER DISMISSES.
+            // This screen writes a member's debit-order details; "Failed to update banking
+            // details" arriving as a native modal, and leaving no trace once dismissed, is
+            // the worst place in the application for that pattern.
+            setNotice('Those banking details were not saved. Nothing was written \u2014 check the values and try again.');
         } finally {
             setSaving(false);
         }
@@ -79,7 +111,9 @@ export default function AcbDebits() {
         if (field === "identityNumber") setIdError(val ? validateSAID(val) : null);
     };
 
-    const handleSelectMember = (m) => {
+    // Stable, because `memberColumns` closes over it: a callback rebuilt every render
+    // rebuilds the column list every render, which rebuilds every cell.
+    const handleSelectMember = useCallback((m) => {
         if (selectedMember?.id === m.id) { setSelectedMember(null); setConfirmed(false); return; }
         setConfirmed(false);
         setLoadingId(m.id);
@@ -87,100 +121,133 @@ export default function AcbDebits() {
             .then(full => { setSelectedMember(full); })
             .catch(() => { setSelectedMember(m); })
             .finally(() => setLoadingId(null));
-    };
+    }, [selectedMember]);
 
-    const statusBadge = (status) => (
-        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-            status === "Active" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-            : status === "Pending" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-            : status === "Suspended" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-            : "bg-gray-100 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300"
-        }`}>{status}</span>
-    );
+    /**
+     * 🔴 THE ROW WAS A `<div onClick>` INSIDE A `grid-cols-5`. Selecting a member for an
+     * ACB banking change -- which is what this screen exists to do -- was mouse-only: no
+     * tab stop, no accessible name, no Enter. `Table` offers no `onRowClick` at all, so
+     * the action is a real button on the membership number.
+     *
+     * 📱 R-RESP-K: five columns do not fit at 390px. ID number and bank drop into the
+     * row's detail panel rather than being crushed or hidden.
+     */
+    const memberColumns = useMemo(() => [
+        {
+            key: 'membershipNumber',
+            header: 'Membership No.',
+            priority: 'essential',
+            cell: (m) => (
+                <button
+                    type="button"
+                    onClick={() => handleSelectMember(m)}
+                    aria-pressed={selectedMember?.id === m.id}
+                    aria-label={`${m.membershipNumber || 'This member'} \u2014 load banking details for ${[m.title, m.initials, m.surname].filter(Boolean).join(' ') || 'this member'}`}
+                    className="touch-target inline-flex items-center gap-2 rounded-sm font-medium text-brand-ink underline-offset-2 hover-hover:hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+                >
+                    {m.membershipNumber}
+                    {loadingId === m.id && (
+                        <span
+                            role="status"
+                            aria-label="Loading banking details"
+                            className="inline-block size-3 animate-spin rounded-full border-2 border-brand border-t-transparent motion-reduce:animate-none"
+                        />
+                    )}
+                </button>
+            ),
+        },
+        {
+            key: 'name',
+            header: 'Name',
+            priority: 'essential',
+            truncate: true,
+            cell: (m) => `${m.title ? `${m.title} ` : ''}${m.initials || ''} ${m.surname || ''}`.trim() || '\u2014',
+        },
+        { key: 'identityNumber', header: 'ID Number', priority: 'secondary', truncate: true, cell: (m) => m.identityNumber || '\u2014' },
+        { key: 'bankName', header: 'Bank', priority: 'secondary', truncate: true, cell: (m) => m.bankName || '\u2014' },
+        { key: 'status', header: 'Status', priority: 'essential', cell: (m) => <StatusChip status={m.status} /> },
+    ], [loadingId, selectedMember, handleSelectMember]);
 
     return (
-        <div className="p-6 text-gray-900 dark:text-gray-100">
+        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
             <PageTitle title="Manage Debits" subtitle="Capture Resubmission Debits" />
 
-            <div className="max-w-4xl mx-auto">
-                {/* Search */}
-                <div className="p-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-4">Member Search</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                        <TextInput label="Surname" value={filters.surname} onChange={handleChange("surname")} placeholder="Search by surname" />
-                        <TextInput label="Membership Number" value={filters.membershipNumber} onChange={handleChange("membershipNumber")} placeholder="Search by membership number" />
-                        <div className="flex flex-col gap-1">
-                            <TextInput label="Identity Number" value={filters.identityNumber} onChange={handleChange("identityNumber")} placeholder="Search by ID number" />
-                            {idError && <p className="text-xs text-red-500 dark:text-red-400">{idError}</p>}
-                        </div>
-                    </div>
-                    <div className="flex gap-2 mt-4">
-                        <Button variant="primary" onClick={handleSearch}>Search</Button>
-                        <Button onClick={handleClear}>Clear</Button>
-                    </div>
+            {/* 🔴 WHAT THE `alert()` BECAME. Focused rather than `role="alert"`: the
+                form primitives already give inline messages that role, and stacking a
+                page-level live region on top is two announcements for one failure. */}
+            {notice && (
+                <div
+                    ref={noticeRef}
+                    tabIndex={-1}
+                    aria-labelledby="acb-notice-title"
+                    className="mt-4 flex items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                >
+                    <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
+                    <p id="acb-notice-title" className="flex-1">{notice}</p>
+                    <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dismiss</Button>
                 </div>
+            )}
+
+            <div className="mt-5 max-w-4xl">
+                {/* The member search -- card.html's criteria row, printed on the page. */}
+                <Criteria label="Member search">
+                    <TextInput className={CRITERION_WIDE} label="Surname" kind="name" value={filters.surname} onChange={handleChange("surname")} placeholder="Any" />
+                    <TextInput className={CRITERION} label="Membership number" kind="identifier" value={filters.membershipNumber} onChange={handleChange("membershipNumber")} placeholder="Any" />
+                    <TextInput className={CRITERION_WIDE} label="Identity number" kind="identifier" value={filters.identityNumber} onChange={handleChange("identityNumber")} placeholder="Any" error={idError || undefined} />
+                    <Button variant="primary" onClick={handleSearch}>
+                        <Search size={16} strokeWidth={1.75} aria-hidden="true" /> Search
+                    </Button>
+                    <Button variant="ghost" onClick={handleClear}>Clear</Button>
+                </Criteria>
 
                 {/* Results */}
                 {searched && (
-                    <div className="mt-6 rounded-2xl shadow-lg bg-white dark:bg-gray-800 overflow-hidden">
-                        <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400">
-                            {results.length} member{results.length !== 1 ? "s" : ""} found
-                        </div>
-                        {results.length === 0 ? (
-                            <p className="px-6 py-6 text-sm text-gray-500 dark:text-gray-400">No members match your search.</p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <div className="grid grid-cols-5 gap-4 px-6 py-3 text-xs uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300">
-                                    <div>Membership No.</div>
-                                    <div>Name</div>
-                                    <div>ID Number</div>
-                                    <div>Bank</div>
-                                    <div>Status</div>
-                                </div>
-                                <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                                    {results.map(m => (
-                                        <div
-                                            key={m.id}
-                                            onClick={() => handleSelectMember(m)}
-                                            className={`grid grid-cols-5 gap-4 px-6 py-3 text-sm cursor-pointer transition ${
-                                                selectedMember?.id === m.id
-                                                    ? "bg-cyan-50 dark:bg-cyan-900/20"
-                                                    : "hover:bg-gray-50 dark:hover:bg-gray-700"
-                                            }`}
-                                        >
-                                            <div className="font-medium flex items-center gap-2">
-                                                {m.membershipNumber}
-                                                {loadingId === m.id && (
-                                                    <span className="w-3 h-3 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin inline-block" />
-                                                )}
-                                            </div>
-                                            <div className="truncate">{m.title ? `${m.title} ` : ""}{m.initials} {m.surname}</div>
-                                            <div className="truncate">{m.identityNumber}</div>
-                                            <div className="truncate">{m.bankName}</div>
-                                            <div>{statusBadge(m.status)}</div>
-                                        </div>
-                                    ))}
-                                </div>
+                    <Sheet className="mt-6">
+                        {/* 🔴 A COUNT IS A FACT ABOUT DATA THAT ARRIVED, and this one used to be
+                            stated whatever happened. On a failed load the table below said "We
+                            could not load the member list." while this line above it asserted
+                            "0 members found" -- so the screen that changes a member's debit order
+                            told an administrator both that something had gone wrong and that
+                            their search was simply too narrow, and the second sentence is the one
+                            that invites them to widen it and try again forever. While loading it
+                            was worse: a confident zero under a spinner. conventions §8 -- the
+                            count and the empty copy render ONLY when the data genuinely
+                            resolved. The state's own words are the table's job. */}
+                        {listState === 'ready' && (
+                            <div className="px-6 py-3 border-b border-line text-sm text-ink-muted">
+                                {results.length} member{results.length !== 1 ? "s" : ""} found
                             </div>
                         )}
-                    </div>
+                        <Table
+                            caption="Members matching the ACB search"
+                            columns={memberColumns}
+                            rows={results}
+                            rowKey="id"
+                            loading={listState === 'loading'}
+                            error={listState === 'error' ? 'We could not load the member list.' : null}
+                            onRetry={loadMembers}
+                            emptyTitle="No members match your search."
+                            emptyMessage="Try a different membership or identity number."
+                            dense
+                        />
+                    </Sheet>
                 )}
 
                 {/* Banking Details & Confirmation */}
                 {selectedMember && (
-                    <div className="mt-4 rounded-2xl shadow-lg bg-white dark:bg-gray-800 overflow-hidden">
+                    <Sheet className="mt-4">
                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                        <div className="px-6 py-4 border-b border-line flex items-center justify-between">
                             <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Banking Details</p>
-                                <p className="mt-0.5 font-semibold text-gray-900 dark:text-gray-100">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Banking Details</p>
+                                <p className="mt-0.5 font-semibold text-ink">
                                     {selectedMember.title ? `${selectedMember.title} ` : ""}{selectedMember.initials} {selectedMember.surname}
-                                    <span className="ml-2 text-gray-400 font-normal text-sm">· {selectedMember.membershipNumber}</span>
+                                    <span className="ml-2 text-ink-muted font-normal text-sm">· {selectedMember.membershipNumber}</span>
                                 </p>
                             </div>
                             <div className="flex items-center gap-3">
                                 <Button onClick={openEdit}>Edit Details</Button>
-                                {statusBadge(selectedMember.status)}
+                                <StatusChip status={selectedMember.status} />
                             </div>
                         </div>
 
@@ -198,22 +265,22 @@ export default function AcbDebits() {
                                 ["Deduct via ACB", selectedMember.deductACB],
                             ].map(([label, val]) => (
                                 <div key={label}>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-                                    <p className="mt-0.5 font-semibold text-gray-800 dark:text-gray-200">{val || "-"}</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{label}</p>
+                                    <p className="mt-0.5 font-semibold text-ink">{val || "-"}</p>
                                 </div>
                             ))}
                         </div>
 
                         {/* Confirmation footer */}
-                        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                        <div className="px-6 py-4 border-t border-line bg-surface-2">
                             {confirmed ? (
-                                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm font-semibold">
+                                <div className="flex items-center gap-2 text-status-active text-sm font-semibold">
                                     <CheckCircle2 size={18} />
                                     Banking details confirmed for {selectedMember.initials} {selectedMember.surname}
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-4">
-                                    <p className="text-sm text-gray-600 dark:text-gray-400 flex-1">
+                                    <p className="text-sm text-ink-muted flex-1">
                                         Please verify the banking details above are correct before confirming the re-debit.
                                     </p>
                                     <Button variant="primary" onClick={() => setConfirmed(true)}>Confirm Details</Button>
@@ -222,30 +289,33 @@ export default function AcbDebits() {
                             )}
                         </div>
 
-                        {/* Edit Modal */}
-                        {editing && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                                <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl p-6">
-                                    <h3 className="text-lg font-semibold mb-4">Update Banking Details</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* 🔴 `03.4`: was a bare `fixed inset-0` div -- not portalled, no focus
+                            trap, no Escape, no scroll lock. Tab walked straight out of it into the
+                            page behind. `Modal` brings all four, and the dvh height cap with them. */}
+                        <Modal
+                            open={editing}
+                            onOpenChange={setEditing}
+                            title="Update Banking Details"
+                            size="lg"
+                            footer={
+                                <>
+                                    <Button onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
+                                    <Button variant="primary" onClick={saveBanking} loading={saving}>Update</Button>
+                                </>
+                            }
+                        >
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <TextInput label="Bank" value={bankForm.bankName} onChange={handleBankChange('bankName')} />
                                         <TextInput label="Branch" value={bankForm.branch} onChange={handleBankChange('branch')} />
                                         <TextInput label="Account Number" value={bankForm.bankAccountNumber} onChange={handleBankChange('bankAccountNumber')} />
                                         <TextInput label="IBT No." value={bankForm.ibtNo} onChange={handleBankChange('ibtNo')} />
-                                        {/*<TextInput label="Work IBT No." value={bankForm.workIbtNo} onChange={handleBankChange('workIbtNo')} />*/}
                                         <TextInput label="Payment Type" value={bankForm.paymentType} onChange={handleBankChange('paymentType')} />
                                         <TextInput label="Debit Day" value={bankForm.debitDay} onChange={handleBankChange('debitDay')} />
                                         <TextInput label="Bank Address" value={bankForm.bankAddress} onChange={handleBankChange('bankAddress')} />
-                                        <TextInput label="Work Bank Address" value={bankForm.workBankAddress} onChange={handleBankChange('workBankAddress')} />
-                                    </div>
-                                    <div className="flex justify-end gap-2 mt-6">
-                                        <Button onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
-                                        <Button variant="primary" onClick={saveBanking} disabled={saving}>{saving ? 'Updating...' : 'Update'}</Button>
-                                    </div>
-                                </div>
+                                <TextInput label="Work Bank Address" value={bankForm.workBankAddress} onChange={handleBankChange('workBankAddress')} />
                             </div>
-                        )}
-                    </div>
+                        </Modal>
+                    </Sheet>
                 )}
             </div>
         </div>

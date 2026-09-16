@@ -38,6 +38,21 @@ export const REP_OPTIONS = [
   'Viviana van Agtmaal', 'Yatin Narsai', 'Yongzhi Ban', 'Yvonne Holenstein',
 ];
 
+/*
+ * THE CAPTURE FORM'S TABS -- and only the capture form's.
+ *
+ * 🔑 THIS IS A CLOSED LIST WITH TWO THINGS HOLDING IT. `memberConstants.test.js` pins these
+ * labels exactly, and the automation suite's capture catalogue drives each tab BY LABEL
+ * (`pages/MemberCapturePage.js`), so renaming one here without moving that suite breaks its
+ * scenarios. That is why these stay the long phrases: this is a wide form and they fit.
+ *
+ * 🔴 THE RECORD PANEL KEEPS ITS OWN LIST, AND FOR A PRODUCT REASON. The design branch had
+ * briefly made `Members.jsx` read this constant too, on the argument that two lists could
+ * drift. Main then removed "Sasbo Structures" from CAPTURE (client 4a7a67b) while keeping it
+ * on the member's RECORD -- so the two lists are meant to differ, and one shared list would
+ * have taken the Structures tab off every member's record. See `RECORD_TABS` in
+ * `Members.jsx`.
+ */
 export const MEMBER_TABS = [
   { id: 'personal', label: 'Personal Information' },
   { id: 'employment', label: 'Employment & Bank' },
@@ -80,7 +95,6 @@ export const MEMBER_FIELD_LABEL_MAP = {
   bankAccountNumber: 'Bank Account Number',
   branch: 'Bank Branch Where Member Works',
   ibtNo: 'IBT No.',
-  /*workIbtNo: 'Work IBT No.',*/
   paymentType: 'Payment Type',
   debitDay: 'Day to be debited',
   bankAddress: 'Bank Address',
