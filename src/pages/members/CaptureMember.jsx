@@ -1,9 +1,10 @@
 import { useRef, useState, useEffect, useMemo } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
-import { memberService } from "../../services/memberService.js";
-import { recruiterService } from "../../services/recruiterService.js";
-import { jobGradeService } from "../../services/jobGradeService.js";
-import { bankService } from "../../services/bankService.js";
+import WelcomeLetter from "../../components/members/WelcomeLetter";
+import { memberService } from "@/services/memberService.js";
+import { recruiterService } from "@/services/recruiterService.js";
+import { jobGradeService } from "@/services/jobGradeService.js";
+import { bankService } from "@/services/bankService.js";
 import PageTitle from "../../components/common/PageTitle";
 import {
     Button, DateField, PositionTreeSelect, SearchableSelect, SelectInput, TextInput,
@@ -120,6 +121,7 @@ export default function CaptureMember() {
 
     const [fieldErrors, setFieldErrors] = useState({});
     const [showSavedNotification, setShowSavedNotification] = useState(false);
+    const [welcomeMember, setWelcomeMember] = useState(null);
     /*
      * ✅ THE FOUR SILENT MOUNT LOADS, REPLACED BY ONE SET (EH-D9).
      *
@@ -281,9 +283,10 @@ export default function CaptureMember() {
 
         setSaveNotice(null);
         memberService.createMember(form)
-            .then(() => {
+            .then((saved) => {
                 setShowSavedNotification(true);
                 setTimeout(() => setShowSavedNotification(false), 3000);
+                setWelcomeMember({ ...form, id: saved?.id });
             })
             .catch((err) => setSaveNotice({
                 kind: "failed",
@@ -366,6 +369,12 @@ export default function CaptureMember() {
     }, [form.bankName, bankListing, jobGradeAttempt]);
 
     return (
+        <>
+        <WelcomeLetter
+            open={!!welcomeMember}
+            onClose={() => setWelcomeMember(null)}
+            member={welcomeMember}
+        />
         <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
             {/* BR-18: the page's only <h1>, from the shared component, so this route stops
                 being one of the nine with no heading of its own. */}
@@ -595,6 +604,7 @@ export default function CaptureMember() {
                 </div>
             </div>
         </div>
+        </>
     );
 }
 
