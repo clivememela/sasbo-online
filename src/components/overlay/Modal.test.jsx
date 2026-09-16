@@ -5,6 +5,7 @@ import { useState } from 'react'
 
 import Modal, { ConfirmDialog } from './Modal'
 import Button from '../form/Button'
+import DateField from '../form/DateField'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { expectNoA11yViolations } from '../../test/assertions'
 import { setupUser } from '../../test/user'
@@ -30,6 +31,78 @@ function Harness({ modalProps = {}, children = <p>Body</p> }) {
     </div>
   )
 }
+
+/** A date inside a dialog, as Recruiters' Add Recruiter and Recruiter details both have one. */
+function DateInModal() {
+  const [open, setOpen] = useState(true)
+  const [value, setValue] = useState('')
+  return (
+    <Modal open={open} onOpenChange={setOpen} title="Add Recruiter">
+      <DateField label="Election Date" value={value} onChange={(event) => setValue(event.target.value)} />
+    </Modal>
+  )
+}
+
+/**
+ * 🔴 R2-F1 (P9's independent review, FIX-NOW): A DATE COULD NOT BE CHOSEN INSIDE A DIALOG.
+ *
+ * `DateField` portalled its calendar to `document.body`, which put it OUTSIDE the Radix dialog it was opened from --
+ * and a modal Radix dialog owns everything outside itself: it sets `pointer-events: none` on the body, traps focus
+ * inside its own DOM, and takes Escape on the document in the capture phase. So the calendar opened, and then no day
+ * could be pressed (the press fell through to whatever lay beneath, or dismissed the dialog with everything typed in
+ * it), the keyboard route was pulled back out of the grid, and Escape closed the dialog instead of the calendar.
+ * Reproduced in a real browser with real input before it was fixed: at 1440 the dialog closed and took the form with
+ * it; at 390 the press landed on a table cell under the sheet. The record panel's date, in no dialog, worked.
+ *
+ * ⚠️ user-event refuses to press an element that has or inherits `pointer-events: none` -- which is exactly the
+ * failure a person met, so the second test fails for the real reason, not a jsdom one.
+ */
+describe('Modal — a date field inside it works (R2-F1)', () => {
+  const dayTen = (calendar) =>
+    within(calendar).getAllByRole('gridcell').find((cell) => cell.textContent.trim() === '10' && cell.getAttribute('aria-disabled') !== 'true')
+
+  it('opens its calendar INSIDE the dialog -- inside its focus trap, its pointer layer and its dismissal', async () => {
+    const user = setupUser()
+    renderWithProviders(<DateInModal />)
+    const dialog = screen.getByRole('dialog', { name: 'Add Recruiter' })
+
+    await user.click(within(dialog).getByRole('combobox', { name: /election date/i }))
+    const calendar = screen.getByRole('dialog', { name: /choose election date/i })
+
+    expect(dialog.contains(calendar), 'the calendar was portalled outside the dialog it was opened from').toBe(true)
+  })
+
+  it('a day pressed with a pointer is chosen, and the dialog stays open', async () => {
+    const user = setupUser()
+    renderWithProviders(<DateInModal />)
+    const dialog = screen.getByRole('dialog', { name: 'Add Recruiter' })
+    const field = within(dialog).getByRole('combobox', { name: /election date/i })
+
+    await user.click(field)
+    await user.click(dayTen(screen.getByRole('dialog', { name: /choose election date/i })))
+
+    expect(field.value).not.toBe('')
+    expect(screen.getByRole('dialog', { name: 'Add Recruiter' })).toBeInTheDocument()
+  })
+
+  it('Escape closes the calendar first, and leaves the dialog -- and what was typed in it -- open', async () => {
+    const user = setupUser()
+    renderWithProviders(<DateInModal />)
+    const dialog = screen.getByRole('dialog', { name: 'Add Recruiter' })
+    const field = within(dialog).getByRole('combobox', { name: /election date/i })
+
+    await user.click(field)
+    expect(field).toHaveAttribute('aria-expanded', 'true')
+
+    await user.keyboard('{Escape}')
+    expect(field).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('dialog', { name: 'Add Recruiter' })).toBeInTheDocument()
+
+    // ...and the must-pass beside it: with nothing open inside, Escape still closes the dialog.
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Add Recruiter' })).toBeNull()
+  })
+})
 
 describe('Modal — the four things the hand-rolled overlays lack', () => {
   it('is PORTALLED out of its parent, so no page overflow can clip it', async () => {

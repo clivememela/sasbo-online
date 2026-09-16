@@ -93,6 +93,22 @@ export default function Modal({
   const block = dismissible ? undefined : (event) => event.preventDefault();
 
   /**
+   * 🔴 ESCAPE BELONGS TO A POPUP OPEN INSIDE THE DIALOG FIRST (R2-F1, R2-F2). Radix takes Escape on the document in the
+   * CAPTURE phase, before a calendar or a list inside the dialog can hear it -- so the key meant to close the calendar
+   * closed the dialog, and everything typed into it. While a combobox or a popup trigger inside is expanded, the
+   * dialog lets that control have the key; the next Escape, with nothing open, closes the dialog as before. Scoped to
+   * popups on purpose: an expanded table row is not one, and Escape must still close a dialog that holds one.
+   */
+  const contentRef = useRef(null);
+  const onEscapeKeyDown = (event) => {
+    if (contentRef.current?.querySelector('[role="combobox"][aria-expanded="true"], [aria-haspopup][aria-expanded="true"]')) {
+      event.preventDefault();
+      return;
+    }
+    block?.(event);
+  };
+
+  /**
    * 🔴 FOCUS RESTORE, WHICH RADIX COULD NOT DO FOR US HERE — AND FAILED SILENTLY.
    *
    * Radix returns focus to `Dialog.Trigger` on close. This primitive is deliberately
@@ -138,7 +154,14 @@ export default function Modal({
           )}
         />
 
+        {/* 🔴 CENTRED BY A GRID, NEVER BY A TRANSFORM (R2-F1). The content used to sit at `left-1/2 top-1/2` pulled back
+            by `-translate-1/2`, and a transformed element is the containing block for every `position: fixed` inside
+            it -- so a calendar could not be placed inside the dialog, was portalled to the body instead, and landed
+            outside the dialog's focus trap, pointer layer and Escape handling. The wrapper passes pointer presses
+            through to the overlay, so a press outside the content still dismisses. */}
+        <div className="pointer-events-none fixed inset-0 z-50 grid place-items-center">
         <Dialog.Content
+          ref={contentRef}
           // 🔑 A CONDITIONAL SPREAD, not a ternary. Radix warns when a dialog has no
           // Description, and the tempting silencer — an `sr-only` Description holding the
           // title — makes a screen reader announce the name TWICE ("Member details. Member
@@ -152,12 +175,12 @@ export default function Modal({
           // it always passes the key, and would have silently broken the association on
           // every dialog that DOES have a description.
           {...(description ? {} : { 'aria-describedby': undefined })}
-          onEscapeKeyDown={block}
+          onEscapeKeyDown={onEscapeKeyDown}
           onPointerDownOutside={block}
           onInteractOutside={block}
           onCloseAutoFocus={returnFocus}
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2',
+            'relative z-50 w-[calc(100%-2rem)]',
             // 📱 `dvh`, never `vh`. The cap and the internal scroll are the primitive's, so
             // a long form cannot push its own Save button off the bottom of a phone.
             'flex max-h-[85dvh] flex-col overflow-hidden',
@@ -212,6 +235,7 @@ export default function Modal({
             </div>
           )}
         </Dialog.Content>
+        </div>
       </Dialog.Portal>
     </Dialog.Root>
   );

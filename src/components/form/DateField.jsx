@@ -177,6 +177,12 @@ export default function DateField({
   // `setState` inside an effect for no gain.
   const keyboardMoved = useRef(false);
   const [position, setPosition] = useState({ top: 0, left: 0, above: false });
+  /**
+   * 🔴 WHERE THE CALENDAR IS PORTALLED: INTO THE DIALOG IT WAS OPENED FROM, when there is one (R2-F1). On the body, a
+   * calendar opened from a modal dialog was outside that dialog's pointer layer, focus trap and Escape handling -- no
+   * day could be pressed. Read when the calendar OPENS, from the event, never from a ref during render.
+   */
+  const [portalTo, setPortalTo] = useState(null);
 
   const now = todayDate();
 
@@ -230,6 +236,7 @@ export default function DateField({
 
   const openPicker = useCallback(() => {
     if (disabled) return;
+    setPortalTo(inputRef.current?.closest('[role="dialog"][data-state]') ?? null);
     const start = parseDate(text) ?? selected ?? todayDate();
     setCursor(start);
     setFocusDay(start);
@@ -775,7 +782,7 @@ export default function DateField({
                 {isSheet && <div aria-hidden="true" className="fixed inset-0 z-50 bg-ink/40" />}
                 {renderPanel()}
               </div>,
-              document.body,
+              portalTo ?? document.body,
             )}
         </div>
       )}
