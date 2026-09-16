@@ -14,12 +14,12 @@ import {
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, YES_NO_OPTIONS,
     SUSPENSION_CODE_OPTIONS, MEMBER_TABS,
     BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS
-} from "../../config/memberConstants.js";
+} from "@/config/memberConstants.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
-    formatDate } from "../../utils/validateSAID.js";
+    formatDate } from "@/utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils.js";
 import useReferenceData from "../../hooks/useReferenceData.js";
 
 const FIELD_TO_TAB_MAP = {
@@ -301,8 +301,6 @@ export default function CaptureMember() {
     const frequencyOptions = FREQUENCY_OPTIONS;
     const identityTypeOptions = IDENTITY_TYPE_OPTIONS;
     const genderOptions = GENDER_OPTIONS;
-    const yesNoOptions = YES_NO_OPTIONS;
-    const suspensionCodeOptions = SUSPENSION_CODE_OPTIONS;
     const [jobGradeOptions, setJobGradeOptions] = useState([]);
     const [jobGradeLoading, setJobGradeLoading] = useState(false);
     /*
