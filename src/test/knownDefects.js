@@ -366,6 +366,18 @@ export const DEFECTS = {
   ),
 }
 
+DEFECTS.A29 = define(
+  'A29',
+  'editing a bank branch crashes the branch screen',
+  'The API returns physicalAddress as an OBJECT ({streetName, streetNumber, suburb, ...}) for ' +
+    'every seeded branch. BankBranchModal hands it unchanged to AddressAutocomplete, whose ' +
+    'debounce effect calls query.trim() on mount, so clicking Edit throws ' +
+    '"query.trim is not a function". The read-only view survives only because DetailItem ' +
+    'formats objects. Found 2026-09-05 by the browser suite; pinned here 2026-09-16. ' +
+    '⚠️ Since the design merge the ErrorBoundary beside the outlet keeps the shell ' +
+    'standing -- the screen falls, not the application. Still this row.',
+)
+
 export const DEFECT_ROWS = Object.keys(DEFECTS)
 
 /**
