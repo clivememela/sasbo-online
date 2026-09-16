@@ -378,6 +378,16 @@ DEFECTS.A29 = define(
     'standing -- the screen falls, not the application. Still this row.',
 )
 
+DEFECTS.A47 = define(
+  'A47',
+  'the failed member register still counts zero around its own error',
+  'When GET /api/members fails, the table correctly says "The register could not be reached" ' +
+    '(A27, retired) -- but Pager is handed `loading` and never the error, so it renders ' +
+    '"No members match", and FigureStrip computes its figures from the empty list and shows ' +
+    'Total 0. An unknown is shown as a zero twice on the screen that learned not to. ' +
+    'Found 2026-09-16 by the browser suite against a stopped API container.',
+)
+
 export const DEFECT_ROWS = Object.keys(DEFECTS)
 
 /**
