@@ -11,8 +11,7 @@ import {
 } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
-    STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, YES_NO_OPTIONS,
-    SUSPENSION_CODE_OPTIONS, MEMBER_TABS,
+    STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, MEMBER_TABS,
     BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS
 } from "@/config/memberConstants.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
@@ -84,7 +83,7 @@ export default function CaptureMember() {
         workTel: "",
         homeTel: "",
         address: "",
-        joinDate: new Date().toISOString().split("T"),
+        joinDate: new Date().toISOString().split("T")[0],
         status: "Active",
         monthlySubscription: "",
         subscriptionFrequency: "Monthly",
