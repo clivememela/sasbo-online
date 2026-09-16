@@ -128,7 +128,7 @@ async function openEmploymentTab(user) {
 }
 
 describe('the job-grade dropdown', () => {
-  it('shows each grade LABEL as its text and carries the grade CODE as its value', async () => {
+  it('shows the grade CODE as its text and carries the same code as its value', async () => {
     const user = setupUser()
     renderWithProviders(<CaptureMember />)
 
@@ -138,12 +138,14 @@ describe('the job-grade dropdown', () => {
     // separate: `textContent` is what the administrator reads and `value` is
     // what the form submits. Asserting only the visible text would pass while
     // the wrong thing was being saved -- which is this defect class exactly.
-    const clerk = await waitFor(() =>
-      screen.getByRole('option', { name: 'C1 - Clerk - Permanent' }),
-    )
+    //
+    // 🔑 SINCE MAIN a23fb81 (2026-09-16) THE TEXT IS THE BARE GRADE, not "C1 - Clerk -
+    // Permanent": the fixture still sends the long label, and the service now forces
+    // the label to the grade. The `[object Object]` regression this pins is unchanged.
+    const clerk = await waitFor(() => screen.getByRole('option', { name: 'C1' }))
 
     expect(clerk).toHaveValue('C1')
-    expect(clerk.textContent).toBe('C1 - Clerk - Permanent')
+    expect(clerk.textContent).toBe('C1')
   })
 
   it('renders a grade with no description as its bare code, with no dangling separator', async () => {
@@ -204,7 +206,7 @@ describe('changing the bank -- main e56dbe4', () => {
     renderWithProviders(<CaptureMember />)
     await chooseBank(user)
 
-    const clerk = await screen.findByRole('option', { name: 'C1 - Clerk - Permanent' })
+    const clerk = await screen.findByRole('option', { name: 'C1' })
     const grade = clerk.closest('select')
     await user.selectOptions(grade, 'C1')
     return grade
@@ -233,7 +235,7 @@ describe('changing the bank -- main e56dbe4', () => {
     await user.click(await screen.findByRole('option', { name: SECOND_BANK.bankName }))
 
     await waitFor(() =>
-      expect(screen.getByRole('option', { name: 'C1 - Clerk - Permanent' }).closest('select')).toHaveValue(''),
+      expect(screen.getByRole('option', { name: 'C1' }).closest('select')).toHaveValue(''),
     )
   })
 })
@@ -288,7 +290,7 @@ describe("when the job grades cannot be fetched -- A25’s second clause", () =>
     server.use(http.get('*/api/job-grades', () => HttpResponse.json(GRADES)))
     await user.click(screen.getByRole('button', { name: 'Try again' }))
 
-    expect(await screen.findByRole('option', { name: 'C1 - Clerk - Permanent' })).toHaveValue('C1')
+    expect(await screen.findByRole('option', { name: 'C1' })).toHaveValue('C1')
   })
 
   it('leaves the rest of the form working -- the failure is per-panel', async () => {
