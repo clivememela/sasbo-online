@@ -32,8 +32,8 @@ import { join } from 'node:path';
 
 import { launch } from './cdp.mjs';
 import {
-  SETTLED, clickByText, mouseDownOn, overflowProbe, pageReady, populationComplaints, storeTheme,
-  themeDimensionComplaints, themeReadout,
+  BOUNDARY_SHOWN, PAGE_CENSUS, SETTLED, clickByText, mouseDownOn, overflowProbe, pageReady, populationComplaints,
+  scrollIntoView, storeTheme, themeDimensionComplaints, themeReadout, typeInto,
 } from './probe.mjs';
 
 const args = process.argv.slice(2);
@@ -240,39 +240,12 @@ const FOOTER_CLEAR_OF_CARD = `(() => {
   return footer.getBoundingClientRect().top >= card.getBoundingClientRect().bottom;
 })()`;
 
-/**
- * What a page that never became ready WAS showing. A readiness failure is diagnosed from this,
- * never "fixed" by running the shot again (the owner's anti-flake rule).
+/*
+ * `PAGE_CENSUS`, `typeInto`, `scrollIntoView` and `BOUNDARY_SHOWN` lived here until `surfaces.mjs` (`07.2`) needed
+ * them too. They are probe.mjs's now, beside the other shared drivers.
  */
-const PAGE_CENSUS = `(() => ({
-  href: location.href,
-  readyState: document.readyState,
-  fonts: document.fonts.status,
-  routePending: !!document.querySelector('[data-testid="route-pending"]'),
-  rootChildren: document.getElementById('root')?.children.length ?? 0,
-  rows: document.querySelectorAll('tr[data-row]').length,
-  skeletons: document.querySelectorAll('tr[data-skeleton]').length,
-  states: [...document.querySelectorAll('[data-state]')].map((n) => n.dataset.state),
-  text: (document.body?.innerText || '').replace(/\\s+/g, ' ').slice(0, 240),
-}))()`;
-
-const typeInto = (selector, value) => `(() => {
-  const input = document.querySelector(${JSON.stringify(selector)});
-  if (!input) return false;
-  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)});
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  return true;
-})()`;
-
-const scrollIntoView = (selector) => `(() => {
-  const el = document.querySelector(${JSON.stringify(selector)});
-  if (!el) return false;
-  el.scrollIntoView({ block: 'start' });
-  return true;
-})()`;
 
 /** A11's box: the designed fallback is up, the shell is still standing, and no build artefact shows. */
-const BOUNDARY_SHOWN = `!!document.querySelector('[data-testid="route-error"]')`;
 const SHELL_STANDING = `!!document.querySelector('nav[aria-label="Main"]') && !!document.querySelector('header input[type="search"]')`;
 const NO_BUILD_ARTEFACT = `!/assets\\/|\\.js\\b|dynamically imported/i.test(document.querySelector('[data-testid="route-error"]')?.innerText || '')`;
 
@@ -434,51 +407,13 @@ let cdp;
 
 try {
   cdp = await launch('review');
-  const { send, evaluate, metrics, waitFor, assertBuiltClient, on } = cdp;
+  const { send, evaluate, metrics, waitFor, assertBuiltClient, intercept } = cdp;
 
   entry = await assertBuiltClient(baseUrl);
   console.log('identity OK — entry script', entry);
 
-  /**
-   * Make one request pattern fail, hang or come back empty for the length of one shot, and return
-   * the teardown. Anything held is released on the way out, so no shot inherits a request the
-   * previous one left hanging. A CDP call that fails here is RETURNED, and it fails the shot.
-   */
-  const intercept = async ({ url, mode, body }) => {
-    const held = [];
-    const problems = [];
-    // `empty` answers `[]`; `fulfill` answers with the shot's own payload.
-    const payload = mode === 'empty' ? [] : mode === 'fulfill' ? await body() : null;
-    const off = on('Fetch.requestPaused', ({ requestId }) => {
-      if (mode === 'hang') { held.push(requestId); return; }
-      const answer = mode === 'fail'
-        ? send('Fetch.failRequest', { requestId, errorReason: 'ConnectionRefused' })
-        : send('Fetch.fulfillRequest', {
-          requestId,
-          responseCode: 200,
-          responseHeaders: [{ name: 'content-type', value: 'application/json' }],
-          body: Buffer.from(JSON.stringify(payload)).toString('base64'),
-        });
-      answer.catch((e) => problems.push(e.message));
-    });
-    // 🔑 THE CACHE IS OFF FOR AN INTERCEPTED SHOT. A route chunk an earlier shot already loaded is
-    // served from memory without ever reaching the network -- so an interception of it would pause
-    // nothing, and the "failed chunk" shot would photograph a page that loaded perfectly.
-    await send('Network.enable');
-    await send('Network.setCacheDisabled', { cacheDisabled: true });
-    await send('Fetch.enable', { patterns: [{ urlPattern: url, requestStage: 'Request' }] });
-    return async () => {
-      off();
-      for (const requestId of held) {
-        // The page that held it may already be gone; an unknown request id is the expected answer.
-        await send('Fetch.failRequest', { requestId, errorReason: 'Aborted' }).catch(() => {});
-      }
-      await send('Fetch.disable');
-      await send('Network.setCacheDisabled', { cacheDisabled: false });
-      await send('Network.disable');
-      return problems;
-    };
-  };
+  // The interception driver -- fail, hang, empty or fulfil one request pattern for one shot -- is cdp.mjs's
+  // `intercept`, shared with surfaces.mjs (`07.2`).
 
   for (const shot of selected) {
     const vp = VIEWPORTS[shot.vp];

@@ -208,6 +208,10 @@ try {
           const quiet = await waitFor(NOTHING_LOADING, { tries: 120 });
           const arrived = requestFailures.length === 0;
           const threw = await evaluate(`!!document.querySelector('[data-testid="route-error"]')`);
+          // 🔴 THE THEME THE ROW ASKED FOR, CHECKED ON THE PAGE BEFORE IT IS PHOTOGRAPHED (findings.md F-P56). The run-level
+          // canary once caught a first row rendered dark with nothing to say why, and four explanations were refuted
+          // without a trace to test them against. A wrong row is now refused, and it names what a cause would show.
+          const wrongTheme = paint?.dark !== (theme === 'dark');
           if (!quiet) {
             failures += 1;
             console.log(`  ⚠ STILL LOADING  ${vp.label} ${theme} ${route} — not photographed`);
@@ -217,11 +221,25 @@ try {
           } else if (threw) {
             failures += 1;
             console.log(`  ⚠ ROUTE ERROR  ${vp.label} ${theme} ${route} — not photographed: ${pageErrors.slice(0, 3).join(' · ') || 'the page reported nothing'}`);
+          } else if (wrongTheme) {
+            failures += 1;
+            const why = await evaluate(`({
+              stored: (() => { try { return localStorage.getItem('darkMode'); } catch { return 'unreadable'; } })(),
+              htmlClass: document.documentElement.className,
+              navigation: performance.getEntriesByType('navigation')[0]?.type ?? null,
+              referrer: document.referrer,
+              href: location.href,
+            })`);
+            let pages = 'unlisted';
+            try {
+              pages = (await (await fetch(`http://127.0.0.1:${cdp.port}/json/list`)).json()).filter((t) => t.type === 'page').map((t) => t.url).join(' | ');
+            } catch { /* the page list is a diagnostic, never a reason to stop */ }
+            console.log(`  ⚠ WRONG THEME  ${vp.label} ${theme} ${route} — not photographed: ${JSON.stringify(why)} · pages: ${pages}`);
           } else {
             await evaluate(FREEZE);
             await evaluate('new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))', { awaitPromise: true });
           }
-          if (!quiet || !arrived || threw) continue;
+          if (!quiet || !arrived || threw || wrongTheme) continue;
         }
         if (shotsDir) {
           const { data } = await send('Page.captureScreenshot', { format: 'png' });

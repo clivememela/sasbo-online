@@ -51,6 +51,8 @@ const PORTS = Object.freeze({
   probe: 9700,
   motion: 9750,
   review: 9800,
+  surfaces: 9850,
+  vitals: 9900,
 });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -159,6 +161,51 @@ export async function launch(tag, { flags = [] } = {}) {
   await send('Runtime.enable');
 
   /**
+   * Make one request pattern -- or several -- fail, hang, come back empty or answer with a payload for the length of
+   * one capture, and return the teardown. Anything held is released on the way out, so no capture inherits a request
+   * the previous one left hanging. A CDP call that fails here is RETURNED by the teardown, and it fails the capture.
+   *
+   * 🔑 MOVED HERE FROM `review.mjs` when `surfaces.mjs` (`07.2`) needed it too. The stub server answers every path the
+   * same way every time, so a failed, hung or empty list is reached only in the browser -- and a second copy of the
+   * one driver that reaches them would drift the way three copies of the overflow probe did (probe.mjs).
+   */
+  const intercept = async ({ url, mode, body }) => {
+    const held = [];
+    const problems = [];
+    // `empty` answers `[]`; `fulfill` answers with the capture's own payload.
+    const payload = mode === 'empty' ? [] : mode === 'fulfill' ? await body() : null;
+    const off = on('Fetch.requestPaused', ({ requestId }) => {
+      if (mode === 'hang') { held.push(requestId); return; }
+      const answer = mode === 'fail'
+        ? send('Fetch.failRequest', { requestId, errorReason: 'ConnectionRefused' })
+        : send('Fetch.fulfillRequest', {
+          requestId,
+          responseCode: 200,
+          responseHeaders: [{ name: 'content-type', value: 'application/json' }],
+          body: Buffer.from(JSON.stringify(payload)).toString('base64'),
+        });
+      answer.catch((e) => problems.push(e.message));
+    });
+    // 🔑 THE CACHE IS OFF FOR AN INTERCEPTED CAPTURE. A route chunk an earlier capture already loaded is served from
+    // memory without ever reaching the network -- so an interception of it would pause nothing, and the "failed
+    // chunk" capture would photograph a page that loaded perfectly.
+    await send('Network.enable');
+    await send('Network.setCacheDisabled', { cacheDisabled: true });
+    await send('Fetch.enable', { patterns: [url].flat().map((urlPattern) => ({ urlPattern, requestStage: 'Request' })) });
+    return async () => {
+      off();
+      for (const requestId of held) {
+        // The page that held it may already be gone; an unknown request id is the expected answer.
+        await send('Fetch.failRequest', { requestId, errorReason: 'Aborted' }).catch(() => {});
+      }
+      await send('Fetch.disable');
+      await send('Network.setCacheDisabled', { cacheDisabled: false });
+      await send('Network.disable');
+      return problems;
+    };
+  };
+
+  /**
    * The viewport, with ONE answer to "is this a phone".
    *
    * 🔴 TRUE DEVICE METRICS, NOT A RESIZED WINDOW (T14). Headless Chrome will not lay out below
@@ -220,7 +267,7 @@ export async function launch(tag, { flags = [] } = {}) {
     chrome.kill();
   };
 
-  return { send, evaluate, metrics, waitFor, assertBuiltClient, close, port, sleep, on };
+  return { send, evaluate, metrics, waitFor, assertBuiltClient, close, port, sleep, on, intercept };
 }
 
 export { sleep };

@@ -388,7 +388,8 @@ export const mouseDownOn = (selector, pattern) => `(() => {
   const re = ${pattern};
   const el = [...document.querySelectorAll(${JSON.stringify(selector)})]
     .find((n) => re.test((n.labels?.[0]?.textContent || n.getAttribute('aria-label') || '').trim()));
-  if (!el) return false;
+  // A disabled control ignores the gesture, so it did not land -- saying so names the race instead of timing out on it.
+  if (!el || el.disabled) return false;
   for (const type of ['pointerdown', 'mousedown', 'mouseup', 'click']) {
     el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
   }
@@ -400,7 +401,279 @@ export const clickByText = (selector, pattern) => `(() => {
   const re = ${pattern};
   const el = [...document.querySelectorAll(${JSON.stringify(selector)})]
     .find((n) => re.test((n.getAttribute('aria-label') || n.textContent || '').trim()));
-  if (!el) return false;
+  if (!el || el.disabled) return false;
   el.click();
   return true;
+})()`;
+
+/*
+ * THE DRIVERS `review.mjs` KEPT TO ITSELF, SHARED WHEN `surfaces.mjs` (`07.2`) NEEDED THEM -- for the reason this
+ * module's header gives.
+ */
+
+/**
+ * What a page that never became ready WAS showing. A readiness failure is diagnosed from this,
+ * never "fixed" by running the shot again (the owner's anti-flake rule).
+ */
+export const PAGE_CENSUS = `(() => ({
+  href: location.href,
+  readyState: document.readyState,
+  fonts: document.fonts.status,
+  routePending: !!document.querySelector('[data-testid="route-pending"]'),
+  rootChildren: document.getElementById('root')?.children.length ?? 0,
+  rows: document.querySelectorAll('tr[data-row]').length,
+  skeletons: document.querySelectorAll('tr[data-skeleton]').length,
+  states: [...document.querySelectorAll('[data-state]')].map((n) => n.dataset.state),
+  dialogs: [...document.querySelectorAll('[role="dialog"]')].map((d) => document.getElementById(d.getAttribute('aria-labelledby') || '')?.textContent || '(unnamed)'),
+  text: (document.body?.innerText || '').replace(/\\s+/g, ' ').slice(0, 240),
+}))()`;
+
+export const typeInto = (selector, value) => `(() => {
+  const input = document.querySelector(${JSON.stringify(selector)});
+  if (!input) return false;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)});
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+})()`;
+
+/**
+ * Type into the field whose LABEL matches, inside a scope, the way React hears it. By label and never by position: the
+ * first input in the document is the topbar's search, and a driver that typed there measured the register instead of
+ * the page it named (states.mjs, `06.3`).
+ */
+export const typeIntoLabelled = (scope, pattern, value) => `(() => {
+  const re = ${pattern};
+  const scope = ${JSON.stringify(scope)};
+  const input = [...document.querySelectorAll(scope + ' input, ' + scope + ' textarea')]
+    .find((n) => re.test((n.labels?.[0]?.textContent || n.getAttribute('aria-label') || '').trim()));
+  if (!input || input.disabled || input.readOnly) return false;
+  const proto = input.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, 'value').set.call(input, ${JSON.stringify(value)});
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+})()`;
+
+export const scrollIntoView = (selector) => `(() => {
+  const el = document.querySelector(${JSON.stringify(selector)});
+  if (!el) return false;
+  el.scrollIntoView({ block: 'start' });
+  return true;
+})()`;
+
+/** The route's error boundary is on screen (ErrorBoundary.jsx). */
+export const BOUNDARY_SHOWN = `!!document.querySelector('[data-testid="route-error"]')`;
+
+/**
+ * An open dialog whose ACCESSIBLE NAME matches. The surface is asserted PRESENT after the gesture, never inferred from
+ * the gesture returning (T30) -- and by the name a screen reader announces, so a dialog that opened unnamed does not
+ * count as the one that was asked for.
+ */
+export const dialogNamed = (pattern) => `(() => {
+  const re = ${pattern};
+  return [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].some((d) => {
+    const labelledBy = d.getAttribute('aria-labelledby');
+    const name = (d.getAttribute('aria-label') || (labelledBy && document.getElementById(labelledBy)?.textContent) || '').trim();
+    return re.test(name) && d.getClientRects().length > 0;
+  });
+})()`;
+
+/**
+ * The nodes axe could not judge, as the pixel sampler needs them (`tools/png.mjs` `pixelContrast`, driven by
+ * surfaces.mjs): each one's box, its text colour as RGBA, and the AA threshold its size and weight put it under.
+ *
+ * 🔴 ONLY WHAT A PERSON SEES. A node whose centre another element covers -- page text under a dialog's scrim is most of
+ * what axe calls "partially obscured" -- is OCCLUDED: not measured, and never counted as passing. A node off screen, or
+ * too small to hold a glyph, is SKIPPED with the reason.
+ *
+ * 🔑 THE COLOUR IS READ BY PAINTING IT, NOT BY PARSING IT (T28): `getComputedStyle().color` is `oklch(...)` in this
+ * design, and a 1×1 canvas turns any CSS colour into the bytes that would actually be drawn.
+ */
+/**
+ * Hide one node's GLYPHS -- and its descendants', with their text shadows -- or restore them, so its box can be
+ * photographed without its letters (png.mjs `pixelContrast` compares that with the box as it is). Resolves after two
+ * frames, so the photograph sees it.
+ */
+export const hideText = (selector, hide) => `(() => {
+  let el = null;
+  try { el = document.querySelector(${JSON.stringify(selector)}); } catch { return false; }
+  if (!el) return false;
+  if (!document.getElementById('__hide_text')) {
+    const style = document.createElement('style');
+    style.id = '__hide_text';
+    // The glyphs ONLY. The colour property stays, so a border, a ring or an icon drawn in currentColor is in both
+    // photographs alike and is never mistaken for a letter.
+    style.textContent = '[data-hide-text], [data-hide-text] * { -webkit-text-fill-color: transparent !important; '
+      + 'text-shadow: none !important; text-decoration-color: transparent !important; transition: none !important; }';
+    document.head.append(style);
+  }
+  if (${hide ? 'true' : 'false'}) el.setAttribute('data-hide-text', ''); else el.removeAttribute('data-hide-text');
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))));
+})()`;
+
+export const contrastTargets = (selectors) => `(() => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1;
+  canvas.height = 1;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const rgba = (colour) => {
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = '#000';
+    ctx.fillStyle = colour;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+    return [r, g, b, Number((a / 255).toFixed(3))];
+  };
+  return ${JSON.stringify(selectors)}.map((selector) => {
+    let el = null;
+    try { el = document.querySelector(selector); } catch { return { selector, skipped: 'the selector does not parse here' }; }
+    if (!el) return { selector, skipped: 'gone from the page' };
+    const box = el.getBoundingClientRect();
+    if (box.width < 4 || box.height < 4) return { selector, skipped: 'too small to hold a glyph' };
+    if (box.bottom <= 0 || box.right <= 0 || box.top >= innerHeight || box.left >= innerWidth) return { selector, skipped: 'off screen' };
+    // 🔴 CLIPPED BY A SCROLLER IS NOT ON SCREEN. A table cell scrolled out of its table's sideways box can still lie
+    // inside the viewport -- and at its centre the browser finds the ancestor that clips it, which the check below
+    // accepts as the element. The fourth sweep photographed 280 such boxes, each showing only its scroller's
+    // background, and read the Locations dates at 1:1. Every ancestor that clips overflow bounds what can be seen.
+    let seen = { left: box.left, top: box.top, right: box.right, bottom: box.bottom };
+    for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+      const ps = getComputedStyle(p);
+      if (ps.overflowX === 'visible' && ps.overflowY === 'visible') continue;
+      const pr = p.getBoundingClientRect();
+      seen = { left: Math.max(seen.left, pr.left), top: Math.max(seen.top, pr.top), right: Math.min(seen.right, pr.right), bottom: Math.min(seen.bottom, pr.bottom) };
+    }
+    if (seen.right - seen.left < box.width - 1 || seen.bottom - seen.top < box.height - 1) return { selector, skipped: 'clipped by a scroller' };
+    const centre = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    if (!centre || !(centre === el || el.contains(centre) || centre.contains(el))) return { selector, occluded: true };
+    const style = getComputedStyle(el);
+    const size = parseFloat(style.fontSize);
+    const bold = Number(style.fontWeight) >= 700;
+    return {
+      selector,
+      text: (el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 40),
+      box: { x: Math.max(0, box.left), y: Math.max(0, box.top), width: Math.min(box.width, innerWidth - Math.max(0, box.left)), height: Math.min(box.height, innerHeight - Math.max(0, box.top)) },
+      fg: rgba(style.color),
+      needs: size >= 24 || (bold && size >= 18.66) ? 3 : 4.5,
+      ariaHidden: !!el.closest('[aria-hidden="true"]'),
+    };
+  });
+})()`;
+
+/**
+ * Run axe with ONLY `color-contrast` on, and return all three buckets. Moved here from `contrast.mjs` when
+ * `surfaces.mjs` (`07.3` inside `07.2`'s states) needed the same call.
+ *
+ * The pass count is how a run proves it examined anything: zero violations out of zero
+ * examined nodes is the vacuous green every guard in this repository carries a floor against.
+ *
+ * 🔴 AND `resultTypes` IS DELIBERATELY ABSENT, HAVING BEEN THERE ONCE AND LIED. The first
+ * version passed `resultTypes: ['violations', 'incomplete']` as an optimisation. That option
+ * does not merely choose what to REPORT -- for every bucket not listed, axe keeps **one node
+ * and discards the rest**. So `passCount` came back as exactly 1 per combination, 100 across
+ * 100 runs, and the non-vacuity floor fired on a number that was an artefact of the
+ * caller's own option rather than a fact about the pages (T26).
+ *
+ * 🔑 THE FLOOR CAUGHT IT, WHICH IS THE ONLY REASON IT WAS SEEN -- and it caught a defect in
+ * the INSTRUMENT, not in the application, which is the third time this arc has had that exact
+ * result. Without the floor the run would have reported 100 combinations swept and one
+ * violation found, and the missing 4,000-odd examined nodes would have gone unnoticed
+ * entirely, because a small number and a large one both read as "it ran".
+ */
+export const AXE_CONTRAST = `(async () => {
+  const r = await window.axe.run(document, {
+    runOnly: { type: 'rule', values: ['color-contrast'] },
+  });
+  const node = (n) => ({
+    target: Array.isArray(n.target) ? n.target.join(' ') : String(n.target),
+    summary: (n.failureSummary || '').replace(/\\s+/g, ' ').slice(0, 300),
+    data: (n.any || []).map((c) => c.data).filter(Boolean),
+  });
+  return {
+    violations: r.violations.flatMap((v) => v.nodes.map(node)),
+    incomplete: r.incomplete.flatMap((v) => v.nodes.map(node)),
+    passCount: r.passes.reduce((n, p) => n + p.nodes.length, 0),
+  };
+})()`;
+
+/**
+ * 🔴 T22 -- THE HIT AREA A FINGER GETS, NOT THE BOX THE ELEMENT DRAWS. `touch-target` (index.css) gives a control a
+ * 44px target with an `::after` overlay on a coarse pointer, so `getBoundingClientRect()` -- the element's own box --
+ * reports exactly the number the utility was written NOT to change. P3's probe read 373 of 489 controls "under 44px"
+ * that way, and a measurement that indicts everything indicts itself.
+ *
+ * Two readings, because either alone can pass a broken control:
+ *   ① DECLARED: the larger of the element's box and its `::after` box, per axis;
+ *   ② ASKED OF THE PAGE: `elementFromPoint` at the four corners of a 44px square centred on the control must land on
+ *      the control or inside it. A target another element sits over is not a target a finger gets.
+ * A control is short when ① is under 44px on either axis, or ② lands somewhere else at any on-screen corner.
+ *
+ * ⚠️ RUN IT UNDER `Emulation.setTouchEmulationEnabled`, NEVER `setEmulatedMedia` (T6): emulated media do not emulate
+ * the pointer. The probe returns whether `(pointer: coarse)` matched, and a caller that asked for touch and got a
+ * mouse must abort -- the whole of T6 in one boolean.
+ *
+ * Exempt, as WCAG 2.5.8 exempts them: a link inside a line of text. A native checkbox or radio inside its label is
+ * measured through the label, which is what a finger hits. Controls off screen are skipped, never guessed at: a
+ * surface that needs them measured scrolls to them.
+ *
+ * 🔴 TWO CORRECTIONS FROM ITS FIRST RUN, EACH WITH A CANARY IN surfaces.mjs:
+ *   ⓐ A REPLACED ELEMENT DRAWS NO `::after`. `input`, `select` and `textarea` report a computed `::after` box that is
+ *     never rendered, so reading it credited a 38px select with a 100px target. They are measured by their own box.
+ *   ⓑ A CONTROL WHOSE CENTRE ANOTHER ELEMENT COVERS IS NOT A SHORT TARGET, it is a control not reachable where it is:
+ *     rows scrolled under a dialog's sticky footer were reported "4/4 corners land on the footer". Such a control is
+ *     counted as OCCLUDED and skipped; a surface that needs it scrolls to it.
+ * Each short target now says why: `undersized` (its hit area is under 44px) or `crowded` (44px, but another control
+ * sits inside the square a finger covers).
+ */
+export const touchTargetProbe = (min = 44) => `(() => {
+  const MIN = ${min};
+  const SELECTOR = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="button"], [role="tab"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="option"], [role="menuitem"]';
+  const px = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
+  const describe = (el) => {
+    const name = (el.getAttribute('aria-label') || el.textContent || el.getAttribute('title') || el.getAttribute('placeholder') || '')
+      .replace(/\\s+/g, ' ').trim().slice(0, 48);
+    return el.tagName.toLowerCase() + (name ? ' "' + name + '"' : '');
+  };
+  let measured = 0;
+  let occluded = 0;
+  const REPLACED = new Set(['INPUT', 'SELECT', 'TEXTAREA']);
+  const INTERACTIVE = 'a[href], button, input, select, textarea, summary, [role="button"], [role="tab"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="option"], [role="menuitem"]';
+  const short = [];
+  for (const el of document.querySelectorAll(SELECTOR)) {
+    const box = el.getBoundingClientRect();
+    if (box.width === 0 || box.height === 0) continue;
+    if (getComputedStyle(el).visibility === 'hidden' || el.closest('[aria-hidden="true"], [inert]')) continue;
+    if (box.bottom <= 0 || box.right <= 0 || box.top >= innerHeight || box.left >= innerWidth) continue;
+    if (el.tagName === 'A' && getComputedStyle(el).display === 'inline'
+      && [...(el.parentElement?.childNodes ?? [])].some((n) => n !== el && n.nodeType === 3 && n.textContent.trim())) continue;
+    // What a finger actually presses. A control inside its own <label> is pressed through the label -- a checkbox, and
+    // equally a text field the label wraps (the topbar's search: a 24px input in a 38px label). Credited only when the
+    // label wraps no other control, so one label cannot lend its size to two.
+    const wrap = REPLACED.has(el.tagName) ? el.closest('label') : null;
+    const hit = wrap && wrap.querySelectorAll(INTERACTIVE).length === 1 ? wrap : el;
+    const r = hit.getBoundingClientRect();
+    const centre = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    if (!centre || !(centre === hit || hit.contains(centre) || centre.closest('label') === hit)) { occluded += 1; continue; }
+    measured += 1;
+    const after = getComputedStyle(hit, '::after');
+    const overlay = !REPLACED.has(hit.tagName) && after.content !== 'none' && after.position === 'absolute';
+    const w = Math.max(r.width, overlay ? Math.max(px(after.width), px(after.minWidth)) : 0);
+    const h = Math.max(r.height, overlay ? Math.max(px(after.height), px(after.minHeight)) : 0);
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const half = MIN / 2 - 1;
+    const corners = [[cx - half, cy - half], [cx + half, cy - half], [cx - half, cy + half], [cx + half, cy + half]]
+      .filter(([x, y]) => x >= 0 && y >= 0 && x < innerWidth && y < innerHeight);
+    const missed = corners.filter(([x, y]) => {
+      const at = document.elementFromPoint(x, y);
+      return !(at && (at === hit || hit.contains(at)));
+    });
+    const undersized = w < MIN - 0.5 || h < MIN - 0.5;
+    const stolenBy = missed.map(([x, y]) => document.elementFromPoint(x, y)).filter(Boolean);
+    const crowded = !undersized && stolenBy.some((at) => at.closest(INTERACTIVE) && !hit.contains(at));
+    if (undersized || crowded) {
+      const to = [...new Set(stolenBy.map(describe))].slice(0, 2);
+      short.push((undersized ? 'undersized ' : 'crowded ') + describe(el) + ' ' + Math.round(w) + 'x' + Math.round(h)
+        + (missed.length ? ' · ' + missed.length + '/' + corners.length + ' corners land on ' + (to.join(', ') || 'nothing') : ''));
+    }
+  }
+  return { coarse: matchMedia('(pointer: coarse)').matches, measured, occluded, shortCount: short.length, short: short.slice(0, 40) };
 })()`;
