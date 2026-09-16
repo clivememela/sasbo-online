@@ -24,7 +24,7 @@
  */
 import { writeFileSync } from 'node:fs';
 
-import { launch } from './cdp.mjs';
+import { isPhone, launch } from './cdp.mjs';
 import { ROUTES as ALL_ROUTES, SETTLED, pageReady, populationComplaints, storeTheme, themeDimensionComplaints, themeReadout } from './probe.mjs';
 
 const args = process.argv.slice(2);
@@ -78,7 +78,7 @@ try {
   //   slow: true      -- the heading's click handler busy-waits 60ms first (the canary that a slow click is reported)
   const visit = async (width, theme, route, { dispatch = true, slow = false } = {}) => {
     await metrics(width);
-    await send('Emulation.setTouchEmulationEnabled', width < 700 ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
+    await send('Emulation.setTouchEmulationEnabled', isPhone(width) ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
     await evaluate(storeTheme(theme === 'dark'));
     await send('Page.navigate', { url: baseUrl + route });
     const ready = await waitFor(pageReady, { tries: 160 }) && await waitFor(SETTLED, { tries: 160, awaitPromise: true });
@@ -130,7 +130,7 @@ try {
   if (canaries.some((c) => !c.ok)) throw new Error('a canary was missed, so no row below could be trusted');
 
   for (const width of WIDTHS) {
-    await send('Emulation.setCPUThrottlingRate', { rate: width < 700 ? 4 : 1 });
+    await send('Emulation.setCPUThrottlingRate', { rate: isPhone(width) ? 4 : 1 });
     for (const theme of THEMES) {
       for (const route of ROUTES) {
         const row = await visit(width, theme, route);

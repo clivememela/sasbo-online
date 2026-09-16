@@ -245,7 +245,7 @@ const FOOTER_CLEAR_OF_CARD = `(() => {
  * them too. They are probe.mjs's now, beside the other shared drivers.
  */
 
-/** A11's box: the designed fallback is up, the shell is still standing, and no build artefact shows. */
+/** A11's box, with probe.mjs `BOUNDARY_SHOWN`: the shell is still standing, and no build artefact shows. */
 const SHELL_STANDING = `!!document.querySelector('nav[aria-label="Main"]') && !!document.querySelector('header input[type="search"]')`;
 const NO_BUILD_ARTEFACT = `!/assets\\/|\\.js\\b|dynamically imported/i.test(document.querySelector('[data-testid="route-error"]')?.innerText || '')`;
 

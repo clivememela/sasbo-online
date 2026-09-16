@@ -83,12 +83,15 @@ export function decodePng(buffer) {
   return { width, height, pixels: out };
 }
 
+const lin = (c) => {
+  const s = c / 255;
+  return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+};
+/** `lin` for every whole channel value, computed by `lin` itself -- so a lookup is the same float, not an approximation. */
+const LIN = Array.from({ length: 256 }, (_, c) => lin(c));
+
 /** WCAG relative luminance of an sRGB colour, 0–255 channels. */
 export function luminance([r, g, b]) {
-  const lin = (c) => {
-    const s = c / 255;
-    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-  };
   return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
 }
 
@@ -117,13 +120,15 @@ export function pixelContrast(shown, hidden, [fr, fg, fb, fa = 1], percentile = 
   const { width, height, pixels } = hidden;
   if (shown.width !== width || shown.height !== height) return null;
   const ratios = [];
+  // Opaque text composites to itself over every backdrop, so its luminance is the same for every pixel.
+  const opaqueText = fa === 1 ? luminance([fr, fg, fb]) : null;
   for (let i = 0; i < width * height * 4; i += 4) {
     const r = pixels[i];
     const g = pixels[i + 1];
     const b = pixels[i + 2];
     if (Math.abs(shown.pixels[i] - r) + Math.abs(shown.pixels[i + 1] - g) + Math.abs(shown.pixels[i + 2] - b) < GLYPH_DELTA) continue;
-    const text = [fr * fa + r * (1 - fa), fg * fa + g * (1 - fa), fb * fa + b * (1 - fa)];
-    ratios.push(contrastRatio(luminance(text), luminance([r, g, b])));
+    const text = opaqueText ?? luminance([fr * fa + r * (1 - fa), fg * fa + g * (1 - fa), fb * fa + b * (1 - fa)]);
+    ratios.push(contrastRatio(text, 0.2126 * LIN[r] + 0.7152 * LIN[g] + 0.0722 * LIN[b]));
   }
   if (!ratios.length) return { ratio: 1, samples: 0, invisible: true };
   ratios.sort((x, y) => x - y);

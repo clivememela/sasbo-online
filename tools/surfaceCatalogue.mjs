@@ -5,9 +5,11 @@
  * (`src/test/stateGatedSurfaces.structural.test.js`) without launching a browser; the browser run is `surfaces.mjs`.
  * A dialog added tomorrow is a red suite tomorrow, not a surface nobody opened.
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
+import { FLOORS } from '../src/test/floors.js';
+import { REPO_ROOT, filesUnder } from '../src/test/sourceScan.js';
 import { BOUNDARY_SHOWN, clickByText, dialogNamed, mouseDownOn, scrollIntoView, typeInto, typeIntoLabelled } from './probe.mjs';
 
 /* ── predicates ──────────────────────────────────────────────────────────────────────────────────── */
@@ -24,7 +26,6 @@ const STATE = (s) => `!!document.querySelector('[data-state="${s}"]')`;
 const PANEL = '[data-testid="member-panel"]';
 const PANEL_OPEN = `!!document.querySelector('${PANEL}[data-open="true"] .mcard')`;
 export const ANY_DIALOG = `!!document.querySelector('[role="dialog"]')`;
-/** The date field says it is open AND a picker is on screen -- the field's own `aria-expanded`, not a guess. */
 /**
  * A date picker OPEN, AND ON SCREEN. "Open" alone once passed a calendar placed below the bottom of the viewport: Add
  * Recruiter's Election Date sits below the fold of the dialog's scrolling body, the calendar opened under it, and the
@@ -69,7 +70,7 @@ const clickNth = (selector, n) => `(() => {
   return true;
 })()`;
 
-export const step = (what, run, until) => ({ what, run, until });
+const step = (what, run, until) => ({ what, run, until });
 /** Bring a dialog's date field into view before it is opened, as a person scrolls to a field before pressing it. */
 const DIALOG_DATE_IN_VIEW = step('bring Election Date into view', scrollIntoView('[role="dialog"] input[aria-haspopup="dialog"]'), `(() => {
   const r = document.querySelector('[role="dialog"] input[aria-haspopup="dialog"]').getBoundingClientRect();
@@ -150,7 +151,7 @@ export const SURFACES = [
       step('cancel', clickByText('main button', '/^Cancel$/'), dialogNamed('/^Discard this member\\?$/'))],
     present: { DIALOG: dialogNamed('/^Discard this member\\?$/') }, covers: ['pages/members/CaptureMember.jsx#ConfirmDialog@discard'] },
   { name: 'capture-refs-error', route: '/members/capture', intercept: { url: ['*/api/banks*', '*/api/job-grades*', '*/api/provinces*', '*/api/recruitment-channels*', '*/api/representatives*', '*/api/members/userRoles*', '*/api/members/structures/tree*', '*/api/branches*', '*/api/districts*', '*/api/areas*'], mode: 'fail' },
-    ready: `${STATE('error')}`, present: { ERROR: STATE('error') },
+    ready: STATE('error'), present: { ERROR: STATE('error') },
     covers: ['pages/members/CaptureMember.jsx#DataState@refs', 'components/form/LoadFailureFrame.jsx#DataState@loadError'] },
   { name: 'capture-listbox', route: '/members/capture', ready: TEXT('Save Member'),
     // `SearchableSelect` opens on MOUSEDOWN (the whole field toggles it), and `el.click()` dispatches no mousedown (T30).
@@ -339,16 +340,21 @@ const SITE_KINDS = [
 /** How many sites of one kind a source text holds. Exported so the guard's own patterns carry canaries. */
 export const siteCount = (text, kind) => (text.match(SITE_KINDS.find((k) => k.kind === kind).re) || []).length;
 
-const walk = (dir) => readdirSync(dir).flatMap((name) => {
-  const path = join(dir, name);
-  return statSync(path).isDirectory() ? walk(path) : [path];
-});
-
-/** Returns complaints; empty means every state-gated site in `src/` is driven or excused. */
+/**
+ * Returns complaints; empty means every state-gated site in `src/` is driven or excused.
+ *
+ * Every `<Modal`, `<ConfirmDialog`, `<BankBranchModal`, `<DataState`, `<DateField` and `aria-expanded` site in a
+ * non-test `.jsx` file under `src/` is counted per file, and the catalogue must name at least that many distinct sites
+ * per file, each driven or listed in `UNREACHABLE` with the reason. The offline banner is claimed by its states. The
+ * source is walked by the suite's own walker (`sourceScan.js`: from the repository root, not the working directory,
+ * and an unreadable directory is recorded rather than dropped) and read RAW -- a site written in a comment is still
+ * counted, which errs towards a complaint.
+ */
 export function coverageComplaints(surfaces = SURFACES, unreachable = UNREACHABLE) {
   const sources = new Map();
-  for (const path of walk('src').filter((p) => /\.jsx$/.test(p) && !/\.test\.jsx$/.test(p))) {
-    const file = relative('src', path).replaceAll('\\', '/');
+  const src = join(REPO_ROOT, 'src');
+  for (const path of filesUnder(src, /\.jsx$/).filter((p) => !/\.test\.jsx$/.test(p))) {
+    const file = relative(src, path).replaceAll('\\', '/');
     const text = readFileSync(path, 'utf8');
     for (const { kind, skip } of SITE_KINDS) {
       if (skip.includes(file)) continue;
@@ -357,8 +363,7 @@ export function coverageComplaints(surfaces = SURFACES, unreachable = UNREACHABL
     }
   }
   const total = [...sources.values()].reduce((a, b) => a + b, 0);
-  // The lowest honest reading at `8d01904` was 55 sites; far under it, the scan is not seeing the source.
-  if (total < 40) return [`read only ${total} state-gated sites under src/ -- the scan is not seeing the source`];
+  if (total < FLOORS.STATE_GATED_SITES) return [`read only ${total} state-gated sites under src/ -- the scan is not seeing the source`];
 
   const claimed = new Map();
   for (const site of [...surfaces.flatMap((s) => s.covers ?? []), ...unreachable.map((u) => u.site)]) {

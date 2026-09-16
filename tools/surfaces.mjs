@@ -14,10 +14,9 @@
  *      width, under a mouse, no `touch-target` overlay is drawn at all -- desktop density provably untouched;
  *   ④ a screenshot, so every finding travels with the picture it came from.
  *
- * 🔑 THE CATALOGUE IS HELD AGAINST THE SOURCE -- the guard that an undriven surface cannot pass again. Every
- * `<Modal`, `<ConfirmDialog`, `<BankBranchModal`, `<DataState`, `<DateField`, `<OfflineBanner` and `aria-expanded`
- * site under `src/` is counted per file, and the catalogue must name at least that many distinct sites per file,
- * each driven or listed in `UNREACHABLE` with the reason. A dialog added tomorrow is a complaint tomorrow.
+ * 🔑 THE CATALOGUE IS HELD AGAINST THE SOURCE -- the guard that an undriven surface cannot pass again. What it counts,
+ * and how, is `surfaceCatalogue.mjs` `coverageComplaints` (one description, beside the code). A dialog added tomorrow
+ * is a complaint tomorrow.
  *
  * 🔑 THE PROBES ARE PROVED BEFORE THE SWEEP (T1). A 1.4:1 paragraph planted INSIDE an open dialog must be caught (axe
  * sees into the portal); a 20px button with no hit area must be reported short under touch while a 20px
@@ -29,13 +28,13 @@
  *   node tools/surfaces.mjs <baseUrl> <outDir> [--only name,name] [--widths 1440,390]
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join } from 'node:path';
 
-import { launch } from './cdp.mjs';
-import { AXE_CONTRAST, PAGE_CENSUS, SETTLED, contrastTargets, hideText, overflowProbe, pageReady, populationComplaints, storeTheme, themeDimensionComplaints, themeReadout, touchTargetProbe } from './probe.mjs';
+import { isPhone, launch } from './cdp.mjs';
+import { AXE_CONTRAST, PAGE_CENSUS, SETTLED, TOUCH_OVERLAYS_DRAWN, UNSEEN, contrastTargets, hideText, overflowProbe, pageReady, populationComplaints, storeTheme, themeDimensionComplaints, themeReadout, touchTargetProbe } from './probe.mjs';
 import { decodePng, pixelContrast } from './png.mjs';
 // The catalogue and the guard that holds it against src/ -- also imported by the suite (stateGatedSurfaces.structural.test.js).
-import { ANY_DIALOG, HEADING, OPEN_CHANNEL, ROWS, SURFACES, UNREACHABLE, coverageComplaints, step } from './surfaceCatalogue.mjs';
+import { ANY_DIALOG, HEADING, OPEN_CHANNEL, ROWS, SURFACES, UNREACHABLE, coverageComplaints } from './surfaceCatalogue.mjs';
 
 const args = process.argv.slice(2);
 const [baseUrl, outDir] = args;
@@ -50,7 +49,6 @@ const flag = (name) => {
 const WIDTHS = (flag('--widths') ?? '1440,390').split(',').map(Number);
 const only = flag('--only') ? new Set(flag('--only').split(',')) : null;
 const THEMES = ['light', 'dark'];
-const PHONE = (width) => width < 700;
 const AXE = readFileSync('node_modules/axe-core/axe.min.js', 'utf8');
 
 /* ── the run ─────────────────────────────────────────────────────────────────────────────────────── */
@@ -91,7 +89,7 @@ try {
     for (const selector of new Set(selectors.map(String))) {
       // Off screen, or clipped by a scroller, is not yet seen: scroll to it -- which scrolls the scroller too -- and look
       // again. One that still cannot be seen whole is UNMEASURED, and fails the run.
-      const unseen = (x) => x.skipped === 'off screen' || x.skipped === 'clipped by a scroller';
+      const unseen = (x) => x.skipped === UNSEEN.OFF_SCREEN || x.skipped === UNSEEN.CLIPPED;
       let [t] = await evaluate(contrastTargets([selector]));
       if (unseen(t)) {
         await evaluate(`(() => { try { document.querySelector(${JSON.stringify(selector)})?.scrollIntoView({ block: 'center', inline: 'center' }); } catch { /* measured as it stands */ } return true; })()`);
@@ -117,7 +115,7 @@ try {
 
   const arrive = async (route, theme, width) => {
     await metrics(width);
-    await send('Emulation.setTouchEmulationEnabled', PHONE(width) ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
+    await send('Emulation.setTouchEmulationEnabled', isPhone(width) ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
     await evaluate(storeTheme(theme === 'dark'));
     await send('Page.navigate', { url: baseUrl + route });
     return waitFor(pageReady, { tries: 120 });
@@ -220,10 +218,12 @@ try {
   canaries.push({ name: 'a covered button is skipped as occluded, not reported short', ok: !touch.short.some((s) => /button "h" /.test(s)) && touch.occluded > 0 });
   canaries.push({ name: 'a 20px input in a 48px label is pressed through the label, and not reported', ok: !touch.short.some((s) => /input "wrapped-tall" /.test(s)) });
   canaries.push({ name: 'the same input in a 30px label is reported undersized', ok: touch.short.some((s) => /undersized input "wrapped-short" /.test(s)) });
+  canaries.push({ name: 'under touch, the sweep\'s overlay count sees the planted touch-target overlay', ok: await evaluate(TOUCH_OVERLAYS_DRAWN) > 0 });
   // ③ and on a mouse, the same utility draws nothing.
   if (!await arrive('/home', 'light', 1440) || !await waitFor(HEADING, { tries: 120 })) throw new Error('the mouse canary\'s page never became ready');
   await evaluate(PLANT_TOUCH);
   canaries.push({ name: 'on a mouse, touch-target draws no overlay', ok: await evaluate(`getComputedStyle(document.getElementById('__covered'), '::after').content === 'none' && !matchMedia('(pointer: coarse)').matches`) });
+  canaries.push({ name: 'on a mouse, the sweep\'s overlay count reads 0 with the planted touch-target present', ok: await evaluate(`!!document.getElementById('__covered') && (${TOUCH_OVERLAYS_DRAWN}) === 0`) });
   for (const c of canaries) console.log(`canary: ${c.ok ? 'CAUGHT' : 'MISSED'} — ${c.name}`);
   if (canaries.some((c) => !c.ok)) throw new Error('a probe failed its canary; its results would be worthless (T1)');
 
@@ -260,16 +260,16 @@ try {
             // The readout, the probes and the shutter on one settled page.
             const { paint, probe } = await evaluate(`({ paint: ${themeReadout}, probe: ${overflowProbe(width)} })`);
             const contrast = await evaluate(AXE_CONTRAST, { awaitPromise: true });
-            const targets = PHONE(width)
+            const targets = isPhone(width)
               ? await evaluate(touchTargetProbe())
-              : { overlaysOnMouse: await evaluate(`[...document.querySelectorAll('.touch-target')].filter((el) => getComputedStyle(el, '::after').content !== 'none').length`) };
+              : { overlaysOnMouse: await evaluate(TOUCH_OVERLAYS_DRAWN) };
             Object.assign(row, {
               reached: true, elements: probe.elements, theme_dark: paint.dark, theme_bg: paint.bg,
               overflow: { count: probe.offenderCount, offenders: probe.offenders },
-              contrast: { violations: contrast.violations, incomplete: contrast.incomplete, passCount: contrast.passCount },
+              contrast,
               targets,
             });
-            if (PHONE(width) && !targets.coarse) row.missed.push('asked for touch and the page had a mouse (T6)');
+            if (isPhone(width) && !targets.coarse) row.missed.push('asked for touch and the page had a mouse (T6)');
             const { data } = await send('Page.captureScreenshot', { format: 'png' });
             row.file = `${name}.png`;
             writeFileSync(join(outDir, row.file), Buffer.from(data, 'base64'));

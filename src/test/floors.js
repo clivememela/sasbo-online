@@ -291,4 +291,13 @@ export const FLOORS = {
    * assertion that no route has two `<h1>`s is trivially true of no routes.
    */
   HEADINGS_MEASURED: 20,
+
+  /**
+   * State-gated sites (`<Modal`, `<ConfirmDialog`, `<BankBranchModal`,
+   * `<DataState`, `<DateField`, `aria-expanded`) that `coverageComplaints` in
+   * `tools/surfaceCatalogue.mjs` counts under `src/`, through that guard's own
+   * scan. Lowest honest reading at `8d01904` (2026-09-15): 55 sites; far under
+   * it, the scan is not seeing the source.
+   */
+  STATE_GATED_SITES: 40,
 }

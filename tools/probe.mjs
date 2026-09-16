@@ -407,8 +407,10 @@ export const clickByText = (selector, pattern) => `(() => {
 })()`;
 
 /*
- * THE DRIVERS `review.mjs` KEPT TO ITSELF, SHARED WHEN `surfaces.mjs` (`07.2`) NEEDED THEM -- for the reason this
- * module's header gives.
+ * THE DRIVERS AND PROBES `surfaces.mjs` (`07.2`) SHARES WITH THE OTHER TOOLS -- for the reason this module's header
+ * gives. Some `review.mjs` had kept to itself (the census, typing, scrolling, the boundary), the axe call `contrast.mjs`
+ * made, and the ones `07.2` and `07.3` added (labelled typing, named dialogs, the pixel sampler's targets, the touch
+ * probe).
  */
 
 /**
@@ -478,17 +480,6 @@ export const dialogNamed = (pattern) => `(() => {
 })()`;
 
 /**
- * The nodes axe could not judge, as the pixel sampler needs them (`tools/png.mjs` `pixelContrast`, driven by
- * surfaces.mjs): each one's box, its text colour as RGBA, and the AA threshold its size and weight put it under.
- *
- * 🔴 ONLY WHAT A PERSON SEES. A node whose centre another element covers -- page text under a dialog's scrim is most of
- * what axe calls "partially obscured" -- is OCCLUDED: not measured, and never counted as passing. A node off screen, or
- * too small to hold a glyph, is SKIPPED with the reason.
- *
- * 🔑 THE COLOUR IS READ BY PAINTING IT, NOT BY PARSING IT (T28): `getComputedStyle().color` is `oklch(...)` in this
- * design, and a 1×1 canvas turns any CSS colour into the bytes that would actually be drawn.
- */
-/**
  * Hide one node's GLYPHS -- and its descendants', with their text shadows -- or restore them, so its box can be
  * photographed without its letters (png.mjs `pixelContrast` compares that with the box as it is). Resolves after two
  * frames, so the photograph sees it.
@@ -510,6 +501,24 @@ export const hideText = (selector, hide) => `(() => {
   return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))));
 })()`;
 
+/**
+ * Why `contrastTargets` could not see a node yet -- a caller scrolls to it and asks again. Shared constants, so a
+ * reworded reason cannot quietly turn "not yet seen" (which is scrolled to, and fails the run if it stays unseen) into
+ * an ordinary skip.
+ */
+export const UNSEEN = { OFF_SCREEN: 'off screen', CLIPPED: 'clipped by a scroller' };
+
+/**
+ * The nodes axe could not judge, as the pixel sampler needs them (`tools/png.mjs` `pixelContrast`, driven by
+ * surfaces.mjs): each one's box, its text colour as RGBA, and the AA threshold its size and weight put it under.
+ *
+ * 🔴 ONLY WHAT A PERSON SEES. A node whose centre another element covers -- page text under a dialog's scrim is most of
+ * what axe calls "partially obscured" -- is OCCLUDED: not measured, and never counted as passing. A node off screen, or
+ * too small to hold a glyph, is SKIPPED with the reason.
+ *
+ * 🔑 THE COLOUR IS READ BY PAINTING IT, NOT BY PARSING IT (T28): `getComputedStyle().color` is `oklch(...)` in this
+ * design, and a 1×1 canvas turns any CSS colour into the bytes that would actually be drawn.
+ */
 export const contrastTargets = (selectors) => `(() => {
   const canvas = document.createElement('canvas');
   canvas.width = 1;
@@ -529,7 +538,7 @@ export const contrastTargets = (selectors) => `(() => {
     if (!el) return { selector, skipped: 'gone from the page' };
     const box = el.getBoundingClientRect();
     if (box.width < 4 || box.height < 4) return { selector, skipped: 'too small to hold a glyph' };
-    if (box.bottom <= 0 || box.right <= 0 || box.top >= innerHeight || box.left >= innerWidth) return { selector, skipped: 'off screen' };
+    if (box.bottom <= 0 || box.right <= 0 || box.top >= innerHeight || box.left >= innerWidth) return { selector, skipped: ${JSON.stringify(UNSEEN.OFF_SCREEN)} };
     // 🔴 CLIPPED BY A SCROLLER IS NOT ON SCREEN. A table cell scrolled out of its table's sideways box can still lie
     // inside the viewport -- and at its centre the browser finds the ancestor that clips it, which the check below
     // accepts as the element. The fourth sweep photographed 280 such boxes, each showing only its scroller's
@@ -541,7 +550,7 @@ export const contrastTargets = (selectors) => `(() => {
       const pr = p.getBoundingClientRect();
       seen = { left: Math.max(seen.left, pr.left), top: Math.max(seen.top, pr.top), right: Math.min(seen.right, pr.right), bottom: Math.min(seen.bottom, pr.bottom) };
     }
-    if (seen.right - seen.left < box.width - 1 || seen.bottom - seen.top < box.height - 1) return { selector, skipped: 'clipped by a scroller' };
+    if (seen.right - seen.left < box.width - 1 || seen.bottom - seen.top < box.height - 1) return { selector, skipped: ${JSON.stringify(UNSEEN.CLIPPED)} };
     const centre = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
     if (!centre || !(centre === el || el.contains(centre) || centre.contains(el))) return { selector, occluded: true };
     const style = getComputedStyle(el);
@@ -594,6 +603,17 @@ export const AXE_CONTRAST = `(async () => {
   };
 })()`;
 
+/** What a finger can press, as the touch probe enumerates it -- one list, so the probe's two selectors cannot drift. */
+const TOUCH_CONTROLS = ['a[href]', 'button', 'input', 'select', 'textarea', 'summary', '[role="button"]', '[role="tab"]',
+  '[role="checkbox"]', '[role="radio"]', '[role="switch"]', '[role="combobox"]', '[role="option"]', '[role="menuitem"]'];
+
+/**
+ * How many `touch-target` hit-area overlays the page DRAWS. Under a mouse it must be 0 on every row -- desk density
+ * provably untouched -- and under touch it must not be: surfaces.mjs runs this same expression as its sweep check and
+ * as both halves of its canary, so the canary proves the count the sweep relies on.
+ */
+export const TOUCH_OVERLAYS_DRAWN = `[...document.querySelectorAll('.touch-target')].filter((el) => getComputedStyle(el, '::after').content !== 'none').length`;
+
 /**
  * 🔴 T22 -- THE HIT AREA A FINGER GETS, NOT THE BOX THE ELEMENT DRAWS. `touch-target` (index.css) gives a control a
  * 44px target with an `::after` overlay on a coarse pointer, so `getBoundingClientRect()` -- the element's own box --
@@ -625,7 +645,7 @@ export const AXE_CONTRAST = `(async () => {
  */
 export const touchTargetProbe = (min = 44) => `(() => {
   const MIN = ${min};
-  const SELECTOR = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="button"], [role="tab"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="option"], [role="menuitem"]';
+  const SELECTOR = ${JSON.stringify(TOUCH_CONTROLS.map((s) => (s === 'input' ? 'input:not([type="hidden"])' : s)).join(', '))};
   const px = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
   const describe = (el) => {
     const name = (el.getAttribute('aria-label') || el.textContent || el.getAttribute('title') || el.getAttribute('placeholder') || '')
@@ -635,7 +655,8 @@ export const touchTargetProbe = (min = 44) => `(() => {
   let measured = 0;
   let occluded = 0;
   const REPLACED = new Set(['INPUT', 'SELECT', 'TEXTAREA']);
-  const INTERACTIVE = 'a[href], button, input, select, textarea, summary, [role="button"], [role="tab"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="option"], [role="menuitem"]';
+  // Every control, hidden inputs included: a label wrapping a hidden input as well as its field wraps two controls.
+  const INTERACTIVE = ${JSON.stringify(TOUCH_CONTROLS.join(', '))};
   const short = [];
   for (const el of document.querySelectorAll(SELECTOR)) {
     const box = el.getBoundingClientRect();
@@ -650,25 +671,25 @@ export const touchTargetProbe = (min = 44) => `(() => {
     const wrap = REPLACED.has(el.tagName) ? el.closest('label') : null;
     const hit = wrap && wrap.querySelectorAll(INTERACTIVE).length === 1 ? wrap : el;
     const r = hit.getBoundingClientRect();
-    const centre = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const centre = document.elementFromPoint(cx, cy);
     if (!centre || !(centre === hit || hit.contains(centre) || centre.closest('label') === hit)) { occluded += 1; continue; }
     measured += 1;
     const after = getComputedStyle(hit, '::after');
     const overlay = !REPLACED.has(hit.tagName) && after.content !== 'none' && after.position === 'absolute';
     const w = Math.max(r.width, overlay ? Math.max(px(after.width), px(after.minWidth)) : 0);
     const h = Math.max(r.height, overlay ? Math.max(px(after.height), px(after.minHeight)) : 0);
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
     const half = MIN / 2 - 1;
+    // Each corner of the square a finger covers, hit-tested once: a corner is missed when what lies there is not the
+    // control, and what lies there is what stole it.
     const corners = [[cx - half, cy - half], [cx + half, cy - half], [cx - half, cy + half], [cx + half, cy + half]]
-      .filter(([x, y]) => x >= 0 && y >= 0 && x < innerWidth && y < innerHeight);
-    const missed = corners.filter(([x, y]) => {
-      const at = document.elementFromPoint(x, y);
-      return !(at && (at === hit || hit.contains(at)));
-    });
+      .filter(([x, y]) => x >= 0 && y >= 0 && x < innerWidth && y < innerHeight)
+      .map(([x, y]) => document.elementFromPoint(x, y));
+    const missed = corners.filter((at) => !(at && (at === hit || hit.contains(at))));
     const undersized = w < MIN - 0.5 || h < MIN - 0.5;
-    const stolenBy = missed.map(([x, y]) => document.elementFromPoint(x, y)).filter(Boolean);
-    const crowded = !undersized && stolenBy.some((at) => at.closest(INTERACTIVE) && !hit.contains(at));
+    const stolenBy = missed.filter(Boolean);
+    const crowded = !undersized && stolenBy.some((at) => at.closest(INTERACTIVE));
     if (undersized || crowded) {
       const to = [...new Set(stolenBy.map(describe))].slice(0, 2);
       short.push((undersized ? 'undersized ' : 'crowded ') + describe(el) + ' ' + Math.round(w) + 'x' + Math.round(h)

@@ -64,6 +64,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * `tag` names the port range and the profile directory, so a crashed run leaves an
  * identifiable profile behind rather than an anonymous one.
  */
+/**
+ * THE ONE ANSWER TO "IS THIS A PHONE" (④): `metrics()` below emulates a mobile viewport by it, and a tool that also
+ * switches touch on at a phone width asks it here rather than writing the cutoff again.
+ */
+export const isPhone = (width) => width < 700;
+
 export async function launch(tag, { flags = [] } = {}) {
   const base = PORTS[tag];
   if (!base) {
@@ -219,7 +225,7 @@ export async function launch(tag, { flags = [] } = {}) {
    * sweep disagreed about the same route at the same width.
    */
   const metrics = (width, height = width < 500 ? 844 : 900) => {
-    const mobile = width < 700;
+    const mobile = isPhone(width);
     return send('Emulation.setDeviceMetricsOverride', {
       width, height, deviceScaleFactor: mobile ? 2 : 1, mobile,
     });
