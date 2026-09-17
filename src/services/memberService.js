@@ -71,4 +71,11 @@ export const memberService = {
       body: JSON.stringify(member),
       signal,
     })),
+
+  sendWelcomeLetter: (id) =>
+    requestJsonWrite((signal) => fetch(apiUrl(`/api/members/${id}/send-welcome`), {
+      method: 'POST',
+      credentials: 'include',
+      signal,
+    })),
 };

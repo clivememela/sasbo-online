@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { ESLint } from 'eslint'
 
 /**
@@ -84,6 +84,21 @@ export function C({ items }) {
 `
 
 describe('no-unused-vars can tell a used component from a dead one', () => {
+  /*
+   * 🔴 THE COLD START IS PAID HERE, NOT BY WHICHEVER TEST HAPPENS TO RUN FIRST.
+   *
+   * The first `lintText` resolves the config and compiles every rule (~1,170ms measured on a
+   * quiet box, above). Test order is shuffled, so that cost used to land inside ONE test's
+   * 20s budget -- and under a loaded full-suite run it did not fit: on 2026-09-16 "STILL
+   * reports..." timed out at 27.8s, and on 2026-09-17 "does not report..." timed out at 27.3s,
+   * each time the test that ran first. Both pass in isolation in ~1s. That is a flake, and the
+   * fix is to bill the setup to a hook with a budget of its own rather than to raise the
+   * tests' timeout, which would also hide a genuinely slow lint.
+   */
+  beforeAll(async () => {
+    await eslint.lintText('export {}\n', { filePath: 'src/__jsxUsageFixture.jsx' })
+  }, 120_000)
+
   it('does not report a binding referenced only by a JSX element', async () => {
     const messages = await lint(USED_ONLY_IN_JSX)
 

@@ -128,7 +128,7 @@ async function openEmploymentTab(user) {
 }
 
 describe('the job-grade dropdown', () => {
-  it('shows each grade LABEL as its text and carries the grade CODE as its value', async () => {
+  it('shows the grade CODE as its text and carries the same code as its value', async () => {
     const user = setupUser()
     renderWithProviders(<CaptureMember />)
 
@@ -138,12 +138,14 @@ describe('the job-grade dropdown', () => {
     // separate: `textContent` is what the administrator reads and `value` is
     // what the form submits. Asserting only the visible text would pass while
     // the wrong thing was being saved -- which is this defect class exactly.
-    const clerk = await waitFor(() =>
-      screen.getByRole('option', { name: 'C1 - Clerk - Permanent' }),
-    )
+    //
+    // 🔑 SINCE MAIN a23fb81 (2026-09-16) THE TEXT IS THE BARE GRADE, not "C1 - Clerk -
+    // Permanent": the fixture still sends the long label, and the service now forces
+    // the label to the grade. The `[object Object]` regression this pins is unchanged.
+    const clerk = await waitFor(() => screen.getByRole('option', { name: 'C1' }))
 
     expect(clerk).toHaveValue('C1')
-    expect(clerk.textContent).toBe('C1 - Clerk - Permanent')
+    expect(clerk.textContent).toBe('C1')
   })
 
   it('renders a grade with no description as its bare code, with no dangling separator', async () => {
@@ -175,6 +177,66 @@ describe('the job-grade dropdown', () => {
     // because it proves the two assertions above are about grades that arrived
     // from the server rather than about anything the component had already.
     expect(await screen.findByText('No job grades available')).toBeInTheDocument()
+  })
+})
+
+describe('changing the bank -- main e56dbe4', () => {
+  /**
+   * A grade is a fact about ONE bank, so a grade chosen for the first bank must not
+   * ride along to the second. Main set out to do this on both member forms; the edit
+   * form's half is `Members.jobGrade.test.jsx` ③, and nothing asserted this one.
+   *
+   * 🔑 BOTH BANKS ANSWER WITH THE SAME GRADES, AND THAT IS WHAT MAKES THIS NON-VACUOUS.
+   * Had the second bank answered with different grades, a form that never cleared
+   * anything would still read `''`: a controlled <select> whose value is not among its
+   * options displays none of them. With the same list, `C1` stays valid for the second
+   * bank, so the ONLY thing that can empty the field is the reset itself.
+   */
+  const SECOND_BANK = { id: 2, bankName: 'Capitec Bank Limited', universalBranchCode: '470010' }
+
+  beforeEach(() => {
+    server.use(
+      http.get('*/api/banks', () => HttpResponse.json([BANK, SECOND_BANK])),
+      http.get('*/api/banks/branches', () => HttpResponse.json([BANK, SECOND_BANK])),
+    )
+  })
+
+  /** Choose C1 for the first bank, and hand back the select it was chosen in. */
+  async function chooseClerkForFirstBank(user) {
+    renderWithProviders(<CaptureMember />)
+    await chooseBank(user)
+
+    const clerk = await screen.findByRole('option', { name: 'C1' })
+    const grade = clerk.closest('select')
+    await user.selectOptions(grade, 'C1')
+    return grade
+  }
+
+  it('keeps a grade chosen after the bank -- the must-pass half', async () => {
+    // Without this, a form that cleared the grade on EVERY render would pass the test
+    // below. The grades have arrived and the fetch has settled before the choice.
+    const user = setupUser()
+    const grade = await chooseClerkForFirstBank(user)
+
+    await waitFor(() => expect(grade).toHaveValue('C1'))
+    expect(screen.queryByText('Job Grade could not be loaded.')).not.toBeInTheDocument()
+  })
+
+  it('clears the grade when a different bank is chosen', async () => {
+    const user = setupUser()
+    const grade = await chooseClerkForFirstBank(user)
+    expect(grade).toHaveValue('C1')
+
+    // Through the control's own clear button: typing into the closed box APPENDS to the
+    // selection it displays, so the search would read "Bidvest Bank LimitedCapitec".
+    await user.click(screen.getByRole('button', { name: /^Clear Bank Where Employed/ }))
+    const bankInput = (await screen.findByText(/^Bank Where Employed/)).closest('div').querySelector('input')
+    await user.type(bankInput, 'Capitec')
+    await user.click(await screen.findByRole('option', { name: SECOND_BANK.bankName }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('option', { name: 'C1' }).closest('select')).toHaveValue(''),
+    )
   })
 })
 
@@ -228,7 +290,7 @@ describe("when the job grades cannot be fetched -- A25’s second clause", () =>
     server.use(http.get('*/api/job-grades', () => HttpResponse.json(GRADES)))
     await user.click(screen.getByRole('button', { name: 'Try again' }))
 
-    expect(await screen.findByRole('option', { name: 'C1 - Clerk - Permanent' })).toHaveValue('C1')
+    expect(await screen.findByRole('option', { name: 'C1' })).toHaveValue('C1')
   })
 
   it('leaves the rest of the form working -- the failure is per-panel', async () => {

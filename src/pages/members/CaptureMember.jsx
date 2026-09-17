@@ -1,24 +1,24 @@
 import { useRef, useState, useEffect, useMemo } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
-import { memberService } from "../../services/memberService.js";
-import { recruiterService } from "../../services/recruiterService.js";
-import { jobGradeService } from "../../services/jobGradeService.js";
-import { bankService } from "../../services/bankService.js";
+import WelcomeLetter from "../../components/members/WelcomeLetter";
+import { memberService } from "@/services/memberService.js";
+import { recruiterService } from "@/services/recruiterService.js";
+import { jobGradeService } from "@/services/jobGradeService.js";
+import { bankService } from "@/services/bankService.js";
 import PageTitle from "../../components/common/PageTitle";
 import {
     Button, DateField, PositionTreeSelect, SearchableSelect, SelectInput, TextInput,
 } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
-    STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, YES_NO_OPTIONS,
-    SUSPENSION_CODE_OPTIONS, MEMBER_TABS,
+    STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, MEMBER_TABS,
     BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS
-} from "../../config/memberConstants.js";
+} from "@/config/memberConstants.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
-    formatDate } from "../../utils/validateSAID.js";
+    formatDate } from "@/utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils.js";
 import useReferenceData from "../../hooks/useReferenceData.js";
 
 const FIELD_TO_TAB_MAP = {
@@ -42,21 +42,6 @@ const FIELD_TO_TAB_MAP = {
     debitDay: "employment",
 };
 
-
-/**
- * THE FOUR REFERENCE LISTS THIS FORM LOADS ON MOUNT. `06.1b`, EH-D9.
- *
- * 🔴 ALL FOUR SWALLOWED THEIR FAILURES -- two as `.catch(err => console.error(...))`, two
- * as `.catch(() => setThing([]))`. On a capture form that is the worst place in the
- * application for a silent empty list: an administrator who cannot find the member's bank
- * does not conclude the server is down, they pick the closest bank they can see. The failure
- * does not stop the work, it corrupts the record -- and the record is a person's union
- * membership.
- *
- * 🔑 THE FIFTH LIST, JOB GRADES, IS NOT HERE and that is not an oversight. It depends on
- * the chosen bank, so it is not a mount fetch at all; it has its own effect, its own error
- * state and its own retry, and it is where A25 was closed.
- */
 const REFERENCE_LOADERS = {
     recruiters: () => recruiterService.getAll(),
     structures: () => recruiterService.getStructures(),
@@ -83,7 +68,7 @@ export default function CaptureMember() {
         workTel: "",
         homeTel: "",
         address: "",
-        joinDate: new Date().toISOString().split("T"),
+        joinDate: new Date().toISOString().split("T")[0],
         status: "Active",
         monthlySubscription: "",
         subscriptionFrequency: "Monthly",
@@ -115,18 +100,12 @@ export default function CaptureMember() {
         printMembershipCards: "Y",
         homeLoanReducedRateOption: "N",
         structure1: "",
-
     });
 
     const [fieldErrors, setFieldErrors] = useState({});
     const [showSavedNotification, setShowSavedNotification] = useState(false);
-    /*
-     * ✅ THE FOUR SILENT MOUNT LOADS, REPLACED BY ONE SET (EH-D9).
-     *
-     * They were two effects and four swallowing catches, in two separate places in this
-     * file. One call, and -- the part that could not be done with four `useState`s -- a
-     * `partial` state that knows THREE OF FOUR ANSWERED and can say which one did not.
-     */
+    const [welcomeMember, setWelcomeMember] = useState(null);
+
     const refs = useReferenceData(REFERENCE_LOADERS);
     const reps = refs.data.recruiters;
     const structures = refs.data.structures;
@@ -233,7 +212,6 @@ export default function CaptureMember() {
             if (!form.bankName.trim()) errors.bankName = "Bank Employer alignment name is required for Debit Orders";
             if (!form.branch.trim()) errors.branch = "Bank Branch selection is required for Debit Orders";
 
-            // 🛠️ NEW VALIDATION RULE TO MATCH JAVA BACKEND
             const validDays = ["20", "25", "31", 20, 25, 31];
             if (!validDays.includes(form.debitDay)) {
                 errors.debitDay = "Debit day must be one of 20, 25 or 31 when payment type is 'Debit Order'";
@@ -243,13 +221,6 @@ export default function CaptureMember() {
         return errors;
     };
 
-    /**
-     * What the last save attempt said. Replaces this file's two `alert()` calls.
-     *
-     * Focused rather than `role="alert"`: the shared `Field` gives every inline message
-     * that role already, so a form failing six validations would queue seven
-     * announcements at once. findings.md F-P23.
-     */
     const [saveNotice, setSaveNotice] = useState(null);
     const saveNoticeRef = useRef(null);
 
@@ -269,21 +240,19 @@ export default function CaptureMember() {
             const fallbackTabContext = FIELD_TO_TAB_MAP[firstFailedField] || "personal";
             setActiveTab(fallbackTabContext);
 
-            // 🔴 IT WAS AN `alert()` OF BULLETED LINES. A native modal blocks the thread,
-            // cannot be styled, is suppressible, and -- worst on a five-tab form -- it
-            // ARRIVES AND LEAVES: dismissing it returned the member to a form that looked
-            // unchanged, with the list of problems now only in their memory. The summary
-            // below stays on the screen, takes focus, and the tab switch above puts them
-            // on the tab holding the first bad field.
             setSaveNotice({ kind: "invalid", messages: Object.values(mergedErrors) });
             return;
         }
 
         setSaveNotice(null);
         memberService.createMember(form)
-            .then(() => {
+            .then((saved) => {
                 setShowSavedNotification(true);
                 setTimeout(() => setShowSavedNotification(false), 3000);
+                
+                // Inject the persisted ID from the Java backend into the payload structure
+                // This triggers the WelcomeLetter evaluation overlay window to perform inspection
+                setWelcomeMember({ ...form, id: saved?.id || saved?.memberId });
             })
             .catch((err) => setSaveNotice({
                 kind: "failed",
@@ -298,37 +267,17 @@ export default function CaptureMember() {
     const frequencyOptions = FREQUENCY_OPTIONS;
     const identityTypeOptions = IDENTITY_TYPE_OPTIONS;
     const genderOptions = GENDER_OPTIONS;
-    const yesNoOptions = YES_NO_OPTIONS;
-    const suspensionCodeOptions = SUSPENSION_CODE_OPTIONS;
     const [jobGradeOptions, setJobGradeOptions] = useState([]);
     const [jobGradeLoading, setJobGradeLoading] = useState(false);
-    /*
-     * ✅ A25's SECOND CLAUSE, `06.1b`. The register's criterion is "the method rejects AND
-     * the caller renders an error", and this is the caller half. `jobGradeService.getByBank`
-     * no longer swallows a failure into the (empty) static list, so a 500, a dropped
-     * connection or the ten-second ceiling arrives here as a rejection in §16's shape and
-     * this field says so, with a retry, instead of reading "No job grades available".
-     *
-     * 🔑 IT IS PER-PANEL, NOT PER-PAGE (EH-D9). Nine things load on this screen. A bank whose
-     * grades cannot be fetched must not blank a capture form the user has half filled in --
-     * the one field says what happened and the other eight keep working.
-     */
     const [jobGradeError, setJobGradeError] = useState(null);
-    // Bumped by the retry control. It is a dependency of the fetch effect, so "try again"
-    // re-runs exactly the effect that failed rather than duplicating its body.
     const [jobGradeAttempt, setJobGradeAttempt] = useState(0);
 
-    // Fetch job grades for the selected bank whenever bankName changes.
     useEffect(() => {
         let cancelled = false;
-
-        // 🛠️ IMMEDIATELY clear out any previously selected Job Grade when Bank changes
         setForm(prev => ({ ...prev, jobGrade: "" }));
 
         const fetchGrades = async () => {
             if (!form.bankName) {
-                // No bank, no grades: grades are per bank, so an empty list is the honest
-                // answer. The job grade itself was already cleared at the top of this effect.
                 setJobGradeOptions([]);
                 setJobGradeError(null);
                 setJobGradeLoading(false);
@@ -338,7 +287,6 @@ export default function CaptureMember() {
             setJobGradeLoading(true);
             setJobGradeError(null);
 
-            // Try to resolve bank code locally from bankListing
             const normalized = String(form.bankName || '').trim().toLowerCase();
             const found = bankListing.find((b) => {
                 const bn = String(b.bankName || b.name || '').trim().toLowerCase();
@@ -350,9 +298,6 @@ export default function CaptureMember() {
                 const grades = await jobGradeService.getByBank(bankIdentifier);
                 if (!cancelled) setJobGradeOptions(Array.isArray(grades) ? grades : []);
             } catch (error) {
-                // ⚠️ AN ABORT IS NOT A FAILURE (§16, EH-D3). A superseded request is dropped
-                // silently: the state stays exactly as it was, and the field does not tell a
-                // user their bank list broke because they kept typing.
                 if (!cancelled && error?.kind !== 'abort') {
                     setJobGradeOptions([]);
                     setJobGradeError(error);
@@ -366,25 +311,19 @@ export default function CaptureMember() {
     }, [form.bankName, bankListing, jobGradeAttempt]);
 
     return (
+        <>
+        <WelcomeLetter
+            open={!!welcomeMember}
+            onClose={() => setWelcomeMember(null)}
+            member={welcomeMember}
+        />
         <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
-            {/* BR-18: the page's only <h1>, from the shared component, so this route stops
-                being one of the nine with no heading of its own. */}
             <PageTitle
                 title="Capture Member"
                 subtitle="Capture a new Sasbo member. Every required personal, employment and banking detail is checked before the record is saved."
                 className="mb-5"
             />
-            {/* ✅ THE FOURTH STATE, ABOVE THE FORM RATHER THAN INSIDE IT (EH-D9).
-
-                Four reference lists fill this form's selectors. When some of them fail this
-                says WHICH, before the member starts typing -- because the alternative is an
-                administrator who fills in six tabs, reaches the bank field, finds it empty,
-                and has no way to know whether that is a broken server or a real answer.
-
-                🔴 IT IS A NOTICE, NOT A BLOCK. Everything that DID load still works, and a
-                capture form is the last place to throw away a half-finished form over one
-                dead endpoint. The retry re-runs only the lists that were asked for; nothing
-                the member has typed is touched. */}
+            
             {(refs.state === 'partial' || refs.state === 'error') && (
                 <div className="mb-4 rounded-lg bg-surface p-3 shadow-(--shadow-1)">
                     <DataState
@@ -413,10 +352,6 @@ export default function CaptureMember() {
                     </div>
                 )}
 
-                {/* 🔴 WHAT REPLACED THE `alert()`. It stays on screen, it takes focus, and
-                    the tab switch that runs beside it puts the member on the tab holding
-                    the first bad field -- so the list of problems and the fields that
-                    caused them are visible at the same time, which a modal made impossible. */}
                 {saveNotice && (
                     <div
                         ref={saveNoticeRef}
@@ -434,15 +369,6 @@ export default function CaptureMember() {
                     </div>
                 )}
 
-                {/* 📱 R-RESP-J: A SCROLLABLE STRIP. Six tabs do not fit at 390px -- they
-                    wrapped into crushed rows, and the last two were effectively hidden.
-                    `overflow-x-auto` with `whitespace-nowrap` makes them reachable by
-                    swiping, which is how a phone expects to meet a row that is too long.
-
-                    ⚠️ Not `role="tab"`: the ARIA tabs pattern promises arrow-key
-                    movement between tabs, which needs roving focus. `05.3` owns that, with
-                    the shared hook RF already has on its list. `aria-current` says which
-                    section is showing and promises nothing else. */}
                 <div className="border-b border-line bg-surface-2">
                     <div className="flex -mb-px overflow-x-auto whitespace-nowrap px-6">
                         {tabs.map((tab) => (
@@ -456,9 +382,6 @@ export default function CaptureMember() {
                                 <span>{tab.label}</span>
                                 {tabsWithErrors.has(tab.id) && (
                                     <>
-                                        {/* The asterisk was the ONLY signal that a tab held
-                                            errors -- invisible to a screen reader, and to
-                                            anyone who cannot distinguish the colour. */}
                                         <span aria-hidden="true" className="text-status-suspended font-bold text-sm">*</span>
                                         <span className="sr-only">(has errors)</span>
                                     </>
@@ -467,7 +390,7 @@ export default function CaptureMember() {
                         ))}
                     </div>
                 </div>
-                {/* Body */}
+
                 <div className="px-6 py-8 text-sm">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         {activeTab === "personal" && (
@@ -477,13 +400,6 @@ export default function CaptureMember() {
                                 <Field label="First Name(s)" value={form.firstNames} onChange={handleChange("firstNames")} error={fieldErrors.firstNames} required />
                                 <Field label="Surname" value={form.surname} onChange={handleChange("surname")} error={fieldErrors.surname} required />
                                 <Field label="Identity Type" value={form.identityType} onChange={handleChange("identityType")} options={identityTypeOptions} error={fieldErrors.identityType} required />
-                                {/* 🔴 THE LABEL WAS AN INSTRUCTION: "Select Identity Type before
-                                    entering", set in the small capitals every label wears, so
-                                    the form appeared to shout a sentence at a field. A label
-                                    names the field; the instruction is a hint under it, and it
-                                    is only there while the field is actually shut. The name
-                                    becomes the chosen type once there is one, which is what the
-                                    member register does one screen over. */}
                                 <Field
                                     label={form.identityType || "Identity Number"}
                                     note={form.identityType ? null : "Choose an identity type first."}
@@ -574,27 +490,14 @@ export default function CaptureMember() {
                         )}
                     </div>
                 </div>
-                {/* 📱 R-RESP-J: SAVE IS A STICKY ACTION BAR NOW.
-                    This form is six tabs of fields and the body used to scroll inside its
-                    own `max-h-[70vh]` box, so on a phone Save sat below a scroller that
-                    was itself below the fold -- reachable only by scrolling the page to
-                    the bottom, past a panel that scrolls independently. The inner scroller
-                    is gone (the page scrolls, which is what a phone expects) and the bar
-                    is pinned to the bottom of the viewport.
 
-                    `pb-[env(safe-area-inset-bottom)]` is the half that only shows up on
-                    real hardware: without it the bar sits under the home indicator on an
-                    iPhone, and Save is a button you can see and cannot press.
-
-                    🔑 SAVE IS FIRST IN THE DOM AND VISUALLY LAST. `flex-row-reverse`
-                    puts the primary action on the right for a mouse while leaving it first
-                    in the tab order -- the order the two audiences each expect. */}
                 <div className="sticky bottom-0 z-10 flex flex-row-reverse justify-start gap-3 border-t border-line bg-surface/95 px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm">
                     <Button variant="primary" onClick={handleSave}>Save Member</Button>
                     <Button onClick={() => window.history.back()}>Cancel</Button>
                 </div>
             </div>
         </div>
+        </>
     );
 }
 
@@ -604,18 +507,6 @@ const SectionTitle = ({ title }) => (
     </div>
 );
 
-/**
- * The rep's election date.
- *
- * 🔴 IT WAS A NATIVE `<input type="date">` UNDER A `<label>` THAT NAMED NOTHING -- no
- * `htmlFor`, so a screen-reader user reached an unnamed date box -- and it was the fourth
- * of the four native date inputs P3 could not reach, because BR-10 owned this file until
- * now. `DateField` is the approved picker: a real label, a keyboard grid, and the same
- * behaviour on every browser instead of whatever the platform happens to supply.
- *
- * ⚠️ THE THREE-FIELD STORAGE IS UNCHANGED. The server keeps day, month and year as
- * separate strings, and re-shaping that is a wire change, not a presentation one.
- */
 function RepElectionDatePicker({ form, setForm }) {
     const dateValue =
         form.repElectionYear && form.repElectionMonth && form.repElectionDay
@@ -654,23 +545,7 @@ function toggleWorkPreferred(setForm) {
     });
 }
 
-/**
- * The two email addresses, each with a "preferred" tick beside it.
- *
- * The toggles keep their existing three-state behaviour exactly -- personal, work, both --
- * because that is a data question the wire already answers. What changed is the chrome
- * around them: `TextInput` supplies the label, the error wiring and the 16px-on-a-phone
- * rule that the hand-rolled `fieldCls` did not.
- */
 function EmailFields({ form, setForm, handleChange, fieldErrors }) {
-    /*
-     * 🔴 THE CHECKBOX SITS UNDER THE FIELD, NOT BESIDE IT. Outboard, it took its width out
-     * of the input: measured against the mock's strict two-column grid, PERSONAL EMAIL was
-     * 447px where SURNAME in the same column was 524, and WORK EMAIL 446 against FIRST
-     * NAME(S)' 525 -- three different widths down one column, which is the one thing a
-     * grid exists to prevent. Under the field it reads as what it is: a note about the
-     * value above it, in the same place `Field` puts a hint.
-     */
     const preferred = (label, checked, onChange) => (
         <label className="touch-target -mt-0.5 flex w-fit cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs text-ink-muted">
             <input type="checkbox" checked={checked} onChange={onChange} className="size-3.5 accent-brand" />
@@ -704,49 +579,9 @@ function EmailFields({ form, setForm, handleChange, fieldErrors }) {
     );
 }
 
-/**
- * ONE FIELD OF THE CAPTURE FORM -- and this is where BR-4's four-way fracture ends.
- *
- * 🔴 WHAT WAS HERE. A private `Field` and a private `SearchableSelect`, both shadowing
- * shared components of the same name, and a `fieldCls` restating the border, the focus
- * ring and the disabled treatment the token layer already owns. Between them they carried
- * four defects the shared primitives do not have:
- *
- *   1. THE ID WAS DERIVED FROM THE LABEL TEXT -- `label.toLowerCase().replace(/\s+/g,"-")`
- *      -- so two fields with the same label produced two elements with the same id, and
- *      the second label pointed at the first control. This form renders "Preferred" twice.
- *   2. THE PRIVATE `SearchableSelect` WAS MOUSE-ONLY. Its options were `<li onClick>` with
- *      `role="option"` and `aria-selected={false}` HARD-CODED on every one -- so it
- *      announced a listbox in which nothing is ever selected, and no arrow key, Enter or
- *      Escape did anything. The shared one is driven by `aria-activedescendant`.
- *   3. EVERY CONTROL WAS `text-sm`, which this design renders at 13px -- under the 16px
- *      floor, so iOS Safari zooms the page on focus and does not zoom back out. Fourteen
- *      of the fifteen remaining offenders in the whole tree were in this file.
- *      `controlClasses` uses `field-text`, which is 16px on a coarse pointer.
- *   4. `type="date"` GAVE A NATIVE DATE INPUT, three of them, which is what P3's
- *      "zero native date inputs" box could not close while BR-10 owned this file.
- *
- * 🔑 IT IS A THIN ADAPTER NOW, NOT A WRAPPER. It maps this form's call shape --
- * `options`, `searchable`, `type`, `note` -- onto the shared primitives, so the ~90 call
- * sites in this file did not each have to change. That is the whole point of BR-4
- * converging rather than rewriting: the fracture closes without touching the form's logic,
- * which is the Capture Member arc's.
- */
 function Field({ label, value, onChange, className = "", options = null, type = "text",
                    error = null, disabled = false, searchable = false, note = null, kind, required = false,
                    loading = false, emptyLabel, loadError = null, onRetryLoad }) {
-    /*
-     * 🔑 `loadError` IS NOT `error`, AND CONFLATING THEM IS THE BUG THIS PROP EXISTS TO AVOID.
-     *
-     *   `error`     the VALUE is wrong. "Enter a valid identity number." The user fixes it.
-     *   `loadError` the CHOICES are missing. The user cannot fix anything by typing; the
-     *               only useful action is to try the fetch again.
-     *
-     * Rendered as a validation message, a failed reference list would blame the member for a
-     * backend being down and offer them no way out -- so it renders as a compact `DataState`
-     * with a retry beneath the control instead (EH-D4: every error state carries a way out
-     * when one is honest, and `retryable` decides whether it is).
-     */
     if (loadError) {
         return (
             <div className={cn("flex flex-col gap-1", className)}>
@@ -806,9 +641,6 @@ function Field({ label, value, onChange, className = "", options = null, type = 
                 loading={loading}
                 onChange={(next) => onChange?.({ target: { value: next } })}
                 placeholder="Select..."
-                // The caller's wording, not a generic one. "No job grades available" tells
-                // a member the BANK has no grades on file; "No options available" tells
-                // them nothing they can act on, and it is the copy the suite pins.
                 emptyLabel={emptyLabel}
             />
         );

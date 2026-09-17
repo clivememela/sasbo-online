@@ -46,17 +46,22 @@ afterEach(() => {
 })
 
 describe('jobGradeService.getByBank', () => {
-  it('passes through the {value,label} objects the server sends', async () => {
+  it('keeps the {value,label} shape the server sends, with the label forced to the grade alone', async () => {
     // The live contract. `JobGradeResponseDto` emits `{value,label}`, and the
-    // dropdown needs both halves intact: the label is what an administrator
-    // reads and the value is what the form submits.
+    // dropdown needs both halves: the label is what an administrator reads and
+    // the value is what the form submits.
+    //
+    // 🔑 SINCE MAIN a23fb81 / 1206c76 (2026-09-16) THE LABEL IS THE GRADE ALONE, on
+    // both sides: the server sends `label: grade`, and this service overrides any
+    // longer label it is handed. So a composed label from an older server still
+    // renders as the bare code -- asserted with one, so the override is what passes.
     gradesFrom([
       { value: 'C1', label: 'C1 - Clerk - Permanent' },
       { value: 'BA1', label: 'BA1' },
     ])
 
     await expect(jobGradeService.getByBank(BANK_CODE)).resolves.toEqual([
-      { value: 'C1', label: 'C1 - Clerk - Permanent' },
+      { value: 'C1', label: 'C1' },
       { value: 'BA1', label: 'BA1' },
     ])
   })
@@ -85,19 +90,16 @@ describe('jobGradeService.getByBank', () => {
   it('builds value and label from the DTO fields when the server sends them raw', async () => {
     // The defensive branch upstream added: if the response carries `grade`,
     // `description` and `contractType` instead of `{value,label}`, the service
-    // composes the label itself.
+    // builds `{value,label}` itself.
     //
-    // ⚠️ AND IT COMPOSES IT DIFFERENTLY FROM THE SERVER. This produces
-    // `"C1 - Clerk (Permanent)"`; `JobGradeResponseDto` produces
-    // `"C1 - Clerk - Permanent"`. Two statements of one format, in two
-    // repositories, already disagreeing about the punctuation -- and today the
-    // disagreement is invisible because the server always sends `{value,label}`,
-    // so this branch never runs in production. Asserted so that the day it does
-    // run, the difference is a red test rather than a puzzling label on screen.
+    // ✅ THE TWO-FORMAT DISAGREEMENT THIS TEST USED TO RECORD IS GONE. The service
+    // composed "C1 - Clerk (Permanent)" and the server "C1 - Clerk - Permanent";
+    // since main a23fb81 / 1206c76 both use the grade alone, so the description
+    // and contract type in this fixture must NOT reach the label.
     gradesFrom([{ grade: 'C1', description: 'Clerk', contractType: 'Permanent' }])
 
     await expect(jobGradeService.getByBank(BANK_CODE)).resolves.toEqual([
-      { value: 'C1', label: 'C1 - Clerk (Permanent)' },
+      { value: 'C1', label: 'C1' },
     ])
   })
 

@@ -151,7 +151,7 @@ export default function About() {
             <li>Standard Bank</li>
             <li>UBank</li>
             <li>VBS</li>
-            <li>Capitec Bank</li>
+            <li>Capitec Bank Limited</li>
           </ul>
         </section>
 
