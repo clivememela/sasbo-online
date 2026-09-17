@@ -13,8 +13,33 @@ import { requestJson, requestJsonWrite } from './parseApiError';
  * rejects, and now with a message worth showing.
  */
 export const recruiterService = {
+  /**
+   * The REPRESENTATIVES: people who sit on a structure with a role and an election date. This is
+   * `Recruiters.jsx`'s list -- the administration screen -- and Edit Member's, and it stays here.
+   */
   getAll: () =>
     requestJson((signal) => fetch(apiUrl('/api/representatives'), {
+      credentials: 'include',
+      signal,
+    })),
+
+  /**
+   * 🔴 S6 / R5 / 03.10 -- THE CAPTURE SCREEN'S RECRUITER LIST, WHICH IS A DIFFERENT LIST.
+   *
+   * A recruiter is the person a member is attributed to. A representative sits on a structure. Main's
+   * `4e41ed5` pointed `/api/representatives` at the `members` table while the member's own recruiter FK
+   * still resolved through `representatives`, so the drop-down and the stored value read DIFFERENT
+   * TABLES -- R5's defect, re-created from the other side. The server settled it by giving recruiters
+   * their own endpoint (`RecruiterController`, on main at 829f252) and leaving `/api/representatives`
+   * to do its own job.
+   *
+   * GET only, deliberately, and that is the server's decision rather than an omission here: creating a
+   * recruiter from the capture screen would let a typo become a permanent option in everybody's
+   * drop-down -- the same failure 02.5's `verified` flag exists to prevent for job grades. Recruiters
+   * are union staff and are administered where staff are administered.
+   */
+  getRecruiters: () =>
+    requestJson((signal) => fetch(apiUrl('/api/recruiters'), {
       credentials: 'include',
       signal,
     })),

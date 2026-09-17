@@ -1614,11 +1614,22 @@ export default function Members() {
 
                             {activeTab === "representatives" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
-                                    {/* Main (client bf547c1, 4a7a67b): renamed to the words the union uses, and
-                                        read-only on the record -- a recruiter is assigned where the member is
-                                        captured, not reassigned from here. */}
-                                    <Detail label="Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={isEditing} disabled={true} />
-                                    <Detail label="Area's Recruiter" value={editForm.areasRep} isEditing={isEditing} disabled={true} />
+                                    {/* 🗣️ 03.9 -- ALL THREE, AND NONE OF THEM EDITABLE FROM HERE. The stakeholder:
+                                        recruitment "should only show ... should not be editable from there". It showed
+                                        TWO, and not because the third was hidden: "Recruiter Type" had no field
+                                        anywhere until 03.8 gave the capture screen one.
+
+                                        🔑 "Area's Recruiter" is GONE rather than relabelled (R2/RE-3). It read
+                                        `areasRep`, which held a PERSON chosen from the recruiter list, under an
+                                        area-shaped name. `areaRecruited` is a different field carrying a different
+                                        kind of thing; showing the old value under the new label would have been the
+                                        same defect with a corrected word on it.
+
+                                        Read-only here, editable on capture: a recruiter is assigned where the member
+                                        is captured, and these three are a historical fact about that moment. */}
+                                    <Detail label="Recruiter Type" value={editForm.recruitedHow} isEditing={false} />
+                                    <Detail label="Area Recruited" value={editForm.areaRecruited} isEditing={false} />
+                                    <Detail label="Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={false} />
                                 </div>
                             )}
 

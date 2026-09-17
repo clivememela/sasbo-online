@@ -3,11 +3,13 @@ import { AlertCircle, CheckCircle2 } from "lucide-react";
 import WelcomeLetter from "../../components/members/WelcomeLetter";
 import { memberService } from "@/services/memberService.js";
 import { recruiterService } from "@/services/recruiterService.js";
+import { recruitmentChannelService } from "@/services/recruitmentChannelService.js";
+import { locationService } from "@/services/locationService.js";
 import { jobGradeService } from "@/services/jobGradeService.js";
 import { bankService } from "@/services/bankService.js";
 import PageTitle from "../../components/common/PageTitle";
 import {
-    Button, DateField, PositionTreeSelect, SearchableSelect, SelectInput, TextInput,
+    Button, DateField, SearchableSelect, SelectInput, TextInput,
 } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
@@ -24,6 +26,7 @@ import { findSubscriptionForBank, formatSubscriptionAmount, sasboSubscriptionAmo
 import { branchCodeOf, branchNamesForBank, findBranchRecord, formatBranchAddress } from "@/utils/bankBranches.js";
 import { DERIVATION, derivationNote, derivationStateOf } from "@/utils/derivation.js";
 import { debitDateSentence } from "@/utils/debitDate.js";
+import { nearMisses, resolveToOption } from "@/utils/jobGradeMatch.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
     formatDate } from "@/utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
@@ -55,9 +58,18 @@ const FIELD_TO_TAB_MAP = {
     debitDay: "employment",
 };
 
+/** The names out of a reference table of `{id, name}` rows -- [] until the list has arrived. */
+const nameList = (rows) => (Array.isArray(rows) ? rows : []).map((row) => row?.name).filter(Boolean);
+
 const REFERENCE_LOADERS = {
-    recruiters: () => recruiterService.getAll(),
-    structures: () => recruiterService.getStructures(),
+    // 🔴 S6/R5/03.10: the CAPTURE screen's recruiter list is `/api/recruiters`, not the representatives
+    // endpoint. Two lists, two jobs -- see `recruiterService.getRecruiters`.
+    recruiters: () => recruiterService.getRecruiters(),
+    // 03.8 -- HOW the member was recruited. A reference table that was seeded, served and administered
+    // with no member ever pointing at it, because no screen had the field.
+    'recruitment channels': () => recruitmentChannelService.getAll(),
+    // 03.3 -- the AREAS, for "Area Recruited". A different list from the recruiters, and that IS the fix.
+    areas: () => locationService.getAllAreas(),
     'bank branches': () => bankService.getBankListing(),
     banks: () => bankService.getBankNames(),
     subscriptions: () => subscriptionsService.getAll(),
@@ -97,24 +109,33 @@ export default function CaptureMember() {
         paymentType: "Debit Order",
         debitDay: "20",
         bankAddress: "",
-        workBankAddress: "",
+        // The three the stakeholder asked for, under the names MemberDto declares.
+        recruitedHow: "",
+        areaRecruited: "",
         recruitmentRep: "",
-        areasRep: "",
-        repElectionDay: "",
-        repElectionMonth: "",
-        repElectionYear: "",
-        remarks: "",
-        remarks2: "",
-        remarks3: "",
-        remarks4: "",
-        memnetMember: "N",
-        printLabelForPostage: "Y",
-        suspensionCode: "",
-        useAltAddress: "N",
-        deductACB: "Y",
-        printMembershipCards: "Y",
-        homeLoanReducedRateOption: "N",
-        structure1: "",
+
+        /* 🗑️ SIXTEEN KEYS WERE HERE, AND EVERY CAPTURE HAS BEEN POSTING THEM (03.1, 03.2).
+         *
+         * Two whole tabs came off this screen -- Sasbo Structures ("a new member cannot immediately sit
+         * on a structure", the stakeholder, 2026-09-09) and History & Remarks. Their CONTROLS went; their
+         * keys stayed here, and `handleSave` posts the form, so the screen went on sending fields nobody
+         * could see, set or stop:
+         *
+         *   workBankAddress · repElectionDay/Month/Year · remarks, remarks2, remarks3, remarks4 ·
+         *   memnetMember · printLabelForPostage · suspensionCode · useAltAddress · deductACB ·
+         *   printMembershipCards · homeLoanReducedRateOption · structure1
+         *
+         * 🔑 A HIDDEN TAB IS NOT A REMOVED FIELD; the payload is the contract. And four of these were not
+         * blanks but OPINIONS -- `memnetMember: "N"`, `printLabelForPostage: "Y"`, `deductACB: "Y"`,
+         * `printMembershipCards: "Y"` -- written into every new member by a form that never asked. The day
+         * one of those columns is read, the answer would be this file's default rather than anybody's
+         * decision, with nothing on screen to contradict it. `remarks3` and `remarks4` never had a control
+         * anywhere at all.
+         *
+         * ⚖️ Cleared with the automation arc before landing (2026-09-17): none of the sixteen is among the
+         * 21 fields its live round-trip scenario types and reads back, and `captureCatalogue.spec.js`'s
+         * closed list of removed-tab labels does not move. `capturePayload.test.jsx` holds the payload as a
+         * CLOSED SET, so a key creeping back reddens whether or not anyone remembers to look for it. */
     });
 
     const [fieldErrors, setFieldErrors] = useState({});
@@ -144,7 +165,8 @@ export default function CaptureMember() {
         return row?.subscriptionAmount ?? sasboSubscriptionAmount(subscriptionRows);
     }, [form.bankName, subscriptionRows]);
     const reps = refs.data.recruiters;
-    const structures = refs.data.structures;
+    const channels = refs.data['recruitment channels'];
+    const areas = refs.data.areas;
     const bankListing = refs.data['bank branches'];
     const bankNames = refs.data.banks;
 
@@ -445,6 +467,24 @@ export default function CaptureMember() {
     const [jobGradeError, setJobGradeError] = useState(null);
     const [jobGradeAttempt, setJobGradeAttempt] = useState(0);
 
+    /**
+     * 🔑 THE NEAR MISS IS A QUESTION, NEVER A SUBSTITUTION (rule 4, "smartly allow free text").
+     *
+     * `SBG4` for `SBG04` is the realistic mistake where grades are zero-padded. Silently correcting it
+     * is the failure 02.5 exists to fix: a grade that appeared to save, saved as something else, and
+     * said nothing. So the screen ASKS, and what was typed stays exactly as typed.
+     *
+     * Computed here rather than inside `SearchableSelect` because the vocabulary is known here and not
+     * there -- the primitive deliberately does not guess.
+     */
+    const jobGradeNote = useMemo(() => {
+        if (!form.jobGrade || resolveToOption(jobGradeOptions, form.jobGrade)) return null;
+        const suggestions = nearMisses(jobGradeOptions, form.jobGrade);
+        if (suggestions.length === 0) return null;
+        return `Did you mean ${suggestions.join(" or ")}? "${form.jobGrade}" will be sent for review as a new grade.`;
+    }, [form.jobGrade, jobGradeOptions]);
+
+
     useEffect(() => {
         let cancelled = false;
         // 🔴 R3-F3: the grade is NOT cleared here. This effect also re-runs when a reference list is retried (the
@@ -632,7 +672,13 @@ export default function CaptureMember() {
                                 <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} {...refs.field('banks')} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
                                 <Field label="Employee Number" kind="reference" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
-                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} emptyLabel="No job grades available" loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
+                                {/* 🔑 02.5 / CM-37 -- LIST FIRST, TYPING ALLOWED. The seeded list is per-bank and
+                                    incomplete (SASBO's own data carries grades no bank row has), so a list-only
+                                    field means a member who cannot be captured at all. The server is built for
+                                    it: `jobGradeMatching` in `api-vocabulary.json` publishes the normalisation
+                                    and `MemberDto.jobGradeOutcome` reports MATCHED / CAPTURED / CLEARED.
+                                    `allowCustom` is the design arc's prop, on their instruction and their shape. */}
+                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} emptyLabel="No job grades available" loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} searchable allowCustom note={jobGradeNote} />
                                 <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={branchOptionsFor(form.bankName)} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable disabled={!form.bankName} note={form.bankName ? null : "Choose the bank first."} />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
 
@@ -656,23 +702,40 @@ export default function CaptureMember() {
 
                         {activeTab === "representatives" && (
                             <>
-                                <Field label="Recruiter" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} {...refs.field('recruiters')} options={reps.map(r => r.name).filter(Boolean)} searchable />
-                                <Field label="Area's Recruiter" value={form.areasRep} onChange={handleChange("areasRep")} {...refs.field('recruiters')} options={reps.map(r => r.name).filter(Boolean)} searchable />
+                                {/* The stakeholder, 2026-09-09, on exactly what this tab captures: "1. How the member
+                                    was recruited. 2. The area where the member was recruited. 3. Who recruited the
+                                    member, where applicable." Those three, in that order, and nothing else.
 
-                                {form.electedRep === 'Y' && (
-                                    <>
-                                        <RepElectionDatePicker form={form} setForm={setForm} />
-                                        <div className="md:col-span-2">
-                                            <PositionTreeSelect
-                                                label="Position / Structure"
-                                                structures={structures}
-                                                selectedIds={form.structureIds || []}
-                                                onChange={(ids) => setForm(prev => ({ ...prev, structureIds: ids }))}
-                                                placeholder="Select positions..."
-                                            />
-                                        </div>
-                                    </>
-                                )}
+                                    🗣️ S6, SETTLED BY THE OWNER the same day. The older spec asks for a tab called
+                                    "Recruiter Type"; the stakeholder calls the tab "Recruitment Channel", twice, on
+                                    both screens. Both are right about different things -- "Recruiter Type" was never
+                                    the TAB, it names the KIND of recruitment, which is what the first field holds. So
+                                    the tab keeps the stakeholder's name and the FIELD takes the spec's. Nothing was
+                                    renamed to satisfy a checker: the reconciliation was put to the owner. */}
+                                <Field label="Recruiter Type" value={form.recruitedHow} onChange={handleChange("recruitedHow")} {...refs.field('recruitment channels')} options={nameList(channels)} searchable />
+
+                                {/* 🔑 R2 / RE-3 -- A CHANGE OF MEANING, NOT A RENAME. This was "Area's Recruiter", fed
+                                    from the list of recruiter PEOPLE, so it captured a person under an area-shaped
+                                    name. Three documents ask for an AREA (28 Aug, §11, RE-3). Relabelling alone would
+                                    have left the screen collecting the wrong KIND of thing behind a corrected word --
+                                    worse than obviously wrong, because nothing about it would ever look wrong again.
+
+                                    ⛔ And it is deliberately NOT pre-filled from the bank's area. The area a member
+                                    WORKS in is usually where they were recruited, and "usually" is a correlation, not
+                                    a lookup (S1). This field records a historical fact; a plausible unverified default
+                                    is the hardest kind to detect later. */}
+                                <Field label="Area Recruited" value={form.areaRecruited} onChange={handleChange("areaRecruited")} {...refs.field('areas')} options={nameList(areas)} searchable />
+
+                                {/* "where applicable" is the stakeholder's own qualifier, so this one is optional by
+                                    instruction rather than by omission. */}
+                                <Field label="Recruiter" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} {...refs.field('recruiters')} options={nameList(reps)} searchable note="Where applicable" />
+
+                                {/* 🗑️ ELECTED RECRUITER + ELECTION DATE + POSITION/STRUCTURE WERE HERE -- removed
+                                    (03.1/S5, R3-OBS-2a). The spec moves an election to Edit Member: it happens to an
+                                    existing member, not while one is being captured. The block was already
+                                    UNREACHABLE -- it was guarded by `form.electedRep === 'Y'` against a form with no
+                                    `electedRep` key -- so nothing on screen changes. Dead code that looks live is how
+                                    a removed field keeps being reasoned about. */}
                             </>
                         )}
                     </div>
@@ -706,22 +769,6 @@ const SectionTitle = ({ title }) => (
         {title}
     </div>
 );
-
-function RepElectionDatePicker({ form, setForm }) {
-    const dateValue =
-        form.repElectionYear && form.repElectionMonth && form.repElectionDay
-            ? `${form.repElectionYear}-${form.repElectionMonth}-${form.repElectionDay}`
-            : "";
-    const handleDateChange = (e) => {
-        const [year, month, day] = e.target.value.split("-");
-        setForm((prev) => ({ ...prev, repElectionYear: year || "", repElectionMonth: month || "", repElectionDay: day || "" }));
-    };
-    return (
-        <div className="md:col-span-2">
-            <DateField label="Election Date" value={dateValue} max="today" hint="ago" onChange={handleDateChange} />
-        </div>
-    );
-}
 
 function togglePersonalPreferred(setForm) {
     setForm((prev) => {
@@ -781,7 +828,7 @@ function EmailFields({ form, setForm, handleChange, fieldErrors }) {
 
 function Field({ label, value, onChange, className = "", options = null, type = "text",
                    error = null, disabled = false, searchable = false, note = null, kind, required = false,
-                   loading = false, emptyLabel, loadError = null, onRetryLoad }) {
+                   loading = false, emptyLabel, loadError = null, onRetryLoad, allowCustom = false }) {
 
     const shared = {
         label,
@@ -806,6 +853,13 @@ function Field({ label, value, onChange, className = "", options = null, type = 
                 loading={loading}
                 loadError={loadError}
                 onRetryLoad={onRetryLoad}
+                allowCustom={allowCustom}
+                /* 🔴 `emptyLabel` WAS NOT FORWARDED HERE, and the plain-select branch below does forward
+                   it. So any field that was searchable fell back to "No options available" while its
+                   caller had written a sentence about its own list -- F-P54's exact shape, surviving in
+                   one of the two branches. Found when Job Grade became searchable and its "No job
+                   grades available" disappeared. */
+                emptyLabel={emptyLabel}
                 onChange={(next) => onChange?.({ target: { value: next } })}
                 placeholder="Search..."
             />
