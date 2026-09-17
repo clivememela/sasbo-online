@@ -137,7 +137,10 @@ describe('Capture Member · Employment & Bank', () => {
     await chooseFrom(user, 'Bank Where Employed', 'Absa', ABSA.bankName)
     const grade = await screen.findByLabelText(/^Job Grade/)
     await waitFor(() => expect(grade).toBeEnabled())
-    await user.selectOptions(grade, 'C1')
+    // ⚠️ Job Grade is a COMBOBOX since 02.5/CM-37 let a grade be typed -- `allowCustom` exists only on
+    // SearchableSelect, and a native select cannot hold a value outside its options. Chosen through the
+    // same helper as the bank above; what this test asserts is unchanged.
+    await chooseFrom(user, 'Job Grade', 'C1', 'C1')
 
     await user.click(retry)
     await waitFor(() => expect(branchCalls).toBeGreaterThanOrEqual(2))
