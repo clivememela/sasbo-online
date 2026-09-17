@@ -204,7 +204,9 @@ describe('reading: one column, and an unanswered question says so', () => {
 
   it('a member saved before V29 reads "Not recorded", not "No" -- nobody was ever asked', async () => {
     // CM-05: Shop Steward and BEC had no column, so for every earlier member the answer is absent.
-    const { isShopSteward: _s, isBec: _b, ...legacy } = MEMBER
+    const legacy = { ...MEMBER }
+    delete legacy.isShopSteward
+    delete legacy.isBec
     server.use(membersRespond([legacy]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)

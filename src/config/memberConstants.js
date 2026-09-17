@@ -3,7 +3,14 @@ export const TITLE_OPTIONS = ['Mr', 'Ms', 'Mrs', 'Dr', 'Prof'];
 export const RACE_OPTIONS = ['African', 'White', 'Coloured', 'Indian', 'Other'];
 export const PAYMENT_TYPE_OPTIONS = ['Debit Order', 'Payroll'];
 export const STATUS_OPTIONS = ['Active', 'Pending', 'Suspended', 'Resigned', 'Retired'];
-export const IDENTITY_TYPE_OPTIONS = ['I.D. Number', 'Passport Number'];
+/**
+ * 🔴 A7: the passport rule compared against "Passport" while the only option is "Passport Number", so
+ * "Date of Birth is required for a passport" never once ran, on either screen. Named once, here, and
+ * compared by name -- a second spelling of a vocabulary value is how the rule went dead.
+ */
+export const IDENTITY_TYPE_ID = 'I.D. Number';
+export const IDENTITY_TYPE_PASSPORT = 'Passport Number';
+export const IDENTITY_TYPE_OPTIONS = [IDENTITY_TYPE_ID, IDENTITY_TYPE_PASSPORT];
 export const GENDER_OPTIONS = ['Male', 'Female'];
 export const YES_NO_OPTIONS = ['Y', 'N'];
 export const SUSPENSION_CODE_OPTIONS = ['', 'NON-PAY', 'RESIGN'];

@@ -67,18 +67,6 @@ export const DEFECTS = {
       'drift between the two halves rather than a typo in one of them.',
   ),
 
-  A7: define(
-    'A7',
-    'the passport date-of-birth rule never fires',
-    'CaptureMember branches on identityType === "Passport" while its own dropdown ' +
-      'offers "Passport Number". The same shape as A6, on a different field: neither ' +
-      'side is wrong alone, they simply do not agree, and the consequence is a rule ' +
-      'that has never once run in production. IT IS IN TWO SCREENS, not one: this row ' +
-      'named only CaptureMember until P4 scanned for the class rather than the ' +
-      'instance and found the same comparison in Members.jsx (validation and the ' +
-      'date-of-birth field). Corrected 2026-09-05 -- an under-reported row is how a ' +
-      'fix gets called complete while half the defect is still shipping.',
-  ),
 
   A9: define(
     'A9',
@@ -91,6 +79,8 @@ export const DEFECTS = {
       'repair that activates untested behaviour.',
   ),
 
+// A7 is RETIRED, 2026-09-17, by the capture-member re-port: both screens compare against
+// IDENTITY_TYPE_PASSPORT, so a passport member needs a date of birth on Capture AND Edit.
 // A11 is RETIRED, 2026-09-09, by the design arc's 03.1.
 //
 // It read: "no error boundary -- one render error blanks the whole application".

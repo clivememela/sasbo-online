@@ -154,4 +154,24 @@ describe('the member record, mid-edit', () => {
     await waitFor(() => expect(saved).toBeDefined())
     expect(saved.cosatuPositions).toEqual(['PEC', 'CEC'])
   })
+  it('⑦ A7 (fixed): a passport member with no date of birth is not saved, and is told why', async () => {
+    // 🔴 The second site of A7: Edit Member required a date of birth when identityType === "Passport", and the only
+    // option is "Passport Number", so the rule never ran and a passport member saved with no date on file.
+    let saved
+    server.use(
+      http.get('*/api/members', () => HttpResponse.json([{ ...ALPHA, identityType: 'Passport Number', identityNumber: 'A12345678' }, BRAVO])),
+      http.put('*/api/members/:id', async ({ request }) => {
+        saved = await request.json()
+        return HttpResponse.json(saved)
+      }),
+    )
+    const user = await editAlpha({ change: true })
+
+    await user.click(screen.getByRole('button', { name: /^Save changes$/ }))
+
+    // Twice by design: under the field, and in the save summary that names every problem.
+    expect((await screen.findAllByText(/Date of Birth is strictly required/i)).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('dialog', { name: 'Save these changes?' })).not.toBeInTheDocument()
+    expect(saved).toBeUndefined()
+  })
 })

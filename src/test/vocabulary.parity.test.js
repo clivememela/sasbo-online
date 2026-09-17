@@ -189,16 +189,8 @@ const EXPECTED = {
     defect: DEFECTS.A6,
     why: 'compared against a value no option can produce, so this branch can NEVER be true.',
   },
-  'src/pages/members/CaptureMember.jsx :: form.identityType === "Passport"': {
-    verdict: 'DEFECT',
-    defect: DEFECTS.A7,
-    why: 'the dropdown offers "Passport Number", so this rule has never once run.',
-  },
-  'src/pages/members/Members.jsx :: editForm.identityType === "Passport"': {
-    verdict: 'DEFECT',
-    defect: DEFECTS.A7,
-    why: 'the SECOND site of A7, in the edit screen -- the one the register missed.',
-  },
+  // A7's two sites (CaptureMember.jsx and Members.jsx comparing against "Passport") are GONE, 2026-09-17:
+  // both compare against IDENTITY_TYPE_PASSPORT now, so there is nothing left here to accept or to flag.
   'src/pages/members/Members.jsx :: (param).paymentType === "Payroll Deduction"': {
     verdict: 'ACCEPTED',
     why:
@@ -358,21 +350,10 @@ describe('vocabulary parity between this browser and its server', () => {
       )
     })
 
-    it.skip(disabled(DEFECTS.A7, 'no screen compares identityType to "Passport"'), () => {
+    it('A7 (fixed): no screen compares identityType to "Passport"', () => {
       expect(offendingKeys.filter((key) => key.includes('identityType'))).toEqual([])
     })
 
-    it(pin(DEFECTS.A7, 'BOTH screens still compare identityType to "Passport"'), () => {
-      // Both, deliberately. The register named only CaptureMember until this
-      // scan found the edit screen too, and a pin that checked one of the two
-      // would go green on a half-finished repair.
-      expect(offendingKeys).toContain(
-        'src/pages/members/CaptureMember.jsx :: form.identityType === "Passport"',
-      )
-      expect(offendingKeys).toContain(
-        'src/pages/members/Members.jsx :: editForm.identityType === "Passport"',
-      )
-    })
   })
 
   describe('the vocabulary the server publishes', () => {

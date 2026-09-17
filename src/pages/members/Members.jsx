@@ -15,7 +15,7 @@ import { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
 import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
-    BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS,
+    BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, IDENTITY_TYPE_PASSPORT,
 } from "../../config/memberConstants.js";
 import {
     validateSAID, validateEmail, formatDate, extractDateOfBirthFromSAID, extractGenderFromSAID
@@ -642,7 +642,7 @@ export default function Members() {
             errors.identityNumber = "Identity Number must be exactly 13 digits when I.D. Number is selected";
         }
 
-        if (editForm.identityType === "Passport" && !editForm.dateOfBirth) {
+        if (editForm.identityType === IDENTITY_TYPE_PASSPORT && !editForm.dateOfBirth) {
             errors.dateOfBirth = "Date of Birth is strictly required when Passport is selected";
         }
 
@@ -1497,7 +1497,7 @@ export default function Members() {
                                         <DateField
                                             label="Date of Birth"
                                             value={editForm.dateOfBirth || ""}
-                                            required={editForm.identityType === "Passport"}
+                                            required={editForm.identityType === IDENTITY_TYPE_PASSPORT}
                                             error={fieldErrors.dateOfBirth || undefined}
                                             max="today"
                                             onChange={(e) => setEditForm(prev => ({ ...prev, dateOfBirth: e.target.value }))}

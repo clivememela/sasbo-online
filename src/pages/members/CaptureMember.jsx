@@ -12,8 +12,9 @@ import {
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, MEMBER_TABS,
-    BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS
+    BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS, IDENTITY_TYPE_PASSPORT
 } from "@/config/memberConstants.js";
+import { toWireDate, today } from "@/lib/format.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
     formatDate } from "@/utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
@@ -68,7 +69,8 @@ export default function CaptureMember() {
         workTel: "",
         homeTel: "",
         address: "",
-        joinDate: new Date().toISOString().split("T")[0],
+        // The LOCAL calendar day (CM-38): toISOString() is UTC, a day behind between midnight and 02:00 in SAST.
+        joinDate: toWireDate(today()),
         status: "Active",
         monthlySubscription: "",
         subscriptionFrequency: "Monthly",
@@ -206,7 +208,7 @@ export default function CaptureMember() {
             errors.identityNumber = "Identity Number must be exactly 13 digits when I.D. Number is selected";
         }
 
-        if (form.identityType === "Passport" && !form.dateOfBirth) {
+        if (form.identityType === IDENTITY_TYPE_PASSPORT && !form.dateOfBirth) {
             errors.dateOfBirth = "Date of Birth is strictly required when Passport is selected";
         }
 
@@ -441,7 +443,7 @@ export default function CaptureMember() {
                                     type={form.identityType === "I.D. Number" ? "text" : "date"}
                                     disabled={form.identityType === "I.D. Number"}
                                     error={fieldErrors.dateOfBirth}
-                                    required={form.identityType === "Passport"}
+                                    required={form.identityType === IDENTITY_TYPE_PASSPORT}
                                 />
                                 <Field
                                     label="Gender"

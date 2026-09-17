@@ -8,7 +8,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { IDENTITY_TYPE_OPTIONS } from '../../config/memberConstants'
-import { DEFECTS, disabled, pin } from '../../test/knownDefects'
+
 import { setupUser } from '../../test/user'
 
 /**
@@ -239,7 +239,7 @@ describe('the identity-type vocabulary', () => {
     await save(user)
   }
 
-  it.skip(disabled(DEFECTS.A7, 'a passport capture must require a date of birth'), async () => {
+  it('A7 (fixed): a passport capture must require a date of birth', async () => {
     // Written to the standard. Unlike an I.D. Number, a passport number
     // carries no date to derive from -- so if the form does not insist on one,
     // the record is simply incomplete, and nothing downstream can tell that
@@ -251,17 +251,4 @@ describe('the identity-type vocabulary', () => {
     expect(alerts, 'a native alert() is back').toEqual([])
   })
 
-  it(pin(DEFECTS.A7, 'a passport capture still saves with no date of birth'), async () => {
-    // The consequence of A7, executed rather than described. The rule exists
-    // in the code -- `identityType === "Passport" && !dateOfBirth` -- and has
-    // never once run, because the dropdown only offers "Passport Number".
-    await capturePassportMember(setupUser())
-
-    await waitFor(() => expect(posted).toBeDefined())
-    expect(
-      posted.dateOfBirth,
-      'A7 has been fixed -- the form now refuses a passport capture with no date of ' +
-        'birth. Delete this pin, un-skip the test above, and close the row.',
-    ).toBeFalsy()
-  })
 })
