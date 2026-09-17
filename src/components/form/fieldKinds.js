@@ -63,6 +63,17 @@ const KINDS = {
     autoCapitalize: 'none',
   },
 
+  // A REFERENCE: letters and digits together -- an employee number (EMP-10001), a passport
+  // number (A12345678). `identifier` would hand a phone a numbers-only keypad with no way to
+  // type the letters, so the field is unfillable on the device most likely to be used for it.
+  // Autofill off for the same reason as `identifier`: the browser only knows the operator's own.
+  reference: {
+    autoComplete: 'off',
+    enterKeyHint: 'next',
+    spellCheck: false,
+    autoCapitalize: 'characters',
+  },
+
   // Amounts. `decimal` gives the phone a decimal separator; `numeric` does not.
   money: { inputMode: 'decimal', enterKeyHint: 'next', spellCheck: false },
 

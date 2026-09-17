@@ -15,6 +15,7 @@ import {
     BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS, IDENTITY_TYPE_PASSPORT
 } from "@/config/memberConstants.js";
 import { toWireDate, today } from "@/lib/format.js";
+import { sanitiseField, validateField } from "@/utils/inputRules.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
     formatDate } from "@/utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
@@ -33,7 +34,10 @@ const FIELD_TO_TAB_MAP = {
     personalEmail: "personal",
     workEmail: "personal",
     phone: "personal",
+    workTel: "personal",
+    homeTel: "personal",
     employeeNumber: "employment",
+    ibtNo: "employment",
     employmentType: "employment",
     jobGrade: "employment",
     bankName: "employment",
@@ -137,17 +141,11 @@ export default function CaptureMember() {
         let rawValue = event.target.value;
         if (field === "initials") initialsTyped.current = true;
 
-        if (field === "identityNumber" && form.identityType === "I.D. Number" && rawValue.length > 13) {
-            rawValue = rawValue.substring(0, 13);
-        }
-
         const hasNonNumericInput =
             field === "identityNumber" && form.identityType === "I.D. Number" &&
             /\D/.test(rawValue);
-        const value =
-            field === "identityNumber" && form.identityType === "I.D. Number"
-                ? rawValue.replace(/\D/g, "")
-                : rawValue;
+        // What each field accepts at all, as it is typed -- one rule for both member screens (utils/inputRules.js).
+        const value = sanitiseField(field, rawValue, { identityType: form.identityType });
 
         setForm((prev) => {
             let updatedForm = { ...prev, [field]: value };
@@ -229,6 +227,16 @@ export default function CaptureMember() {
             if (!validDays.includes(form.debitDay)) {
                 errors.debitDay = "Debit day must be one of 20, 25 or 31 when payment type is 'Debit Order'";
             }
+        }
+
+        // Shape checks, on what is FILLED IN (requiredness is above). Bank Account Number only while it is on screen:
+        // under Payroll it is hidden, and a stale value there must not block a save nobody can see the reason for.
+        const shapeChecked = ["initials", "phone", "workTel", "homeTel", "ibtNo", "personalEmail", "workEmail", "dateOfBirth"];
+        if (form.paymentType === "Debit Order") shapeChecked.push("bankAccountNumber");
+        for (const key of shapeChecked) {
+            if (errors[key]) continue;
+            const message = validateField(key, form[key], { identityType: form.identityType });
+            if (message) errors[key] = message;
         }
 
         return errors;
@@ -430,12 +438,12 @@ export default function CaptureMember() {
                         {activeTab === "personal" && (
                             <>
                                 <Field label="Title" value={form.title} onChange={handleChange("title")} options={titleOptions} />
-                                <Field label="Initials" value={form.initials} onChange={handleChange("initials")} />
+                                <Field label="Initials" value={form.initials} onChange={handleChange("initials")} error={fieldErrors.initials} />
                                 <Field label="First Name(s)" value={form.firstNames} onChange={handleChange("firstNames")} error={fieldErrors.firstNames} required />
                                 <Field label="Surname" value={form.surname} onChange={handleChange("surname")} error={fieldErrors.surname} required />
                                 <Field label="Identity Type" value={form.identityType} onChange={handleChange("identityType")} options={identityTypeOptions} error={fieldErrors.identityType} required />
                                 <Field
-                                    kind="identifier"
+                                    kind={form.identityType === IDENTITY_TYPE_PASSPORT ? "reference" : "identifier"}
                                     label={form.identityType || "Identity Number"}
                                     note={form.identityType ? null : "Choose an identity type first."}
                                     value={form.identityNumber}
@@ -462,9 +470,9 @@ export default function CaptureMember() {
                                 />
                                 <Field label="Race" value={form.race} onChange={handleChange("race")} options={raceOptions} />
                                 <EmailFields form={form} setForm={setForm} handleChange={handleChange} fieldErrors={fieldErrors} />
-                                <Field label="Cellphone Number" kind="tel" value={form.phone} onChange={handleChange("phone")} />
-                                <Field label="Work Tel" kind="tel" value={form.workTel} onChange={handleChange("workTel")} />
-                                <Field label="Home Tel" kind="tel" value={form.homeTel} onChange={handleChange("homeTel")} />
+                                <Field label="Cellphone Number" kind="tel" value={form.phone} onChange={handleChange("phone")} error={fieldErrors.phone} />
+                                <Field label="Work Tel" kind="tel" value={form.workTel} onChange={handleChange("workTel")} error={fieldErrors.workTel} />
+                                <Field label="Home Tel" kind="tel" value={form.homeTel} onChange={handleChange("homeTel")} error={fieldErrors.homeTel} />
                                 <AddressAutocomplete label="Residential Address" value={form.address} onChange={handleChange("address")} placeholder="Start typing a residential address..." className="md:col-span-2" />
                             </>
                         )}
@@ -479,7 +487,7 @@ export default function CaptureMember() {
                         )}
                         {activeTab === "employment" && (
                             <>
-                                <Field label="Employee Number" kind="identifier" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
+                                <Field label="Employee Number" kind="reference" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
                                 <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} {...refs.field('banks')} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
                                 <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} emptyLabel="No job grades available" loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
@@ -497,7 +505,7 @@ export default function CaptureMember() {
                                         Bank account details are not required for Payroll. Debit day is handled by payroll.
                                     </p>
                                 )}
-                                <Field label="IBT No." value={form.ibtNo} onChange={handleChange("ibtNo")} />
+                                <Field label="IBT No." kind="identifier" value={form.ibtNo} onChange={handleChange("ibtNo")} error={fieldErrors.ibtNo} />
                                 <AddressAutocomplete label="Bank Address" value={form.bankAddress} onChange={handleChange("bankAddress")} placeholder="Start typing a bank address..." className="md:col-span-2" />
                             </>
                         )}

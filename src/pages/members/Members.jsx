@@ -32,6 +32,7 @@ import Sheet from "../../components/common/Sheet.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
 import { parseDate, sameDate, today } from "../../lib/format.js";
+import { sanitiseField, validateField } from "../../utils/inputRules.js";
 import { cn } from "../../lib/utils";
 import { personName } from "../../lib/names.js";
 
@@ -151,7 +152,10 @@ const FIELD_TO_TAB_MAP = {
     personalEmail: "personal",
     workEmail: "personal",
     phone: "personal",
+    workTel: "personal",
+    homeTel: "personal",
     employeeNumber: "employment",
+    ibtNo: "employment",
     employmentType: "employment",
     jobGrade: "employment",
     bankName: "employment",
@@ -576,17 +580,11 @@ export default function Members() {
         let rawValue = event && event.target ? event.target.value : event;
         if (field === "initials") initialsTyped.current = true;
 
-        if (field === "identityNumber" && editForm.identityType === "I.D. Number" && rawValue.length > 13) {
-            rawValue = rawValue.substring(0, 13);
-        }
-
         const hasNonNumericInput =
             field === "identityNumber" && editForm.identityType === "I.D. Number" &&
             /\D/.test(rawValue);
-        const value =
-            field === "identityNumber" && editForm.identityType === "I.D. Number"
-                ? rawValue.replace(/\D/g, "")
-                : rawValue;
+        // One typing rule for both member screens (utils/inputRules.js).
+        const value = sanitiseField(field, rawValue, { identityType: editForm.identityType });
 
         setEditForm((prev) => {
             const next = { ...prev, [field]: value };
@@ -661,6 +659,19 @@ export default function Members() {
             if (!editForm.bankAccountNumber?.trim()) errors.bankAccountNumber = "Bank Account Number is required for Debit Orders";
             if (!editForm.bankName?.trim()) errors.bankName = "Bank Employer alignment name is required for Debit Orders";
             if (!editForm.branch?.trim()) errors.branch = "Bank Branch selection is required for Debit Orders";
+        }
+
+        // Shape checks on what the administrator CHANGED in this edit, and only on fields this screen shows. A stored
+        // value nobody touched is left alone: rules written today would otherwise make older members unsaveable over a
+        // field on another tab. The emails have no control on Edit Member, and Bank Account Number is hidden under
+        // Payroll, so neither can block a save the administrator has no way to fix.
+        const original = editBaseline ? JSON.parse(editBaseline) : {};
+        const shapeChecked = ["initials", "phone", "workTel", "homeTel", "ibtNo", "dateOfBirth"];
+        if (editForm.paymentType === "Debit Order") shapeChecked.push("bankAccountNumber");
+        for (const key of shapeChecked) {
+            if (errors[key] || String(editForm[key] ?? "") === String(original[key] ?? "")) continue;
+            const message = validateField(key, editForm[key], { identityType: editForm.identityType });
+            if (message) errors[key] = message;
         }
 
         // No COSATU-requires-BEC check here: the form cannot express the contradiction (COSATU is only
@@ -1483,7 +1494,7 @@ export default function Members() {
                             {activeTab === "personal" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
                                     <Detail label="Title" value={editForm.title} isEditing={isEditing} options={titleOptions} onChange={handleEditChange("title")} />
-                                    <Detail label="Initials" value={editForm.initials} isEditing={isEditing} onChange={handleEditChange("initials")} />
+                                    <Detail label="Initials" value={editForm.initials} isEditing={isEditing} onChange={handleEditChange("initials")} error={fieldErrors.initials} />
                                     <Detail label="First Name(s)" value={editForm.firstNames} isEditing={isEditing} onChange={handleEditChange("firstNames")} error={fieldErrors.firstNames} required kind="name" />
                                     <Detail label="Surname" value={editForm.surname} isEditing={isEditing} onChange={handleEditChange("surname")} error={fieldErrors.surname} required kind="name" />
                                     <Detail label="Identity Type" value={editForm.identityType} isEditing={isEditing} options={idTypeOptions} onChange={handleEditChange("identityType")} error={fieldErrors.identityType} required />
@@ -1494,7 +1505,7 @@ export default function Members() {
                                         onChange={handleEditChange("identityNumber")}
                                         error={fieldErrors.identityNumber}
                                         disabled={!editForm.identityType}
-                                        kind="identifier"
+                                        kind={editForm.identityType === IDENTITY_TYPE_PASSPORT ? "reference" : "identifier"}
                                         required
                                     />
                                     {/* 🔴 `04.2`: was a native <input type="date"> reached through
@@ -1518,9 +1529,9 @@ export default function Members() {
                                     )}
                                     <Detail label="Gender" value={editForm.gender} isEditing={isEditing} options={editForm.identityType === "I.D. Number" ? null : genderOptions} onChange={handleEditChange("gender")} disabled={editForm.identityType === "I.D. Number"} />
                                     <Detail label="Race" value={editForm.race} isEditing={isEditing} options={raceOptions} onChange={handleEditChange("race")} />
-                                    <Detail label="Cellphone Number" value={editForm.phone} isEditing={isEditing} onChange={handleEditChange("phone")} kind="tel" />
-                                    <Detail label="Work Tel" value={editForm.workTel} isEditing={isEditing} onChange={handleEditChange("workTel")} kind="tel" />
-                                    <Detail label="Home Tel" value={editForm.homeTel} isEditing={isEditing} onChange={handleEditChange("homeTel")} kind="tel" />
+                                    <Detail label="Cellphone Number" value={editForm.phone} isEditing={isEditing} onChange={handleEditChange("phone")} kind="tel" error={fieldErrors.phone} />
+                                    <Detail label="Work Tel" value={editForm.workTel} isEditing={isEditing} onChange={handleEditChange("workTel")} kind="tel" error={fieldErrors.workTel} />
+                                    <Detail label="Home Tel" value={editForm.homeTel} isEditing={isEditing} onChange={handleEditChange("homeTel")} kind="tel" error={fieldErrors.homeTel} />
                                     <div className="col-span-full">
                                         {isEditing ? (
                                             <AddressAutocomplete label="Residential Address" value={editForm.address} onChange={handleEditChange("address")} placeholder="Update residential location address strings..." />
@@ -1533,7 +1544,7 @@ export default function Members() {
 
                             {activeTab === "employment" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
-                                    <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="identifier" />
+                                    <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="reference" />
                                     <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} {...refs.field('banks')} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
                                     <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
                                     <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGrade} onChange={handleEditChange("jobGrade")} disabled={!editForm.bankName} loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
@@ -1553,7 +1564,7 @@ export default function Members() {
                                             />
                                         </>
                                     )}
-                                    <Detail label="IBT No." value={editForm.ibtNo} isEditing={isEditing} onChange={handleEditChange("ibtNo")} kind="identifier" />
+                                    <Detail label="IBT No." value={editForm.ibtNo} isEditing={isEditing} onChange={handleEditChange("ibtNo")} kind="identifier" error={fieldErrors.ibtNo} />
                                     <div className="col-span-full">
                                         {isEditing ? (
                                             <AddressAutocomplete label="Bank Work Address" value={editForm.bankAddress} onChange={handleEditChange("bankAddress")} placeholder="Search coordinates..." />
