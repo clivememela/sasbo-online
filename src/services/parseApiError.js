@@ -216,7 +216,7 @@ export function networkError(cause, { timedOut = false } = {}) {
  * @param {{ parseBody?: boolean }} [options] `parseBody: false` for a 204/DELETE.
  * @returns {Promise<unknown>}
  */
-export async function requestJson(send, { parseBody = true, timeoutMs = READ_CEILING_MS } = {}) {
+export async function requestJson(send, { parseBody = true, allowEmpty = false, timeoutMs = READ_CEILING_MS } = {}) {
   /*
    * 🔴 THE CEILING. A14, and the failure mode with the LONGEST time to detection in this
    * application: a hung backend renders the loading state forever, which an administrator reads
@@ -251,6 +251,22 @@ export async function requestJson(send, { parseBody = true, timeoutMs = READ_CEI
 
   if (!response.ok) throw await apiErrorFrom(response)
   if (!parseBody) return undefined
+
+  /*
+   * `allowEmpty`: a success that says NOTHING is a success, and a success that says something must still be JSON.
+   * `POST /api/members/{id}/send-welcome` answers an empty 200 (A50) -- rejected as not-JSON, a sent letter read as
+   * failed. `requestOptionalJson` would accept it, and also accept a proxy's HTML page as sent (case 4). This is the
+   * shape in between: empty resolves `undefined`; any body is parsed, and one that is not JSON rejects as before.
+   */
+  if (allowEmpty) {
+    const text = await response.text()
+    if (!text) return undefined
+    try {
+      return JSON.parse(text)
+    } catch (cause) {
+      throw apiError(NOT_JSON, { kind: ERROR_KINDS.NON_JSON, status: response.status, cause })
+    }
+  }
 
   try {
     return await response.json()

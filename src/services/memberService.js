@@ -72,10 +72,15 @@ export const memberService = {
       signal,
     })),
 
+  /**
+   * 🔴 A50: THE SERVER ANSWERS A SENT LETTER WITH AN EMPTY 200 (`ResponseEntity.ok().build()`). Read as JSON, a letter
+   * that WAS emailed rejected as a failure -- and a second press emailed the member twice. `allowEmpty` resolves
+   * exactly that, while a body that is not JSON (a proxy's HTML page) still rejects: see memberService.sendWelcome.test.
+   */
   sendWelcomeLetter: (id) =>
     requestJsonWrite((signal) => fetch(apiUrl(`/api/members/${id}/send-welcome`), {
       method: 'POST',
       credentials: 'include',
       signal,
-    })),
+    }), { allowEmpty: true }),
 };
