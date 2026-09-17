@@ -19,6 +19,7 @@ import { sanitiseField, validateField } from "@/utils/inputRules.js";
 import { subscriptionsService } from "@/services/subscriptionsService.js";
 import { ERROR_KINDS, messageOf, validationErrorsOf } from "@/services/parseApiError.js";
 import { findSubscriptionForBank, formatSubscriptionAmount, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
+import { branchNamesForBank } from "@/utils/bankBranches.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
     formatDate } from "@/utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
@@ -159,6 +160,16 @@ export default function CaptureMember() {
      */
     const initialsTyped = useRef(false);
 
+    /**
+     * E3 + the owner (2026-09-15, "take what's on Bank Branch of dev.sasbo.online"): the chosen bank's OWN branches
+     * together with the fourteen names dev offers. A union, because the seeded listing holds one branch per bank and
+     * the fourteen alone name nothing a bank owns. Empty until a bank is chosen: a branch means nothing without one.
+     * SASBO's 31/07/26 branch report (planning/branches/capture-member/bankBranchReport.md) replaces the source once
+     * it is imported.
+     */
+    const branchOptionsFor = (bankName) =>
+        bankName ? [...new Set([...branchNamesForBank(bankListing, bankName), ...BRANCH_OPTIONS])] : [];
+
     const handleChange = (field) => (event) => {
         let rawValue = event.target.value;
         if (field === "initials") initialsTyped.current = true;
@@ -171,6 +182,15 @@ export default function CaptureMember() {
 
         setForm((prev) => {
             let updatedForm = { ...prev, [field]: value };
+
+            // A different bank: its grades and its branches are different ones. The grade always goes; the branch goes
+            // only if the new bank's list does not offer it (the fourteen names are offered for every bank).
+            if (field === "bankName" && value !== prev.bankName) {
+                updatedForm.jobGrade = "";
+                // Judged against the bank actually CHOSEN: the searchable control passes through an empty bank while
+                // the administrator clears it to pick another, and that moment must not drop a branch the next bank offers.
+                if (value && prev.branch && !branchOptionsFor(value).includes(prev.branch)) updatedForm.branch = "";
+            }
 
             if (field === "firstNames" && !initialsTyped.current) {
                 const autoInitials = value
@@ -348,7 +368,9 @@ export default function CaptureMember() {
 
     useEffect(() => {
         let cancelled = false;
-        setForm(prev => ({ ...prev, jobGrade: "" }));
+        // 🔴 R3-F3: the grade is NOT cleared here. This effect also re-runs when a reference list is retried (the
+        // listing gets a new identity), and clearing here wiped a chosen grade under a notice promising "anything you
+        // have already typed is kept". A grade belongs to a bank, so it is cleared where the BANK changes: handleChange.
 
         const fetchGrades = async () => {
             if (!form.bankName) {
@@ -528,11 +550,11 @@ export default function CaptureMember() {
                         )}
                         {activeTab === "employment" && (
                             <>
+                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} {...refs.field('banks')} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
                                 <Field label="Employee Number" kind="reference" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
-                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} {...refs.field('banks')} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
                                 <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} emptyLabel="No job grades available" loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
-                                <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable />
+                                <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={branchOptionsFor(form.bankName)} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable disabled={!form.bankName} note={form.bankName ? null : "Choose the bank first."} />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
 
                                 {form.paymentType === "Debit Order" && (
