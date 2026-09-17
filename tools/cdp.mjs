@@ -265,6 +265,25 @@ export async function launch(tag, { flags = [] } = {}) {
     if (!/\/assets\/index-[A-Za-z0-9_-]+\.js$/.test(entry)) {
       throw new Error(`the server at ${baseUrl} is not the built client (entry script: ${entry})`);
     }
+    /*
+     * 🔴 AND THE APP HAS MOUNTED BEFORE THIS RETURNS -- F-P56's first row. A loaded DOCUMENT is not a mounted app: the
+     * entry is a module, which runs after `readyState` leaves 'loading'. Profiles are reused between runs, so this page
+     * can mount holding the LAST run's stored theme, and `ThemeProvider`'s mount effect writes that value back to
+     * `localStorage`. Returning before it had run let a tool store its first row's theme and then have the app
+     * overwrite it: the run's first row, light, photographed dark (P6's closing gate; the P7 merge gate refused the same
+     * row with `stored: "true"`). Throttled on purpose it reproduced in 2 of 3 runs, and a trace of every write showed
+     * the app's stale write racing the tool's. Waiting for the root to hold the app, then two frames for its effects,
+     * closes the window instead of hoping the race is lost.
+     */
+    const mounted = await waitFor(
+      `(async () => {
+        if (!document.getElementById('root')?.firstElementChild) return false;
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        return true;
+      })()`,
+      { tries: 200, awaitPromise: true },
+    );
+    if (!mounted) throw new Error(`${baseUrl}/login loaded but the application never mounted into #root`);
     return String(entry).split('/').pop();
   };
 
