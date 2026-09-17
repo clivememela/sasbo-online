@@ -97,9 +97,26 @@ try {
         if (unseen(t)) { out.push({ selector, unmeasured: `${t.skipped} after scrolling to it` }); continue; }
       }
       if (!t.box) { out.push(t); continue; }
-      const photograph = async () => decodePng(Buffer.from(
-        (await send('Page.captureScreenshot', { format: 'png', clip: { ...t.box, scale: 1 }, captureBeyondViewport: false })).data, 'base64'));
+      /*
+       * 🔴 A PHOTOGRAPH IS TAKEN WHEN IT HOLDS STILL, NOT WHEN IT IS ASKED FOR. After the glyphs are hidden, the browser can
+       * hand back a frame from a LOWER-RESOLUTION raster of the same box: on a settled page, with nothing animating, the
+       * record's "Active" chip read 5.26 in 22 of 24 measurements and 2.67 in 2 -- its second photograph blurred
+       * throughout, ring and dot included, so the sampler counted 2,151 pixels "behind the glyphs" instead of 846 and
+       * compared the text with a softened gold ring. So each photograph is repeated, two frames apart, until two
+       * captures are byte-identical; one that never holds still is UNMEASURED, and fails the run.
+       */
+      const photograph = async () => {
+        let last = null;
+        for (let i = 0; i < 6; i++) {
+          const { data } = await send('Page.captureScreenshot', { format: 'png', clip: { ...t.box, scale: 1 }, captureBeyondViewport: false });
+          if (data === last) return decodePng(Buffer.from(data, 'base64'));
+          last = data;
+          await evaluate('new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))', { awaitPromise: true });
+        }
+        return null;
+      };
       const shown = await photograph();
+      if (!shown) { out.push({ ...t, unmeasured: 'its photograph never held still' }); continue; }
       if (await evaluate(hideText(selector, true), { awaitPromise: true }) !== true) { out.push({ selector, unmeasured: 'gone before its text could be hidden' }); continue; }
       let hidden;
       try {
@@ -107,6 +124,7 @@ try {
       } finally {
         await evaluate(hideText(selector, false), { awaitPromise: true });
       }
+      if (!hidden) { out.push({ ...t, unmeasured: 'its photograph with the text hidden never held still' }); continue; }
       const measured = pixelContrast(shown, hidden, t.fg);
       out.push(measured ? { ...t, ...measured } : { ...t, unmeasured: 'its two photographs were not the same size' });
     }
