@@ -86,13 +86,6 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
     }));
   };
 
-  const isSubItemActive = (subItems = []) => {
-    return subItems.some((item) => {
-      if (location.pathname === item.href) return true;
-      return isSubItemActive(item.subItems || []);
-    });
-  };
-
   /**
    * 🔴 ESCAPE CLOSES THE DRAWER, AND UNTIL `05.4` NOTHING DID.
    *
@@ -224,7 +217,6 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
               key={item.href}
               item={item}
               isActive={location.pathname === item.href}
-              hasActiveSubItem={isSubItemActive(item.subItems)}
               expandedItems={expandedItems}
               onToggle={toggleExpand}
               onClick={() => setSideBarOpen(false)}

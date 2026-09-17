@@ -485,12 +485,8 @@ export default function Members() {
             // guard, Escape in the calendar of the edit form threw the member away.
             if (e.defaultPrevented || e.target?.closest?.('[role="dialog"], [role="listbox"]')) return;
             // `06.5`: through the same guard as every other way out -- an edit with changes asks first.
-            if (leaveRef.current) {
-                leaveRef.current();
-                return;
-            }
-            closeRecord();
-            setIsEditing(false);
+            // `leaveRef` is assigned on every commit, before any key can be pressed, so there is no second path.
+            leaveRef.current?.();
         };
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);

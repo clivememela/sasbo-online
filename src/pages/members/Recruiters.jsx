@@ -1295,7 +1295,6 @@ export function Recruiters() {
                     ? `${[pendingRemoveMember.initials, pendingRemoveMember.surname].filter(Boolean).join(' ')} will no longer be on ${selectedRep?.name ?? 'this recruiter'}'s list.`
                     : undefined}
                 confirmLabel="Remove from recruiter"
-                loading={saving}
                 onConfirm={handleRemove}
             />
 
@@ -1304,7 +1303,6 @@ export function Recruiters() {
                 onOpenChange={closeOn(() => setPendingRemoveRep(null))}
                 title="Remove this recruiter?"
                 confirmLabel="Remove recruiter"
-                loading={saving}
                 onConfirm={handleRemoveRep}
             >
                 {/* 🔑 The consequence is SPELLED OUT, and it is the reason this one could
