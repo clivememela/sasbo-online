@@ -79,6 +79,13 @@ export default function Modal({
   children,
   /** Escape and a click outside are ON by default. Off only for a step you must answer. */
   dismissible = true,
+  /**
+   * 🔴 A WRITE STARTED FROM THIS DIALOG IS RUNNING (R2-F3). Every way out is shut until it answers -- Escape, a press
+   * outside, the X, and any `onOpenChange(false)` Radix would send -- so the result or the failure lands on the
+   * surface the user is still looking at, and a second attempt cannot overlap the first. Nothing moves: the X stays
+   * where it is, disabled, and only while the write is in flight.
+   */
+  busy = false,
 }) {
   if (import.meta.env?.DEV && !title) {
     throw new Error(
@@ -90,7 +97,11 @@ export default function Modal({
   }
 
   // One blocker, passed three times, rather than the same arrow written three times.
-  const block = dismissible ? undefined : (event) => event.preventDefault();
+  const block = dismissible && !busy ? undefined : (event) => event.preventDefault();
+  const changeOpen = (next) => {
+    if (busy && !next) return;
+    onOpenChange?.(next);
+  };
 
   /**
    * 🔴 ESCAPE BELONGS TO A POPUP OPEN INSIDE THE DIALOG FIRST (R2-F1, R2-F2). Radix takes Escape on the document in the
@@ -141,7 +152,7 @@ export default function Modal({
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={changeOpen}>
       <Dialog.Portal>
         {/* Portalled to the body, so no page's `overflow` or stacking context can clip it —
             which is the single thing all eight hand-rolled overlays got wrong. */}
@@ -211,6 +222,7 @@ export default function Modal({
                 <button
                   type="button"
                   aria-label="Close"
+                  disabled={busy}
                   className={cn(
                     'touch-target -mr-1 shrink-0 rounded-md p-1.5 text-ink-faint',
                     'hover-hover:hover:bg-surface-2 hover-hover:hover:text-ink',
@@ -281,10 +293,12 @@ export function ConfirmDialog({
       title={title}
       description={description}
       size="sm"
+      // The confirm's own write is the dialog's: while it runs, nothing closes it (R2-F3).
+      busy={loading}
       footer={
         <>
           <Dialog.Close asChild>
-            <Button variant="ghost">{cancelLabel}</Button>
+            <Button variant="ghost" disabled={loading}>{cancelLabel}</Button>
           </Dialog.Close>
           <Button variant={destructive ? 'danger' : 'primary'} loading={loading} onClick={onConfirm}>
             {confirmLabel}

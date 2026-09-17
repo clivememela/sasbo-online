@@ -32,6 +32,7 @@ import KeyHints from "../../components/common/KeyHints.jsx";
 import Sheet from "../../components/common/Sheet.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
+import { writeMayHaveLanded } from "../../services/parseApiError.js";
 import { parseDate, sameDate, today } from "../../lib/format.js";
 import { cn } from "../../lib/utils";
 import { personName } from "../../lib/names.js";
@@ -302,6 +303,18 @@ const getChangedFields = (draft, original) => Object.keys(draft)
 const REFERENCE_LOADERS = {
     'lead recruiters': () => recruiterService.getRoles(),
     banks: () => bankService.getBankNames(),
+};
+
+/**
+ * The record's save notice, by kind. `unconfirmed` and `stale` are R3-F2's: a save whose answer never arrived is not
+ * "not saved", and a save that landed before the register failed to refresh is saved.
+ */
+const SAVE_NOTICE_TITLES = {
+    invalid: "Fix these before saving",
+    unchanged: "Nothing to save",
+    failed: "The changes were not saved",
+    unconfirmed: "The save could not be confirmed",
+    stale: "The changes were saved",
 };
 
 export default function Members() {
@@ -717,25 +730,44 @@ export default function Members() {
         setSavingRecord(true);
         try {
             await memberService.updateMember(editForm);
-            const refreshed = await memberService.getMembers();
-            const list = Array.isArray(refreshed) ? refreshed : (refreshed.data || refreshed.members || []);
-            setPendingSave(null);
-            setMembersList(list);
-            setSelectedMember({ ...editForm });
-            setEditBaseline(null);
-            setIsEditing(false);
-            setSavedName([editForm.firstNames, editForm.surname].filter(Boolean).join(" "));
-            setShowSavedNotification(true);
-            window.setTimeout(() => setShowSavedNotification(false), 2600);
         } catch (error) {
             reportError("Members.save", error);
             // 06.1 owns the shared error CONTRACT; what this wave owes the screen is that
             // a failed save is visible on the screen the member is looking at, rather than
             // in a dialog they dismiss and a console they never open.
+            // 🔴 R3-F2: "Nothing was written" only after a refusal. A timeout, a lost connection or a 5xx may have saved
+            // the change, and a clerk told otherwise redoes it.
             setPendingSave(null);
+            setSaveNotice(writeMayHaveLanded(error)
+                ? {
+                    kind: "unconfirmed",
+                    messages: ["We did not get an answer about these changes, so they may have been saved. Reload the register and check this member before trying again."],
+                }
+                : {
+                    kind: "failed",
+                    messages: ["We could not save these changes. Nothing was written — please try again."],
+                });
+            setSavingRecord(false);
+            return;
+        }
+
+        // The save landed. What follows is the register catching up, and its failure is not the save's (R3-F2): it
+        // shared the write's `try`, so a good save followed by a failed refresh was reported as not written.
+        setPendingSave(null);
+        setSelectedMember({ ...editForm });
+        setEditBaseline(null);
+        setIsEditing(false);
+        setSavedName([editForm.firstNames, editForm.surname].filter(Boolean).join(" "));
+        setShowSavedNotification(true);
+        window.setTimeout(() => setShowSavedNotification(false), 2600);
+        try {
+            const refreshed = await memberService.getMembers();
+            setMembersList(Array.isArray(refreshed) ? refreshed : (refreshed.data || refreshed.members || []));
+        } catch (error) {
+            reportError("Members.refreshAfterSave", error);
             setSaveNotice({
-                kind: "failed",
-                messages: ["We could not save these changes. Nothing was written — please try again."],
+                kind: "stale",
+                messages: ["The changes were saved, but the register could not be refreshed, so its rows may show the old values until the page is reloaded."],
             });
         } finally {
             setSavingRecord(false);
@@ -1345,18 +1377,14 @@ export default function Members() {
                                 tabIndex={-1}
                                 aria-labelledby="member-save-notice-title"
                                 className={`mt-4 rounded-lg border p-3 text-sm no-print focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring ${
-                                    saveNotice.kind === "unchanged"
+                                    saveNotice.kind === "unchanged" || saveNotice.kind === "stale"
                                         ? "border-line-strong bg-surface-2 text-ink-muted"
                                         : "border-status-suspended-dot bg-status-suspended-bg text-status-suspended"
                                 }`}
                             >
                                 <p id="member-save-notice-title" className="flex items-center gap-2 font-medium">
                                     <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.5} />
-                                    {saveNotice.kind === "invalid"
-                                        ? "Fix these before saving"
-                                        : saveNotice.kind === "unchanged"
-                                            ? "Nothing to save"
-                                            : "The changes were not saved"}
+                                    {SAVE_NOTICE_TITLES[saveNotice.kind]}
                                 </p>
                                 <ul className="mt-1 list-disc pl-6">
                                     {saveNotice.messages.map((message) => <li key={message}>{message}</li>)}

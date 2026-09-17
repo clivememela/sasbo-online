@@ -350,6 +350,23 @@ export function messageOf(error) {
 }
 
 /**
+ * Could a failed WRITE have landed anyway? (R3-F2, P9's independent review.)
+ *
+ * 🔴 "NOTHING WAS WRITTEN" IS A CLAIM ABOUT THE SERVER, and only one rejection supports it: a 4xx, where the server
+ * answered and refused. A timeout or a lost connection says only that the ANSWER did not arrive; a 5xx can fail after
+ * the row was written; a 2xx whose body was not JSON succeeded. Telling a clerk any of those was "not saved" invites
+ * them to redo a change that already happened -- on Capture Member, a second copy of the member.
+ *
+ * So a screen asks this before it chooses its words: `false` may say "not saved", `true` must say "could not be
+ * confirmed -- check before trying again". Anything unrecognised counts as possibly landed, the safe side to be wrong on.
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+export function writeMayHaveLanded(error) {
+  return !(error?.kind === ERROR_KINDS.HTTP && error.status >= 400 && error.status < 500)
+}
+
+/**
  * Reads the per-field errors off anything, always an object.
  * @param {unknown} error
  * @returns {Record<string, string>}

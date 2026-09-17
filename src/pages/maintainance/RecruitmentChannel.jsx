@@ -9,6 +9,8 @@ import { ConfirmDialog, closeOn } from '../../components/overlay/Modal.jsx';
 import { recruitmentChannelService } from '../../services/recruitmentChannelService.js';
 import DataState from '../../components/common/DataState.jsx';
 import reportError from '../../lib/reportError.js';
+import DialogNotice from '../../components/common/DialogNotice.jsx';
+import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 
 /*
  * 📐 THE CHROME OF AN IN-ROW EDITOR -- one constant, with the same classes as `Subscriptions.jsx`'s
@@ -132,17 +134,27 @@ export default function RecruitmentChannel() {
     // SUPPRESSIBLE -- a user who ticks "don't show me these again" silently loses every
     // confirmation in the application.
     const [pendingDelete, setPendingDelete] = useState(null);
+    // A failed delete is said in the dialog that is still open (R4-F1): the page notice renders under its scrim.
+    const [deleteNotice, setDeleteNotice] = useState(null);
+    const askToDelete = (r) => { setDeleteNotice(null); setPendingDelete(r); };
 
     const handleDelete = async () => {
         const r = pendingDelete;
         if (!r) return;
         setSaving(true);
+        setDeleteNotice(null);
         try {
             await recruitmentChannelService.remove(r.id);
             setPendingDelete(null);
             await refresh();
         } catch (err) {
-            setNotice(`That change could not be saved. ${err?.message || ''}`.trim());
+            reportError('RecruitmentChannel.remove', err);
+            // R3-F2: only a refusal proves nothing was deleted; a lost answer may have deleted it.
+            setDeleteNotice({
+                message: writeMayHaveLanded(err)
+                    ? `The delete of ${r.name} could not be confirmed. Reload the list and check before trying again.`
+                    : `${r.name} was not deleted. ${messageOf(err)}`,
+            });
         } finally {
             setSaving(false);
         }
@@ -345,7 +357,7 @@ export default function RecruitmentChannel() {
                                     <td className="px-3.5 py-[11px] pr-5">
                                         <button
                                             type="button"
-                                            onClick={() => setPendingDelete(r)}
+                                            onClick={() => askToDelete(r)}
                                             disabled={saving}
                                             aria-label={`Delete ${r.name}`}
                                             className="touch-size rounded-md p-1.5 text-status-suspended transition hover-hover:hover:bg-status-suspended-bg disabled:opacity-40">
@@ -378,7 +390,9 @@ export default function RecruitmentChannel() {
                 confirmLabel="Delete recruiter type"
                 loading={saving}
                 onConfirm={handleDelete}
-            />
+            >
+                <DialogNotice notice={deleteNotice} onDismiss={() => setDeleteNotice(null)} />
+            </ConfirmDialog>
         </Page>
     );
 }

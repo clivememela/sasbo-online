@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useRef, useState, useEffect, useCallback } from 'react';
-import { AlertCircle, CheckCircle2, ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
+import { ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
 import Pager from '../../components/common/Pager.jsx';
@@ -15,6 +15,7 @@ import { bankService } from '../../services/bankService.js';
 import { locationService } from '../../services/locationService.js';
 import { validateEmail } from '../../utils/validateSAID.js';
 import DataState from '../../components/common/DataState.jsx';
+import DialogNotice, { NoticeIcon, noticeTone } from '../../components/common/DialogNotice.jsx';
 import useReferenceData from '../../hooks/useReferenceData.js';
 import reportError from '../../lib/reportError.js';
 import { cn } from '../../lib/utils';
@@ -1359,42 +1360,6 @@ function Section({ title, children }) {
         <div className="space-y-3">
             <h4 className="border-b border-line pb-1 text-xs font-bold uppercase tracking-widest text-brand-ink">{title}</h4>
             {children}
-        </div>
-    );
-}
-
-/**
- * What a notice wears for its tone. The page's notice and `DialogNotice` spelt out the same two tones and the same two
- * icons, character for character; the frame around each differs, and stays with it.
- */
-function noticeTone(tone) {
-    return tone === 'ok'
-        ? 'border-status-active-dot bg-status-active-bg text-status-active'
-        : 'border-status-suspended-dot bg-status-suspended-bg text-status-suspended';
-}
-
-function NoticeIcon({ tone }) {
-    return tone === 'ok'
-        ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
-        : <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />;
-}
-
-/**
- * A failure said INSIDE the dialog it happened in. `06.4`.
- *
- * `role="alert"` rather than the page notice's focus: the dialog owns focus, and pulling it out of a form
- * the user is still filling in would be worse than the silence this replaces.
- */
-function DialogNotice({ notice, onDismiss }) {
-    if (!notice) return null;
-    return (
-        <div
-            role={notice.tone === 'ok' ? 'status' : 'alert'}
-            className={cn('mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm', noticeTone(notice.tone))}
-        >
-            <NoticeIcon tone={notice.tone} />
-            <p className="flex-1">{notice.message}</p>
-            <Button size="sm" variant="ghost" onClick={onDismiss}>Dismiss</Button>
         </div>
     );
 }

@@ -96,7 +96,25 @@ const CEILINGS = {
   // 600 -> 640 on 2026-09-09: see the re-measured table above. 6% over the 602.24
   // actual, for the reason the header gives -- a limit equal to the measurement
   // reddens for things nobody caused.
-  js: 640 * KB,
+  //
+  // 640 -> 650 on 2026-09-17, MEASURED, at P9's batch 2. The measurement build went
+  // 639.42 -> 641.29 KiB (empty VITE_API_BASE_URL; the production env adds 0.06). What
+  // spent it, chunk by chunk (`p9b2` build against `p9b0`):
+  //   DialogNotice 0 -> 885 B  a NEW SHARED CHUNK. R4-F1 needed a failure said inside the
+  //                            dialog on its second and third consumers, so Recruiters'
+  //                            local copy was lifted to components/common per conventions
+  //                            §11. Rollup gives a module three pages share its own chunk.
+  //   circle-check 0 -> 174 B  the CheckCircle2 icon, split out for the same reason.
+  //   Members +533 · RecruitmentChannel +333 · AcbDebits +329 · index +305  R3-F2's
+  //                            kind-aware copy plus `writeMayHaveLanded`.
+  //   Recruiters -642 · memberService -131 · api -60  what the lift and P9 batch 0 removed.
+  // ⚠️ THE RAISE IS STILL THE LAST STEP. It was taken only after the above accounted for
+  // every byte: the growth is one extraction that REMOVED a duplicate and ~1 KiB of the
+  // 1.87 is Rollup's per-chunk overhead for sharing it, not product code. 1.4% of headroom
+  // over the 641.29 actual -- the same margin the header argues for, and no more, so the
+  // next feature still meets a real ceiling. The design arc owns this number: the ACB arc
+  // raises it again, by exactly its screen's bytes, when its Runs screen lands.
+  js: 650 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before

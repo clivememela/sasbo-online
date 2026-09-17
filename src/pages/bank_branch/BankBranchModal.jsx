@@ -94,13 +94,15 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
       onOpenChange={closeOn(onClose)}
       title={isReadOnlyView ? "Bank Details" : isEditMode ? "Edit Bank/Branch Details" : "Add Bank/Branch Details"}
       size="xl"
+      // R2-F3: closed mid-update, `BankBranch`'s `onUpdated` reopened this dialog when the write landed.
+      busy={loading}
       footer={
         <>
           {/* 🔴 was `variant="secondary"`, which Button has never had -- the old
               `VARIANTS[variant] ?? VARIANTS.default` silently rendered `default` for it. That
               is the exact silent degrade `pick()` now refuses, and this call site is what it
               found. Naming the variant it was ALREADY rendering: no pixel changes. */}
-          <Button type="button" onClick={isReadOnlyView ? onClose : handleCancel} variant="default">{isReadOnlyView ? "Close" : "Cancel"}</Button>
+          <Button type="button" onClick={isReadOnlyView ? onClose : handleCancel} variant="default" disabled={loading}>{isReadOnlyView ? "Close" : "Cancel"}</Button>
           {isReadOnlyView ? (
             <Button type="button" variant="primary" onClick={() => setIsEditing(true)}>Edit</Button>
           ) : (

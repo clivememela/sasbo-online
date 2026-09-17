@@ -10,6 +10,8 @@ import Table from '../../components/table/Table.jsx';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import StatusChip from '../../components/common/StatusChip.jsx';
 import reportError from '../../lib/reportError.js';
+import DialogNotice from '../../components/common/DialogNotice.jsx';
+import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 
 export default function AcbDebits() {
     const [membersList, setMembersList] = useState([]);
@@ -29,6 +31,8 @@ export default function AcbDebits() {
     const [editing, setEditing] = useState(false);
     const [bankForm, setBankForm] = useState({});
     const [saving, setSaving] = useState(false);
+    // A failed update is said in the dialog, which stays open on a failure (R4-F1): the page notice renders under its scrim.
+    const [bankingNotice, setBankingNotice] = useState(null);
 
     /**
      * 🔴 SAME SHAPE, SAME MISSING `.catch`. And it matters more here than on a listing:
@@ -62,6 +66,7 @@ export default function AcbDebits() {
             paymentType: selectedMember.paymentType || "",
             debitDay: selectedMember.debitDay || "",
         });
+        setBankingNotice(null);
         setEditing(true);
     };
 
@@ -70,6 +75,7 @@ export default function AcbDebits() {
     const saveBanking = async () => {
         if (!selectedMember) return;
         setSaving(true);
+        setBankingNotice(null);
         try {
             const updated = await memberService.updateBanking(selectedMember.id, bankForm);
             setSelectedMember(updated);
@@ -80,7 +86,13 @@ export default function AcbDebits() {
             // This screen writes a member's debit-order details; "Failed to update banking
             // details" arriving as a native modal, and leaving no trace once dismissed, is
             // the worst place in the application for that pattern.
-            setNotice('Those banking details were not saved. Nothing was written \u2014 check the values and try again.');
+            // R3-F2: and "Nothing was written" is true only of a refusal. After a timeout, a lost connection or a 5xx
+            // the change may have landed, and re-submitting a debit-order change whose outcome is unknown is the harm.
+            setBankingNotice({
+                message: writeMayHaveLanded(err)
+                    ? 'This banking change could not be confirmed. It may have been saved \u2014 reload the member and check their details before trying again.'
+                    : `Those banking details were not saved. Nothing was written \u2014 ${messageOf(err)}`,
+            });
         } finally {
             setSaving(false);
         }
@@ -305,6 +317,7 @@ export default function AcbDebits() {
                             onOpenChange={setEditing}
                             title="Update Banking Details"
                             size="lg"
+                            busy={saving}
                             footer={
                                 <>
                                     <Button onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
@@ -312,6 +325,7 @@ export default function AcbDebits() {
                                 </>
                             }
                         >
+                            <DialogNotice notice={bankingNotice} onDismiss={() => setBankingNotice(null)} />
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <TextInput label="Bank" value={bankForm.bankName} onChange={handleBankChange('bankName')} />
                                         <TextInput label="Branch" value={bankForm.branch} onChange={handleBankChange('branch')} />
