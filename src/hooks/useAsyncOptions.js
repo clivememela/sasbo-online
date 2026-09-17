@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { ERROR_KINDS } from '../services/parseApiError.js';
+
 /**
  * OPTIONS THAT ARRIVE OUT OF ORDER MUST NOT OVERWRITE NEWER ONES. `03.2b`, R-ROB-G.
  *
@@ -108,7 +110,7 @@ export default function useAsyncOptions(fetcher, deps = [], { enabled = true } =
          * in a searchable field would have rendered "we could not load the banks" under a
          * field the user was still typing into, and then cleared the options.
          */
-        if (error?.kind === 'abort') return;
+        if (error?.kind === ERROR_KINDS.ABORT) return;
         setState({ options: [], loading: false, error });
       });
 

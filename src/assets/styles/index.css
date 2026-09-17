@@ -69,7 +69,7 @@
      shell opening or closing -- and at `--duration-base` it arrived faster than the eye
      tracks it, which reads as a jump rather than as a panel. It gets its own token so the
      component, the scrim and the record inside it cannot drift out of step with each other.
-     `MemberPanel`'s `PANEL_MS` is this number; they are commented at both ends. */
+     `Members.jsx`'s `PANEL_MS` is this number; they are commented at both ends. */
   --duration-panel: 380ms;
   --duration-pour: 1200ms;
 
@@ -128,7 +128,7 @@
 
   /* The metal card (component tokens) */
   --card-metal-a: oklch(32.6% 0.052 215);  /* gradient start */
-  --card-metal-b: oklch(53.2% 0.088 209);  /* gradient mid */
+  --card-metal-b: oklch(40.7% 0.067 211);  /* gradient mid -- deepened for AA, P7 (card.css says why) */
   --card-metal-c: oklch(37.7% 0.061 211);  /* gradient end */
   --card-engrave: oklch(97.9% 0.008 197);  /* engraved text */
   --card-engrave-gold: oklch(88.8% 0.102 93);  /* engraved name */
@@ -139,12 +139,12 @@
      make it read as metal rather than as a teal rectangle: `04.x` defined the
      gradient and the engraving and stopped there, so the card had tokens and no
      component. Added when the component was finally built. */
-  --card-gloss: rgba(255, 255, 255, 0.16);   /* the light coming over the top-left */
+  --card-gloss: rgba(255, 255, 255, 0.08);   /* the light coming over the top-left */
   --card-shade: rgba(0, 0, 0, 0.22);         /* the shadow gathering bottom-right */
   --card-edge-top: rgba(255, 255, 255, 0.2); /* the milled top edge */
   --card-edge-bottom: rgba(0, 0, 0, 0.3);    /* and the bottom one */
-  --card-text-2: rgba(242, 250, 250, 0.66);  /* secondary engraving */
-  --card-chip-bg: rgba(255, 255, 255, 0.1);
+  --card-text-2: rgba(242, 250, 250, 0.9);  /* secondary engraving */
+  --card-chip-bg: rgba(255, 255, 255, 0.04);
   --card-chip-suspended: #FFC4C4;
   --card-chip-pending: #F5E2A8;
   --card-chip-muted: rgba(242, 250, 250, 0.75);
@@ -224,7 +224,7 @@
 
   /* The metal card (component tokens) */
   --card-metal-a: oklch(36.4% 0.058 212);
-  --card-metal-b: oklch(58.2% 0.096 209);
+  --card-metal-b: oklch(44.0% 0.072 211);
   --card-metal-c: oklch(41.4% 0.067 211);
   --card-engrave: oklch(97.9% 0.008 197);
   --card-engrave-gold: oklch(89.7% 0.096 93);
@@ -232,12 +232,12 @@
   --card-chip-ring: rgba(243, 220, 146, 0.5);
   /* The card's material treatments hold in dark: the mock's own dark theme keeps
      them, because the card is lit by its own gradient rather than by the page. */
-  --card-gloss: rgba(255, 255, 255, 0.14);
+  --card-gloss: rgba(255, 255, 255, 0.07);
   --card-shade: rgba(0, 0, 0, 0.3);
   --card-edge-top: rgba(255, 255, 255, 0.16);
   --card-edge-bottom: rgba(0, 0, 0, 0.4);
-  --card-text-2: rgba(242, 250, 250, 0.66);
-  --card-chip-bg: rgba(255, 255, 255, 0.1);
+  --card-text-2: rgba(242, 250, 250, 0.9);
+  --card-chip-bg: rgba(255, 255, 255, 0.04);
   --card-chip-suspended: #FFC4C4;
   --card-chip-pending: #F5E2A8;
   --card-chip-muted: rgba(242, 250, 250, 0.75);
@@ -388,6 +388,19 @@
    the print surface, forced-colors, utilities -- belong below, and survive a
    regeneration. Do not remove this line.
    ========================================================================== */
+
+/* ── Card's gold as a line: today's ring in the date picker ──────────────────────────
+   The generated layer names this gold `--color-accent`, then aliases shadcn's `accent` to
+   the surface wash in its `@theme inline` block -- and the later definition wins for
+   utilities, so `ring-accent` drew today's ring grey (the `06.3` critique, confirmed in the
+   built CSS). A name the generator does not use cannot be shadowed by it, and survives a
+   regeneration down here. The values are the generated layer's own gold, light and dark. */
+@theme {
+  --color-accent-line: oklch(68.0% 0.110 84);
+}
+.dark {
+  --color-accent-line: oklch(79.0% 0.110 87);
+}
 
 /* ==========================================================================
    THE AUTHORED MOMENT -- "the card is drawn from the wallet and laid on the desk".
@@ -665,6 +678,31 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
   opacity: 0.5;
 }
 
+/* 🔴 touch-size — THE 44px RULE FOR WHAT `touch-target` CANNOT REACH (`07.2`).
+
+   `touch-target` grows a control's HIT AREA with an ::after overlay, and a replaced element -- an input, a select, a
+   textarea -- draws no ::after at all. Measured under real touch emulation (tools/surfaces.mjs), every text field and
+   select in the application offered a 38px target while wearing `touch-target`. The topbar search's target is its
+   38px label. And the rail's 36px rows, each with a 24px disclosure beside it, cannot take an overlay without one
+   control's square landing on its neighbour. So on a coarse pointer these GROW to 44px instead.
+
+   Desk density is untouched: a fine pointer never matches. Unlayered, like `touch-target`'s rule, so it wins over a
+   fixed `h-9` or `h-[38px]` utility. Below the token layer's marker on purpose: `gen_theme.py` rewrites everything
+   above it. */
+@media (pointer: coarse) {
+  .touch-size {
+    height: auto;
+    min-height: var(--size-touch);
+    /* And WIDE enough: two 28px icon buttons side by side, each with a 44px overlay, put each one's square on the
+       other ("crowded", the second sweep). Grown to real 44px boxes they abut instead of overlapping. */
+    min-width: var(--size-touch);
+  }
+  /* A table row ignores min-height; its height is set through its cells, and a cell's height is its minimum. */
+  tr.touch-size > td {
+    height: var(--size-touch);
+  }
+}
+
 /* The global search is 14px on a desk and 16px wherever iOS would zoom it (card.css:453). */
 @utility search-text {
   font-size: var(--text-base);
@@ -676,15 +714,31 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
 /* ── The register is a CONTAINER (card.css R-RESP-L) ──────────────────────────
    Docking the panel from 1280 narrows the register to ~560-740px, so the viewport
    stopped predicting how much room the table has. Columns respond to the register,
-   not the window: each step is the width at which the NEXT column stops fitting. */
+   not the window: each step is the width at which the NEXT column stops fitting.
+
+   🔴 THE STEPS WERE MEASURED FOR A PANEL THAT WAS ALWAYS DOCKED, AND ON NAMES SHORTER THAN THE
+   CAPS ALLOW. Ruling ② lets the record collapse, and with it closed at 1280 -- the owner's
+   machine -- the register was 968px: past the old 900px step, so six columns drew where six
+   cannot fit, and the table ran 103px past its own sheet with Status cut to "STA". Docked, it ran
+   past at 1349-1366 and 1536-1680. No instrument saw it, because the overflow was inside the
+   table's own scroller; `overflowProbe` (tools/probe.mjs) now measures every register's scroller.
+
+   📐 EACH STEP IS WHERE THE NEXT COLUMN STOPS FITTING, measured in `06.3` by holding the register
+   at an exact width with each column set forced on, over the stub's row at every cap
+   (tools/serve-dist.mjs) -- Member at 13rem, Bank and Branch at their fluid caps (Members.jsx).
+   Three columns fit from 516px, four from 660, five from 904, six from 1,110; each step sits 8px
+   above its fit. What the steps must keep is ruling ②: four columns with the record docked at
+   1440 (the register 680px) and six with it closed (1,128px).
+
+   ⚠️ IN REM, BECAUSE WHAT THEY MEASURE IS IN REM. The caps and the text grow with the root font
+   size and a px step does not: at a 125% root font (WCAG 1.4.4) on a 1024px screen the px steps
+   let the table run 8px past its sheet -- caught by `edges.mjs` ②. A container query resolves
+   `rem` against the root's computed size, so 69.875 / 57 / 41.75rem are the measured 1118 / 912 /
+   668px at the default root, and grow with it. */
 .register { container-type: inline-size; container-name: register; }
-@container register (max-width: 900px) { .register [data-fit="wide"] { display: none; } }
-@container register (max-width: 740px) { .register [data-fit="medium"] { display: none; } }
-/* The mock's 600 holds, and it was measured rather than trusted: at 1349 (the common laptop
-   with the panel docked) the register is 605px, and the four remaining columns need 598 with
-   the Bank column truncated at 10rem (Members.jsx) -- at 11rem they needed 614 and the Status
-   chip scrolled off the right edge on exactly the machine most of the union's staff use. */
-@container register (max-width: 600px) { .register [data-fit="narrow"] { display: none; } }
+@container register (max-width: 69.875rem) { .register [data-fit="wide"] { display: none; } }
+@container register (max-width: 57rem) { .register [data-fit="medium"] { display: none; } }
+@container register (max-width: 41.75rem) { .register [data-fit="narrow"] { display: none; } }
 
 /* ── The topbar is a CONTAINER too, and for the same reason the register is ──────
    🔴 THE CURRENT PAGE'S CRUMB WAS PAINTING UNDERNEATH THE SEARCH BOX. The topbar is
@@ -717,6 +771,58 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
 .topbar { container-type: inline-size; container-name: topbar; }
 @container topbar (max-width: 660px) { .crumb-lead { display: none; } }
 
+/* ── The figure strip follows the width it is given (ruling ③; FigureStrip.jsx) ───────────
+   Five EQUAL columns, because five figures packed into the first 560px of a rule running 1128px
+   looked, in the owner's word, "squashed" (2026-09-10). Equal columns are still not tiles: no
+   box, no fill, no radius -- one continuous ruled line, evenly divided.
+   🔴 AND THREE WHEN FIVE DO NOT FIT, which is the comp's own answer (card.css:463) asked of the
+   STRIP's width rather than the viewport's. Docking the record panel at 1280 leaves the strip
+   ~560px wide on the owner's laptop, where "Updated today" ran 15px past the strip's own rule
+   (`06.3`, measured). Two on a phone, flush to the page's gutter. */
+.figure-strip { container: figures / inline-size; }
+.figure-strip > dl { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+@container figures (max-width: 660px) {
+  .figure-strip > dl { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .figure-strip > dl > div { border-right-width: 0; }
+  .figure-strip > dl > div:nth-child(3n + 1) { padding-left: 0; }
+}
+@container figures (max-width: 460px) {
+  .figure-strip > dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .figure-strip > dl > div { padding-left: 0; padding-right: 0; }
+}
+
+/* ── The criteria row holds one line where the comp does (Criteria.jsx) ─────────────────
+   card.css `.crit` is `flex: 0 1 140px; min-width: 120px`, and on the comp's narrowest docked
+   register three of them, More criteria and Clear share a line. Docking at 1280 leaves a row the
+   comp never had, and More criteria and Clear were orphaned onto a second line, left-aligned under
+   Bank -- on the owner's own screen (`06.3`).
+   🔑 THE BASIS, NOT THE FLOOR. Flex breaks a line on each item's BASIS and only shrinks after, so a
+   lower `min-width` moved nothing. Measured with a record docked: the row is 605.3px at 1349 and
+   616.9 at 1366, where a 120px basis fits (596.2px needed); and 558.4px at 1280, where it takes a
+   110px basis and an 8px gap (542.2px, and "All banks" still has 60px inside its control). A
+   hidden criterion's count badge adds ~29px, and in that state the pair may wrap -- that is the
+   honest outcome. A phone's criteria keep their full size and wrap two to a line. */
+.criteria-row { container: criteria / inline-size; }
+@media (min-width: 1024px) {
+  @container criteria (max-width: 620px) {
+    .criteria-row .criterion { min-width: 104px; flex-basis: 120px; }
+  }
+  @container criteria (max-width: 580px) {
+    .criteria-items { column-gap: 8px; }
+    .criteria-row .criterion { min-width: 104px; flex-basis: 110px; }
+  }
+}
+
+/* ── The card's foot keeps the comp's one baseline on the owner's laptop (MembershipCard.jsx) ──
+   Measured at 1280 with a record docked: the card's interior is 317.6px, and its three foot groups
+   (113 · 98.3 · 67.5px) with the comp's 22px gaps need 322.8 -- so "Absa Bank" fell to a line of its
+   own by 5px (`06.3`). A card that narrow closes the gaps to 16px (310.8px). At 1349 the interior is
+   339.7px and the comp's 22px fit as drawn. */
+.mcard { container: mcard / inline-size; }
+@container mcard (max-width: 330px) {
+  .mcard-foot { column-gap: 16px; }
+}
+
 /* ── The register on a phone (card.css `@media (max-width: 760px)`) ──────────────
    The head goes to screen readers only and every row becomes a small card of its own:
    the member over their number, the status at the top right, the bank and the branch
@@ -729,7 +835,14 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
   .register table, .register tbody { display: block; }
   .register tr[data-row] {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    /* 🔴 THE RIGHT COLUMN IS CAPPED, AND card.css's `1fr auto` IS NOT. One column holds the status,
+       the employee number AND the branch, so a long branch -- "Pietermaritzburg & Midlands
+       Branch" -- set it to its full width and squeezed the member's own name to "Synthetic
+       Testpe…" in that row alone (`06.3`, mobile.png). The mock's branches were all short. The
+       column is now its content's width but never past 45% -- `fit-content`, not `minmax`: a
+       `minmax(auto, 45%)` track GROWS to its 45% in every row, and the first version of this fix
+       took that width from every member and bank that had fitted before. */
+    grid-template-columns: minmax(0, 1fr) fit-content(45%);
     grid-template-areas: "member status" "number employee" "bank branch";
     gap: 1px 12px;
     padding: 12px 16px;
@@ -742,7 +855,41 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
   .register td[data-col="membershipNumber"] { grid-area: number; }
   .register td[data-col="employeeNumber"] { grid-area: employee; justify-self: end; }
   .register td[data-col="bankName"] { grid-area: bank; max-width: none; }
-  .register td[data-col="branch"] { grid-area: branch; justify-self: end; }
+  .register td[data-col="branch"] { grid-area: branch; justify-self: end; text-align: right; max-width: none; }
+  .register tr[data-row] > td:first-child { padding-left: 0; }
+}
+
+/* ── The register narrower than its three essential columns ────────────────────────
+   The ladder hides columns down to Membership, Member and Status, and then has nothing left
+   to give -- and those three need 516px at the default text size and 642px at a 125% root
+   font. Enlarged text grows the rail and the page padding while the record panel still docks
+   by the viewport, so at 1280 with a record open the register was 480px and Status was cut by
+   162px (and by 8px at 1024 with the record closed, which `edges.mjs` ② caught). Below the width
+   three columns need, the register takes the phone's arrangement whatever the viewport:
+   nothing hidden, nothing sideways. 33rem is that width with a margin, and it grows with the
+   text; at the default size no desktop register is ever that narrow, so this only ever answers
+   enlarged text.
+   ⚠️ THE SAME RULES AS THE PHONE BLOCK ABOVE, HELD IDENTICAL by `registerRows.structural.test.js`:
+   CSS cannot say "@media or @container" once, and two copies drift the day one is edited. */
+@container register (max-width: 33rem) {
+  .register thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .register table, .register tbody { display: block; }
+  .register tr[data-row] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) fit-content(45%);
+    grid-template-areas: "member status" "number employee" "bank branch";
+    gap: 1px 12px;
+    padding: 12px 16px;
+  }
+  .register tr[data-row] > td { display: block !important; border: 0; padding: 1px 0; white-space: normal; font-size: var(--text-sm); }
+  .register tr[data-row] > td[data-expander], .register tr[data-detail] { display: none !important; }
+  .register td[data-col="member"] { grid-area: member; max-width: none; }
+  .register td[data-col="member"] > span { max-width: none; }
+  .register td[data-col="status"] { grid-area: status; justify-self: end; }
+  .register td[data-col="membershipNumber"] { grid-area: number; }
+  .register td[data-col="employeeNumber"] { grid-area: employee; justify-self: end; }
+  .register td[data-col="bankName"] { grid-area: bank; max-width: none; }
+  .register td[data-col="branch"] { grid-area: branch; justify-self: end; text-align: right; max-width: none; }
   .register tr[data-row] > td:first-child { padding-left: 0; }
 }
 
@@ -860,4 +1007,9 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
   ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
   :root.vt-soft::view-transition-new(root) { mask-image: none; -webkit-mask-image: none; }
   .mcard-sweep { display: none; }
+  /* card.css:492, transcribed: under reduced motion the card still ARRIVES, as a 200ms fade. The
+     surface rule (REDUCED MOTION, above) stops every keyframe animation, which snapped the card in --
+     and the posture keeps opacity. This one fade is named back; it outranks the surface rule's
+     `!important` duration on specificity. `tools/motion.mjs` reads it off the running animations. */
+  .panel-arriving .mcard { animation: fade-in 200ms ease-out both !important; }
 }

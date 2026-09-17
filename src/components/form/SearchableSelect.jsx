@@ -2,6 +2,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Loader2, X } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
+import LoadFailureFrame from './LoadFailureFrame';
+import { choicePlaceholder } from './choicePlaceholder';
 import Field, { controlClasses } from './Field';
 import { asOptionValue, findOption, normaliseOptions } from './options';
 
@@ -57,6 +59,11 @@ export default function SearchableSelect({
   loading = false,
   emptyLabel = 'No options available',
   noMatchLabel = 'No matches',
+  // The options could not be fetched -- a state of the CHOICES, not of the value (`error`). See
+  // `SelectInput`: a failed list renders as "Unavailable" with a compact error and a retry, never as
+  // an empty one (F-P54, `06.4`).
+  loadError = null,
+  onRetryLoad,
   clearable = true,
   className,
   ...rest
@@ -75,7 +82,8 @@ export default function SearchableSelect({
   );
 
   const selected = findOption(normalised, value);
-  const isEmpty = !loading && normalised.length === 0;
+  const failed = Boolean(loadError) && !loading;
+  const isEmpty = !loading && !failed && normalised.length === 0;
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -120,7 +128,7 @@ export default function SearchableSelect({
     listRef.current?.children?.[activeIndex]?.scrollIntoView?.({ block: 'nearest' });
   }, [open, activeIndex]);
 
-  const isDisabled = disabled || loading || isEmpty;
+  const isDisabled = disabled || loading || isEmpty || failed;
 
   const openList = useCallback(() => {
     if (isDisabled) return;
@@ -206,10 +214,10 @@ export default function SearchableSelect({
   // Loop-invariant: the same for every option row. Computed once rather than twice per row,
   // which on a several-hundred-entry bank list was 2N string coercions per render.
   const currentValue = asOptionValue(value);
-  const shownPlaceholder = loading ? 'Loading…' : isEmpty ? emptyLabel : placeholder;
+  const shownPlaceholder = choicePlaceholder({ loading, failed, isEmpty }, emptyLabel, placeholder);
 
-  return (
-    <Field label={label} required={required} error={error} hint={hint} className={className}>
+  const control = (
+    <Field label={label} required={required} error={error} hint={hint} className={failed ? undefined : className}>
       {({ id, describedBy, invalid }) => (
         <div ref={containerRef} className="relative">
           <input
@@ -325,7 +333,8 @@ export default function SearchableSelect({
                     }}
                     onMouseEnter={() => setActiveIndex(index)}
                     className={cn(
-                      'field-text cursor-pointer px-3 py-2 text-ink',
+                      // `touch-size`: each option is 44px on a coarse pointer -- the second sweep measured them at 39 (`07.2`).
+                      'field-text touch-size cursor-pointer px-3 py-2 text-ink',
                       entry.disabled && 'cursor-not-allowed opacity-50',
                       index === activeIndex && 'bg-brand-soft text-brand-ink',
                       entry.value === currentValue && 'font-medium text-brand-ink',
@@ -340,5 +349,11 @@ export default function SearchableSelect({
         </div>
       )}
     </Field>
+  );
+
+  return (
+    <LoadFailureFrame failed={failed} className={className} label={label} loadError={loadError} onRetryLoad={onRetryLoad}>
+      {control}
+    </LoadFailureFrame>
   );
 }

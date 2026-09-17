@@ -139,3 +139,41 @@ describe('jobGradeService.getByBank', () => {
     ).toEqual([])
   })
 })
+
+describe('jobGradeService.getByBank, given a bank NAME (06.4, F-P54)', () => {
+  const BRANCHES = [{ id: 1, bankName: 'Standard Bank', branchCode: '051001' }]
+  const asked = []
+  const gradesRecordingTheCode = () =>
+    http.get('*/api/job-grades', ({ request }) => {
+      asked.push(new URL(request.url).searchParams.get('bankCode'))
+      return HttpResponse.json([{ value: 'C1', label: 'C1' }])
+    })
+
+  beforeEach(() => {
+    asked.length = 0
+  })
+
+  it('REJECTS when the name cannot be resolved to a code, instead of asking for grades by the name', async () => {
+    // 🔴 The lookup's failure was swallowed and the grades were asked for with the NAME, which no code
+    // matches -- so a failed lookup read as "this bank has no job grades on file".
+    server.use(
+      http.get('*/api/banks/branches', () => HttpResponse.json(BRANCHES)),
+      http.get('*/api/banks', () => HttpResponse.json({ status: 500, error: 'boom' }, { status: 500 })),
+      gradesRecordingTheCode(),
+    )
+
+    await expect(jobGradeService.getByBank('Standard Bank')).rejects.toThrow()
+    expect(asked, 'the grades were asked for with a code nobody resolved').toEqual([])
+  })
+
+  it('the must-pass: a resolved name asks for the grades by its code', async () => {
+    server.use(
+      http.get('*/api/banks/branches', () => HttpResponse.json(BRANCHES)),
+      http.get('*/api/banks', () => HttpResponse.json([{ name: 'Standard Bank', universalBranchCode: '051001' }])),
+      gradesRecordingTheCode(),
+    )
+
+    await expect(jobGradeService.getByBank('Standard Bank')).resolves.toEqual([{ value: 'C1', label: 'C1' }])
+    expect(asked).toEqual(['051001'])
+  })
+})

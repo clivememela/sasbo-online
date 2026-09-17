@@ -7,7 +7,7 @@ import Modal from "../../components/overlay/Modal.jsx";
 import { memberService } from "../../services/memberService.js";
 import { validateSAID } from "../../utils/validateSAID.js";
 import Table from '../../components/table/Table.jsx';
-import Sheet from '../../components/common/Sheet.jsx';
+import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import StatusChip from '../../components/common/StatusChip.jsx';
 import reportError from '../../lib/reportError.js';
 
@@ -118,8 +118,16 @@ export default function AcbDebits() {
         setConfirmed(false);
         setLoadingId(m.id);
         memberService.getMemberById(m.id)
-            .then(full => { setSelectedMember(full); })
-            .catch(() => { setSelectedMember(m); })
+            .then(full => { setSelectedMember(full); setNotice(null); })
+            // 🔴 A FAILED RECORD FETCH USED TO OPEN THE REGISTER ROW AS IF IT WERE THE RECORD (`06.4`). The row
+            // is the list's summary: a banking field it does not carry printed "-", Confirm Details confirmed
+            // details nobody had loaded, and Edit Details seeded its form with blanks that Update would write.
+            // Now nothing is opened -- not this member, and not the one open before -- and the page says why.
+            .catch((err) => {
+                reportError('AcbDebits.loadMember', err);
+                setSelectedMember(null);
+                setNotice(`The banking details for ${m.membershipNumber || 'that member'} could not be loaded, so nothing is shown for them. Select the member again to try again.`);
+            })
             .finally(() => setLoadingId(null));
     }, [selectedMember]);
 
@@ -169,7 +177,7 @@ export default function AcbDebits() {
     ], [loadingId, selectedMember, handleSelectMember]);
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+        <Page>
             <PageTitle title="Manage Debits" subtitle="Capture Resubmission Debits" />
 
             {/* 🔴 WHAT THE `alert()` BECAME. Focused rather than `role="alert"`: the
@@ -318,6 +326,6 @@ export default function AcbDebits() {
                     </Sheet>
                 )}
             </div>
-        </div>
+        </Page>
     );
 }

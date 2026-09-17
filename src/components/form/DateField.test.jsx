@@ -432,7 +432,9 @@ describe('DateField — the full keyboard set the mock specifies', () => {
     // The mock is explicit that they are different marks, so that today still reads as
     // today on the day it is also the selection.
     const cell = screen.getByRole('gridcell', { name: new RegExp(', today') })
-    expect(cell.className).toMatch(/ring-accent/)
+    // The class, because jsdom cannot see a colour. That it resolves to Card's gold rather than the
+    // surface wash `ring-accent` became is `tools/review.mjs`'s TODAY_RING_GOLD, read in a browser (`06.3`).
+    expect(cell.className).toMatch(/\bring-accent-line\b/)
     expect(cell.className).toMatch(/bg-brand/)
   })
 })

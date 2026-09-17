@@ -45,7 +45,7 @@ export default function Home() {
   return (
     <Page>
       <PageTitle title="Welcome to SASBO Online" subtitle="Select an area to begin." />
-      <Sheet className="mt-6 max-w-4xl divide-y divide-line">
+      <Sheet className="mt-6 divide-y divide-line">
         {cards.map((card) => (
           <NavigationCard
             key={card.href}

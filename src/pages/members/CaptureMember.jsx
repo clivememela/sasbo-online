@@ -18,8 +18,8 @@ import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderF
     formatDate } from "@/utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState";
-import { cn } from "@/lib/utils.js";
 import useReferenceData from "../../hooks/useReferenceData.js";
+import { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
 
 const FIELD_TO_TAB_MAP = {
     title: "personal",
@@ -105,7 +105,10 @@ export default function CaptureMember() {
     const [fieldErrors, setFieldErrors] = useState({});
     const [showSavedNotification, setShowSavedNotification] = useState(false);
     const [welcomeMember, setWelcomeMember] = useState(null);
-
+    const [saving, setSaving] = useState(false);
+    const [savedName, setSavedName] = useState("");
+    const [pristineForm] = useState(() => JSON.stringify(form));
+    const [confirmDiscard, setConfirmDiscard] = useState(false);
     const refs = useReferenceData(REFERENCE_LOADERS);
     const reps = refs.data.recruiters;
     const structures = refs.data.structures;
@@ -229,6 +232,7 @@ export default function CaptureMember() {
     }, [saveNotice]);
 
     const handleSave = () => {
+        if (saving) return;
         const clientSideErrors = validateFormBeforeSave();
         const mergedErrors = { ...fieldErrors, ...clientSideErrors };
 
@@ -245,8 +249,10 @@ export default function CaptureMember() {
         }
 
         setSaveNotice(null);
+        setSaving(true);
         memberService.createMember(form)
             .then((saved) => {
+                setSavedName([form.firstNames, form.surname].filter(Boolean).join(" "));
                 setShowSavedNotification(true);
                 setTimeout(() => setShowSavedNotification(false), 3000);
                 
@@ -257,7 +263,16 @@ export default function CaptureMember() {
             .catch((err) => setSaveNotice({
                 kind: "failed",
                 messages: [`This member was not saved. ${err?.message || "Please try again."}`],
-            }));
+            }))
+            .finally(() => setSaving(false));
+    };
+
+    const handleCancel = () => {
+        if (JSON.stringify(form) !== pristineForm) {
+            setConfirmDiscard(true);
+            return;
+        }
+        window.history.back();
     };
 
     const tabs = MEMBER_TABS;
@@ -344,11 +359,20 @@ export default function CaptureMember() {
                 </div>
             )}
 
-            <div className="relative mt-2 max-w-4xl rounded-lg bg-surface shadow-(--shadow-1)">
+            <div className="relative mt-2 rounded-lg bg-surface shadow-(--shadow-1)">
+                {/* 🔴 IT SAID "Member captured successfully!" AT THE TOP OF A LONG FORM, WHERE NOBODY PRESSING SAVE AT THE
+                    BOTTOM COULD SEE IT (`06.5`). It is the world's toast now, fixed above the action bar as the record's
+                    own is, and it names who was captured.
+                    ⚠️ THE SENTENCE IS KEPT WORD FOR WORD, IN ITS OWN ELEMENT: the automation arc's `MemberCapturePage`
+                    waits for `getByText('Member captured successfully!')`. The name is a second element beside it. */}
                 {showSavedNotification && (
-                    <div role="status" className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-lg border border-status-active-dot bg-status-active-bg px-4 py-2 text-status-active shadow-(--shadow-2)">
-                        <CheckCircle2 size={18} aria-hidden="true" />
-                        <span className="text-sm font-medium">Member captured successfully!</span>
+                    <div
+                        role="status"
+                        className="kind-in fixed bottom-[84px] left-1/2 z-50 flex -translate-x-1/2 items-center gap-2.5 rounded-[10px] bg-ink px-3.5 py-2.5 text-[13.5px] font-medium text-bg shadow-(--shadow-2)"
+                    >
+                        <CheckCircle2 size={16} strokeWidth={1.75} aria-hidden="true" className="text-brand" />
+                        <span>Member captured successfully!</span>
+                        {savedName && <span className="font-normal opacity-80">{savedName}</span>}
                     </div>
                 )}
 
@@ -360,7 +384,7 @@ export default function CaptureMember() {
                         className="m-4 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
                     >
                         <p id="capture-save-notice-title" className="flex items-center gap-2 font-medium">
-                            <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+                            <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.75} />
                             {saveNotice.kind === "invalid" ? "Fix these before saving" : "This member was not saved"}
                         </p>
                         <ul className="mt-1 list-disc pl-6">
@@ -370,7 +394,7 @@ export default function CaptureMember() {
                 )}
 
                 <div className="border-b border-line bg-surface-2">
-                    <div className="flex -mb-px overflow-x-auto whitespace-nowrap px-6">
+                    <div className="flex flex-wrap -mb-px px-6">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
@@ -382,7 +406,7 @@ export default function CaptureMember() {
                                 <span>{tab.label}</span>
                                 {tabsWithErrors.has(tab.id) && (
                                     <>
-                                        <span aria-hidden="true" className="text-status-suspended font-bold text-sm">*</span>
+                                        <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-status-suspended-dot" />
                                         <span className="sr-only">(has errors)</span>
                                     </>
                                 )}
@@ -401,6 +425,7 @@ export default function CaptureMember() {
                                 <Field label="Surname" value={form.surname} onChange={handleChange("surname")} error={fieldErrors.surname} required />
                                 <Field label="Identity Type" value={form.identityType} onChange={handleChange("identityType")} options={identityTypeOptions} error={fieldErrors.identityType} required />
                                 <Field
+                                    kind="identifier"
                                     label={form.identityType || "Identity Number"}
                                     note={form.identityType ? null : "Choose an identity type first."}
                                     value={form.identityNumber}
@@ -427,9 +452,9 @@ export default function CaptureMember() {
                                 />
                                 <Field label="Race" value={form.race} onChange={handleChange("race")} options={raceOptions} />
                                 <EmailFields form={form} setForm={setForm} handleChange={handleChange} fieldErrors={fieldErrors} />
-                                <Field label="Cellphone Number" value={form.phone} onChange={handleChange("phone")} />
-                                <Field label="Work Tel" value={form.workTel} onChange={handleChange("workTel")} />
-                                <Field label="Home Tel" value={form.homeTel} onChange={handleChange("homeTel")} />
+                                <Field label="Cellphone Number" kind="tel" value={form.phone} onChange={handleChange("phone")} />
+                                <Field label="Work Tel" kind="tel" value={form.workTel} onChange={handleChange("workTel")} />
+                                <Field label="Home Tel" kind="tel" value={form.homeTel} onChange={handleChange("homeTel")} />
                                 <AddressAutocomplete label="Residential Address" value={form.address} onChange={handleChange("address")} placeholder="Start typing a residential address..." className="md:col-span-2" />
                             </>
                         )}
@@ -444,16 +469,16 @@ export default function CaptureMember() {
                         )}
                         {activeTab === "employment" && (
                             <>
-                                <Field label="Employee Number" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
+                                <Field label="Employee Number" kind="identifier" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
-                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
+                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} {...refs.field('banks')} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
                                 <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} emptyLabel="No job grades available" loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
                                 <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={BRANCH_OPTIONS} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
 
                                 {form.paymentType === "Debit Order" && (
                                     <>
-                                        <Field label="Bank Account Number" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} error={fieldErrors.bankAccountNumber} required />
+                                        <Field label="Bank Account Number" kind="identifier" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} error={fieldErrors.bankAccountNumber} required />
                                         <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={DEBIT_DAY_OPTIONS} />
                                     </>
                                 )}
@@ -469,8 +494,8 @@ export default function CaptureMember() {
 
                         {activeTab === "representatives" && (
                             <>
-                                <Field label="Recruiter" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} options={reps.map(r => r.name).filter(Boolean)} searchable />
-                                <Field label="Area's Recruiter" value={form.areasRep} onChange={handleChange("areasRep")} options={reps.map(r => r.name).filter(Boolean)} searchable />
+                                <Field label="Recruiter" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} {...refs.field('recruiters')} options={reps.map(r => r.name).filter(Boolean)} searchable />
+                                <Field label="Area's Recruiter" value={form.areasRep} onChange={handleChange("areasRep")} {...refs.field('recruiters')} options={reps.map(r => r.name).filter(Boolean)} searchable />
 
                                 {form.electedRep === 'Y' && (
                                     <>
@@ -491,10 +516,23 @@ export default function CaptureMember() {
                     </div>
                 </div>
 
-                <div className="sticky bottom-0 z-10 flex flex-row-reverse justify-start gap-3 border-t border-line bg-surface/95 px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm">
-                    <Button variant="primary" onClick={handleSave}>Save Member</Button>
-                    <Button onClick={() => window.history.back()}>Cancel</Button>
+                <div className="sticky bottom-0 z-10 flex flex-row-reverse justify-start gap-3 border-t border-line bg-surface px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                    <Button variant="primary" onClick={handleSave} loading={saving}>Save Member</Button>
+                    <Button onClick={handleCancel}>Cancel</Button>
                 </div>
+
+                <ConfirmDialog
+                    open={confirmDiscard}
+                    onOpenChange={closeOn(() => setConfirmDiscard(false))}
+                    title="Discard this member?"
+                    description="Nothing on this form has been saved."
+                    confirmLabel="Discard member"
+                    cancelLabel="Keep capturing"
+                    onConfirm={() => {
+                        setConfirmDiscard(false);
+                        window.history.back();
+                    }}
+                />
             </div>
         </div>
         </>
@@ -582,29 +620,6 @@ function EmailFields({ form, setForm, handleChange, fieldErrors }) {
 function Field({ label, value, onChange, className = "", options = null, type = "text",
                    error = null, disabled = false, searchable = false, note = null, kind, required = false,
                    loading = false, emptyLabel, loadError = null, onRetryLoad }) {
-    if (loadError) {
-        return (
-            <div className={cn("flex flex-col gap-1", className)}>
-                <SelectInput
-                    label={label}
-                    value={value}
-                    onChange={(next) => onChange?.({ target: { value: next } })}
-                    options={[]}
-                    disabled
-                    required={required}
-                    placeholder="Unavailable"
-                    emptyLabel="Unavailable"
-                />
-                <DataState
-                    state="error"
-                    compact
-                    error={loadError}
-                    onRetry={onRetryLoad}
-                    title={`${label} could not be loaded.`}
-                />
-            </div>
-        );
-    }
 
     const shared = {
         label,
@@ -627,6 +642,8 @@ function Field({ label, value, onChange, className = "", options = null, type = 
                 {...shared}
                 options={options}
                 loading={loading}
+                loadError={loadError}
+                onRetryLoad={onRetryLoad}
                 onChange={(next) => onChange?.({ target: { value: next } })}
                 placeholder="Search..."
             />
@@ -639,6 +656,8 @@ function Field({ label, value, onChange, className = "", options = null, type = 
                 {...shared}
                 options={options}
                 loading={loading}
+                loadError={loadError}
+                onRetryLoad={onRetryLoad}
                 onChange={(next) => onChange?.({ target: { value: next } })}
                 placeholder="Select..."
                 emptyLabel={emptyLabel}

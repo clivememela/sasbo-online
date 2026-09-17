@@ -7,6 +7,8 @@ import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Cri
 import Pager from '../../components/common/Pager.jsx';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import Table from "../../components/table/Table.jsx";
+import DataState from "../../components/common/DataState";
+import reportError from "../../lib/reportError";
 
 const PAGE_SIZE = bankService.getPageSize();
 
@@ -20,6 +22,10 @@ export default function BankListing() {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  // Whether the universal branch codes arrived with the listing. They are an enrichment: without them
+  // every bank still lists, and this page SAYS the codes are missing rather than printing a dash for each
+  // one and answering a search by code with "no banks match" (F-P54, `06.4`).
+  const [codes, setCodes] = useState("ready");
 
   const normalizeBankResponse = (payload) => {
     if (Array.isArray(payload)) return payload;
@@ -36,9 +42,11 @@ export default function BankListing() {
     setError("");
 
     return bankService
-      .getBankListing()
-      .then((data) => {
-        setBanks(normalizeBankResponse(data));
+      .getBankListingDetailed()
+      .then(({ branches, codes: codesState, codesError }) => {
+        setBanks(normalizeBankResponse(branches));
+        setCodes(codesState);
+        if (codesState === "failed") reportError("BankListing.codes", codesError);
       })
       .catch(() => {
         setError("Unable to load bank listing at the moment.");
@@ -74,9 +82,10 @@ export default function BankListing() {
     return listingRows.filter((bank) => {
       if (bankNameQuery && !bank.bankName.toLowerCase().includes(bankNameQuery)) return false;
       if (abbreviationQuery && !bank.abbreviation.toLowerCase().includes(abbreviationQuery)) return false;
-      return !(branchCodeQuery && !bank.universalBranchCode.toLowerCase().includes(branchCodeQuery));
+      // A search by code cannot be answered without the codes; the field is disabled while they are missing.
+      return !(branchCodeQuery && codes !== "failed" && !bank.universalBranchCode.toLowerCase().includes(branchCodeQuery));
     });
-  }, [filters, listingRows]);
+  }, [filters, listingRows, codes]);
 
   const handleInputChange = (field) => (event) => {
     setFilters((prev) => ({ ...prev, [field]: event.target.value }));
@@ -97,8 +106,9 @@ export default function BankListing() {
       priority: 'essential',
       cell: (b) => <span className="font-semibold text-brand-ink">{b.abbreviation || '\u2014'}</span>,
     },
-    { key: 'universalBranchCode', header: 'Universal Branch Code', priority: 'essential', cell: (b) => b.universalBranchCode || '\u2014' },
-  ], []);
+    // A code the listing never received reads "Unavailable", not a dash: the dash says the bank has none (F-P54).
+    { key: 'universalBranchCode', header: 'Universal Branch Code', priority: 'essential', cell: (b) => codes === "failed" && !b.universalBranchCode ? <span className="text-ink-muted">Unavailable</span> : b.universalBranchCode || '\u2014' },
+  ], [codes]);
 
   return (
     <Page>
@@ -134,8 +144,22 @@ export default function BankListing() {
           value={filters.universalBranchCode}
           onChange={handleInputChange("universalBranchCode")}
           placeholder="Any"
+          disabled={codes === "failed"}
         />
       </Criteria>
+
+      {codes === "failed" && !isLoading && !error && (
+        <div className="mt-4 rounded-lg bg-surface shadow-(--shadow-1)">
+          <DataState
+            state="partial"
+            layout="row"
+            compact
+            onRetry={loadBanks}
+            title="Universal branch codes could not be loaded."
+            message="Every bank below is listed, but not its code, so a search by code cannot be answered until they load."
+          />
+        </div>
+      )}
 
       <Sheet className="mt-4">
         {/* 🔴 A `grid-cols-3` PSEUDO-TABLE, AND THE LAST OF THE SEVEN run 7 counted.
@@ -167,6 +191,7 @@ export default function BankListing() {
           totalPages={totalPages}
           onPageChange={setPage}
           count={filteredRows.length}
+          error={Boolean(error)}
           start={startIndex + 1}
           end={endIndex}
           noun="banks"

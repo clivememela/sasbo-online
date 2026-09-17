@@ -43,6 +43,10 @@ export default function AddressAutocomplete({
   const listboxId = useId();
   const [query, setQuery] = useState(value || '');
   const [predictions, setPredictions] = useState([]);
+  // 🔴 A SUGGESTION LOOKUP THAT FAILED LOOKED EXACTLY LIKE AN ADDRESS GOOGLE DID NOT KNOW (`06.4`): the list
+  // simply never opened, and the person typing waited for suggestions that were not coming. The field says so
+  // now -- and that what they type is kept, which is true: `onChange` carries every keystroke.
+  const [suggestionsFailed, setSuggestionsFailed] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const wrapperRef = useRef(null);
@@ -81,6 +85,7 @@ export default function AddressAutocomplete({
             includedRegionCodes: ['za'],
           });
 
+        setSuggestionsFailed(false);
         if (suggestions && suggestions.length > 0) {
           setPredictions(
             suggestions
@@ -102,6 +107,7 @@ export default function AddressAutocomplete({
       } catch (err) {
         reportError('AddressAutocomplete.suggest', err);
         setPredictions([]);
+        setSuggestionsFailed(true);
       }
     },
     [placesLib],
@@ -190,7 +196,11 @@ export default function AddressAutocomplete({
 
   return (
     <div ref={wrapperRef} className={cn('relative', className)}>
-      <Field label={label} error={error} hint={hint}>
+      <Field
+        label={label}
+        error={error}
+        hint={suggestionsFailed ? 'Address suggestions could not be loaded. Type the full address; it is kept as typed.' : hint}
+      >
         {({ id, describedBy, invalid }) => (
           <div className="relative">
             <input

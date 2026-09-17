@@ -50,6 +50,9 @@ const PORTS = Object.freeze({
   tokens: 9650,
   probe: 9700,
   motion: 9750,
+  review: 9800,
+  surfaces: 9850,
+  vitals: 9900,
 });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -61,6 +64,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * `tag` names the port range and the profile directory, so a crashed run leaves an
  * identifiable profile behind rather than an anonymous one.
  */
+/**
+ * THE ONE ANSWER TO "IS THIS A PHONE" (④): `metrics()` below emulates a mobile viewport by it, and a tool that also
+ * switches touch on at a phone width asks it here rather than writing the cutoff again.
+ */
+export const isPhone = (width) => width < 700;
+
 export async function launch(tag, { flags = [] } = {}) {
   const base = PORTS[tag];
   if (!base) {
@@ -103,13 +112,29 @@ export async function launch(tag, { flags = [] } = {}) {
 
   let id = 0;
   const pending = new Map();
+  /*
+   * CDP EVENTS, for the one kind of tool that needs them: request interception. The stub server
+   * answers every `/api/` path the same way every time, so a register whose fetch FAILS, HANGS or
+   * comes back EMPTY cannot be reached through it -- and those are the states A27 is about. An
+   * event with no listener is dropped, exactly as every event was before this existed.
+   */
+  const listeners = new Map();
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
     if (m.id && pending.has(m.id)) {
       const p = pending.get(m.id);
       pending.delete(m.id);
       m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result);
+      return;
     }
+    if (m.method) for (const fn of listeners.get(m.method) ?? []) fn(m.params);
+  };
+
+  /** Subscribe to a CDP event. Returns the unsubscribe. */
+  const on = (method, fn) => {
+    if (!listeners.has(method)) listeners.set(method, new Set());
+    listeners.get(method).add(fn);
+    return () => listeners.get(method).delete(fn);
   };
 
   const send = (method, params = {}) =>
@@ -142,6 +167,51 @@ export async function launch(tag, { flags = [] } = {}) {
   await send('Runtime.enable');
 
   /**
+   * Make one request pattern -- or several -- fail, hang, come back empty or answer with a payload for the length of
+   * one capture, and return the teardown. Anything held is released on the way out, so no capture inherits a request
+   * the previous one left hanging. A CDP call that fails here is RETURNED by the teardown, and it fails the capture.
+   *
+   * 🔑 MOVED HERE FROM `review.mjs` when `surfaces.mjs` (`07.2`) needed it too. The stub server answers every path the
+   * same way every time, so a failed, hung or empty list is reached only in the browser -- and a second copy of the
+   * one driver that reaches them would drift the way three copies of the overflow probe did (probe.mjs).
+   */
+  const intercept = async ({ url, mode, body }) => {
+    const held = [];
+    const problems = [];
+    // `empty` answers `[]`; `fulfill` answers with the capture's own payload.
+    const payload = mode === 'empty' ? [] : mode === 'fulfill' ? await body() : null;
+    const off = on('Fetch.requestPaused', ({ requestId }) => {
+      if (mode === 'hang') { held.push(requestId); return; }
+      const answer = mode === 'fail'
+        ? send('Fetch.failRequest', { requestId, errorReason: 'ConnectionRefused' })
+        : send('Fetch.fulfillRequest', {
+          requestId,
+          responseCode: 200,
+          responseHeaders: [{ name: 'content-type', value: 'application/json' }],
+          body: Buffer.from(JSON.stringify(payload)).toString('base64'),
+        });
+      answer.catch((e) => problems.push(e.message));
+    });
+    // 🔑 THE CACHE IS OFF FOR AN INTERCEPTED CAPTURE. A route chunk an earlier capture already loaded is served from
+    // memory without ever reaching the network -- so an interception of it would pause nothing, and the "failed
+    // chunk" capture would photograph a page that loaded perfectly.
+    await send('Network.enable');
+    await send('Network.setCacheDisabled', { cacheDisabled: true });
+    await send('Fetch.enable', { patterns: [url].flat().map((urlPattern) => ({ urlPattern, requestStage: 'Request' })) });
+    return async () => {
+      off();
+      for (const requestId of held) {
+        // The page that held it may already be gone; an unknown request id is the expected answer.
+        await send('Fetch.failRequest', { requestId, errorReason: 'Aborted' }).catch(() => {});
+      }
+      await send('Fetch.disable');
+      await send('Network.setCacheDisabled', { cacheDisabled: false });
+      await send('Network.disable');
+      return problems;
+    };
+  };
+
+  /**
    * The viewport, with ONE answer to "is this a phone".
    *
    * 🔴 TRUE DEVICE METRICS, NOT A RESIZED WINDOW (T14). Headless Chrome will not lay out below
@@ -155,16 +225,19 @@ export async function launch(tag, { flags = [] } = {}) {
    * sweep disagreed about the same route at the same width.
    */
   const metrics = (width, height = width < 500 ? 844 : 900) => {
-    const mobile = width < 700;
+    const mobile = isPhone(width);
     return send('Emulation.setDeviceMetricsOverride', {
       width, height, deviceScaleFactor: mobile ? 2 : 1, mobile,
     });
   };
 
-  /** Poll an expression until it is `true`. Returns whether it ever was. */
-  const waitFor = async (expression, { tries = 80, every = 150 } = {}) => {
+  /**
+   * Poll an expression until it is `true`. Returns whether it ever was. `awaitPromise` for an
+   * expression that resolves to its answer (`SETTLED`, in probe.mjs).
+   */
+  const waitFor = async (expression, { tries = 80, every = 150, awaitPromise = false } = {}) => {
     for (let i = 0; i < tries; i++) {
-      if (await evaluate(expression) === true) return true;
+      if (await evaluate(expression, { awaitPromise }) === true) return true;
       await sleep(every);
     }
     return false;
@@ -177,13 +250,40 @@ export async function launch(tag, { flags = [] } = {}) {
    */
   const assertBuiltClient = async (baseUrl) => {
     await send('Page.navigate', { url: `${baseUrl}/login` });
-    await sleep(800);
+    // 🔴 A CONDITION, NOT THE FIXED 800ms THIS WAS. On a cold Chrome under memory pressure the
+    // document had not finished parsing its head after 800ms, so the entry script was not there
+    // yet and a server that was serving perfectly was refused as "not the built client"
+    // (2026-09-14, `06.3`). The href clause stops `about:blank` answering for the page.
+    const arrived = await waitFor(
+      `location.href.startsWith(${JSON.stringify(baseUrl)}) && document.readyState !== 'loading'`,
+      { tries: 100 },
+    );
+    if (!arrived) throw new Error(`${baseUrl}/login never finished loading — is the server up?`);
     const entry = await evaluate(
       "document.querySelector('script[type=module]')?.src || location.href",
     );
     if (!/\/assets\/index-[A-Za-z0-9_-]+\.js$/.test(entry)) {
       throw new Error(`the server at ${baseUrl} is not the built client (entry script: ${entry})`);
     }
+    /*
+     * 🔴 AND THE APP HAS MOUNTED BEFORE THIS RETURNS -- F-P56's first row. A loaded DOCUMENT is not a mounted app: the
+     * entry is a module, which runs after `readyState` leaves 'loading'. Profiles are reused between runs, so this page
+     * can mount holding the LAST run's stored theme, and `ThemeProvider`'s mount effect writes that value back to
+     * `localStorage`. Returning before it had run let a tool store its first row's theme and then have the app
+     * overwrite it: the run's first row, light, photographed dark (P6's closing gate; the P7 merge gate refused the same
+     * row with `stored: "true"`). Throttled on purpose it reproduced in 2 of 3 runs, and a trace of every write showed
+     * the app's stale write racing the tool's. Waiting for the root to hold the app, then two frames for its effects,
+     * closes the window instead of hoping the race is lost.
+     */
+    const mounted = await waitFor(
+      `(async () => {
+        if (!document.getElementById('root')?.firstElementChild) return false;
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        return true;
+      })()`,
+      { tries: 200, awaitPromise: true },
+    );
+    if (!mounted) throw new Error(`${baseUrl}/login loaded but the application never mounted into #root`);
     return String(entry).split('/').pop();
   };
 
@@ -192,7 +292,7 @@ export async function launch(tag, { flags = [] } = {}) {
     chrome.kill();
   };
 
-  return { send, evaluate, metrics, waitFor, assertBuiltClient, close, port, sleep };
+  return { send, evaluate, metrics, waitFor, assertBuiltClient, close, port, sleep, on, intercept };
 }
 
 export { sleep };

@@ -1,3 +1,5 @@
+import { ERROR_KINDS } from '../services/parseApiError.js';
+
 /**
  * THE ONE SINK. EH-D10, `06.1b`.
  *
@@ -131,7 +133,7 @@ export function onNetworkFailure(listener) {
 }
 
 export default function reportError(context, error) {
-  if (error?.kind === 'network') {
+  if (error?.kind === ERROR_KINDS.NETWORK) {
     lastNetworkFailureAt = Date.now();
     // Copied before iterating: a listener that unsubscribes itself while being notified
     // would otherwise mutate the set mid-iteration.

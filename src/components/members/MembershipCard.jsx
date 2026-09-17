@@ -136,7 +136,7 @@ export default function MembershipCard({ name, membershipNumber, status = 'Activ
           two figures take 284 of the card's 354, leaving 70px for a label that is 85px wide,
           and the group ran off the card's own edge. Wrapping puts the employer on a full
           line of its own exactly when it cannot share one, and never before. */}
-      <div className="flex flex-wrap items-start gap-x-[22px] gap-y-2.5">
+      <div className="mcard-foot flex flex-wrap items-start gap-x-[22px] gap-y-2.5">
         <span className="grid shrink-0 gap-[3px] leading-[1.1]">
           <small className={LABEL}>Membership no.</small>
           {/* Tabular numerals, spaced like a number pressed into metal. */}
@@ -163,10 +163,15 @@ export default function MembershipCard({ name, membershipNumber, status = 'Activ
         )}
 
         {employer && (
-          <span className="ml-auto grid min-w-[9rem] max-w-[48%] gap-[3px] text-right leading-[1.15] max-sm:max-w-full">
-            {/* A floor of 9rem is what makes the wrap decide itself: the group either has
-                room for its own label or it takes a line. Without one, flex shrinks it below
-                the width of the word "EMPLOYER" and the text overhangs the card. */}
+          <span className="ml-auto grid max-w-full shrink-0 gap-[3px] text-right leading-[1.15]">
+            {/* 🔴 THE EMPLOYER'S OWN WIDTH DECIDES THE WRAP NOW, AND A FIXED FLOOR USED TO. A
+                `min-w-[9rem]` floor needed 144px beside the two figures whatever the employer was
+                called, so "Absa Bank" -- 70px of text -- took a line of its own on every docked
+                card and lifted the engraved name ~40px up the thesis element (`06.3`, measured
+                against the comp's one baseline). A flex item that does not shrink offers its
+                CONTENT width to the line: it shares the line when that fits and takes a line
+                when it does not, and `max-w-full` wraps a long name inside its own line rather
+                than letting it overhang the card. */}
             <small className={LABEL}>Employer</small>
             {/* Whole, never an ellipsis: an engraved fact on the thesis element must read
                 entire, and real employers run to "The Standard Bank of South Africa Limited".

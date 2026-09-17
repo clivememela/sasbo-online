@@ -1,8 +1,8 @@
 import { Download, FileText, ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useMemo } from "react";
 import PageTitle from '../../components/common/PageTitle';
-import Sheet from '../../components/common/Sheet.jsx';
-import DataState from '../../components/common/DataState.jsx';
+import Sheet, { Page } from '../../components/common/Sheet.jsx';
+import ArchiveEmpty from '../../components/archives/ArchiveEmpty.jsx';
 import { Button, TextInput } from '../../components/form';
 
 export default function FinanceHouses() {
@@ -445,7 +445,7 @@ export default function FinanceHouses() {
   }, [fileStructure, searchQuery]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+    <Page>
       <PageTitle
         title="Finance Houses"
         subtitle="Access official policies, salary agreements, and collective bargaining documents from South African financial institutions"
@@ -479,22 +479,9 @@ export default function FinanceHouses() {
       </div>
 
       <div className="max-w-4xl">
-        {/* 🔴 A SEARCH THAT MATCHED NOTHING LEFT THE PAGE BLANK. The list simply stopped
-            rendering, and the only signal was the "Found 0 …" line above -- which itself only
-            appears while a search is typed, and which reads as a fact about the archive rather
-            than about the query. A blank page with a filled search box is the shape a user
-            reads as "broken", and there was no way out of it but to clear the field by hand. */}
+        {/* A search that matched nothing says so, with the way out -- `ArchiveEmpty`, shared by the three archives. */}
         {Object.keys(filteredStructure).length === 0 ? (
-          <Sheet>
-            <DataState
-              state="empty"
-              title={searchQuery ? "Nothing matches that search." : "Nothing here yet."}
-              message={searchQuery ? "Try fewer words, or clear the search to see everything again." : null}
-              action={searchQuery
-                ? <Button variant="default" onClick={() => setSearchQuery("")}>Clear the search</Button>
-                : null}
-            />
-          </Sheet>
+          <ArchiveEmpty searchQuery={searchQuery} onClear={() => setSearchQuery("")} />
         ) : (
           <Sheet className="divide-y divide-line">
             {Object.entries(filteredStructure).map(([bank, categories]) => (
@@ -537,7 +524,7 @@ export default function FinanceHouses() {
                         type="button"
                         onClick={() => toggleSubFolder(`${bank}-${category}`)}
                         aria-expanded={Boolean(expandedFolders[`${bank}-${category}`])}
-                        className="touch-target w-full flex items-center gap-2 rounded-md px-3 py-1.5 transition-colors hover-hover:hover:bg-surface text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+                        className="touch-size w-full flex items-center gap-2 rounded-md px-3 py-1.5 transition-colors hover-hover:hover:bg-surface text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
                       >
                         {expandedFolders[`${bank}-${category}`] ? (
                           <ChevronDown size={16} className="text-brand-ink flex-shrink-0" />
@@ -576,6 +563,6 @@ export default function FinanceHouses() {
           </Sheet>
         )}
       </div>
-    </div>
+    </Page>
   );
 }

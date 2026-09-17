@@ -46,6 +46,25 @@ describe('SearchableSelect — the states', () => {
     expect(combobox).toHaveAttribute('placeholder', 'No options available')
   })
 
+  it('failed: the choices are unavailable, a retry is offered, and it is NOT the empty state above (F-P54)', async () => {
+    // The "empty" case above is this one's must-pass: the same `options={[]}`, and only `loadError`
+    // separates "there are none" from "we could not find out".
+    const user = setupUser()
+    const retry = vi.fn()
+    renderWithProviders(
+      <SearchableSelect label="Bank Name" value="" onChange={() => {}} options={[]} loadError="The banks list could not be loaded." onRetryLoad={retry} />,
+    )
+
+    const combobox = screen.getByRole('combobox', { name: 'Bank Name' })
+    expect(combobox).toBeDisabled()
+    expect(combobox).toHaveAttribute('placeholder', 'Unavailable')
+    expect(combobox).not.toHaveAttribute('placeholder', 'No options available')
+    expect(screen.getByText('Bank Name could not be loaded.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /try again/i }))
+    expect(retry).toHaveBeenCalledOnce()
+  })
+
   it('no matches is a different message from no options, and is not a selectable row', async () => {
     const user = setupUser()
     renderWithProviders(<SearchableSelect label="Bank Name" value="" onChange={() => {}} options={BANKS} />)
@@ -225,6 +244,13 @@ describe('SearchableSelect — accessibility, both themes', () => {
 })
 
 describe('SearchableSelect — the 16px rule, mutation-checked', () => {
+  // `07.2`: the combobox is an <input>, which draws no ::after, so `touch-target` gives it nothing. See
+  // TextInput.test.jsx for the rule; the browser half is tools/surfaces.mjs.
+  it('the control wears touch-size, so a coarse pointer gets a 44px target', () => {
+    renderWithProviders(<SearchableSelect label="Bank Name" value="" onChange={() => {}} options={BANKS} />)
+    expect(screen.getByRole('combobox', { name: 'Bank Name' }).className).toMatch(/\btouch-size\b/)
+  })
+
   it('the control wears field-text, and so does every option row', async () => {
     const user = setupUser()
     renderWithProviders(<SearchableSelect label="Bank Name" value="" onChange={() => {}} options={BANKS} />)

@@ -25,7 +25,7 @@ const ACTIVE = "bg-surface font-semibold text-brand-ink shadow-(--shadow-1)";
    never generates (`dynamicUtilities.test.js`). */
 const INDENT = ["pl-10", "pl-14", "pl-[4.5rem]"];
 
-export default function SidebarItem({ item, isActive, hasActiveSubItem, expandedItems, onToggle, onClick, selectedCardHref, depth = 0 }) {
+export default function SidebarItem({ item, isActive, expandedItems, onToggle, onClick, selectedCardHref, depth = 0 }) {
   const location = useLocation();
   const Icon = item.icon;
   const hasSubItems = item.subItems && item.subItems.length > 0;
@@ -73,7 +73,8 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
           made real: the link navigates, the button expands, and each says what it is. */}
       <div
         className={cn(
-          "flex items-center rounded-lg pr-1.5",
+          // `touch-size`: 44px rows on a coarse pointer, so the link's target and its disclosure's never land on a neighbour.
+          "touch-size flex items-center rounded-lg pr-1.5",
           depth === 0 ? "h-9 pl-2.5 text-sm font-medium" : cn("h-8 text-[13.5px] font-medium", INDENT[Math.min(depth - 1, INDENT.length - 1)]),
           ROW,
           highlighted ? ACTIVE : RESTING,
@@ -146,9 +147,7 @@ export default function SidebarItem({ item, isActive, hasActiveSubItem, expanded
           ))}
         </div>
       )}
-      {/* `hasActiveSubItem` keeps the section's meaning for callers; the mock lifts only
-          the row you are ON, and the open section above it says the rest. */}
-      {hasActiveSubItem && null}
+
     </div>
   );
 }

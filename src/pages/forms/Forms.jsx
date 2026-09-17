@@ -6,7 +6,7 @@ import MembershipApplication from "./MembershipApplication.jsx";
 import {TextInput, Button, FilterForm, SearchableSelect} from "../../components/form";
 import { FileSearch } from "lucide-react";
 import PageTitle from '../../components/common/PageTitle';
-import Sheet from '../../components/common/Sheet.jsx';
+import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import DataState from '../../components/common/DataState.jsx';
 
 export function Forms(){
@@ -60,7 +60,7 @@ export function Forms(){
     };
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+        <Page>
             <PageTitle title="Forms" subtitle="Search and complete Forms" />
             <FilterForm onSubmit={handleSubmit}>
                 <TextInput
@@ -125,6 +125,6 @@ export function Forms(){
                     </Sheet>
                 )}
             </div>
-        </div>
+        </Page>
     )
 }

@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useRef, useState, useEffect, useCallback } from 'react';
-import { AlertCircle, ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
 import Pager from '../../components/common/Pager.jsx';
@@ -18,6 +18,7 @@ import DataState from '../../components/common/DataState.jsx';
 import useReferenceData from '../../hooks/useReferenceData.js';
 import reportError from '../../lib/reportError.js';
 import { cn } from '../../lib/utils';
+import { formalName } from '../../lib/names.js';
 
 const PAGE_SIZE = 20;
 
@@ -99,12 +100,26 @@ export function Recruiters() {
     const [notice, setNotice] = useState(null);
     const noticeRef = useRef(null);
     const fail = useCallback((message) => setNotice({ tone: 'error', message }), []);
+    // 🔴 `06.5`: AN ACTION THAT WORKED SAID NOTHING. A member added or removed, a recruiter created, its details saved --
+    // each changed a list, often one behind the dialog, without a word. The same notice says so, as a status.
+    const succeed = useCallback((message) => setNotice({ tone: 'ok', message }), []);
+
+    /*
+     * 🔴 EVERY `fail()` ON THIS SCREEN HAPPENS WITH A DIALOG OPEN (`06.4`), and the notice rendered on the
+     * page -- under the dialog's scrim. A recruiter that could not be created, a member that could not be
+     * assigned, details that could not be saved: each was announced where nobody could see it, and the
+     * dialog looked exactly as if nothing had been tried. While a dialog is open the notice is the
+     * dialog's (`DialogNotice`); when it closes, an unresolved notice is still on the page.
+     */
+    const dialogOpen = Boolean(selectedRep || selectedRepDetail || showAddRep || selectedMember);
 
     // Focus it once it EXISTS -- the same shape as `Auth` and `Members`, and for the same
     // reason: the element is not in the document at the moment the handler sets the state.
+    // Also when a dialog closes over an unresolved notice, which is the moment it mounts here.
     useEffect(() => {
-        if (notice) noticeRef.current?.focus();
-    }, [notice]);
+        // A failure takes focus; a confirmation is announced where it appears and leaves focus where the user is.
+        if (notice?.tone === 'error' && !dialogOpen) noticeRef.current?.focus();
+    }, [notice, dialogOpen]);
 
     const refreshAll = useCallback(() => {
         setListState((current) => (current === 'ready' ? 'ready' : 'loading'));
@@ -205,7 +220,8 @@ export function Recruiters() {
         }).sort((a, b) => {
             const nameA = a.name || "";
             const nameB = b.name || "";
-            return nameA.localeCompare(nameB)
+            // Numeric collation, so "Synthetic Channel 2" comes before "Synthetic Channel 10" (`06.3` critique).
+            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' })
         });
     }, [members, reps, BANK_META]);
 
@@ -432,12 +448,13 @@ export function Recruiters() {
             const cleanData = sanitizeMemberPayload(member, { areasRep: selectedRep.name });
             await memberService.updateMember(cleanData);
             await refreshAll();
+            succeed(`${formalName(member) || 'That member'} was added to ${selectedRep?.name ?? 'this recruiter'}.`);
         } catch (err) {
             fail(`That member could not be assigned to ${selectedRep?.name ?? 'this recruiter'}. ${err?.message || ''}`.trim());
         } finally {
             setSaving(false);
         }
-    }, [selectedRep, refreshAll, fail]);
+    }, [selectedRep, refreshAll, fail, succeed]);
 
     // 🔴 `03.4`: both of this file's `window.confirm()` calls become ConfirmDialogs. The
     // second one is the reason it matters: it sets EVERY member of a recruiter to Inactive,
@@ -454,6 +471,7 @@ export function Recruiters() {
             const cleanData = sanitizeMemberPayload(member, { areasRep: '' });
             await memberService.updateMember(cleanData);
             await refreshAll();
+            succeed(`${formalName(member) || 'That member'} was removed from ${selectedRep?.name ?? 'the recruiter'}.`);
         } catch (err) {
             fail(`That member could not be removed from the recruiter. ${err?.message || ''}`.trim());
         } finally {
@@ -491,7 +509,7 @@ export function Recruiters() {
             setNewRepMember(null);
             setNewRepDetails({ roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] });
             setSelectedRep({ id: createdRep?.id, name: repName });
-            setNotice(null);
+            succeed(`${repName} is a recruiter now.`);
         } catch (err) {
             fail(`That recruiter could not be created. ${err?.message || ''}`.trim());
         } finally {
@@ -598,9 +616,11 @@ export function Recruiters() {
 
     const repMemberColumns = useMemo(() => [
         memberColumn(setSelectedMember),
-        { key: 'name', header: 'Name', priority: 'essential', truncate: true, cell: fullName },
-        { key: 'bankName', header: 'Bank', priority: 'secondary', truncate: true, cell: (m) => m.bankName || '—' },
-        { key: 'branch', header: 'Branch', priority: 'secondary', truncate: true, cell: (m) => m.branch || '—' },
+        // Capped so the list fits its xl dialog whatever the names: 142 + 192 + 160 + 160 + 108 + 82 = 844px of
+        // the dialog's ~894. Truncated in the cell, whole in its title.
+        { key: 'name', header: 'Name', priority: 'essential', truncate: true, className: 'max-w-[12rem]', cell: fullName },
+        { key: 'bankName', header: 'Bank', priority: 'secondary', truncate: true, className: 'max-w-[10rem]', cell: (m) => m.bankName || '—' },
+        { key: 'branch', header: 'Branch', priority: 'secondary', truncate: true, className: 'max-w-[10rem]', cell: (m) => m.branch || '—' },
         { key: 'status', header: 'Status', priority: 'essential', cell: (m) => <StatusChip status={m.status} /> },
         {
             key: 'remove',
@@ -690,14 +710,18 @@ export function Recruiters() {
                 page-level live region on top means two announcements for one failure.
                 Dismissible, because unlike a validation summary this describes something
                 that already happened and the member may simply want it out of the way. */}
-            {notice && (
+            {notice && !dialogOpen && (
                 <div
                     ref={noticeRef}
                     tabIndex={-1}
+                    {...(notice.tone === 'ok' && { role: 'status' })}
                     aria-labelledby="recruiters-notice-title"
-                    className="mt-4 flex items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                    className={cn(
+                        "mt-4 flex items-start gap-2 rounded-lg border p-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring",
+                        noticeTone(notice.tone),
+                    )}
                 >
-                    <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
+                    <NoticeIcon tone={notice.tone} />
                     <p id="recruiters-notice-title" className="flex-1">{notice.message}</p>
                     <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dismiss</Button>
                 </div>
@@ -719,7 +743,7 @@ export function Recruiters() {
             {(refs.state === 'partial' || refs.state === 'error') && (
                 <div className="mt-4 rounded-lg bg-surface shadow-(--shadow-1)">
                     <DataState
-                        state={refs.state === 'error' ? 'error' : 'partial'}
+                        state={refs.state}
                         layout="row"
                         compact
                         onRetry={refs.retry}
@@ -731,7 +755,9 @@ export function Recruiters() {
                         message={
                             refs.state === 'error'
                                 ? 'The filters and forms below have no options to offer until this succeeds.'
-                                : `${refs.failed.join(', ')} did not load. Everything else on this page is up to date.`
+                                // 🔴 "EVERYTHING ELSE ON THIS PAGE IS UP TO DATE" WAS SAID WHATEVER THE RECRUITER LIST HAD DONE (`06.4`)
+                                // -- while it was loading, and when it had failed as well. It is said once the list has loaded.
+                                : `${refs.failed.join(', ').replace(/^./, (c) => c.toUpperCase())} did not load.${listState === 'ready' ? ' The recruiter list below is complete.' : ''}`
                         }
                     />
                 </div>
@@ -740,13 +766,13 @@ export function Recruiters() {
                 the register as the sheet beneath them with its pager at the foot. */}
             <Criteria className="mt-5">
                 <TextInput className={CRITERION_WIDE} label="Recruiter Name" value={filters.repName} onChange={handleFilter('repName')} placeholder="Any" />
-                <SearchableSelect className={CRITERION} label="Bank" value={filters.bankName} onChange={handleFilter('bankName')} placeholder="All banks"
+                <SearchableSelect className={CRITERION} label="Bank" value={filters.bankName} onChange={handleFilter('bankName')} placeholder="All banks" {...refs.field('banks')}
                                   options={[{ value: '', label: 'All banks' }, ...BANK_NAMES.map(b => ({ value: b, label: b }))]} />
-                <SearchableSelect className={CRITERION} label="Branch" value={filters.branch} onChange={handleFilter('branch')} placeholder="Any"
+                <SearchableSelect className={CRITERION} label="Branch" value={filters.branch} onChange={handleFilter('branch')} placeholder="Any" {...refs.field('banks')}
                                   options={[{ value: '', label: 'All branches' }, ...BRANCHES.map(b => ({ value: b, label: b }))]} />
-                <SearchableSelect className={CRITERION} label="Province" value={filters.province} onChange={handleFilter('province')} placeholder="Any"
+                <SearchableSelect className={CRITERION} label="Province" value={filters.province} onChange={handleFilter('province')} placeholder="Any" {...refs.field('provinces')}
                                   options={[{ value: '', label: 'All provinces' }, ...PROVINCES.map(p => ({ value: p, label: p }))]} />
-                <SearchableSelect className={CRITERION} label="Area" value={filters.area} onChange={handleFilter('area')} placeholder="Any"
+                <SearchableSelect className={CRITERION} label="Area" value={filters.area} onChange={handleFilter('area')} placeholder="Any" {...refs.field('banks')}
                                   options={[{ value: '', label: 'All areas' }, ...AREAS.map(a => ({ value: a, label: a }))]} />
                 <Button variant="ghost" onClick={handleClear}>Clear</Button>
             </Criteria>
@@ -776,6 +802,7 @@ export function Recruiters() {
                     totalPages={totalPages}
                     onPageChange={setPage}
                     count={filtered.length}
+                    error={listState === 'error'}
                     start={(page - 1) * PAGE_SIZE + 1}
                     end={Math.min(page * PAGE_SIZE, filtered.length)}
                     noun="recruiters"
@@ -800,7 +827,9 @@ export function Recruiters() {
                     onOpenChange={closeOn(handleCloseRepModal)}
                     title={selectedRep.name}
                     description="Recruitment channel"
-                    size="lg"
+                    // xl, with the member list's text columns capped below: at lg (672px) its six columns
+                    // needed 858px and put Status and Remove off the right edge (the `06.3` critique).
+                    size="xl"
                     footer={
                         <>
                             <Button
@@ -818,9 +847,9 @@ export function Recruiters() {
                         </>
                     }
                 >
+                        <DialogNotice notice={notice} onDismiss={() => setNotice(null)} />
                         <div className="flex items-center justify-between pb-4">
                             <div>
-                                <p className="text-xs uppercase tracking-wider font-bold text-ink-muted">Recruitment Channel</p>
                                 <div className="flex items-center gap-2">
                                     <h3 className="text-lg font-semibold text-brand-ink">{selectedRep.name}</h3>
                                     {/* 🔴 THE TOOLTIP WAS CSS-ONLY AND MOUSE-ONLY. A
@@ -901,6 +930,7 @@ export function Recruiters() {
                     size="lg"
                     footer={<Button onClick={handleCloseAddMember}>Cancel</Button>}
                 >
+                        <DialogNotice notice={notice} onDismiss={() => setNotice(null)} />
                         <div className="pb-3">
                             <TextInput
                                 label="Search members"
@@ -939,6 +969,7 @@ export function Recruiters() {
                     description={selectedRepDetail.name}
                     size="md"
                 >
+                        <DialogNotice notice={notice} onDismiss={() => setNotice(null)} />
                         <div className="flex items-center justify-end gap-2 pb-4">
                             <div className="flex items-center gap-2">
                                 {!editingRep && (
@@ -997,6 +1028,7 @@ export function Recruiters() {
                                 <SelectInput
                                     label="Recruiter Type"
                                     value={editRepFields.recruiterTypeId ?? ''}
+                                    {...refs.field('recruitment channels')}
                                     placeholder="Select recruitment channel..."
                                     options={RECRUITMENT_CHANNELS.map(rt => ({ value: rt.id, label: rt.name }))}
                                     onChange={(next) => setEditRepFields(p => ({ ...p, recruiterTypeId: next ? Number(next) : null }))}
@@ -1004,6 +1036,7 @@ export function Recruiters() {
                                 <SelectInput
                                     label="Role"
                                     value={editRepFields.roleId ?? ''}
+                                    {...refs.field('roles')}
                                     placeholder="Select role..."
                                     options={ROLES.map(r => ({ value: r.id, label: r.name }))}
                                     onChange={(next) => setEditRepFields(p => ({ ...p, roleId: next ? Number(next) : null }))}
@@ -1026,6 +1059,7 @@ export function Recruiters() {
                                     label="Structures / Positions"
                                     structures={STRUCTURES_TREE}
                                     selectedIds={editRepFields.structureIds || []}
+                                    {...refs.field('structures')}
                                     onChange={(ids) => setEditRepFields(p => ({ ...p, structureIds: ids }))}
                                     placeholder="Select positions..."
                                 />
@@ -1068,6 +1102,7 @@ export function Recruiters() {
                                                     setSelectedRepDetail(d => ({ ...d, ...editRepFields }));
                                                     if (selectedRep?.id === selectedRepDetail.id) setSelectedRep(r => ({ ...r, ...editRepFields }));
                                                     setEditingRep(false);
+                                                    succeed('Those recruiter details are saved.');
                                                 } catch (err) {
                                                     fail(`Those recruiter details could not be saved. ${err?.message || ''}`.trim());
                                                 } finally {
@@ -1101,6 +1136,7 @@ export function Recruiters() {
                         </>
                     }
                 >
+                        <DialogNotice notice={notice} onDismiss={() => setNotice(null)} />
                         {newRepMember && (
                             <div className="mt-3 px-4 py-3 rounded-lg bg-brand-soft border border-brand-ring flex items-center justify-between shrink-0">
                                 <div>
@@ -1140,6 +1176,7 @@ export function Recruiters() {
                                     label="Recruiter Type"
                                     required
                                     value={newRepDetails.recruiterTypeId ?? ''}
+                                    {...refs.field('recruitment channels')}
                                     placeholder="Select recruiter type..."
                                     options={RECRUITMENT_CHANNELS.map(rt => ({ value: rt.id, label: rt.name }))}
                                     onChange={(next) => setNewRepDetails(p => ({ ...p, recruiterTypeId: next ? Number(next) : null }))}
@@ -1147,6 +1184,7 @@ export function Recruiters() {
                                 <SelectInput
                                     label="Role"
                                     value={newRepDetails.roleId ?? ''}
+                                    {...refs.field('roles')}
                                     placeholder="Select role..."
                                     options={ROLES.map(r => ({ value: r.id, label: r.name }))}
                                     onChange={(next) => setNewRepDetails(p => ({ ...p, roleId: next ? Number(next) : null }))}
@@ -1169,6 +1207,7 @@ export function Recruiters() {
                                     label="Structures / Positions"
                                     structures={STRUCTURES_TREE}
                                     selectedIds={newRepDetails.structureIds}
+                                    {...refs.field('structures')}
                                     onChange={(ids) => setNewRepDetails(p => ({ ...p, structureIds: ids }))}
                                     placeholder="Select positions..."
                                 />
@@ -1235,7 +1274,10 @@ export function Recruiters() {
                                 </Section>
                                 <Section title="Recruiters">
                                     <DRow label="Area's Rep" value={selectedMember.areasRep} />
-                                    <DRow label="Recruitment Rep" value={selectedMember.recruitmentRep} />
+                                    {/* 🔴 IT READ `recruitmentRep`, WHICH THE API DOES NOT SEND (`06.4`): `MemberDto` carries
+                                        `recruitmentRepresentativeId` and `recruitmentRepresentativeName`, so this row was a dash for
+                                        every member -- on the screen whose subject is who recruited whom. */}
+                                    <DRow label="Recruitment Rep" value={selectedMember.recruitmentRepresentativeName} />
                                     <DRow label="Elected Rep" value={selectedMember.electedRep} />
                                     <DRow label="Election Date" value={[selectedMember.repElectionDay, selectedMember.repElectionMonth, selectedMember.repElectionYear].filter(Boolean).join('/') || '—'} />
                                     <DRow label="Remarks" value={selectedMember.remarks} />
@@ -1323,11 +1365,47 @@ function Section({ title, children }) {
     );
 }
 
+/**
+ * What a notice wears for its tone. The page's notice and `DialogNotice` spelt out the same two tones and the same two
+ * icons, character for character; the frame around each differs, and stays with it.
+ */
+function noticeTone(tone) {
+    return tone === 'ok'
+        ? 'border-status-active-dot bg-status-active-bg text-status-active'
+        : 'border-status-suspended-dot bg-status-suspended-bg text-status-suspended';
+}
+
+function NoticeIcon({ tone }) {
+    return tone === 'ok'
+        ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
+        : <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />;
+}
+
+/**
+ * A failure said INSIDE the dialog it happened in. `06.4`.
+ *
+ * `role="alert"` rather than the page notice's focus: the dialog owns focus, and pulling it out of a form
+ * the user is still filling in would be worse than the silence this replaces.
+ */
+function DialogNotice({ notice, onDismiss }) {
+    if (!notice) return null;
+    return (
+        <div
+            role={notice.tone === 'ok' ? 'status' : 'alert'}
+            className={cn('mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm', noticeTone(notice.tone))}
+        >
+            <NoticeIcon tone={notice.tone} />
+            <p className="flex-1">{notice.message}</p>
+            <Button size="sm" variant="ghost" onClick={onDismiss}>Dismiss</Button>
+        </div>
+    );
+}
+
 function DRow({ label, value, className = '' }) {
     return (
         <div>
             <p className="text-2xs font-bold uppercase tracking-wider text-ink-muted">{label}</p>
-            <p className={`text-sm font-semibold text-ink ${className}`}>{value || '—'}</p>
+            <p className={`text-sm font-semibold text-ink ${className}`}>{value === 0 ? '0' : value || '—'}</p>
         </div>
     );
 }

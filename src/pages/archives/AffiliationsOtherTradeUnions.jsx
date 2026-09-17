@@ -1,8 +1,8 @@
 import { Download, FileText, ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useMemo } from "react";
 import PageTitle from '../../components/common/PageTitle';
-import Sheet from '../../components/common/Sheet.jsx';
-import DataState from '../../components/common/DataState.jsx';
+import Sheet, { Page } from '../../components/common/Sheet.jsx';
+import ArchiveEmpty from '../../components/archives/ArchiveEmpty.jsx';
 import { Button, TextInput } from '../../components/form';
 
 export default function AffiliationsOtherTradeUnions() {
@@ -156,7 +156,7 @@ export default function AffiliationsOtherTradeUnions() {
   }, [fileStructure, searchQuery]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+    <Page>
       <PageTitle
         title="Affiliations & Other Trade Unions"
         subtitle="COSATU congress documents, membership figures, trade union constitutions, and international affiliations"
@@ -190,22 +190,9 @@ export default function AffiliationsOtherTradeUnions() {
       </div>
 
       <div className="max-w-4xl">
-        {/* 🔴 A SEARCH THAT MATCHED NOTHING LEFT THE PAGE BLANK. The list simply stopped
-            rendering, and the only signal was the "Found 0 …" line above -- which itself only
-            appears while a search is typed, and which reads as a fact about the archive rather
-            than about the query. A blank page with a filled search box is the shape a user
-            reads as "broken", and there was no way out of it but to clear the field by hand. */}
+        {/* A search that matched nothing says so, with the way out -- `ArchiveEmpty`, shared by the three archives. */}
         {Object.keys(filteredStructure).length === 0 ? (
-          <Sheet>
-            <DataState
-              state="empty"
-              title={searchQuery ? "Nothing matches that search." : "Nothing here yet."}
-              message={searchQuery ? "Try fewer words, or clear the search to see everything again." : null}
-              action={searchQuery
-                ? <Button variant="default" onClick={() => setSearchQuery("")}>Clear the search</Button>
-                : null}
-            />
-          </Sheet>
+          <ArchiveEmpty searchQuery={searchQuery} onClear={() => setSearchQuery("")} />
         ) : (
           <Sheet className="divide-y divide-line">
             {Object.entries(filteredStructure).map(([folder, files]) => (
@@ -248,6 +235,6 @@ export default function AffiliationsOtherTradeUnions() {
           </Sheet>
         )}
       </div>
-    </div>
+    </Page>
   );
 }

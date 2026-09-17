@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 import { useNavigate, useLocation, useOutletContext } from "react-router-dom";
 import {
     LucideUserRoundPlus, AlertCircle, CircleCheck, Printer, SlidersHorizontal,
-    Download, Pencil, Check,
+    Pencil, Check,
 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
 import { recruiterService } from "../../services/recruiterService.js";
@@ -34,6 +34,7 @@ import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
 import { parseDate, sameDate, today } from "../../lib/format.js";
 import { cn } from "../../lib/utils";
+import { personName } from "../../lib/names.js";
 
 const PAGE_SIZE = memberService.getPageSize();
 
@@ -100,6 +101,9 @@ const RECORD_TABS = [
     { id: "structures", label: "Structures", full: "Sasbo Structures" },
 ];
 const TABS = RECORD_TABS;
+
+/** A record field's value, or "Not on file" when the record holds none -- never an invented default. */
+const notOnFile = (value) => (value === null || value === undefined || String(value).trim() === "" ? "Not on file" : value);
 
 /*
  * 🗣️ WHERE EACH OF THE FIVE SECTIONS SITS IN THE RECORD'S TAB STRIP -- the owner's
@@ -216,14 +220,71 @@ const getInitialFilters = (locationState) => ({
     branch: locationState?.filters?.branch || "",
 });
 
+/*
+ * 🔴 THE SAVE CONFIRMATION SPOKE IN FIELD KEYS, AND PRINTED "No" AS "-" (`06.5`, the `06.3` critique, F-P55). It
+ * labelled each change from the shared `MEMBER_FIELD_LABEL_MAP`, which knows none of the record's Structures fields,
+ * so an administrator was asked to confirm `isCosatu: Y → N` and `becCommitteeId: - → bec-04`. It named fields
+ * differently from the form above it, printed `false` and an empty list as "-" or nothing, and reported an unchanged
+ * COSATU positions list as a change, because the record holds it as "PEC,CEC" and the form as an array.
+ *
+ * The form's own words come first here. The shared map, which the Capture Member arc also reads, is left as it is.
+ */
+const RECORD_FIELD_LABELS = {
+    firstNames: "First Name(s)",
+    identityType: "Identity Type",
+    identityNumber: "Identity Number",
+    phone: "Cellphone Number",
+    address: "Residential Address",
+    bankName: "Bank Where Employed",
+    employmentType: "Employment Type",
+    branch: "Bank Branch",
+    debitDay: "Debit Day",
+    bankAddress: "Bank Work Address",
+    status: "Account Membership Status",
+    isShopSteward: "Shop Steward",
+    shopStewardElectionDate: "Shop Steward Election Date",
+    isBec: "BEC Member",
+    becCommitteeId: "BEC Committee",
+    isBecRecruiter: "BEC Recruiter",
+    becRecruiterRole: "BEC Recruiter Role",
+    isBecStructureRep: "BEC Structure Representative",
+    becStructures: "BEC Structures Represented",
+    isBecExecutive: "BEC Executive",
+    becExecutivePosition: "BEC Executive Position",
+    isCosatu: "COSATU Member",
+    cosatuLocal: "COSATU Local",
+    cosatuRegion: "Region within Local",
+    cosatuPositions: "COSATU Positions",
+};
+
+/** Never listed: identifiers, and a name the form derives from a field that is listed (the committee's id). */
+const UNLISTED_KEYS = ["id", "membershipNumber", "memberId", "becCommitteeName"];
+
+/** A value as the form holds it, for comparing: a yes/no flag as a boolean, a list as its joined text. */
+const comparable = (key, value) => {
+    if (key === "paymentType") return normalizePaymentType(value);
+    if (/^is[A-Z]/.test(key)) return value === true || value === "Y";
+    if (Array.isArray(value)) return value.join(",");
+    if (value === null || value === undefined) return "";
+    return value;
+};
+
+/** A value as a person reads it. */
+const readable = (key, value) => {
+    const shown = comparable(key, value);
+    if (typeof shown === "boolean") return shown ? "Yes" : "No";
+    if (key === "becCommitteeId") return SASBO_BEC_BRANCHES.find((branch) => branch.id === shown)?.name ?? (shown || "—");
+    if (key === "becStructures" || key === "cosatuPositions") return shown ? String(shown).split(",").join(", ") : "none";
+    return shown === "" ? "—" : String(shown);
+};
+
+const fieldLabel = (key) =>
+    RECORD_FIELD_LABELS[key] || MEMBER_FIELD_LABEL_MAP[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+
 const getChangedFields = (draft, original) => Object.keys(draft)
-    .filter((key) => !["id", "membershipNumber", "memberId"].includes(key))
-    .filter((key) => {
-        const draftValue = key === "paymentType" ? normalizePaymentType(draft[key]) : draft[key];
-        const originalValue = key === "paymentType" ? normalizePaymentType(original[key]) : original[key];
-        return draftValue !== originalValue;
-    })
-    .map((key) => `${MEMBER_FIELD_LABEL_MAP[key] || key}: ${original[key] || "-"} → ${draft[key] || "-"}`);
+    .filter((key) => !UNLISTED_KEYS.includes(key))
+    .filter((key) => comparable(key, draft[key]) !== comparable(key, original[key]))
+    .map((key) => `${fieldLabel(key)}: ${readable(key, original[key])} → ${readable(key, draft[key])}`);
 
 
 /**
@@ -262,6 +323,8 @@ export default function Members() {
      */
     const [panelClosing, setPanelClosing] = useState(false);
     const closeTimer = useRef(null);
+    // The guarded close, for the window-level Escape listener, which is registered once. Kept current by an effect.
+    const leaveRef = useRef(null);
 
     const openRecord = useCallback((member) => {
         if (closeTimer.current) {
@@ -287,6 +350,9 @@ export default function Members() {
     }, []);
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState({});
+    // The form as it stood when editing began, serialised: an edit has changes exactly when the form no longer
+    // serialises to it. Compared whole, so a field the member record never carried still counts once it is typed in.
+    const [editBaseline, setEditBaseline] = useState(null);
     const [activeTab, setActiveTab] = useState("personal");
     const [showSavedNotification, setShowSavedNotification] = useState(false);
     const [fieldErrors, setFieldErrors] = useState({});
@@ -418,6 +484,11 @@ export default function Members() {
             // dialog, a listbox -- is not a request to close the whole record. Without this
             // guard, Escape in the calendar of the edit form threw the member away.
             if (e.defaultPrevented || e.target?.closest?.('[role="dialog"], [role="listbox"]')) return;
+            // `06.5`: through the same guard as every other way out -- an edit with changes asks first.
+            if (leaveRef.current) {
+                leaveRef.current();
+                return;
+            }
             closeRecord();
             setIsEditing(false);
         };
@@ -477,13 +548,23 @@ export default function Members() {
 
 
     const handleEditToggle = () => {
-        setIsEditing((editing) => {
-            if (!editing) {
-                setEditForm({ ...selectedMember, paymentType: normalizePaymentType(selectedMember?.paymentType) });
-                setFieldErrors({});
-            }
-            return !editing;
-        });
+        if (isEditing) {
+            // Cancel is the one way out that is itself the discard, so it does not ask; it does put the record's own
+            // values back, so the page read after it is the record rather than the edit that was thrown away.
+            endEdit();
+            return;
+        }
+        const start = { ...selectedMember, paymentType: normalizePaymentType(selectedMember?.paymentType) };
+        // 🔴 THE SERVER SENDS COSATU POSITIONS AS ONE STRING ("PEC,CEC"), AND THIS COPIED IT RAW (`06.5`). The effect above
+        // makes it a list when the record loads; entering edit mode copied the record again and undid that, so the
+        // checkbox group was handed a string -- unticking a position threw, and ticking one saved the string's letters.
+        if (typeof start.cosatuPositions === "string") {
+            start.cosatuPositions = start.cosatuPositions.split(",").map((s) => s.trim()).filter(Boolean);
+        }
+        setEditForm(start);
+        setEditBaseline(JSON.stringify(start));
+        setFieldErrors({});
+        setIsEditing(true);
     };
 
     const handleEditChange = useCallback((field) => (event) => {
@@ -627,14 +708,25 @@ export default function Members() {
         setPendingSave(changes);
     };
 
+    /*
+     * 🔴 THE CONFIRMATION CLOSED BEFORE THE WRITE, AND NOTHING SHOWED WHILE IT RAN (`06.5`, F-P55). "Save changes"
+     * dismissed the dialog first and awaited the request after, so for the length of a slow save the record looked
+     * exactly as if nothing had been pressed -- and could be pressed again. The dialog stays open, its button busy,
+     * until the write has answered either way.
+     */
+    const [savingRecord, setSavingRecord] = useState(false);
+
     const commitSave = async () => {
-        setPendingSave(null);
+        if (savingRecord) return;
+        setSavingRecord(true);
         try {
             await memberService.updateMember(editForm);
             const refreshed = await memberService.getMembers();
             const list = Array.isArray(refreshed) ? refreshed : (refreshed.data || refreshed.members || []);
+            setPendingSave(null);
             setMembersList(list);
             setSelectedMember({ ...editForm });
+            setEditBaseline(null);
             setIsEditing(false);
             setSavedName([editForm.firstNames, editForm.surname].filter(Boolean).join(" "));
             setShowSavedNotification(true);
@@ -644,14 +736,76 @@ export default function Members() {
             // 06.1 owns the shared error CONTRACT; what this wave owes the screen is that
             // a failed save is visible on the screen the member is looking at, rather than
             // in a dialog they dismiss and a console they never open.
+            setPendingSave(null);
             setSaveNotice({
                 kind: "failed",
                 messages: ["We could not save these changes. Nothing was written — please try again."],
             });
+        } finally {
+            setSavingRecord(false);
         }
     };
 
     const [pendingSave, setPendingSave] = useState(null);
+
+    /*
+     * 🔴 AN EDIT WAS THROWN AWAY BY ANYTHING THAT CHANGED THE RECORD (`06.5`, the `06.3` critique, F-P55). Choosing
+     * another member, the close button, the scrim and Escape each replaced or cleared the record while the form held
+     * unsaved changes -- without a word -- and the next member opened already in edit mode, because nothing reset
+     * `isEditing`. Every one of those ways out comes through here now: an edit with changes asks first, an edit
+     * without them simply ends, and the record that opens next opens to be read.
+     */
+    const [pendingLeave, setPendingLeave] = useState(null);
+    // The ways out read the record as of the last commit, and ask whether it changed only when one is taken --
+    // `recordIsDirty`, below the component. Serialising the whole form on every render to fill a ref nothing
+    // renders was work every keystroke paid for.
+    const guard = useRef({ isEditing: false, selectedId: null, baseline: null, editForm: null });
+
+    const endEdit = useCallback(() => {
+        const { baseline } = guard.current;
+        if (baseline) setEditForm(JSON.parse(baseline));
+        setEditBaseline(null);
+        setIsEditing(false);
+        setSaveNotice(null);
+        setFieldErrors({});
+    }, []);
+
+    const requestOpenRecord = useCallback((member) => {
+        const { isEditing: editing, selectedId } = guard.current;
+        // The member already open, chosen again: there is nothing to switch to, and nothing to throw away.
+        if (member?.id != null && member.id === selectedId) {
+            if (!editing) openRecord(member);
+            return;
+        }
+        if (recordIsDirty(guard.current)) {
+            setPendingLeave({ member });
+            return;
+        }
+        endEdit();
+        openRecord(member);
+    }, [openRecord, endEdit, setPendingLeave]);
+
+    const requestCloseRecord = useCallback(() => {
+        if (recordIsDirty(guard.current)) {
+            setPendingLeave({ close: true });
+            return;
+        }
+        endEdit();
+        closeRecord();
+    }, [closeRecord, endEdit, setPendingLeave]);
+
+    useEffect(() => {
+        guard.current = { isEditing, selectedId: selectedMember?.id ?? null, baseline: editBaseline, editForm };
+        leaveRef.current = requestCloseRecord;
+    });
+
+    const discardAndLeave = () => {
+        const leave = pendingLeave;
+        setPendingLeave(null);
+        endEdit();
+        if (leave?.member) openRecord(leave.member);
+        else closeRecord();
+    };
 
     // Same shape as `Auth`'s, and for the same reason: the summary does not exist yet when
     // the handler that sets it runs, so focusing it there is a silent no-op. `saveNotice`
@@ -766,7 +920,9 @@ export default function Members() {
     };
 
     const formatBackendDate = (dateVal) => {
-        if (!dateVal) return "-";
+        // Empty, not "-": `Detail` prints the record's own "—" for a value that is not there,
+        // and a hyphen beside it read as a different mark for the same absence (`06.3`).
+        if (!dateVal) return "";
         if (Array.isArray(dateVal)) {
             const [year, month, day] = dateVal;
             return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -800,7 +956,7 @@ export default function Members() {
                     <button
                         type="button"
                         data-row-action=""
-                        onClick={() => openRecord(member)}
+                        onClick={() => requestOpenRecord(member)}
                         // The number alone is not a name a screen-reader user can act on:
                         // "1002" says nothing about what pressing it does, and every row
                         // has one.
@@ -844,8 +1000,10 @@ export default function Members() {
             priority: "essential",
             // The two-line member cell -- `Ms NT Mokoena` over `Nomvula Thandeka`. Both lines
             // truncate at the same width, and the full names are one click away on the card.
+            // 13rem, not 14: the cap is what the column ladder must fit (index.css `.register`),
+            // and at 14rem a real long name put Status past the sheet with the record docked at 1440.
             cell: (m) => (
-                <span className="block max-w-[14rem]">
+                <span className="block max-w-[13rem]">
                     <span className="block truncate text-base font-semibold leading-tight text-ink">
                         {[m.title, m.initials, m.surname].filter(Boolean).join(" ") || "—"}
                     </span>
@@ -866,9 +1024,11 @@ export default function Members() {
             // 1349 (the register 605px, four columns fitting in 598) and then conceded that
             // width everywhere else: at 1440 the register is 680 and four names still
             // truncated with ~20px going spare. `cqw` reads the `.register` container the
-            // column ladder already measures, so the cap grows with the space and the floor
-            // is the measurement that made Status fit on the laptop.
-            className: "max-w-[clamp(10rem,26cqw,18rem)]",
+            // column ladder already measures, so the cap grows with the space.
+            // ⚠️ 9rem / 21cqw / 16rem since `06.3`, measured on a row at every cap: at 10rem /
+            // 26cqw a real long name and bank put Status past the sheet with the record docked
+            // at 1440, where the owner's ruling keeps four columns (index.css `.register`).
+            className: "max-w-[clamp(9rem,21cqw,16rem)]",
             cell: (m) => m.bankName || "—",
         },
         {
@@ -876,7 +1036,13 @@ export default function Members() {
             header: "Branch",
             priority: "secondary",
             fit: "medium",
-            cell: (m) => <span className="text-ink-muted">{m.branch || "—"}</span>,
+            // Capped like Bank, and for Bank's reason: an uncapped branch sets the width the column
+            // ladder has to fit, so one real branch longer than the synthetic data's longest would
+            // move the width at which Status is cut. Truncated here and whole in the cell's title --
+            // which Table writes only for a STRING cell, so the muted ink moves to the cell's class.
+            truncate: true,
+            className: "text-ink-muted max-w-[clamp(9rem,22cqw,15rem)]",
+            cell: (m) => m.branch || "—",
         },
         {
             key: "status",
@@ -884,11 +1050,10 @@ export default function Members() {
             priority: "essential",
             cell: (member) => <StatusChip status={member.status} />,
         },
-    // `openRecord` is a `useCallback` with no dependencies, so this list is still stable and
-    // the columns are still built once -- it is named because the rule is right: a closure
-    // that is not declared is a closure nobody will remember to check when it stops being
-    // stable.
-    ], [openRecord]);
+    // `requestOpenRecord` reads the edit through a ref and depends only on stable callbacks, so this list is still
+    // stable and the columns are still built once -- it is named because the rule is right: a closure that is not
+    // declared is a closure nobody will remember to check when it stops being stable.
+    ], [requestOpenRecord]);
 
     return (
         /* 📐 card.html's `.main`, section by section: the page head, the ruled figure strip,
@@ -922,7 +1087,7 @@ export default function Members() {
                 refuses the alternative by name ("hero-metric tiles, dashboards of same-size
                 cards"). Counted from the register the page already holds, so it can never
                 disagree with the rows below it. */}
-            <FigureStrip className="mx-7 mt-5 max-lg:mx-4" {...registerFigures} />
+            <FigureStrip className="mx-7 mt-5 max-lg:mx-4" {...registerFigures} state={listState} />
 
             {/* 🔍 THE CRITERIA ROW -- card.css `.criteria`. Three labelled fields printed on
                 the page, "More criteria" beside them, Clear at the end. This page had FIFTEEN
@@ -936,6 +1101,7 @@ export default function Members() {
                         value={filters.bankName}
                         onChange={handleInputChange("bankName")}
                         placeholder="All banks"
+                        {...refs.field('banks')}
                         options={[{ value: '', label: 'All banks' }, ...bankOptions.map(b => ({ value: b, label: b }))]}
                     />
                     {/* A picker, as the mock's `.crit` is -- fed by the branches the register
@@ -1029,8 +1195,10 @@ export default function Members() {
                         layout="row"
                         compact
                         onRetry={refs.retry}
-                        title="Some option lists are missing."
-                        message={`${refs.failed.join(' and ')} did not load, so the edit panel cannot offer them. The register below is up to date.`}
+                        // 🔴 "THE REGISTER BELOW IS UP TO DATE" WAS SAID WHATEVER THE REGISTER HAD DONE (`06.4`) -- while it was
+                        // loading, and when it had failed as well -- and the sentence began in lowercase, "banks did not load".
+                        title={refs.state === "error" ? "None of the edit panel’s option lists could be loaded." : "Some option lists are missing."}
+                        message={`${refs.failed.join(" and ").replace(/^./, (c) => c.toUpperCase())} did not load, so the edit panel cannot offer them.${listState === "ready" ? " The register below is complete." : ""}`}
                     />
                 </div>
             )}
@@ -1057,7 +1225,7 @@ export default function Members() {
                         rows={visibleMembers}
                         rowKey="id"
                         selectedKey={selectedMember?.id}
-                        onRowSelect={openRecord}
+                        onRowSelect={requestOpenRecord}
                         enterKey={enterKey}
                         loading={listState === "loading"}
                         error={listState === "error" ? "The register could not be reached" : null}
@@ -1069,7 +1237,13 @@ export default function Members() {
                                 ? "Try the membership number, which is unique, or clear the search to see the whole register."
                                 : "Clear the criteria to see the whole register, or capture a new member."
                         }
-                        emptyAction={<Button onClick={handleClear}>Clear</Button>}
+                        // 🔴 "Clear" WAS OFFERED WHEN NOTHING WAS SET, AND DID NOTHING (`06.4`). A register that is empty with no
+                        // search and no criteria has nothing to clear; what there is to do is capture a member.
+                        emptyAction={
+                            query || Object.values(filters).some((value) => String(value ?? "").trim() !== "")
+                                ? <Button onClick={handleClear}>Clear</Button>
+                                : <Button variant="primary" onClick={() => navigate("/members/capture")}>Capture member</Button>
+                        }
                     />
 
                     {/* card.css `.pager`: "Showing 1–14 of 2 418 · Page 1 of 173", Previous and Next. */}
@@ -1081,6 +1255,7 @@ export default function Members() {
                         start={startIndex + 1}
                         end={endIndex}
                         noun="members"
+                        error={listState === "error"}
                         loading={listState === "loading"}
                         /* 🔴 THE KEYBOARD LEGEND MOVED HERE FROM THE RECORD PANEL'S EMPTY
                            STATE. It always described THIS surface -- ↑ and ↓ move the
@@ -1128,7 +1303,7 @@ export default function Members() {
             <MemberPanel
                 member={selectedMember}
                 open={Boolean(selectedMember) && !panelClosing}
-                onClose={closeRecord}
+                onClose={requestCloseRecord}
                 footer={
                     isEditing ? (
                         <>
@@ -1324,7 +1499,7 @@ export default function Members() {
                                         now. The I.D.-derived case stays read-only text: it is
                                         computed from the identity number, not typed. */}
                                     {editForm.identityType === "I.D. Number" ? (
-                                        <Detail label="Date of Birth" value={formatDate(editForm.dateOfBirth)} isEditing={isEditing} disabled onChange={handleEditChange("dateOfBirth")} />
+                                        <Detail label="Date of Birth" value={editForm.dateOfBirth ? formatDate(editForm.dateOfBirth) : ""} isEditing={isEditing} disabled onChange={handleEditChange("dateOfBirth")} />
                                     ) : isEditing ? (
                                         <DateField
                                             label="Date of Birth"
@@ -1355,7 +1530,7 @@ export default function Members() {
                             {activeTab === "employment" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
                                     <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="identifier" />
-                                    <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
+                                    <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} {...refs.field('banks')} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
                                     <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
                                     <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGrade} onChange={handleEditChange("jobGrade")} disabled={!editForm.bankName} loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
                                     <Detail label="Bank Branch" value={editForm.branch} isEditing={isEditing} options={branchOptions} error={fieldErrors.branch} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("branch")} />
@@ -1390,8 +1565,10 @@ export default function Members() {
                                     <Detail label="Date Joined Sasbo" value={formatBackendDate(selectedMember.joinDate)} isEditing={false} />
                                     <Detail label="Account Membership Status" value={editForm.status} isEditing={isEditing} options={statusOptions} onChange={handleEditChange("status")} />
                                     <h4 className="col-span-full mt-1.5 border-t border-line pt-[18px] text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Sasbo Subscription Fee Details</h4>
-                                    <Detail label="Monthly Subscription (ZAR)" value={selectedMember.monthlySubscription || "182.77"} isEditing={false} />
-                                    <Detail label="Billing Frequency" value={selectedMember.subscriptionFrequency || "Monthly"} isEditing={false} />
+                                    {/* 🔴 A MEMBER WITH NO SUBSCRIPTION ON FILE WAS SHOWN R182.77, MONTHLY (`06.4`) -- two invented
+                                        facts about their money, printed as if the record held them. The absence is said instead. */}
+                                    <Detail label="Monthly Subscription (ZAR)" value={notOnFile(selectedMember.monthlySubscription)} isEditing={false} />
+                                    <Detail label="Billing Frequency" value={notOnFile(selectedMember.subscriptionFrequency)} isEditing={false} />
                                 </div>
                             )}
 
@@ -1492,7 +1669,7 @@ export default function Members() {
                                                             setEditForm(prev => ({ ...prev, isBecRecruiter: isYes, ...(!isYes ? { becRecruiterRole: "" } : {}) }));
                                                         }} />
                                                         {editForm.isBecRecruiter && (
-                                                            <Detail label="BEC Recruiter Role" value={editForm.becRecruiterRole} isEditing={true} options={roles?.map(r => r.name) || ["Standard Recruiter", "Lead Recruiter"]} onChange={(e) => setEditForm(prev => ({ ...prev, becRecruiterRole: e.target.value }))} />
+                                                            <Detail label="BEC Recruiter Role" value={editForm.becRecruiterRole} isEditing={true} {...refs.field('lead recruiters')} options={roles.map(r => r.name)} onChange={(e) => setEditForm(prev => ({ ...prev, becRecruiterRole: e.target.value }))} />
                                                         )}
                                                     </div>
 
@@ -1548,7 +1725,7 @@ export default function Members() {
                                                 }} />
                                                 {(editForm.isCosatu === "Y" || editForm.isCosatu === true) && (
                                                     <div className="mt-4 space-y-4 border-l border-line pl-4">
-                                                        <p className="text-xs font-bold uppercase tracking-wide text-accent-ink">COSATU structure</p>
+                                                        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-accent-ink">COSATU structure</p>
                                                         {/* 🔴 BR-14 — THE TWO UNLABELLED CHECKBOXES ARE GONE, replaced
                                                             by the two labelled free-text fields `V19` actually
                                                             describes. What was here rendered `<label>` elements with
@@ -1580,14 +1757,14 @@ export default function Members() {
                                     ) : (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="space-y-3">
-                                                <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted">Core Appointments</h4>
+                                                <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Core Appointments</h4>
                                                 <Detail label="Shop Steward status" value={selectedMember.isShopSteward ? "Yes" : "No"} isEditing={false} />
-                                                {selectedMember.isShopSteward && <Detail label="Election Date" value={selectedMember.shopStewardElectionDate || "-"} isEditing={false} />}
+                                                {selectedMember.isShopSteward && <Detail label="Election Date" value={selectedMember.shopStewardElectionDate} isEditing={false} />}
                                                 <Detail label="BEC Member status" value={selectedMember.isBec ? "Yes" : "No"} isEditing={false} />
-                                                {selectedMember.isBec && <Detail label="Assigned BEC Committee" value={SASBO_BEC_BRANCHES.find(b => b.id === selectedMember.becCommitteeId)?.name || selectedMember.becCommitteeName || "-"} isEditing={false} />}
+                                                {selectedMember.isBec && <Detail label="Assigned BEC Committee" value={SASBO_BEC_BRANCHES.find(b => b.id === selectedMember.becCommitteeId)?.name || selectedMember.becCommitteeName} isEditing={false} />}
                                             </div>
                                             <div className="space-y-3 pt-4 md:pt-0">
-                                                <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted">Specialized Assignments</h4>
+                                                <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Specialized Assignments</h4>
                                                 {selectedMember.isBec && (
                                                     <>
                                                         <Detail label="BEC Recruiter" value={selectedMember.isBecRecruiter ? `Yes (${selectedMember.becRecruiterRole || 'Standard'})` : "No"} isEditing={false} />
@@ -1600,12 +1777,12 @@ export default function Members() {
                                                     inside `selectedMember.isBec &&`, so a COSATU member who was not
                                                     BEC had their COSATU record simply not shown. */}
                                                 <div className="pt-3 mt-3 border-t border-line">
-                                                    <h5 className="text-xs font-bold uppercase tracking-wider text-accent-ink mb-2">COSATU Structure</h5>
+                                                    <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-accent-ink">COSATU Structure</h5>
                                                     <Detail label="COSATU Member" value={selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true ? "Yes" : "No"} isEditing={false} />
                                                     {(selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true) && (
                                                         <div className="grid grid-cols-1 gap-3 mt-2">
-                                                            <Detail label="COSATU Local" value={selectedMember.cosatuLocal || "-"} isEditing={false} />
-                                                            <Detail label="Region within Local" value={selectedMember.cosatuRegion || "-"} isEditing={false} />
+                                                            <Detail label="COSATU Local" value={selectedMember.cosatuLocal} isEditing={false} />
+                                                            <Detail label="Region within Local" value={selectedMember.cosatuRegion} isEditing={false} />
                                                             <Detail label="Positions Held" value={selectedMember.cosatuPositions?.length > 0 ? selectedMember.cosatuPositions.join(", ") : "None"} isEditing={false} />
                                                         </div>
                                                     )}
@@ -1623,12 +1800,13 @@ export default function Members() {
 
             <ConfirmDialog
                 open={Boolean(pendingSave)}
-                onOpenChange={closeOn(() => setPendingSave(null))}
+                onOpenChange={closeOn(() => { if (!savingRecord) setPendingSave(null); })}
                 title="Save these changes?"
                 confirmLabel="Save changes"
                 cancelLabel="Keep editing"
                 destructive={false}
                 onConfirm={commitSave}
+                loading={savingRecord}
             >
                 {/* 🔑 The changes are a LIST now, not a string of bullets concatenated into
                     a browser dialog. A long list scrolls inside the modal body rather than
@@ -1644,6 +1822,16 @@ export default function Members() {
                     ))}
                 </ul>
             </ConfirmDialog>
+
+            <ConfirmDialog
+                open={Boolean(pendingLeave)}
+                onOpenChange={closeOn(() => setPendingLeave(null))}
+                title="Discard your changes?"
+                description={`The changes to ${personName(selectedMember) || "this record"} have not been saved.`}
+                confirmLabel="Discard changes"
+                cancelLabel="Keep editing"
+                onConfirm={discardAndLeave}
+            />
         </div>
     );
 }
@@ -1661,6 +1849,11 @@ export default function Members() {
  * when there are not, and a definition-list entry when reading. `useId` inside `Field`
  * makes the collision impossible rather than unlikely.
  */
+/** An edit with changes: the form no longer serialises to the record it started from. */
+function recordIsDirty({ isEditing, baseline, editForm }) {
+    return isEditing && baseline !== null && JSON.stringify(editForm) !== baseline;
+}
+
 function Detail({ label, value, isEditing, onChange, className = "", options = null, kind = "text", error = null, disabled = false, required = false, loadError = null, onRetryLoad }) {
     if (!isEditing) {
         /* card.css `.field`: the label in small capitals, the value in ink, no box around
@@ -1674,38 +1867,11 @@ function Detail({ label, value, isEditing, onChange, className = "", options = n
     }
 
     /*
-     * 🔑 `loadError` IS NOT `error`. `error` says the VALUE is wrong and the user can fix
-     * it by typing; `loadError` says the CHOICES never arrived, which no amount of typing
-     * repairs. Rendering the second as the first blames an administrator for a backend being
-     * down and offers them nothing to do about it -- so the failure gets its own compact
-     * state, with the retry that EH-D4 requires of every error state that can honestly offer
-     * one. (`Detail` is the read/edit twin of `CaptureMember`'s `Field`; the prop pair is
-     * deliberately named the same on both.)
+     * 🔑 `loadError` IS NOT `error` -- `error` says the VALUE is wrong, `loadError` that the CHOICES never
+     * arrived. `SelectInput` renders a failed list since `06.4`; this adapter carried its own copy of that
+     * state, as `CaptureMember`'s `Field` did, and now passes the pair on. (`Detail` is the read/edit twin
+     * of that `Field`; the props are deliberately named the same on both.)
      */
-    if (loadError) {
-        return (
-            <div className={cn("flex flex-col gap-1", className)}>
-                <SelectInput
-                    label={label}
-                    value={value}
-                    onChange={(next) => onChange?.({ target: { value: next } })}
-                    options={[]}
-                    disabled
-                    required={required}
-                    placeholder="Unavailable"
-                    emptyLabel="Unavailable"
-                />
-                <DataState
-                    state="error"
-                    compact
-                    error={loadError}
-                    onRetry={onRetryLoad}
-                    title={`${label} could not be loaded.`}
-                />
-            </div>
-        );
-    }
-
     if (options) {
         return (
             <SelectInput
@@ -1717,6 +1883,8 @@ function Detail({ label, value, isEditing, onChange, className = "", options = n
                 error={error || undefined}
                 disabled={disabled}
                 required={required}
+                loadError={loadError}
+                onRetryLoad={onRetryLoad}
                 className={className}
             />
         );

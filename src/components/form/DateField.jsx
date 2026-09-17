@@ -6,13 +6,13 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
 import Field, { controlClasses } from './Field';
+import useMediaQuery from '../../hooks/useMediaQuery';
 import {
   ageInWords,
   compareDates,
@@ -113,7 +113,8 @@ const FOCUS_RING = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-b
 
 // The month and year grids are the same control with different contents.
 const OPTION_BUTTON = [
-  'touch-target rounded-md px-2 py-2 text-sm text-ink',
+  // `touch-size`, not an overlay: a 44px square on each 36px cell lay across its neighbours (`07.2`, the second sweep).
+  'touch-size rounded-md px-2 py-2 text-sm text-ink',
   'hover-hover:hover:bg-surface-2',
   FOCUS_RING,
   'disabled:cursor-not-allowed disabled:opacity-40',
@@ -129,44 +130,8 @@ function readBound(bound) {
   return parseDate(bound);
 }
 
-/**
- * 🔑 `useSyncExternalStore`, NOT an effect. A media query is an external store, which is
- * exactly what this hook is for: no synchronous `setState` inside an effect (which the
- * `react-hooks` rules flag, and rightly — it is a second render every mount), and no
- * window between the first paint and the listener attaching where the value can be stale.
- * The server snapshot is `false`, so a non-browser render gets the popover, not the sheet.
- */
-// ⚠️ NOT CACHED IN A MODULE-LEVEL MAP, and the refactor pass proposed exactly that.
-// `getSnapshot` runs at least once per render, so a form with three date fields re-parses
-// this query on every keystroke -- a real, if small, waste. Caching the MediaQueryList by
-// query string fixes it and was tried: it makes the component's viewport behaviour
-// UNSTUBBABLE, because the cache outlives a test that replaces `window.matchMedia`, and
-// `DateField.test.jsx`'s bottom-sheet case went red. DECLINED: one `matchMedia` parse per
-// render is not worth a component that cannot be driven into its ≤760px state, which is
-// the state the whole sheet contract lives in (contract ⑤).
-function useMediaQuery(query) {
-  const subscribe = useCallback(
-    (onChange) => {
-      if (typeof window === 'undefined' || !window.matchMedia) return () => {};
-      const list = window.matchMedia(query);
-      // `addListener` is the Safari < 14 spelling, and this back office runs on old iPads.
-      if (list.addEventListener) {
-        list.addEventListener('change', onChange);
-        return () => list.removeEventListener('change', onChange);
-      }
-      list.addListener(onChange);
-      return () => list.removeListener(onChange);
-    },
-    [query],
-  );
-
-  const getSnapshot = useCallback(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return false;
-    return window.matchMedia(query).matches;
-  }, [query]);
-
-  return useSyncExternalStore(subscribe, getSnapshot, () => false);
-}
+// `useMediaQuery` lived here until the topbar needed the same answer; it is src/hooks/useMediaQuery.js now, with the
+// reasons it is a store and not an effect, and why it is not cached.
 
 export default function DateField({
   label,
@@ -212,6 +177,12 @@ export default function DateField({
   // `setState` inside an effect for no gain.
   const keyboardMoved = useRef(false);
   const [position, setPosition] = useState({ top: 0, left: 0, above: false });
+  /**
+   * 🔴 WHERE THE CALENDAR IS PORTALLED: INTO THE DIALOG IT WAS OPENED FROM, when there is one (R2-F1). On the body, a
+   * calendar opened from a modal dialog was outside that dialog's pointer layer, focus trap and Escape handling -- no
+   * day could be pressed. Read when the calendar OPENS, from the event, never from a ref during render.
+   */
+  const [portalTo, setPortalTo] = useState(null);
 
   const now = todayDate();
 
@@ -265,6 +236,7 @@ export default function DateField({
 
   const openPicker = useCallback(() => {
     if (disabled) return;
+    setPortalTo(inputRef.current?.closest('[role="dialog"][data-state]') ?? null);
     const start = parseDate(text) ?? selected ?? todayDate();
     setCursor(start);
     setFocusDay(start);
@@ -518,20 +490,30 @@ export default function DateField({
     }
   };
 
+  /*
+   * 📐 THE DAYS SPAN THE PICKER, AS `datepicker.css` LAYS THEM OUT: `.dp__week` is `repeat(7, 1fr)`,
+   * and a day is 38px tall in the popover and 44px in the phone's sheet. They were fixed 36px
+   * squares in a flex row, so the sheet's month header ran the width of the phone while its days
+   * stopped at 252px (`06.3`, date-sheet-phone-light.png) -- and 36px is under the 44px target the
+   * approved sheet promises.
+   */
   const renderDayGrid = () => (
     <div
       role="grid"
       aria-label={`${MONTHS_LONG[cursor.m - 1]} ${cursor.y}`}
-      className="p-2"
+      className={isSheet ? 'px-4 py-2' : 'p-2'}
     >
-      <div role="row" className="flex">
+      <div role="row" className="grid grid-cols-7">
         {WEEKDAYS.map((day) => (
           <span
             key={day.short}
             role="columnheader"
             aria-label={day.long}
             title={day.long}
-            className="w-9 text-center text-2xs font-semibold uppercase tracking-wide text-ink-muted"
+            className={cn(
+              'text-center font-semibold uppercase tracking-wide text-ink-muted',
+              isSheet ? 'h-7 text-xs leading-7' : 'h-6 text-2xs leading-6',
+            )}
           >
             {day.short}
           </span>
@@ -539,7 +521,7 @@ export default function DateField({
       </div>
 
       {gridDays.map((week) => (
-        <div key={`${week[0].y}-${week[0].m}-${week[0].d}`} role="row" className="flex">
+        <div key={`${week[0].y}-${week[0].m}-${week[0].d}`} role="row" className="grid grid-cols-7 gap-0.5">
           {week.map((day) => {
             const outside = day.m !== cursor.m;
             const unavailable = Boolean(outOfRange(day));
@@ -567,7 +549,8 @@ export default function DateField({
                   if (!unavailable) commit(day);
                 }}
                 className={cn(
-                  'size-9 rounded-md text-sm text-ink',
+                  'w-full rounded-md text-ink',
+                  isSheet ? 'h-11 text-[15px]' : 'h-[38px] text-sm',
                   'hover-hover:hover:bg-surface-2',
                   FOCUS_RING,
                   outside && 'text-ink-muted',
@@ -575,7 +558,7 @@ export default function DateField({
                   // Today is RINGED in accent; the choice is FILLED in brand. The mock is
                   // explicit that they are different marks, so that today still reads as
                   // today on the day it is also the selection.
-                  isToday && 'ring-1 ring-inset ring-accent',
+                  isToday && 'ring-1 ring-inset ring-accent-line',
                   isSelected && 'bg-brand font-medium text-on-brand',
                 )}
               >
@@ -635,7 +618,7 @@ export default function DateField({
           type="button"
           onClick={() => step(-1)}
           aria-label={`Previous ${stepUnit}`}
-          className={cn('touch-target rounded-md p-1.5 text-ink-muted hover-hover:hover:bg-surface-2', FOCUS_RING)}
+          className={cn('touch-size rounded-md p-1.5 text-ink-muted hover-hover:hover:bg-surface-2', FOCUS_RING)}
         >
           <ChevronLeft aria-hidden="true" className="size-4" />
         </button>
@@ -645,7 +628,7 @@ export default function DateField({
             type="button"
             aria-expanded={view === 'months'}
             onClick={() => setView(view === 'months' ? 'days' : 'months')}
-            className={cn('touch-target inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-sm font-medium text-ink hover-hover:hover:bg-surface-2', FOCUS_RING)}
+            className={cn('touch-size inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-sm font-medium text-ink hover-hover:hover:bg-surface-2', FOCUS_RING)}
           >
             {MONTHS_LONG[cursor.m - 1]}
             <ChevronDown aria-hidden="true" className="size-3.5" />
@@ -660,7 +643,7 @@ export default function DateField({
                 setView('years');
               }
             }}
-            className={cn('touch-target inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-sm font-medium text-ink hover-hover:hover:bg-surface-2', FOCUS_RING)}
+            className={cn('touch-size inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-sm font-medium text-ink hover-hover:hover:bg-surface-2', FOCUS_RING)}
           >
             {view === 'years' ? `${yearBase}–${yearBase + YEARS_PER_PAGE - 1}` : cursor.y}
             <ChevronDown aria-hidden="true" className="size-3.5" />
@@ -671,7 +654,7 @@ export default function DateField({
           type="button"
           onClick={() => step(1)}
           aria-label={`Next ${stepUnit}`}
-          className={cn('touch-target rounded-md p-1.5 text-ink-muted hover-hover:hover:bg-surface-2', FOCUS_RING)}
+          className={cn('touch-size rounded-md p-1.5 text-ink-muted hover-hover:hover:bg-surface-2', FOCUS_RING)}
         >
           <ChevronRight aria-hidden="true" className="size-4" />
         </button>
@@ -799,7 +782,7 @@ export default function DateField({
                 {isSheet && <div aria-hidden="true" className="fixed inset-0 z-50 bg-ink/40" />}
                 {renderPanel()}
               </div>,
-              document.body,
+              portalTo ?? document.body,
             )}
         </div>
       )}

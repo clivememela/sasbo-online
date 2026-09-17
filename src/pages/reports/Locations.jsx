@@ -6,7 +6,7 @@ import { TextInput, Button } from "../../components/form";
 import PageTitle from '../../components/common/PageTitle';
 import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
 import DataState from '../../components/common/DataState.jsx';
-import Sheet from '../../components/common/Sheet.jsx';
+import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import reportError from '../../lib/reportError.js';
 
 export function Locations() {
@@ -59,7 +59,7 @@ export function Locations() {
     };
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+        <Page>
             <PageTitle
                 title="Location Listings"
                 subtitle="View and manage branch location records, member listings, and contact details across all financial institutions."
@@ -124,6 +124,6 @@ export function Locations() {
             {searchState === 'ready' && results.map((location, index) => (
                 <LocationListing key={index} data={location} />
             ))}
-        </div>
+        </Page>
     );
 }
