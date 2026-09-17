@@ -88,6 +88,19 @@ const OPEN_FIRST_MEMBER = step('open the first member', clickByText('[data-row-a
 const OPEN_EDITABLE_MEMBER = step('open a member whose record validates', clickNth('[data-row-action]', 1), PANEL_OPEN);
 const EDIT_RECORD = step('edit the record', clickByText(`${PANEL} button`, '/^Edit Member$/'), TEXT('Save changes'));
 const CHANGE_PHONE = step('change the cellphone number', typeIntoLabelled(PANEL, '/^Cellphone Number/', '0829990001'));
+const WELCOME_SENT = `!!document.querySelector('[role="dialog"] [role="status"]') && ${TEXT('Welcome Letter Sent')}`;
+const CAPTURE_A_MEMBER = [
+  // The identity field is shut until a type is chosen, and then takes the type's name as its label (CaptureMember).
+  step('choose I.D. Number', chooseOption('main', '/^Identity Type/', 'I.D. Number'),
+    `[...document.querySelectorAll('main input')].some((i) => !i.disabled && /^I\\.D\\. Number/.test((i.labels?.[0]?.textContent || '').trim()))`),
+  step('type a first name', typeIntoLabelled('main', '/^First Name/', 'Thandi')),
+  step('type a surname', typeIntoLabelled('main', '/^Surname/', 'Synthetic')),
+  // Synthetic, and passes the form's own check-digit test (validateSAID) -- a number that fails it holds the save back.
+  step('type a valid synthetic I.D. number', typeIntoLabelled('main', '/^I\\.D\\. Number/', '9001015800088')),
+  step('open Employment & Bank', clickByText('main button', '/^Employment/'), `[...document.querySelectorAll('main select')].some((s) => /^Payment Type/.test(s.labels?.[0]?.textContent || ''))`),
+  step('choose Payroll', chooseOption('main', '/^Payment Type/', 'Payroll')),
+  step('save the member', clickByText('main button', '/^Save Member$/'), dialogNamed('/^Welcome Letter Preview$/')),
+];
 export const OPEN_CHANNEL = step('open the first channel', clickByText('button', '/show the members recruited/i'), ANY_DIALOG);
 const IN_DIALOG = '[role="dialog"] button';
 
@@ -150,6 +163,16 @@ export const SURFACES = [
     steps: [step('type a surname', typeIntoLabelled('main', '/^Surname/', 'Synthetic')),
       step('cancel', clickByText('main button', '/^Cancel$/'), dialogNamed('/^Discard this member\\?$/'))],
     present: { DIALOG: dialogNamed('/^Discard this member\\?$/') }, covers: ['pages/members/CaptureMember.jsx#ConfirmDialog@discard'] },
+  // The welcome letter opens after a save the form accepts: I.D. Number with 13 digits, and Payroll, which asks for no
+  // bank. `serve-dist.mjs` answers the save with an id and the send with an empty 200, as the server does.
+  { name: 'capture-welcome', route: '/members/capture', ready: TEXT('Save Member'),
+    steps: CAPTURE_A_MEMBER, present: { DIALOG: dialogNamed('/^Welcome Letter Preview$/') },
+    covers: ['components/members/WelcomeLetter.jsx#Modal@welcome'] },
+  { name: 'capture-welcome-sent', route: '/members/capture', ready: TEXT('Save Member'),
+    steps: [...CAPTURE_A_MEMBER,
+      step('send the welcome letter', clickByText('[role="dialog"] button', '/^Send Welcome Letter$/'), WELCOME_SENT)],
+    present: { DIALOG: dialogNamed('/^Welcome Letter Preview$/'), SENT: WELCOME_SENT },
+    covers: ['components/members/WelcomeLetter.jsx#Modal@welcome'] },
   { name: 'capture-refs-error', route: '/members/capture', intercept: { url: ['*/api/banks*', '*/api/job-grades*', '*/api/provinces*', '*/api/recruitment-channels*', '*/api/representatives*', '*/api/members/userRoles*', '*/api/members/structures/tree*', '*/api/branches*', '*/api/districts*', '*/api/areas*'], mode: 'fail' },
     ready: STATE('error'), present: { ERROR: STATE('error') },
     covers: ['pages/members/CaptureMember.jsx#DataState@refs', 'components/form/LoadFailureFrame.jsx#DataState@loadError'] },

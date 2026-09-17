@@ -275,6 +275,19 @@ const server = createServer((req, res) => {
   const path = decodeURIComponent(url.pathname);
 
   if (path.startsWith('/api/')) {
+    // The two writes the capture form's welcome letter needs, answered as the server does (MemberController): a saved
+    // member comes back WITH its id, and `send-welcome` is an EMPTY 200 -- the shape A50 was about, so a measurement of
+    // the "sent" state goes through the same read the application does. Nothing is stored: every save is id 9001.
+    if (req.method === 'POST' && path === '/api/members') {
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ id: 9001 }));
+      return;
+    }
+    if (req.method === 'POST' && /^\/api\/members\/\d+\/send-welcome$/.test(path)) {
+      res.writeHead(200);
+      res.end();
+      return;
+    }
     const key = API_KEYS.find((k) => path.startsWith(k));
     if (!key) {
       // 🔴 LOGGED ON FIRST SIGHT, not only at shutdown. On Windows a measurement session ends
