@@ -85,13 +85,24 @@ describe('actualDebitDate', () => {
   })
 })
 
-describe('🔴 A57 -- a non-business day moves FORWARD, and only backward at the end of the month', () => {
+describe('🔴 A57 -- a non-business day moves BACKWARD, and forward only where backward would fall below the 20th', () => {
   // The source of the rule: a SASBO "Not Provided For" re-debit letter (printed
   // 11/09/26, planning/branches/acb/legacy/) tells the member that debits run on the
   // 20th and that a Saturday, Sunday or public holiday moves the date FORWARD to the
   // next weekday; the specification's 18 August worked example says the same. The
   // rule here used to move backwards only, which put a Saturday 20th on Friday the
   // 19th -- below the 20-31 window the debit day exists to respect.
+
+  it('🔴 a weekend INSIDE the window moves BACKWARD -- the 18 August rule: day 25, Saturday 25 July 2026, is Friday 24 July', () => {
+    // Spec, 18 Aug session (SASBO Membership System.txt:1862): "it must move backward to the most recent business day
+    // within the same month"; A.7 glossary (:3668) says the same. Forward is only the bottom-of-window exception.
+    // Found by the ACB arc (sasbo-online-8a): an always-forward rule differs from the spec on 56 of 288 cells in
+    // 2026-2027, and none of the spec's three examples tells the two apart.
+    expect(actualDebitDate(25, new Date(2026, 6, 1))).toMatchObject({ iso: '2026-07-24', day: 24, adjusted: true })
+    // 26 and 27 September 2026 are a weekend: both are Friday the 25th, not Monday the 28th.
+    expect(actualDebitDate(26, new Date(2026, 8, 1)).iso).toBe('2026-09-25')
+    expect(actualDebitDate(27, new Date(2026, 8, 1)).iso).toBe('2026-09-25')
+  })
 
   it('a Saturday 20th is debited on Monday the 22nd, never Friday the 19th', () => {
     // 20 June 2026 is a Saturday.

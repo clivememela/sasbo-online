@@ -8,16 +8,17 @@
  * the only sentence this form can tell an administrator that they did not already
  * know, and the rule behind it exists nowhere in either repository.
  *
- * <h2>The rule (A57, corrected 2026-09-17)</h2>
- * A debit day that lands on a non-business day moves <b>FORWARD</b> to the next
- * business day — what SASBO's own re-debit letter tells members, and the
- * specification's 18 August example (a Sunday 20th is debited Monday the 21st).
- * <b>Only when forward would leave the month</b> does it move backward instead,
- * because a collection in the next month changes which month the member paid for.
- * So the date never falls below the 20th and never leaves its month.
+ * <h2>The rule (A57, as the signed specification states it)</h2>
+ * A debit day that lands on a non-business day moves <b>BACKWARD</b> to the most recent business day in the same
+ * month -- the 18 August session ("it must move backward to the most recent business day within the same month")
+ * and the A.7 glossary. <b>Only when backward would fall below the 20th</b> does it move forward instead: the
+ * session's own example (a Sunday 20th is processed on Monday the 21st) and SASBO's re-debit letter, which only
+ * ever debits on the 20th. So the date never falls below the 20th and never leaves its month.
  *
- * 🔴 It used to move backward ALWAYS, which put a Saturday 20th on Friday the 19th —
- * outside the 20–31 window — and "never leaves the month" did not guard that bottom.
+ * 🔴 History, because it went wrong twice. The first rule moved backward ALWAYS, which put a Saturday 20th on
+ * Friday the 19th, outside the window. The first correction over-reached and moved EVERY weekend forward, which
+ * matched all three of the spec's examples and disagreed with its rule on 56 of 288 cells in 2026-2027 (day 25
+ * in July 2026: Friday the 24th, not Monday the 27th). Found by the ACB arc; the test pins a mid-window weekend.
  *
  * <h2>🔴 IT MUST ITERATE, NOT STEP ONCE</h2>
  * Under the Public Holidays Act 36 of 1994, a public holiday falling on a Sunday
@@ -97,11 +98,12 @@ export const actualDebitDate = (day, reference = new Date(), holidays = new Set(
   const clampedDay = Math.min(requested, monthEnd)
 
   const target = new Date(year, month, clampedDay)
-  const forward = nextBusinessDayOnOrAfter(target, holidays)
-  // Forward unless that crosses into the next month (A57).
-  const actual = forward.getMonth() === month
-    ? forward
-    : lastBusinessDayOnOrBefore(target, holidays)
+  // Backward, as the spec says; forward only where backward would leave the window (below the 20th, or the
+  // month). A57 -- see the rule above.
+  const backward = lastBusinessDayOnOrBefore(target, holidays)
+  const actual = backward.getMonth() === month && backward.getDate() >= 20
+    ? backward
+    : nextBusinessDayOnOrAfter(target, holidays)
 
   return {
     iso: isoOf(actual),
