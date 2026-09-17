@@ -61,8 +61,16 @@ export default function BankBranch() {
   const endIndex = Math.min(startIndex + PAGE_SIZE, filteredBanks.length);
   const visibleBanks = filteredBanks.slice(startIndex, endIndex);
 
-  const handleInputChange = (field) => (event) => {
-    setFilters((prev) => ({ ...prev, [field]: event.target.value }));
+  /*
+   * 🔴 R2-F5's SECOND SITE (FIX-NOW, found in P9's execution): choosing a bank threw and took the register with it.
+   * `SearchableSelect` reports a VALUE, `TextInput` an event, and this read `event.target.value` from both. See
+   * `Forms.jsx` for the same fix and the reason one handler takes both shapes.
+   */
+  const handleInputChange = (field) => (eventOrValue) => {
+    const value = eventOrValue && typeof eventOrValue === 'object' && 'target' in eventOrValue
+      ? eventOrValue.target.value
+      : eventOrValue ?? '';
+    setFilters((prev) => ({ ...prev, [field]: value }));
     setPage(1);
   };
 

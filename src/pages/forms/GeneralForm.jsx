@@ -94,7 +94,7 @@ export default function GeneralForm({ filters }) {
                             type="text"
                             placeholder="Name"
                             aria-label={`Name of non-member ${member.id}`}
-                            className="flex-1 bg-transparent border-none focus:outline-none field-text py-1 text-ink placeholder-ink-faint"
+                            className="flex-1 bg-transparent border-none focus:outline-none field-text py-1 text-ink placeholder:text-ink-muted"
                             value={member.name}
                             onChange={(e) => handleNonMemberChange(idx, 'name', e.target.value)}
                         />
@@ -102,8 +102,8 @@ export default function GeneralForm({ filters }) {
                             type="text"
                             placeholder="Ind."
                             maxLength={2}
-                            aria-label={`Industry code for non-member ${member.id}`}
-                            className="w-14 bg-transparent border-none focus:outline-none field-text py-1 text-center text-ink placeholder-ink-faint uppercase"
+                            aria-label={`Indicator for non-member ${member.id}`}
+                            className="w-14 bg-transparent border-none focus:outline-none field-text py-1 text-center text-ink placeholder:text-ink-muted uppercase"
                             value={member.indicator}
                             onChange={(e) => handleNonMemberChange(idx, 'indicator', e.target.value)}
                         />

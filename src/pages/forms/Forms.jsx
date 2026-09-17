@@ -28,8 +28,22 @@ export function Forms(){
         { label: "General Form", value: "General Form" }
     ];
 
-    const handleInputChange = (field) => (event) => {
-        setFilters((prev) => ({ ...prev, [field]: event.target.value }));
+    /*
+     * 🔴 R2-F5 (FIX-NOW, found in P9's execution): THIS CRASHED THE WHOLE SCREEN THE MOMENT A FORM TYPE WAS CHOSEN.
+     *
+     * `SearchableSelect` reports a choice as `onChange(value, option)` -- a VALUE, not an event -- and this read
+     * `event.target.value`, so picking anything threw `Cannot read properties of undefined (reading 'value')` and the
+     * route fell to the error boundary. The picker is the only control here, so the entire Forms feature was
+     * unreachable in the built app. Members and Recruiters already accepted both shapes; these two call sites did not.
+     *
+     * Both shapes are taken here rather than splitting the handler in two, because the same `field` is fed by
+     * `TextInput` (an event) and by `SearchableSelect` (a value), and a second handler is a second thing to forget.
+     */
+    const handleInputChange = (field) => (eventOrValue) => {
+        const value = eventOrValue && typeof eventOrValue === 'object' && 'target' in eventOrValue
+            ? eventOrValue.target.value
+            : eventOrValue ?? '';
+        setFilters((prev) => ({ ...prev, [field]: value }));
     };
 
     const handleSubmit = (e) => {

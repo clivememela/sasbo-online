@@ -52,6 +52,17 @@ import { blankComments, nonTestSources } from './sourceScan.js'
 const UTILITY = 'text-ink-faint'
 
 /**
+ * 🔴 THE OTHER SPELLING, AND IT HID A REAL DEFECT FOR THE WHOLE ARC (R4-F2, P9's independent review).
+ *
+ * Tailwind has TWO ways to colour a placeholder: the variant `placeholder:text-<colour>`, which RULE 2 below
+ * catches, and the utility `placeholder-<colour>`, which contains neither `text-` nor a `:` and was invisible to
+ * this guard. `GeneralForm.jsx` used the second form on all 120 roster inputs -- prompts at 3.65:1 in dark, on a
+ * state-gated surface no sweep reaches -- and the guard reported the tree clean. Aimed at the FACT: a placeholder
+ * is text however the class is spelt.
+ */
+const PLACEHOLDER_UTILITY = 'placeholder-ink-faint'
+
+/**
  * The opening tag containing an offset, and its children up to the matching close.
  *
  * Deliberately small and deliberately not a JSX parser: it walks back to the `<` that opens
@@ -148,6 +159,9 @@ const CANARY = {
     // RULE 2: a class STRING with no element anywhere near it -- `Field.jsx`'s shape, and the
     // one site that reaches every form in the application.
     "cn('bg-surface text-ink placeholder:text-ink-faint')",
+    // RULE 3: the `placeholder-<colour>` UTILITY -- the spelling that hid R4-F2 on 120 inputs. Self-closing, so
+    // rule 1 would acquit it, and it contains no `text-`, so rule 2 never saw it.
+    '<input placeholder="Ind." className="field-text placeholder-ink-faint uppercase" />',
   ],
   mustAcquit: [
     // 🔑 THE HALF THAT CATCHES A GUARD THAT STARTED CONVICTING EVERYTHING. Without these, a
@@ -164,6 +178,8 @@ const CANARY = {
     // The CORRECTED placeholder must not convict -- otherwise rule 2 is matching the token
     // rather than the variant, and every fix would read as a fresh offence.
     "cn('bg-surface text-ink placeholder:text-ink-muted')",
+    // And the corrected UTILITY spelling likewise: rule 3 must match the colour, not the word `placeholder`.
+    '<input placeholder="Ind." className="field-text placeholder:text-ink-muted" />',
     // A comment mentioning the utility is not a use of it -- the F-P29 trap, and the reason
     // this scan reads `code` (comments blanked) rather than `raw`.
     '<p className="text-ink-muted">{/* never text-ink-faint here */}Real copy</p>',
@@ -211,6 +227,20 @@ const inkFaintOnText = (code) => {
         name: `${variant}:`,
         text: `a ${variant} is text wherever this class is written`,
       })
+    }
+  }
+
+  // RULE 3: the `placeholder-<colour>` UTILITY. Unconditional, like rule 2 and for the same reason: whatever it
+  // is written on, a placeholder is text somebody reads.
+  {
+    let at = code.indexOf(PLACEHOLDER_UTILITY)
+    while (at !== -1) {
+      offenders.push({
+        line: lineOf(at),
+        name: 'placeholder-',
+        text: 'a placeholder is text, and this is the utility spelling the guard could not see',
+      })
+      at = code.indexOf(PLACEHOLDER_UTILITY, at + PLACEHOLDER_UTILITY.length)
     }
   }
 
