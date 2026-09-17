@@ -188,9 +188,9 @@ export default function WelcomeLetter({ open, onClose, member }) {
                     with us.
                 </p>
 
-                {/* Member details summary */}
-                <table className="my-6 w-full border-collapse text-sm">
-                    <tbody>
+                {/* Member details summary -- label and value pairs, so a definition list rather than a table element, which
+                    would be one more outside TableScroller (contract ⑮); these rows never need a sideways scroll. */}
+                <dl className="my-6 grid grid-cols-[8rem_minmax(0,1fr)] text-sm sm:grid-cols-[11rem_minmax(0,1fr)]">
                         {[
                             ['Full Name',        fullName],
                             ['Identity Number',  member.identityNumber || '—'],
@@ -200,14 +200,14 @@ export default function WelcomeLetter({ open, onClose, member }) {
                             ['Payment Type',     member.paymentType || '—'],
                             ['Date Joined',      member.joinDate ? formatDate(String(member.joinDate).split('T')[0]) : today],
                             ['Status',           member.status || 'Active'],
-                        ].map(([label, value]) => (
-                            <tr key={label} className="border-b border-line last:border-0">
-                                <td className="w-32 py-1.5 pr-4 font-medium text-ink-muted sm:w-44 sm:pr-6">{label}</td>
-                                <td className="break-words py-1.5">{value}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        ].map(([label, value], i, rows) => {
+                            const rule = i < rows.length - 1 ? 'border-b border-line' : '';
+                            return [
+                                <dt key={`${label}-term`} className={`py-1.5 pr-4 font-medium text-ink-muted sm:pr-6 ${rule}`}>{label}</dt>,
+                                <dd key={`${label}-value`} className={`break-words py-1.5 ${rule}`}>{value}</dd>,
+                            ];
+                        })}
+                </dl>
 
                 {/* Sign-off -- the template's own words (Sasbo Welcome Letter.docx), which is what the member receives. */}
                 <p className="mt-6">Your Faithfully,</p>
