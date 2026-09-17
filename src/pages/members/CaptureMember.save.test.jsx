@@ -35,7 +35,7 @@ async function fillValidMember(user) {
   await fill(user, 'First Name(s)', 'Synthetic')
   await fill(user, 'Surname', 'Testperson')
   await user.click(screen.getByRole('button', { name: /Employment & Bank/i }))
-  await user.selectOptions(labelled('Payment Type'), 'Payroll')
+  await user.selectOptions(labelled('Payment Type'), 'Payroll Deduction')
   await user.click(screen.getByRole('button', { name: /Personal Information/i }))
   await user.selectOptions(labelled('Identity Type'), 'I.D. Number')
   await fill(user, 'I.D. Number', '9001010000080')

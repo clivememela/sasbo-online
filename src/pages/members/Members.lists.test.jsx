@@ -26,7 +26,7 @@ const MEMBER = {
   surname: 'Banker',
   identityNumber: '9001010000080',
   status: 'Active',
-  paymentType: 'Payroll',
+  paymentType: 'Payroll Deduction',
   bankName: 'ABSA',
 }
 const boom = () => HttpResponse.json({ status: 500, error: 'boom' }, { status: 500 })

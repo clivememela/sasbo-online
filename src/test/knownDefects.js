@@ -56,18 +56,6 @@
 const define = (row, headline, detail) => ({ row, headline, detail })
 
 export const DEFECTS = {
-  A6: define(
-    'A6',
-    'the payment-type branch is dead code',
-    'usePaymentTypeValidation compares the payment type against "Payroll Deduction". ' +
-      'PAYMENT_TYPE_OPTIONS cannot produce that string -- it offers "Payroll". The ' +
-      'branch can therefore never be true, so isPayrollDeduction is permanently false ' +
-      'and every field it disables is permanently enabled. The server still carries a ' +
-      'PAYROLL_DEDUCTION shim in PaymentType.fromString, which is what proves this is ' +
-      'drift between the two halves rather than a typo in one of them.',
-  ),
-
-
   A9: define(
     'A9',
     'the client re-implements a rule the server publishes, and they disagree',
@@ -79,6 +67,23 @@ export const DEFECTS = {
       'repair that activates untested behaviour.',
   ),
 
+// A6 is RETIRED, 2026-09-17, by the capture-member re-port. It read: "the payment-type branch is
+// dead code -- usePaymentTypeValidation compares against 'Payroll Deduction' and
+// PAYMENT_TYPE_OPTIONS offers 'Payroll', so the branch can never be true."
+//
+// The BROWSER is what moved, not the hook. The server's PaymentType is PAYROLL("Payroll
+// Deduction") and it is now on main (829f252), published in `api-vocabulary.json`, so the option
+// takes the server's name and `Members.jsx` folds the legacy stored value onto it instead of the
+// other way about. `usePaymentTypeValidation.test.jsx` keeps the scan that pinned this, flipped:
+// exactly one offered option now reaches the branch.
+//
+// ⚠️ A9 IS UNCHANGED AND STAYS OPEN, and that is the honest reading of the pair. A9's own text
+// warned that fixing A6 "switches on code nothing has ever tested". What it switches on is
+// reachable now, but it is still not RUNNING: no screen imports usePaymentTypeValidation --
+// checked again on the day A6 closed -- so both screens carry their own `paymentType === "Debit
+// Order"` test and the hook's hardcoded rule reaches no member. Closing A6 changed the hook's
+// reachability, not the application's behaviour, and A9's pin is what still says so.
+//
 // A7 is RETIRED, 2026-09-17, by the capture-member re-port: both screens compare against
 // IDENTITY_TYPE_PASSPORT, so a passport member needs a date of birth on Capture AND Edit.
 // A11 is RETIRED, 2026-09-09, by the design arc's 03.1.

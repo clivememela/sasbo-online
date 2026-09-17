@@ -1,7 +1,23 @@
 export const FREQUENCY_OPTIONS = ['Monthly', 'Quarterly', 'Bi-annually', 'Annually'];
 export const TITLE_OPTIONS = ['Mr', 'Ms', 'Mrs', 'Dr', 'Prof'];
 export const RACE_OPTIONS = ['African', 'White', 'Coloured', 'Indian', 'Other'];
-export const PAYMENT_TYPE_OPTIONS = ['Debit Order', 'Payroll'];
+/**
+ * 🔴 A6: the browser offered "Payroll" while the server's `PaymentType` declares
+ * `PAYROLL("Payroll Deduction")`, so every rule written against the server's spelling compared
+ * against a string no option could produce. The names come from `src/test/api-vocabulary.json`,
+ * which the server generates from the enum itself -- `vocabulary.parity.test.js` asserts that
+ * every option below is one the server accepts.
+ *
+ * `PAYMENT_TYPE_PAYROLL_LEGACY` is the older spelling, and it is not an option: it is what is
+ * already STORED against members captured before the rename. `MemberDto.paymentType` is a String
+ * passed straight through from storage, so it really does reach the browser, and
+ * `normalizePaymentType` in `Members.jsx` folds it onto the current name. Without that fold every
+ * legacy member would read as edited the moment their record was opened.
+ */
+export const PAYMENT_TYPE_DEBIT_ORDER = 'Debit Order';
+export const PAYMENT_TYPE_PAYROLL = 'Payroll Deduction';
+export const PAYMENT_TYPE_PAYROLL_LEGACY = 'Payroll';
+export const PAYMENT_TYPE_OPTIONS = [PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL];
 export const STATUS_OPTIONS = ['Active', 'Pending', 'Suspended', 'Resigned', 'Retired'];
 /**
  * 🔴 A7: the passport rule compared against "Passport" while the only option is "Passport Number", so
@@ -68,7 +84,25 @@ export const MEMBER_TABS = [
   // { id: 'history', label: 'History & Remarks' },
 ];
 
-export const DEBIT_DAY_OPTIONS = ['20', '25', '31'];
+/**
+ * 🔴 E9a/E9b/A32: the form offered three days -- 20, 25 and 31 -- while the signed spec and the
+ * server both take the whole 20th-to-31st range (`DebitDay.EARLIEST` = 20, `DebitDay.LATEST` = 31,
+ * and `isValid` accepts everything between). Thirteen of the fifteen banks' own ACB days fall
+ * outside the three, so most debit-order members held a day the form could not re-offer: opening
+ * their record and saving anything at all meant silently moving their debit day.
+ *
+ * Derived from the two bounds rather than typed out, so the range has one shape and not twelve.
+ */
+export const DEBIT_DAY_EARLIEST = 20;
+export const DEBIT_DAY_LATEST = 31;
+export const DEBIT_DAY_OPTIONS = Array.from(
+  { length: DEBIT_DAY_LATEST - DEBIT_DAY_EARLIEST + 1 },
+  (_, i) => String(DEBIT_DAY_EARLIEST + i),
+);
+export const isDebitDayInRange = (day) => {
+  const n = Number(String(day ?? '').trim());
+  return Number.isInteger(n) && n >= DEBIT_DAY_EARLIEST && n <= DEBIT_DAY_LATEST;
+};
 
 export const MEMBER_FIELD_LABEL_MAP = {
   title: 'Title',

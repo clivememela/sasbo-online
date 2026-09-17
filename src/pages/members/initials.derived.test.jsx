@@ -58,7 +58,7 @@ describe('Capture Member', () => {
 describe('Edit Member', () => {
   const ALPHA = {
     id: 7, membershipNumber: 'M0007', firstNames: 'Thabo Sipho', surname: 'Alpha', initials: 'TS',
-    identityType: 'I.D. Number', identityNumber: '9001010000080', status: 'Active', paymentType: 'Payroll',
+    identityType: 'I.D. Number', identityNumber: '9001010000080', status: 'Active', paymentType: 'Payroll Deduction',
   }
   const BRAVO = { ...ALPHA, id: 8, membershipNumber: 'M0008', surname: 'Bravo', identityNumber: '8506155000084' }
   const panel = () => within(screen.getByTestId('member-panel'))

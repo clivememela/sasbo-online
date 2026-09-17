@@ -76,7 +76,7 @@ describe('Capture Member', () => {
     await screen.findByLabelText(/^Work Tel/)
     await fillValidPayrollMember(user)
     await openTab(user, /Employment & Bank/i)
-    await user.selectOptions(field('Payment Type'), 'Payroll')
+    await user.selectOptions(field('Payment Type'), 'Payroll Deduction')
     await openTab(user, /Personal Information/i)
     await retype(user, 'Work Tel', '0821')
 
@@ -95,7 +95,7 @@ describe('Capture Member', () => {
     await openTab(user, /Employment & Bank/i)
     await user.selectOptions(field('Payment Type'), 'Debit Order')
     await retype(user, 'Bank Account Number', '123')
-    await user.selectOptions(field('Payment Type'), 'Payroll')
+    await user.selectOptions(field('Payment Type'), 'Payroll Deduction')
 
     await user.click(screen.getByRole('button', { name: /save member/i }))
 
@@ -119,7 +119,7 @@ describe('Capture Member', () => {
 describe('Edit Member', () => {
   const ALPHA = {
     id: 7, membershipNumber: 'M0007', firstNames: 'Synthetic', surname: 'Alpha', initials: 'S',
-    identityType: 'I.D. Number', identityNumber: '9001010000080', status: 'Active', paymentType: 'Payroll',
+    identityType: 'I.D. Number', identityNumber: '9001010000080', status: 'Active', paymentType: 'Payroll Deduction',
     // A legacy value no rule written today would accept.
     homeTel: '123',
   }

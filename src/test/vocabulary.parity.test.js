@@ -13,7 +13,6 @@ import {
   assertNonVacuousScan,
   assertNothingWasSkipped,
 } from './assertNonVacuousScan'
-import { DEFECTS, disabled, pin } from './knownDefects'
 import { blankingDestroyedCode, readSources, unreadableDirectories } from './sourceScan.js'
 
 /**
@@ -184,21 +183,17 @@ function comparisons() {
  * the time it was reviewed.
  */
 const EXPECTED = {
-  'src/hooks/usePaymentTypeValidation.js :: (param).paymentType === "Payroll Deduction"': {
-    verdict: 'DEFECT',
-    defect: DEFECTS.A6,
-    why: 'compared against a value no option can produce, so this branch can NEVER be true.',
-  },
   // A7's two sites (CaptureMember.jsx and Members.jsx comparing against "Passport") are GONE, 2026-09-17:
   // both compare against IDENTITY_TYPE_PASSPORT now, so there is nothing left here to accept or to flag.
-  'src/pages/members/Members.jsx :: (param).paymentType === "Payroll Deduction"': {
-    verdict: 'ACCEPTED',
-    why:
-      'normalizePaymentType, and it is LIVE rather than dead. MemberDto.paymentType is a ' +
-      'String passed through from storage, not the PaymentType enum, so a legacy ' +
-      '"Payroll Deduction" row really can reach the browser. This is the client-side twin ' +
-      'of the server PAYROLL_DEDUCTION shim in PaymentType.fromString.',
-  },
+  //
+  // A6's two sites are gone the same way, 2026-09-17, and by the same repair rather than by
+  // deletion. `usePaymentTypeValidation.js` compared against "Payroll Deduction" while the options
+  // offered "Payroll"; the OPTION took the server's name, so that comparison is now in-vocabulary
+  // and the scan does not flag it. `Members.jsx`'s legacy fold is still live and still necessary --
+  // stored members really do arrive spelled "Payroll" -- but it compares against
+  // PAYMENT_TYPE_PAYROLL_LEGACY, a named constant, so there is no drifted literal left to accept.
+  // That is the shape this guard is for: the exception disappears because the code stopped
+  // spelling a vocabulary value twice, not because the guard stopped looking.
   // ⚖️ THE ENTRY BELOW WAS SPECIFIED BY THE AUTOMATION ARC, NOT BY THE DESIGN ARC, and the
   // attribution is part of the record. This file is a guard and guards belong to that arc;
   // `06.1b` raised the match, proposed an entry, and asked. They did the reasoning, declined
@@ -340,14 +335,8 @@ describe('vocabulary parity between this browser and its server', () => {
    * third site appearing.
    */
   describe('the drifted constants', () => {
-    it.skip(disabled(DEFECTS.A6, 'no dead payment-type comparison survives'), () => {
-      expect(offendingKeys.filter((key) => key.includes('usePaymentTypeValidation'))).toEqual([])
-    })
-
-    it(pin(DEFECTS.A6, 'the dead payment-type branch is still there'), () => {
-      expect(offendingKeys).toContain(
-        'src/hooks/usePaymentTypeValidation.js :: (param).paymentType === "Payroll Deduction"',
-      )
+    it('A6 (fixed): no dead payment-type comparison survives', () => {
+      expect(offendingKeys.filter((key) => key.includes('paymentType'))).toEqual([])
     })
 
     it('A7 (fixed): no screen compares identityType to "Passport"', () => {

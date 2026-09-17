@@ -12,7 +12,8 @@ import {
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, MEMBER_TABS,
-    BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS, IDENTITY_TYPE_PASSPORT
+    BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS, IDENTITY_TYPE_PASSPORT,
+    DEBIT_DAY_EARLIEST, DEBIT_DAY_LATEST, isDebitDayInRange, PAYMENT_TYPE_PAYROLL
 } from "@/config/memberConstants.js";
 import { toWireDate, today } from "@/lib/format.js";
 import { sanitiseField, validateField } from "@/utils/inputRules.js";
@@ -265,9 +266,10 @@ export default function CaptureMember() {
             if (!form.bankName.trim()) errors.bankName = "Bank Employer alignment name is required for Debit Orders";
             if (!form.branch.trim()) errors.branch = "Bank Branch selection is required for Debit Orders";
 
-            const validDays = ["20", "25", "31", 20, 25, 31];
-            if (!validDays.includes(form.debitDay)) {
-                errors.debitDay = "Debit day must be one of 20, 25 or 31 when payment type is 'Debit Order'";
+            // A RANGE, not a list of three. The server's DebitDay takes the 20th to the 31st and
+            // most banks' own ACB days live between them (E9a/E9b, A32).
+            if (!isDebitDayInRange(form.debitDay)) {
+                errors.debitDay = `Debit day must be between ${DEBIT_DAY_EARLIEST} and ${DEBIT_DAY_LATEST} when payment type is 'Debit Order'`;
             }
         }
 
@@ -563,9 +565,9 @@ export default function CaptureMember() {
                                         <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={DEBIT_DAY_OPTIONS} />
                                     </>
                                 )}
-                                {form.paymentType === "Payroll" && (
+                                {form.paymentType === PAYMENT_TYPE_PAYROLL && (
                                     <p className="md:col-span-2 rounded-lg border border-line-strong bg-surface-2 p-3 text-sm text-ink-muted">
-                                        Bank account details are not required for Payroll. Debit day is handled by payroll.
+                                        Bank account details are not required for {PAYMENT_TYPE_PAYROLL}. Debit day is handled by payroll.
                                     </p>
                                 )}
                                 <Field label="IBT No." kind="identifier" value={form.ibtNo} onChange={handleChange("ibtNo")} error={fieldErrors.ibtNo} />

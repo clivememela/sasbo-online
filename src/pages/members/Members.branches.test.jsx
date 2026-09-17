@@ -23,7 +23,7 @@ const CAPITEC = { id: 2, bankName: 'Capitec Bank Limited', name: 'Capitec Bank L
 
 const MEMBER = {
   id: 7, membershipNumber: 'M0007', firstNames: 'Synthetic', surname: 'Alpha', initials: 'S',
-  identityType: 'I.D. Number', identityNumber: '9001010000080', status: 'Active', paymentType: 'Payroll',
+  identityType: 'I.D. Number', identityNumber: '9001010000080', status: 'Active', paymentType: 'Payroll Deduction',
   bankName: 'Absa Bank Limited', branch: 'Sandton City',
 }
 

@@ -31,7 +31,7 @@ const MEMBER = {
   identityType: 'I.D. Number',
   identityNumber: '9001010000080',
   status: 'Active',
-  paymentType: 'Payroll',
+  paymentType: 'Payroll Deduction',
   // COSATU is only offered under BEC = Yes (stakeholder, 2026-09-17), so the record is a BEC member.
   isBec: true,
   isCosatu: 'Y',

@@ -95,12 +95,14 @@ const save = async (user) => {
  * `PaymentType.requiresBankAccount()` -- so a round-trip test that ignored it
  * would be testing an impossible capture.
  *
- * Choosing "Payroll" is also the honest half of register A9: the option is
- * real, the server agrees no bank account is needed, and the client's own
- * `isPayrollDeduction` branch STILL does not fire, because it compares against
- * "Payroll Deduction" (A6). The capture below therefore succeeds for the right
- * reason and the dead branch stays dead -- which is exactly the state
- * `usePaymentTypeValidation.test.jsx` pins.
+ * Choosing "Payroll Deduction" is also the honest half of register A9. A6 is
+ * now CLOSED -- the option is spelled the way the server spells it, so
+ * `usePaymentTypeValidation`'s `isPayrollDeduction` branch is reachable at
+ * last. A9 is not: no screen imports that hook, so the rule it carries still
+ * comes from a hardcoded string rather than from the server's published
+ * `requiresBankAccount()`, and the capture below succeeds because the FORM's
+ * own `paymentType === "Debit Order"` test agrees with the server, not because
+ * anything consulted it. `usePaymentTypeValidation.test.jsx` pins that.
  *
  * The form is TABBED and renders only the active tab, so Payment Type has to
  * be reached by opening "Employment & Bank" first. That is worth doing through
@@ -114,7 +116,7 @@ const openTab = async (user, label) => {
 
 const choosePayroll = async (user) => {
   await openTab(user, /Employment & Bank/i)
-  await user.selectOptions(labelled('Payment Type'), 'Payroll')
+  await user.selectOptions(labelled('Payment Type'), 'Payroll Deduction')
   await openTab(user, /Personal Information/i)
 }
 

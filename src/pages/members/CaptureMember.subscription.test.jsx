@@ -72,7 +72,7 @@ describe('Monthly Subscription on Capture Member', () => {
     await user.selectOptions(screen.getByLabelText(/^Identity Type/), 'I.D. Number')
     await type('I.D. Number', '9001010000080')
     await user.click(screen.getByRole('button', { name: /Employment & Bank/i }))
-    await user.selectOptions(screen.getByLabelText(/^Payment Type/), 'Payroll')
+    await user.selectOptions(screen.getByLabelText(/^Payment Type/), 'Payroll Deduction')
     await user.click(screen.getByRole('button', { name: /save member/i }))
 
     await waitFor(() => expect(posted).toBeDefined())

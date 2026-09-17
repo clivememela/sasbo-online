@@ -16,6 +16,7 @@ import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, IDENTITY_TYPE_PASSPORT,
+    DEBIT_DAY_OPTIONS, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
 } from "../../config/memberConstants.js";
 import {
     validateSAID, validateEmail, formatDate, extractDateOfBirthFromSAID, extractGenderFromSAID
@@ -213,7 +214,20 @@ export const SASBO_BEC_BRANCHES = [
     { id: "bec-44", name: "BankservAfrica & Financial Infrastructure Committee", region: "Corporate National" }
 ];
 
-const normalizePaymentType = (paymentType) => paymentType === "Payroll Deduction" ? "Payroll" : paymentType;
+/**
+ * The stored value, folded onto the name the form offers.
+ *
+ * 🔑 THE FOLD RUNS THE OTHER WAY NOW (A6). It used to turn the server's "Payroll Deduction" into
+ * the browser's "Payroll"; the browser was the one that had drifted, so the browser is what moved.
+ * `PaymentType` on the server is `PAYROLL("Payroll Deduction")` and that is what the option says.
+ *
+ * ⚠️ The fold itself is NOT redundant and must not be deleted with the rename. `MemberDto.paymentType`
+ * is a String passed through from storage, not the enum, so members captured under the old spelling
+ * still arrive as "Payroll". Without this, opening such a record would show a payment type that is
+ * not one of the options, and the first save would report a change the administrator never made.
+ */
+const normalizePaymentType = (paymentType) =>
+    paymentType === PAYMENT_TYPE_PAYROLL_LEGACY ? PAYMENT_TYPE_PAYROLL : paymentType;
 
 const getInitialFilters = (locationState) => ({
     ...EMPTY_FILTERS,
@@ -1569,7 +1583,7 @@ export default function Members() {
                                                 label="Debit Day"
                                                 value={editForm.debitDay}
                                                 isEditing={isEditing}
-                                                options={["20", "25", "31"]}
+                                                options={DEBIT_DAY_OPTIONS}
                                                 error={fieldErrors.debitDay}
                                                 onChange={handleEditChange("debitDay")}
                                             />
