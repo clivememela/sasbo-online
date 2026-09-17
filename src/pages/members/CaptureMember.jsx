@@ -17,6 +17,7 @@ import {
 import { toWireDate, today } from "@/lib/format.js";
 import { sanitiseField, validateField } from "@/utils/inputRules.js";
 import { subscriptionsService } from "@/services/subscriptionsService.js";
+import { ERROR_KINDS, messageOf, validationErrorsOf } from "@/services/parseApiError.js";
 import { findSubscriptionForBank, formatSubscriptionAmount, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
     formatDate } from "@/utils/validateSAID.js";
@@ -298,11 +299,30 @@ export default function CaptureMember() {
                 // Inject the persisted ID from the Java backend into the payload structure
                 // This triggers the WelcomeLetter evaluation overlay window to perform inspection
                 setWelcomeMember({ ...form, id: saved?.id || saved?.memberId });
+
+                // 🔴 R3-OBS-2b: the form stayed filled and Save re-enabled, so a second press posted the same member
+                // again. The welcome letter has taken its own copy above, so the form can be emptied now.
+                initialsTyped.current = false;
+                setForm(JSON.parse(pristineForm));
+                setFieldErrors({});
             })
-            .catch((err) => setSaveNotice({
-                kind: "failed",
-                messages: [`This member was not saved. ${err?.message || "Please try again."}`],
-            }))
+            .catch((err) => {
+                // The server's per-field messages go under their fields, not only into the summary.
+                const serverFieldErrors = validationErrorsOf(err);
+                if (Object.keys(serverFieldErrors).length > 0) {
+                    setFieldErrors((prev) => ({ ...prev, ...serverFieldErrors }));
+                }
+                // 🔴 R3-F2: only a 4xx is the server saying no. A timeout, a dropped connection or a 5xx does NOT mean
+                // nothing was written -- "not saved" there invites a second press, and the second press is a second
+                // member. Worded as Recruiters.jsx already words it.
+                const refused = err?.kind === ERROR_KINDS.HTTP && err.status >= 400 && err.status < 500;
+                setSaveNotice({
+                    kind: refused ? "failed" : "unconfirmed",
+                    messages: [refused
+                        ? `This member was not saved. ${messageOf(err)}`
+                        : `We could not confirm whether this member was saved. ${messageOf(err)} Check the register for this member before trying again, or they may be captured twice.`],
+                });
+            })
             .finally(() => setSaving(false));
     };
 
@@ -424,7 +444,7 @@ export default function CaptureMember() {
                     >
                         <p id="capture-save-notice-title" className="flex items-center gap-2 font-medium">
                             <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.75} />
-                            {saveNotice.kind === "invalid" ? "Fix these before saving" : "This member was not saved"}
+                            {saveNotice.kind === "invalid" ? "Fix these before saving" : saveNotice.kind === "unconfirmed" ? "Save not confirmed" : "This member was not saved"}
                         </p>
                         <ul className="mt-1 list-disc pl-6">
                             {saveNotice.messages.map((message) => <li key={message}>{message}</li>)}
