@@ -65,6 +65,20 @@ export default function SearchableSelect({
   loadError = null,
   onRetryLoad,
   clearable = true,
+  /**
+   * LIST FIRST, TYPING ALLOWED. Off by default, and that default is load-bearing rather than polite:
+   * this control is consumed by Members, Recruiters and Capture, so one changed default is three
+   * screens changed in silence. `SearchableSelect.test.jsx` pairs every custom-value case with the
+   * same interaction and no prop.
+   *
+   * When on, a value typed that matches no option survives blur and is reported through the SAME
+   * `onChange(value, option)` -- with no option, because there is not one. No second callback.
+   *
+   * ⚠️ The control does NOT guess. A near-miss prompt ("did you mean BA2?") is the call site's, where
+   * the vocabulary is known; see `utils/jobGradeMatch.js`. Silently turning what somebody typed into
+   * something else is the failure 02.5 exists to correct, and a primitive is the wrong place to do it.
+   */
+  allowCustom = false,
   className,
   ...rest
 }) {
@@ -94,7 +108,12 @@ export default function SearchableSelect({
   // 🔑 Closed, the box shows the SELECTION; open, it shows what is being typed. Keeping
   // one input for both is what makes the whole field the trigger, and resetting `search`
   // on close is what stops a half-typed filter from reading as the current value.
-  const displayValue = open ? search : (selected?.label ?? '');
+  //
+  // ⚠️ Under `allowCustom` the value may be one NO option carries, so `selected` is undefined and
+  // falling back to '' would blank a value the user typed and the form is still holding -- the field
+  // would look empty while posting a grade. The raw value is shown instead.
+  const closedDisplay = selected?.label ?? (allowCustom ? asOptionValue(value) : '');
+  const displayValue = open ? search : closedDisplay;
 
   const close = useCallback(() => {
     setOpen(false);
@@ -111,16 +130,51 @@ export default function SearchableSelect({
     [onChange, close],
   );
 
+  /**
+   * Leaving the field with something typed -- the only thing `allowCustom` adds.
+   *
+   * 🔑 A TYPED VALUE THAT NAMES AN OPTION IS THE OPTION, not the text. `BA2` typed and `BA2` chosen
+   * must store the same thing, or the same grade exists twice over depending on how it was entered.
+   * Matched case-insensitively for the same reason, and the option's own value is what is stored.
+   *
+   * ⚠️ MATCHED AGAINST THE VALUE AS WELL AS THE LABEL, and the job grades are why. Their options are
+   * `{value: "C1", label: "C1 - Clerk - Permanent"}`: the code is what an administrator types and the
+   * label is decorated, so a label-only comparison would have captured "C1" as a BRAND NEW grade
+   * beside the one already on the list. Both are identities of the same option.
+   *
+   * Blank is not a value: whitespace commits nothing rather than storing "   ".
+   *
+   * ⚠️ NOT called from `close()`, and that is deliberate. Escape means "never mind" everywhere else
+   * in this control, and routing it through here would make it a second way to commit. Escape clears
+   * `search` first, so the blur that follows finds nothing to keep.
+   */
+  const commitTyped = useCallback(() => {
+    const typed = search.trim();
+    if (!allowCustom || typed === '') {
+      close();
+      return;
+    }
+    const wanted = typed.toLowerCase();
+    const match = normalised.find(
+      (entry) => !entry.disabled
+        && (entry.label.toLowerCase() === wanted || entry.value.toLowerCase() === wanted),
+    );
+    if (match) onChange?.(match.value, match.option);
+    else onChange?.(typed, undefined);
+    close();
+  }, [allowCustom, search, normalised, onChange, close]);
+
   // Pointer-down outside, not click: a click that starts inside and ends outside is not
   // a dismissal, and `mousedown` alone misses touch on iOS.
   useEffect(() => {
     if (!open) return undefined;
     const handler = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) close();
+      // Clicking away IS leaving the field, so it keeps a typed value exactly as blur does.
+      if (containerRef.current && !containerRef.current.contains(event.target)) commitTyped();
     };
     document.addEventListener('pointerdown', handler);
     return () => document.removeEventListener('pointerdown', handler);
-  }, [open, close]);
+  }, [open, commitTyped]);
 
   // Keep the active option in view when the arrows move past the visible window.
   useEffect(() => {
@@ -187,6 +241,11 @@ export default function SearchableSelect({
           // must reach the form, which is how every other field in this app submits.
           event.preventDefault();
           commit(filtered[activeIndex]);
+        } else if (open && allowCustom && search.trim() !== '') {
+          // Nothing highlighted, but something typed: Enter keeps it. Without this the key
+          // would submit the form while the field still held the old value.
+          event.preventDefault();
+          commitTyped();
         }
         break;
       case 'Escape':
@@ -196,7 +255,7 @@ export default function SearchableSelect({
         }
         break;
       case 'Tab':
-        if (open) close();
+        if (open) commitTyped();
         break;
       default:
         break;
@@ -257,6 +316,11 @@ export default function SearchableSelect({
               if (!open) openList();
             }}
             onKeyDown={handleKeyDown}
+            onBlur={() => {
+              // `allowCustom` off: `commitTyped` closes and keeps nothing, which is what the
+              // list-only control has always done.
+              if (open) commitTyped();
+            }}
             onMouseDown={() => {
               // The WHOLE FIELD opens it. Toggle rather than open, so a second click on
               // an open field closes it the way a native select does.
