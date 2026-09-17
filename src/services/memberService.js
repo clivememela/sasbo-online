@@ -4,6 +4,33 @@ import { requestJson, requestJsonWrite } from './parseApiError';
 const PAGE_SIZE = 100;
 
 /**
+ * Fields the server stores as ONE delimited string ("PEC,CEC") and the browser holds as a list.
+ *
+ * 🔴 A37 / A38. `StringArrayToCommaSeparatedDeserializer` folds an incoming array on the way IN and
+ * nothing unfolds it on the way OUT, so every consumer received a string where its code expected an
+ * array: the register threw "cosatuPositions.join is not a function" on open, and each screen that
+ * noticed wrote its own `split(",")` -- two of them twelve lines apart in Members.jsx, one of which
+ * was undone by the other. Unfolded here, once, for every consumer.
+ */
+const DELIMITED_LIST_FIELDS = ['cosatuPositions', 'becStructures'];
+
+/** A member as the browser holds it. Anything that is not a member object passes through untouched. */
+export function normalizeMember(member) {
+  if (!member || typeof member !== 'object' || Array.isArray(member)) return member;
+  const normalized = { ...member };
+  for (const field of DELIMITED_LIST_FIELDS) {
+    const value = normalized[field];
+    if (Array.isArray(value)) continue;
+    normalized[field] = typeof value === 'string' && value.trim()
+      ? value.split(',').map((part) => part.trim()).filter(Boolean)
+      : [];
+  }
+  return normalized;
+}
+
+const normalizeMembers = (value) => (Array.isArray(value) ? value.map(normalizeMember) : value);
+
+/**
  * The member lane's service, on the one error path (conventions §16).
  *
  * 🔴 THIS IS THE FILE WHERE THE OLD MESSAGE COST THE MOST. A failed capture told the user
@@ -34,7 +61,7 @@ export const memberService = {
     requestJson((signal) => fetch(apiUrl('/api/members'), {
       credentials: 'include',
       signal,
-    })),
+    })).then(normalizeMembers),
 
   getPageSize: () => PAGE_SIZE,
 
@@ -45,7 +72,7 @@ export const memberService = {
       credentials: 'include',
       body: JSON.stringify(updatedMember),
       signal,
-    })),
+    })).then(normalizeMember),
 
   // Banking fields only (PATCH).
   updateBanking: (id, banking) =>
@@ -55,13 +82,13 @@ export const memberService = {
       credentials: 'include',
       body: JSON.stringify(banking),
       signal,
-    })),
+    })).then(normalizeMember),
 
   getMemberById: (id) =>
     requestJson((signal) => fetch(apiUrl(`/api/members/${id}`), {
       credentials: 'include',
       signal,
-    })),
+    })).then(normalizeMember),
 
   createMember: (member) =>
     requestJsonWrite((signal) => fetch(apiUrl('/api/members'), {
@@ -70,7 +97,7 @@ export const memberService = {
       credentials: 'include',
       body: JSON.stringify(member),
       signal,
-    })),
+    })).then(normalizeMember),
 
   /**
    * 🔴 A50: THE SERVER ANSWERS A SENT LETTER WITH AN EMPTY 200 (`ResponseEntity.ok().build()`). Read as JSON, a letter

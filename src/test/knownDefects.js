@@ -339,34 +339,12 @@ export const DEFECTS = {
       'than excluding it, so it stays visible in the output of every run.',
   ),
 
-  A37: define(
-    'A37',
-    'a member with COSATU positions crashes the member register on render',
-    'MemberDto.cosatuPositions is a STRING on the server: ' +
-      'StringArrayToCommaSeparatedDeserializer folds an incoming array into "PEC,CEC" on ' +
-      'the way in and nothing unfolds it on the way out. Members.jsx calls .join(", ") on ' +
-      'it. The `?.length > 0` guard beside the call does NOT protect, and that is the ' +
-      'whole trap: a non-empty string has a length, so the guard passes and the call ' +
-      'throws "cosatuPositions.join is not a function". The detail view does not render ' +
-      'at all for any member whose positions are set. ' +
-      'Verified 2026-09-08 from both sides: the DTO field type and the call site. ' +
-      '\u26a0\ufe0f The BLAST RADIUS shrank on 2026-09-09 and the defect did not: this used to take ' +
-      'the whole shell with it (old row A11, no boundary anywhere). With ErrorBoundary now ' +
-      'beside the outlet it is a broken panel with a way back -- still a member whose record ' +
-      'cannot be opened, and still this row.',
-  ),
-
-  A38: define(
-    'A38',
-    'the same asymmetry one field over, currently latent',
-    'Members.jsx calls .join(", ") on selectedMember.becStructures behind the identical ' +
-      '`?.length > 0` guard. It does not crash today only because the server has no ' +
-      'becStructures field at all, so the value is undefined and the guard is false. It ' +
-      'becomes A37 the day that field is added and returns a delimited string -- which is ' +
-      'the shape this API already uses for the neighbouring one. Recorded now because the ' +
-      'cost of finding it later is a second production crash.',
-  ),
 }
+
+// A37 and A38 are RETIRED, 2026-09-17, by the capture-member re-port: memberService.normalizeMember
+// unfolds the server's delimited list fields for every consumer, and the Structures tab no longer
+// renders either list (stakeholder shape, 2026-09-17). Proved in Members.structures.test.jsx (a
+// string-shaped record opens, reads and edits) and memberService.normalize.test.js.
 
 DEFECTS.A29 = define(
   'A29',
