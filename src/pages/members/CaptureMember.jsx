@@ -16,6 +16,8 @@ import {
 } from "@/config/memberConstants.js";
 import { toWireDate, today } from "@/lib/format.js";
 import { sanitiseField, validateField } from "@/utils/inputRules.js";
+import { subscriptionsService } from "@/services/subscriptionsService.js";
+import { findSubscriptionForBank, formatSubscriptionAmount, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
     formatDate } from "@/utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
@@ -52,6 +54,7 @@ const REFERENCE_LOADERS = {
     structures: () => recruiterService.getStructures(),
     'bank branches': () => bankService.getBankListing(),
     banks: () => bankService.getBankNames(),
+    subscriptions: () => subscriptionsService.getAll(),
 };
 
 export default function CaptureMember() {
@@ -116,6 +119,24 @@ export default function CaptureMember() {
     const [pristineForm] = useState(() => JSON.stringify(form));
     const [confirmDiscard, setConfirmDiscard] = useState(false);
     const refs = useReferenceData(REFERENCE_LOADERS);
+
+    /**
+     * 🗣️ THE SASBO SUBSCRIPTION -- 174, shown before anyone picks a bank.
+     *
+     * The owner: "You keep on giving me a blank field instead of 174! Put 174!!!" The fee is the UNION's, set once
+     * for everybody; the reference table has a row per bank only because the debit DAY differs, and SASBO's own
+     * branch report (31/07/26) has subs = members x R174 on every one of its 5,513 workplaces. So: the chosen bank's
+     * row when it has one, otherwise the single amount every row agrees on -- and nothing at all when the rows
+     * disagree, because then only a bank could say and a guess would reach a finance report.
+     *
+     * Derived during render and added to the payload at save, never copied into `form` by an effect: the field is
+     * read-only, so there is no user value to preserve, and a copy is a second place for the number to go stale.
+     */
+    const subscriptionRows = refs.data.subscriptions;
+    const subscriptionAmount = useMemo(() => {
+        const row = form.bankName ? findSubscriptionForBank(subscriptionRows, form.bankName) : null;
+        return row?.subscriptionAmount ?? sasboSubscriptionAmount(subscriptionRows);
+    }, [form.bankName, subscriptionRows]);
     const reps = refs.data.recruiters;
     const structures = refs.data.structures;
     const bankListing = refs.data['bank branches'];
@@ -268,7 +289,7 @@ export default function CaptureMember() {
 
         setSaveNotice(null);
         setSaving(true);
-        memberService.createMember(form)
+        memberService.createMember({ ...form, monthlySubscription: subscriptionAmount ?? form.monthlySubscription })
             .then((saved) => {
                 setSavedName([form.firstNames, form.surname].filter(Boolean).join(" "));
                 setShowSavedNotification(true);
@@ -481,7 +502,7 @@ export default function CaptureMember() {
                                 <Field label="Date Joined" value={form.joinDate} onChange={handleChange("joinDate")} type="date" disabled />
                                 <Field label="Status" value={form.status} onChange={handleChange("status")} options={statusOptions} disabled />
                                 <SectionTitle title="Sasbo Subscription" />
-                                <Field label="Monthly Subscription" value={form.monthlySubscription} onChange={handleChange("monthlySubscription")} disabled note="*reviewed annually through business discussions *" />
+                                <Field label="Monthly Subscription" value={formatSubscriptionAmount(subscriptionAmount)} onChange={handleChange("monthlySubscription")} disabled note="*reviewed annually through business discussions *" />
                                 <Field label="Frequency" value={form.subscriptionFrequency} onChange={handleChange("subscriptionFrequency")} options={frequencyOptions} disabled />
                             </>
                         )}

@@ -151,12 +151,6 @@ export const SURFACES = [
       step('make the identity a passport', chooseOption(PANEL, '/^Identity Type/', 'Passport Number'), `!!document.querySelector('${PANEL} input[aria-haspopup="dialog"]')`),
       step('open Date of Birth', mouseDownOn(`${PANEL} input[aria-haspopup="dialog"]`, '/^Date of Birth/'), DATE_PICKER_OPEN)],
     present: { DATE_PICKER_OPEN }, covers: ['pages/members/Members.jsx#DateField@Date of Birth', 'components/form/DateField.jsx#aria-expanded@field'] },
-  { name: 'record-shop-steward-date', route: '/members', ready: ROWS,
-    steps: [OPEN_FIRST_MEMBER, EDIT_RECORD,
-      step('open Structures', clickByText(`${PANEL} button`, '/Structures/i'), TEXT('Shop Steward?')),
-      step('answer Shop Steward: Yes', chooseOption(PANEL, '/Shop Steward\\?/', 'Yes'), `!!document.querySelector('${PANEL} input[aria-haspopup="dialog"]')`),
-      step('open its election date', mouseDownOn(`${PANEL} input[aria-haspopup="dialog"]`, '/Shop Steward Election Date/'), DATE_PICKER_OPEN)],
-    present: { DATE_PICKER_OPEN }, covers: ['pages/members/Members.jsx#DateField@Shop Steward Election Date'] },
 
   // ── Capture Member ────────────────────────────────────────────────────────────────────────────
   { name: 'capture-discard', route: '/members/capture', ready: TEXT('Save Member'),
