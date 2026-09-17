@@ -1,6 +1,6 @@
-import { apiUrl } from './api';
-import { requestJson } from './parseApiError';
-import { bankService } from './bankService.js';
+import {apiUrl} from './api';
+import {requestJson} from './parseApiError';
+import {bankService} from './bankService.js';
 
 /*
  * ✅ A25 IS CLOSED HERE, AND `JOB_GRADE_OPTIONS` IS WHAT WENT WITH IT. `06.1b`.
@@ -70,28 +70,33 @@ export const jobGradeService = {
         .then((payload) => {
             const list = normalizeList(payload);
 
-            const normalized = list
-                .map((it) => {
-                    if (!it || typeof it !== 'object') return null;
-
-                    // If the backend sent standard React { value, label } fields
-                    if (it.value != null) return it;
-
-                    // Map your Java JobGradeResponseDto fields structurally
-                    const grade = it.grade || '';
-                    const description = it.description ? ` - ${it.description}` : '';
-                    const contract = it.contractType ? ` (${it.contractType})` : '';
-
-                    return {
-                        value: grade,
-                        label: `${grade}${description}${contract}`.trim() // E.g., "Grade 1 - Clerk (Permanent)"
-                    };
-                })
-                .filter(Boolean);
-
           // ⚠️ NO `.catch()` BELOW, AND ITS ABSENCE IS THE FIX. A rejection travels to the
           // caller, which renders it (EH-D9). See the header.
-          return normalized;
+          return list
+              .map((it) => {
+                  if (!it || typeof it !== 'object') return null;
+
+                  // If the backend sent standard React { value, label } fields,
+                  // still force label to grade-only text.
+                  if (it.value != null) {
+                      const grade = String(it.grade ?? it.value ?? '').trim();
+                      if (!grade) return null;
+                      return {
+                          ...it,
+                          value: grade,
+                          label: grade,
+                      };
+                  }
+
+                  // Map your Java JobGradeResponseDto fields structurally
+                  const grade = String(it.grade || '').trim();
+                  if (!grade) return null;
+                  return {
+                      value: grade,
+                      label: grade
+                  };
+              })
+              .filter(Boolean);
         });
   }
 };

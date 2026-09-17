@@ -1,21 +1,21 @@
 import { useRef, useState, useEffect, useMemo } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
-import { memberService } from "../../services/memberService.js";
-import { recruiterService } from "../../services/recruiterService.js";
-import { jobGradeService } from "../../services/jobGradeService.js";
-import { bankService } from "../../services/bankService.js";
+import WelcomeLetter from "../../components/members/WelcomeLetter";
+import { memberService } from "@/services/memberService.js";
+import { recruiterService } from "@/services/recruiterService.js";
+import { jobGradeService } from "@/services/jobGradeService.js";
+import { bankService } from "@/services/bankService.js";
 import PageTitle from "../../components/common/PageTitle";
 import {
     Button, DateField, PositionTreeSelect, SearchableSelect, SelectInput, TextInput,
 } from "../../components/form";
 import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
-    STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, YES_NO_OPTIONS,
-    SUSPENSION_CODE_OPTIONS, MEMBER_TABS,
+    STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, MEMBER_TABS,
     BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS
-} from "../../config/memberConstants.js";
+} from "@/config/memberConstants.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
-    formatDate } from "../../utils/validateSAID.js";
+    formatDate } from "@/utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState";
 import useReferenceData from "../../hooks/useReferenceData.js";
@@ -83,7 +83,7 @@ export default function CaptureMember() {
         workTel: "",
         homeTel: "",
         address: "",
-        joinDate: new Date().toISOString().split("T"),
+        joinDate: new Date().toISOString().split("T")[0],
         status: "Active",
         monthlySubscription: "",
         subscriptionFrequency: "Monthly",
@@ -120,6 +120,7 @@ export default function CaptureMember() {
 
     const [fieldErrors, setFieldErrors] = useState({});
     const [showSavedNotification, setShowSavedNotification] = useState(false);
+    const [welcomeMember, setWelcomeMember] = useState(null);
     /*
      * 🔴 SAVE STAYED PRESSABLE WHILE THE MEMBER WAS BEING SAVED, AND CANCEL DISCARDED WITHOUT ASKING (`06.5`, the
      * `06.3` critique, F-P55). `Button` has a `loading` state for exactly this -- its own comment names a submit
@@ -294,10 +295,11 @@ export default function CaptureMember() {
         setSaveNotice(null);
         setSaving(true);
         memberService.createMember(form)
-            .then(() => {
+            .then((saved) => {
                 setSavedName([form.firstNames, form.surname].filter(Boolean).join(" "));
                 setShowSavedNotification(true);
                 setTimeout(() => setShowSavedNotification(false), 3000);
+                setWelcomeMember({ ...form, id: saved?.id });
             })
             .catch((err) => setSaveNotice({
                 kind: "failed",
@@ -321,8 +323,6 @@ export default function CaptureMember() {
     const frequencyOptions = FREQUENCY_OPTIONS;
     const identityTypeOptions = IDENTITY_TYPE_OPTIONS;
     const genderOptions = GENDER_OPTIONS;
-    const yesNoOptions = YES_NO_OPTIONS;
-    const suspensionCodeOptions = SUSPENSION_CODE_OPTIONS;
     const [jobGradeOptions, setJobGradeOptions] = useState([]);
     const [jobGradeLoading, setJobGradeLoading] = useState(false);
     /*
@@ -389,6 +389,12 @@ export default function CaptureMember() {
     }, [form.bankName, bankListing, jobGradeAttempt]);
 
     return (
+        <>
+        <WelcomeLetter
+            open={!!welcomeMember}
+            onClose={() => setWelcomeMember(null)}
+            member={welcomeMember}
+        />
         <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
             {/* BR-18: the page's only <h1>, from the shared component, so this route stops
                 being one of the nine with no heading of its own. */}
@@ -644,6 +650,7 @@ export default function CaptureMember() {
                 />
             </div>
         </div>
+        </>
     );
 }
 
