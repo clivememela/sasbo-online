@@ -61,6 +61,13 @@ export default function WelcomeLetter({ open, onClose, member }) {
         return member.personalEmail || member.workEmail || '—';
     })();
 
+    /*
+     * 🔴 A56: A LETTER WITH NOWHERE TO GO WAS STILL OFFERED. Capture saves a member with no email address, and the dialog
+     * read "emailed as an attachment to —" beside an enabled Send; the server refuses it (400, "No email address is
+     * available for this member."). Send is not offered when the member has no address at all, and the dialog says why.
+     */
+    const hasAddress = Boolean(member.personalEmail || member.workEmail);
+
     const handleSend = () => {
         if (!member.id) {
             setErrorMessage('Member ID is missing — cannot send email.');
@@ -95,7 +102,7 @@ export default function WelcomeLetter({ open, onClose, member }) {
                         <Button
                             variant="primary"
                             onClick={handleSend}
-                            disabled={sendState === 'sending'}
+                            disabled={sendState === 'sending' || !hasAddress}
                         >
                             {sendState === 'sending'
                                 ? <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden="true" />
@@ -107,11 +114,18 @@ export default function WelcomeLetter({ open, onClose, member }) {
             }
         >
             {/* Recipient notice */}
-            <p className="mb-4 text-sm text-ink-muted">
-                This letter will be emailed as an attachment to{' '}
-                <strong className="text-ink">{preferredLabel}</strong>
-                {member.preferredEmail === 'both' && ' (both addresses)'}.
-            </p>
+            {hasAddress ? (
+                <p className="mb-4 text-sm text-ink-muted">
+                    This letter will be emailed as an attachment to{' '}
+                    <strong className="text-ink">{preferredLabel}</strong>
+                    {member.preferredEmail === 'both' && ' (both addresses)'}.
+                </p>
+            ) : (
+                <p className="mb-4 flex items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended">
+                    <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                    <span>This member has no email address, so the letter cannot be sent. Add one to the member's record first.</span>
+                </p>
+            )}
 
             {!membershipNo && (
                 <p className="mb-4 flex items-start gap-2 rounded-lg border border-status-pending-dot bg-status-pending-bg p-3 text-sm text-status-pending">

@@ -126,6 +126,31 @@ describe('the welcome letter dialog', () => {
     })
   })
 
+  describe('A56 — a letter with nowhere to go is not offered', () => {
+    // The server refuses it (400, "No email address is available for this member.", pinned in server 93c11d9), so the
+    // defect is only the offer: "emailed as an attachment to —" beside an enabled Send.
+    it('a member with no email address: Send is not offered, and the dialog says why', () => {
+      renderWithProviders(
+        <WelcomeLetter open onClose={() => {}} member={person(101, { personalEmail: '', workEmail: '' })} />,
+      )
+
+      const dialog = screen.getByRole('dialog')
+      expect(within(dialog).getByRole('button', { name: /send welcome letter/i })).toBeDisabled()
+      expect(within(dialog).getByText(/no email address/i)).toBeInTheDocument()
+      expect(dialog).not.toHaveTextContent(/attachment to\s*—/)
+    })
+
+    it('must-pass: a member with a work address only, preferring work, can be sent the letter', () => {
+      renderWithProviders(
+        <WelcomeLetter open onClose={() => {}} member={person(101, { personalEmail: '', workEmail: 'work101@example.test', preferredEmail: 'work' })} />,
+      )
+
+      const dialog = screen.getByRole('dialog')
+      expect(within(dialog).getByRole('button', { name: /send welcome letter/i })).toBeEnabled()
+      expect(within(dialog).getByText('work101@example.test')).toBeInTheDocument()
+    })
+  })
+
   describe('A52 — the letter says what it will carry, not a dash', () => {
     it('a member with no membership number: the dialog says the letter goes without one', () => {
       renderWithProviders(<WelcomeLetter open onClose={() => {}} member={person(101)} />)
