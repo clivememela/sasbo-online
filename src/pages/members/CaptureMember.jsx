@@ -13,14 +13,17 @@ import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, MEMBER_TABS,
     BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS, IDENTITY_TYPE_PASSPORT,
-    DEBIT_DAY_EARLIEST, DEBIT_DAY_LATEST, isDebitDayInRange, PAYMENT_TYPE_PAYROLL
+    DEBIT_DAY_EARLIEST, DEBIT_DAY_LATEST, isDebitDayInRange,
+    PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL
 } from "@/config/memberConstants.js";
 import { toWireDate, today } from "@/lib/format.js";
 import { sanitiseField, validateField } from "@/utils/inputRules.js";
 import { subscriptionsService } from "@/services/subscriptionsService.js";
 import { ERROR_KINDS, messageOf, validationErrorsOf } from "@/services/parseApiError.js";
 import { findSubscriptionForBank, formatSubscriptionAmount, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
-import { branchNamesForBank } from "@/utils/bankBranches.js";
+import { branchCodeOf, branchNamesForBank, findBranchRecord, formatBranchAddress } from "@/utils/bankBranches.js";
+import { DERIVATION, derivationNote, derivationStateOf } from "@/utils/derivation.js";
+import { debitDateSentence } from "@/utils/debitDate.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
     formatDate } from "@/utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
@@ -162,6 +165,15 @@ export default function CaptureMember() {
     const initialsTyped = useRef(false);
 
     /**
+     * 🔑 S4, FOR THE TWO BRANCH-DERIVED FIELDS (E4, E6). Same rule as the initials above and the same defect
+     * behind it: a derivation must never win an argument with a value somebody typed. State rather than a ref,
+     * unlike `initialsTyped`, because the NOTE under each field renders from it -- a ref would leave the field
+     * saying "filled in from the branch" under a value the administrator had just corrected.
+     */
+    const [bankAddressTyped, setBankAddressTyped] = useState(false);
+    const [ibtNoTyped, setIbtNoTyped] = useState(false);
+
+    /**
      * E3 + the owner (2026-09-15, "take what's on Bank Branch of dev.sasbo.online"): the chosen bank's OWN branches
      * together with the fourteen names dev offers. A union, because the seeded listing holds one branch per bank and
      * the fourteen alone name nothing a bank owns. Empty until a bank is chosen: a branch means nothing without one.
@@ -171,9 +183,59 @@ export default function CaptureMember() {
     const branchOptionsFor = (bankName) =>
         bankName ? [...new Set([...branchNamesForBank(bankListing, bankName), ...BRANCH_OPTIONS])] : [];
 
+    /**
+     * WHY EACH BRANCH-DERIVED FIELD LOOKS THE WAY IT DOES (04.1's closed set, `utils/derivation.js`).
+     *
+     * The state is computed per field rather than shared, because the two do not always agree: the fourteen
+     * dev branch names resolve to no record at all, while a real branch can carry a code and no address. The
+     * ORDER of the tests is the rule -- typed beats everything, then "no input yet", then "the source is
+     * missing", then "the source had nothing for this input". Getting the last two the wrong way round is how
+     * a failed fetch comes to read as an empty result (CM-15).
+     */
+    const branchRecord = findBranchRecord(bankListing, form.bankName, form.branch);
+    const branchSourceLoaded = Array.isArray(bankListing) && bankListing.length > 0;
+    const derivedFrom = (userEdited, value) => derivationStateOf({
+        userEdited,
+        hasInput: Boolean(form.bankName && form.branch),
+        sourceLoaded: branchSourceLoaded,
+        match: Boolean(value),
+    });
+    const ibtNoState = derivedFrom(ibtNoTyped, branchCodeOf(branchRecord));
+    const bankAddressState = derivedFrom(bankAddressTyped, formatBranchAddress(branchRecord));
+
+    /**
+     * The sentence under a branch-derived field.
+     *
+     * The two states that need their own words are the ones whose general wording would be WRONG here:
+     *   NOT_APPLICABLE  means "no branch chosen yet", not "this member has no IBT number", and saying the
+     *                   latter would tell the administrator to stop looking for a value that is coming.
+     *   NO_MATCH        names the branch, because the fourteen dev branch names are offered for every bank
+     *                   and belong to none of them -- "nothing found" without the name reads as a fault.
+     */
+    const branchDerivationNote = (state, source) => derivationNote(state, {
+        source,
+        detail: state === DERIVATION.NOT_APPLICABLE
+            ? `Choose a branch and this fills in from ${source}.`
+            : `Nothing found for ${form.branch} in the branch listing — you can still enter this yourself.`,
+    });
+
+    /**
+     * 04.3 -- the one thing this screen can say that no other screen can: the DATE, not the day.
+     *
+     * The rule is the signed spec's and A57 corrected it: back to the last business day, forward only where
+     * back would fall out of the 20th-to-31st window. The sentence carries its own caveat, because no
+     * maintained public-holiday source is wired to this application and presenting the date as certain would
+     * overstate it.
+     */
+    const debitDateHint = form.paymentType === PAYMENT_TYPE_DEBIT_ORDER
+        ? debitDateSentence(form.debitDay)
+        : null;
+
     const handleChange = (field) => (event) => {
         let rawValue = event.target.value;
         if (field === "initials") initialsTyped.current = true;
+        if (field === "bankAddress") setBankAddressTyped(true);
+        if (field === "ibtNo") setIbtNoTyped(true);
 
         const hasNonNumericInput =
             field === "identityNumber" && form.identityType === "I.D. Number" &&
@@ -191,6 +253,21 @@ export default function CaptureMember() {
                 // Judged against the bank actually CHOSEN: the searchable control passes through an empty bank while
                 // the administrator clears it to pick another, and that moment must not drop a branch the next bank offers.
                 if (value && prev.branch && !branchOptionsFor(value).includes(prev.branch)) updatedForm.branch = "";
+            }
+
+            /**
+             * E4 + E6: the branch record already holds the IBT number and the address. Derived HERE, where the
+             * branch changes, rather than in an effect -- an effect that writes the form from the form is the
+             * shape that overwrites people mid-keystroke, and this needs no second render to be correct.
+             *
+             * A blank bank or an unknown branch resolves to `null`, and both helpers answer "" for it. That is
+             * deliberate: a stale address from the branch previously chosen is worse than an empty one, because
+             * it is wrong AND it looks deliberate.
+             */
+            if (field === "bankName" || field === "branch") {
+                const record = findBranchRecord(bankListing, updatedForm.bankName, updatedForm.branch);
+                if (!ibtNoTyped) updatedForm.ibtNo = branchCodeOf(record);
+                if (!bankAddressTyped) updatedForm.bankAddress = formatBranchAddress(record);
             }
 
             if (field === "firstNames" && !initialsTyped.current) {
@@ -562,7 +639,7 @@ export default function CaptureMember() {
                                 {form.paymentType === "Debit Order" && (
                                     <>
                                         <Field label="Bank Account Number" kind="identifier" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} error={fieldErrors.bankAccountNumber} required />
-                                        <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={DEBIT_DAY_OPTIONS} />
+                                        <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={DEBIT_DAY_OPTIONS} note={debitDateHint} />
                                     </>
                                 )}
                                 {form.paymentType === PAYMENT_TYPE_PAYROLL && (
@@ -570,8 +647,10 @@ export default function CaptureMember() {
                                         Bank account details are not required for {PAYMENT_TYPE_PAYROLL}. Debit day is handled by payroll.
                                     </p>
                                 )}
-                                <Field label="IBT No." kind="identifier" value={form.ibtNo} onChange={handleChange("ibtNo")} error={fieldErrors.ibtNo} />
-                                <AddressAutocomplete label="Bank Address" value={form.bankAddress} onChange={handleChange("bankAddress")} placeholder="Start typing a bank address..." className="md:col-span-2" />
+                                <Field label="IBT No." kind="identifier" value={form.ibtNo} onChange={handleChange("ibtNo")} error={fieldErrors.ibtNo}
+                                       note={branchDerivationNote(ibtNoState, "the branch's code")} />
+                                <AddressAutocomplete label="Bank Address" value={form.bankAddress} onChange={handleChange("bankAddress")} placeholder="Start typing a bank address..." className="md:col-span-2"
+                                       hint={branchDerivationNote(bankAddressState, "the branch's address")} />
                             </>
                         )}
 
