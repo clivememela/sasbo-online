@@ -126,8 +126,16 @@ export default function CaptureMember() {
         return errorTabs;
     }, [fieldErrors]);
 
+    /**
+     * 🔴 R4-F1: Initials are derived from First Name(s) until the administrator types them, and never after.
+     * Recomputing on every keystroke replaced initials somebody had set on purpose the moment they fixed a typo in
+     * the first names. A ref, not state: it changes what the NEXT keystroke does, and nothing renders from it.
+     */
+    const initialsTyped = useRef(false);
+
     const handleChange = (field) => (event) => {
         let rawValue = event.target.value;
+        if (field === "initials") initialsTyped.current = true;
 
         if (field === "identityNumber" && form.identityType === "I.D. Number" && rawValue.length > 13) {
             rawValue = rawValue.substring(0, 13);
@@ -144,7 +152,7 @@ export default function CaptureMember() {
         setForm((prev) => {
             let updatedForm = { ...prev, [field]: value };
 
-            if (field === "firstNames") {
+            if (field === "firstNames" && !initialsTyped.current) {
                 const autoInitials = value
                     .trim()
                     .split(/\s+/)

@@ -501,7 +501,15 @@ export default function Members() {
         return () => window.removeEventListener("keydown", onKeyDown);
     }, []);
 
+    /**
+     * 🔴 R4-F1, the edit twin of Capture Member's: Initials are derived from First Name(s) until the administrator
+     * types them. Reset whenever a record is loaded or an edit begins, so one member's typed initials do not stop the
+     * next member's from deriving.
+     */
+    const initialsTyped = useRef(false);
+
     useEffect(() => {
+        initialsTyped.current = false;
         if (selectedMember) {
             // List fields arrive as lists: memberService.normalizeMember unfolds the server's
             // "PEC,CEC" once, for every consumer (A37 / A38).
@@ -557,6 +565,7 @@ export default function Members() {
             return;
         }
         const start = { ...selectedMember, paymentType: normalizePaymentType(selectedMember?.paymentType) };
+        initialsTyped.current = false;
         setEditForm(start);
         setEditBaseline(JSON.stringify(start));
         setFieldErrors({});
@@ -565,6 +574,7 @@ export default function Members() {
 
     const handleEditChange = useCallback((field) => (event) => {
         let rawValue = event && event.target ? event.target.value : event;
+        if (field === "initials") initialsTyped.current = true;
 
         if (field === "identityNumber" && editForm.identityType === "I.D. Number" && rawValue.length > 13) {
             rawValue = rawValue.substring(0, 13);
@@ -587,7 +597,8 @@ export default function Members() {
                 next.jobGrade = "";
             }
 
-            if (field === "firstNames") {
+            // R4-F1: derived until typed -- see `initialsTyped`.
+            if (field === "firstNames" && !initialsTyped.current) {
                 next.initials = value
                     .trim()
                     .split(/\s+/)
