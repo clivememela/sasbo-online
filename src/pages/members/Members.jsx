@@ -33,6 +33,7 @@ import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
 import { parseDate, sameDate, today } from "../../lib/format.js";
 import { sanitiseField, validateField } from "../../utils/inputRules.js";
+import { branchNamesForBank } from "../../utils/bankBranches.js";
 import { cn } from "../../lib/utils";
 import { personName } from "../../lib/names.js";
 
@@ -312,6 +313,7 @@ const getChangedFields = (draft, original) => Object.keys(draft)
  */
 const REFERENCE_LOADERS = {
     banks: () => bankService.getBankNames(),
+    'bank branches': () => bankService.getBankListing(),
 };
 
 export default function Members() {
@@ -473,7 +475,14 @@ export default function Members() {
     const paymentTypeOptions = PAYMENT_TYPE_OPTIONS;
     const statusOptions = STATUS_OPTIONS;
     const bankOptions = bankNames;
-    const branchOptions = BRANCH_OPTIONS;
+    // The same branch rule as Capture Member: the bank's own branches together with the fourteen names. One rule on
+    // both screens -- two screens holding one member with two vocabularies is how A6 and A7 happened.
+    const bankListing = refs.data['bank branches'];
+    const branchOptionsFor = useCallback(
+        (bankName) => (bankName ? [...new Set([...branchNamesForBank(bankListing, bankName), ...BRANCH_OPTIONS])] : BRANCH_OPTIONS),
+        [bankListing],
+    );
+    const branchOptions = branchOptionsFor(editForm.bankName);
     const genderOptions = GENDER_OPTIONS;
     const [jobGradeOptions, setJobGradeOptions] = useState([]);
     /*
@@ -593,6 +602,8 @@ export default function Members() {
             // loading: a grade belongs to a bank, so choosing a DIFFERENT bank clears it.
             if (field === "bankName" && value !== prev.bankName) {
                 next.jobGrade = "";
+                // A branch the new bank does not offer goes with the old bank; the fourteen names stay for every bank.
+                if (value && prev.branch && !branchOptionsFor(value).includes(prev.branch)) next.branch = "";
             }
 
             // R4-F1: derived until typed -- see `initialsTyped`.
@@ -637,7 +648,7 @@ export default function Members() {
             }
             return newErrors;
         });
-    }, [editForm.identityType]);
+    }, [editForm.identityType, branchOptionsFor]);
 
     const validateEditForm = () => {
         const errors = {};
