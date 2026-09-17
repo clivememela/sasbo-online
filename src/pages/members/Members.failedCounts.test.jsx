@@ -7,7 +7,6 @@ import MembersPage from './Members'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
-import { DEFECTS, disabled, pin } from '../../test/knownDefects'
 
 /**
  * A47: THE FAILED REGISTER STILL COUNTS ZERO AROUND ITS OWN ERROR.
@@ -24,6 +23,11 @@ import { DEFECTS, disabled, pin } from '../../test/knownDefects'
  * by two other parts of the same screen. (With the reference lists failing too, a banner
  * added "The register below is up to date" -- that half needs both failures and is the
  * browser suite's to assert.)
+ *
+ * ✅ RETIRED 2026-09-17 when main merged into the design arc's design/06-close: its K1 fix
+ * (a95e7b9, 2026-09-14) already shows the figures as "not available" and the pager as "Could
+ * not load members". The pin went red on that branch, as it said it would; it is deleted and
+ * the standard-facing test un-skipped -- flipped, not repaired (BR-5).
  */
 const failed = () =>
   http.get('*/api/members', () => HttpResponse.json({ status: 500 }, { status: 500 }))
@@ -38,27 +42,13 @@ describe('the member register when the member list cannot be fetched', () => {
     server.use(failed())
   })
 
-  it.skip(
-    disabled(DEFECTS.A47, 'nothing on the failed screen reports a count of members'),
-    async () => {
-      renderWithProviders(<MembersPage />)
-      expect(await screen.findByText('The register could not be reached')).toBeInTheDocument()
-
-      // Written to the standard: an unknown is not a zero. The pager and the figures say
-      // nothing, or say they are unavailable -- never that there are no members.
-      expect(screen.queryByText('No members match')).not.toBeInTheDocument()
-      expect(figure('Total')).not.toHaveTextContent(/^0$/)
-    },
-  )
-
-  it(pin(DEFECTS.A47, 'the pager says no members match and the figures read 0'), async () => {
+  it('nothing on the failed screen reports a count of members', async () => {
     renderWithProviders(<MembersPage />)
-
-    // Must-pass first: the table IS reporting the failure, so what follows is about the
-    // rest of the screen and not about an error state that never rendered.
     expect(await screen.findByText('The register could not be reached')).toBeInTheDocument()
 
-    expect(screen.getByText('No members match')).toBeInTheDocument()
-    expect(figure('Total')).toHaveTextContent(/^0$/)
+    // Written to the standard: an unknown is not a zero. The pager and the figures say
+    // nothing, or say they are unavailable -- never that there are no members.
+    expect(screen.queryByText('No members match')).not.toBeInTheDocument()
+    expect(figure('Total')).not.toHaveTextContent(/^0$/)
   })
 })
