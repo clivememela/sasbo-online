@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Header from "./Header";
 import ErrorBoundary from "./common/ErrorBoundary";
 import RoutePending from "./common/RoutePending";
@@ -21,6 +21,7 @@ export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref,
    * same situation; hiding the first to tidy the second would lose a real failure.
    */
   const [lastNetworkFailureAt, setLastNetworkFailureAt] = useState(getLastNetworkFailureAt);
+  const { pathname } = useLocation();
 
   useEffect(() => onNetworkFailure(setLastNetworkFailureAt), []);
 
@@ -67,7 +68,11 @@ export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref,
             Suspense sits inside it for the same reason: `03.1` made every route lazy, so
             the outlet is where a chunk arrives -- and where a chunk that fails to arrive
             throws. A boundary above the Suspense would never see it. */}
-        <ErrorBoundary>
+        {/* 🔴 KEYED BY ROUTE (R1-F1). A boundary holds its error in state and renders the fallback whatever its
+            children become, so one page that threw left "This page could not be displayed." on every route the rail
+            could reach -- and the fallback's own sentence, "you can carry on somewhere else", was false. A key change
+            remounts it, which clears the error for the page you have moved to and keeps it for the one that threw. */}
+        <ErrorBoundary key={pathname}>
           <Suspense fallback={<RoutePending />}>
             <Outlet context={{ setSelectedCardHref, setSideBarOpen, search, setSearch }} />
           </Suspense>

@@ -237,20 +237,50 @@ export async function requestJson(send, { parseBody = true, allowEmpty = false, 
     controller.abort()
   }, timeoutMs)
 
+  /*
+   * 🔴 R2-F4: THE DEADLINE COVERS THE BODY, NOT JUST THE HEADERS. It used to be cleared in a `finally` around `send`
+   * alone -- so a proxy that sent headers and then stalled (a streaming gateway, a half-dead upstream) left every read
+   * below running with no timer, the loading state up forever, and `DataState` promising "It will stop trying
+   * shortly" while nothing was going to stop. That is A14's own failure mode, on the row the register calls closed.
+   * The signal already passed to `fetch` aborts body reads too, so the ceiling is real once the timer outlives
+   * `send`. Every exit path below clears it -- a pending timer keeps the event loop alive and, under fake timers in
+   * the suite, a stray deadline fires into whichever test runs next, which is the anti-flake rule's own worst case.
+   */
+  const done = () => clearTimeout(deadline)
+
   let response
   try {
     response = await send(controller.signal)
   } catch (cause) {
+    done()
     throw networkError(cause, { timedOut })
-  } finally {
-    // Cleared whatever happened. A pending timer keeps the event loop alive and, under fake
-    // timers in the suite, a stray deadline fires into whichever test is running next -- which
-    // is the anti-flake rule's own worst case.
-    clearTimeout(deadline)
   }
 
-  if (!response.ok) throw await apiErrorFrom(response)
-  if (!parseBody) return undefined
+  try {
+    if (!response.ok) throw await apiErrorFrom(response)
+    if (!parseBody) return undefined
+    return await readBody(response, { allowEmpty })
+  } catch (cause) {
+    /*
+     * 🔑 THE DEADLINE IS AUTHORITATIVE, NOT THE ERROR'S SHAPE. An aborted `response.json()` is caught inside
+     * `readBody` and rewritten as `nonJson`, and an aborted error body is swallowed by `apiErrorFrom`, which returns
+     * an `http` error -- so matching on `AbortError` here would have converted only one of the three paths and left
+     * the other two lying about why they failed. If the timer fired, this failed because we stopped waiting.
+     */
+    if (timedOut) throw networkError(cause, { timedOut })
+    throw cause
+  } finally {
+    done()
+  }
+}
+
+/**
+ * The body of a successful response, in the two shapes `requestJson` supports.
+ *
+ * Its own function because the ceiling above has to wrap every read in one `try`, and a `finally` around a block this
+ * long is where the next exit path forgets to clear the timer.
+ */
+async function readBody(response, { allowEmpty }) {
 
   /*
    * `allowEmpty`: a success that says NOTHING is a success, and a success that says something must still be JSON.
@@ -319,14 +349,24 @@ export async function requestOptionalJson(send, { timeoutMs = WRITE_CEILING_MS }
   try {
     response = await send(controller.signal)
   } catch (cause) {
+    clearTimeout(deadline)
     throw networkError(cause, { timedOut })
+  }
+
+  // R2-F4 again: the deadline covers the body here too. `text()` on a stalled response never settled, and this is the
+  // helper the BANK WRITE uses -- the one place where "did my change land?" is hardest to answer afterwards.
+  let text
+  try {
+    if (!response.ok) throw await apiErrorFrom(response)
+    text = await response.text()
+  } catch (cause) {
+    // As above: the timer having fired is what makes this a timeout, whatever shape the read's own failure took.
+    if (timedOut) throw networkError(cause, { timedOut })
+    throw cause
   } finally {
     clearTimeout(deadline)
   }
 
-  if (!response.ok) throw await apiErrorFrom(response)
-
-  const text = await response.text()
   if (!text) return undefined
   try {
     return JSON.parse(text)

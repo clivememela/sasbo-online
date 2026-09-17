@@ -537,23 +537,38 @@ export default function Members() {
          * own change, which only a person can cause. Proved by `Members.jobGrade.test.jsx`:
          * ① reddened on the merged code, and ③ holds that a real change of bank still clears it.
          */
-        if (!editForm.bankName) {
+        /*
+         * 🔴 R3-F4: ONLY WHILE EDITING, AND ONLY THE LATEST ANSWER COUNTS.
+         *
+         * The list is offered by the edit form alone -- the read view prints `editForm.jobGrade` directly and never
+         * touches these options -- so fetching on every OPEN spent two requests per member looked at, on the screen
+         * used most, for something nobody could see. And the fetch had no ticket: switching bank A → B with A's
+         * answer arriving last put A's grades under bank B, where one of them could then be saved.
+         */
+        if (!isEditing || !editForm.bankName) {
             // No bank, no grades: grades are per bank, so an empty list is the honest answer.
             setJobGradeOptions([]);
             setJobGradeError(null);
             return;
         }
 
+        let superseded = false;
         setJobGradeError(null);
         jobGradeService.getByBank(editForm.bankName)
-            .then((grades) => setJobGradeOptions(Array.isArray(grades) ? grades : []))
+            .then((grades) => {
+                if (superseded) return;
+                setJobGradeOptions(Array.isArray(grades) ? grades : []);
+            })
             .catch((error) => {
                 // An abort is the caller superseding itself, not a failure (§16, EH-D3).
-                if (error?.kind === 'abort') return;
+                if (superseded || error?.kind === 'abort') return;
                 setJobGradeOptions([]);
                 setJobGradeError(error);
             });
-    }, [editForm.bankName, jobGradeAttempt]);
+        return () => {
+            superseded = true;
+        };
+    }, [isEditing, editForm.bankName, jobGradeAttempt]);
 
 
     const handleEditToggle = () => {

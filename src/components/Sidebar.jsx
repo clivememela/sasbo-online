@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import Logo from "./common/Logo";
 import SidebarItem from "./common/SidebarItem";
 import ThemeToggle from "./common/ThemeToggle";
@@ -8,6 +8,7 @@ import Button from "./form/Button";
 import { navItems, authItems } from "../config/navigation";
 import { MENU_BUTTON_ID, SIDEBAR_ID } from "./shellIds";
 import { cn } from "../lib/utils";
+import useMediaQuery from "../hooks/useMediaQuery";
 
 /*
  * The chain of hrefs from the rail's root to `target`, and the SHORTEST one when a route
@@ -86,6 +87,20 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
     }));
   };
 
+  /*
+   * 🔴 R1-F2, THE OTHER HALF: OPENING THE DRAWER MOVED NO FOCUS. The hamburger stays focused behind the scrim, so a
+   * keyboard user who opens the menu is still outside it and the next Tab walks the page underneath. Focus goes to
+   * the drawer's own close button -- the first control in it, and the way back out -- matching where Escape returns
+   * focus from. Only below the desk breakpoint: at `lg` the rail is static furniture nobody "opened".
+   */
+  const belowDesk = useMediaQuery("(max-width: 1023px)");
+  const drawerRef = useRef(null);
+
+  useEffect(() => {
+    if (!sideBarOpen || !belowDesk) return;
+    drawerRef.current?.querySelector('[aria-label="Close navigation menu"]')?.focus();
+  }, [sideBarOpen, belowDesk]);
+
   /**
    * 🔴 ESCAPE CLOSES THE DRAWER, AND UNTIL `05.4` NOTHING DID.
    *
@@ -144,6 +159,16 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
       <nav
         id={SIDEBAR_ID}
         aria-label="Main"
+        /**
+         * 🔴 R1-F2: A CLOSED DRAWER IS OFF SCREEN, NOT OUT OF THE WAY. Below `lg` it was hidden by
+         * `-translate-x-64` alone, and a translated element is still focusable -- so a keyboard user on a narrow
+         * window tabbed through about twenty stops they could not see before reaching the page (WCAG 2.4.3 / 2.4.7).
+         * `inert` removes the whole subtree from the tab order and the accessibility tree, and it is applied ONLY
+         * when the drawer is genuinely off canvas: at desk width the rail is static and always reachable.
+         * Pixel-neutral -- `inert` has no rendering of its own, and the drawer is already translated away.
+         */
+        inert={belowDesk && !sideBarOpen}
+        ref={drawerRef}
         className={cn(
           "fixed z-20 flex h-dvh w-64 flex-col border-r border-line bg-bg-raised px-3 pb-3 pt-3.5",
           "shadow-(--shadow-2) transition-transform duration-(--duration-base) ease-(--ease-out)",
@@ -157,8 +182,13 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
             the topbar carries no application title: an application's name belongs in one
             place, and the rail is the place that is on screen at every width. */}
         <div className="relative flex items-center gap-2 px-2 pb-4 pt-1.5">
-          <a
-            href="/home"
+          {/* 🔴 R1-F4: WAS A RAW `<a href="/home">`, so the one thing at the top of every screen RELOADED THE WHOLE
+              APPLICATION -- the entry chunk fetched and parsed again, the topbar search and any page state (a record
+              mid-edit) dropped with no confirm, and on a phone the drawer left open because `setSideBarOpen` never
+              ran. Every other rail entry was already a `<Link>`. Same classes, so no pixel moves. */}
+          <Link
+            to="/home"
+            onClick={() => setSideBarOpen(false)}
             aria-label="SASBO Online home"
             className="touch-size flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
           >
@@ -171,7 +201,7 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
                 The Finance Union
               </small>
             </span>
-          </a>
+          </Link>
           {/* Same defect as the hamburger it undoes: an icon-only raw <button> with no
               accessible name, announcing as "button". The primitive brings the name, the
               44px coarse-pointer hit area and the focus ring. Positioned over the row's
