@@ -20,6 +20,7 @@ import useReferenceData from '../../hooks/useReferenceData.js';
 import reportError from '../../lib/reportError.js';
 import { cn } from '../../lib/utils';
 import { formalName } from '../../lib/names.js';
+import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 
 const PAGE_SIZE = 20;
 
@@ -47,6 +48,20 @@ const REFERENCE_LOADERS = {
     roles: () => recruiterService.getRoles(),
     'recruitment channels': () => recruitmentChannelService.getAll(),
 };
+
+/**
+ * 🔴 R3-F2, WIDENED 2026-09-18: "could not be saved" is a claim about the SERVER, and only a refusal supports it.
+ *
+ * This screen already worded its recruiter REMOVAL honestly ("may be only partly removed ... reload and check"),
+ * because that one obviously half-writes. The other three said flatly that nothing happened -- and a create whose
+ * answer never arrived, announced as "could not be created", is how a recruiter gets made twice.
+ *
+ * `writeMayHaveLanded` in `parseApiError.js` is the one place the rule lives; this chooses the sentence and names
+ * where to go and look.
+ */
+const writeFailure = (err, what, whereToCheck) => (writeMayHaveLanded(err)
+    ? `${what} could not be confirmed. Reload ${whereToCheck} and check before trying again.`
+    : `${what} was not saved. ${messageOf(err)}`.trim());
 
 export function Recruiters() {
     const [members, setMembers] = useState([]);
@@ -474,7 +489,7 @@ export function Recruiters() {
             await refreshAll();
             succeed(`${formalName(member) || 'That member'} was removed from ${selectedRep?.name ?? 'the recruiter'}.`);
         } catch (err) {
-            fail(`That member could not be removed from the recruiter. ${err?.message || ''}`.trim());
+            fail(writeFailure(err, `${formalName(member) || 'That member'}'s removal from the recruiter`, 'the recruiter'));
         } finally {
             setSaving(false);
         }
@@ -512,7 +527,7 @@ export function Recruiters() {
             setSelectedRep({ id: createdRep?.id, name: repName });
             succeed(`${repName} is a recruiter now.`);
         } catch (err) {
-            fail(`That recruiter could not be created. ${err?.message || ''}`.trim());
+            fail(writeFailure(err, 'That recruiter', 'the list'));
         } finally {
             setSaving(false);
         }
@@ -1105,7 +1120,7 @@ export function Recruiters() {
                                                     setEditingRep(false);
                                                     succeed('Those recruiter details are saved.');
                                                 } catch (err) {
-                                                    fail(`Those recruiter details could not be saved. ${err?.message || ''}`.trim());
+                                                    fail(writeFailure(err, 'Those recruiter details', 'the recruiter'));
                                                 } finally {
                                                     setSaving(false);
                                                 }

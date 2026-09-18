@@ -24,6 +24,17 @@ const CELL_INPUT = 'w-full rounded border border-line-strong bg-surface-2 px-2 p
 
 const HEAD_CELL = 'whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5';
 
+/**
+ * 🔴 R3-F2, WIDENED: "could not be saved" is a claim about the SERVER, and only a refusal supports it.
+ *
+ * The delete learnt this first; add, rename and enable/disable were left saying it after a timeout or a lost
+ * connection, when the change may well have landed -- and an administrator who believes that adds the channel twice.
+ * `writeMayHaveLanded` is the one place the rule lives (`parseApiError.js`); this is the sentence it chooses.
+ */
+const writeFailureNotice = (err, what) => (writeMayHaveLanded(err)
+    ? `${what} could not be confirmed. Reload the list and check before trying again.`
+    : `${what} was not saved. ${messageOf(err)}`.trim());
+
 export default function RecruitmentChannel() {
     const [notice, setNotice] = useState(null);
     const noticeRef = useRef(null);
@@ -87,6 +98,7 @@ export default function RecruitmentChannel() {
     }, [recruitmentChannels, search]);
 
     const handleAdd = async () => {
+        const what = 'That recruitment channel';
         const name = newName.trim();
         if (!name) return;
         setSaving(true);
@@ -96,13 +108,14 @@ export default function RecruitmentChannel() {
             setNewName('');
             setShowAdd(false);
         } catch (err) {
-            setNotice(`That change could not be saved. ${err?.message || ''}`.trim());
+            setNotice(writeFailureNotice(err, what));
         } finally {
             setSaving(false);
         }
     };
 
     const handleEdit = async (r) => {
+        const what = `The new name for ${r.name}`;
         const name = editName.trim();
         if (!name) return;
         setSaving(true);
@@ -111,19 +124,20 @@ export default function RecruitmentChannel() {
             await refresh();
             setEditingId(null);
         } catch (err) {
-            setNotice(`That change could not be saved. ${err?.message || ''}`.trim());
+            setNotice(writeFailureNotice(err, what));
         } finally {
             setSaving(false);
         }
     };
 
     const handleToggleEnabled = async (r) => {
+        const what = `The change to ${r.name}`;
         setSaving(true);
         try {
             await recruitmentChannelService.update(r.id, { name: r.name, enabled: !r.enabled });
             await refresh();
         } catch (err) {
-            setNotice(`That change could not be saved. ${err?.message || ''}`.trim());
+            setNotice(writeFailureNotice(err, what));
         } finally {
             setSaving(false);
         }
