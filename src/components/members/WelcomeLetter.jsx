@@ -88,11 +88,16 @@ export default function WelcomeLetter({ open, onClose, member }) {
         <Modal
             open={open}
             onOpenChange={closeOn(onClose)}
+            // 🔴 R2-F3, THE ONE WRITE-BEARING DIALOG IT MISSED (found by P10's component inventory). While the letter
+            // is sending, every way out is shut, so the result lands on the dialog the user is still looking at.
+            busy={sendState === 'sending'}
             title="Welcome Letter Preview"
             size="xl"
             footer={
                 <>
-                    <Button variant="ghost" onClick={onClose}>Close</Button>
+                    {/* ⚠️ `busy` cannot reach this: it is the caller's own button calling `onClose` directly, so it is
+                        disabled here while sending -- exactly what `ConfirmDialog` does with its Cancel. */}
+                    <Button variant="ghost" onClick={onClose} disabled={sendState === 'sending'}>Close</Button>
                     {sendState === 'sent' ? (
                         <span role="status" className="flex items-center gap-2 text-sm font-medium text-status-active">
                             <CheckCircle2 className="size-4" aria-hidden="true" />

@@ -168,4 +168,72 @@ describe('the welcome letter dialog', () => {
       expect(within(dialog).queryByText(/no membership number/i)).not.toBeInTheDocument()
     })
   })
+
+  describe('R2-F3, the one write-bearing dialog it missed — no way out while the letter is sending', () => {
+    /*
+     * 🔴 FOUND BY P10's COMPONENT INVENTORY, NOT BY P9's REVIEW. R2-F3 gave `Modal` a `busy` prop so a dialog
+     * cannot be closed while its write is in flight -- otherwise the result lands on a surface the user has
+     * already left, and they cannot tell whether it happened. `ConfirmDialog`, `AcbDebits` and `BankBranchModal`
+     * all pass it. This dialog holds `sendState === 'sending'` and did not, so Escape, the scrim and the X all
+     * closed it mid-send.
+     *
+     * ⚠️ AND `busy` ALONE WOULD NOT HAVE BEEN THE FIX, which is why the second assertion is here. The footer has
+     * its own Close button calling `onClose` directly; `Modal` cannot intercept that, so it has to be disabled
+     * by the caller while sending -- exactly what `ConfirmDialog` does with its Cancel.
+     *
+     * The send is HELD until the test releases it, so "while sending" is a state the test is in, not a race.
+     */
+    function held() {
+      let release
+      const answered = new Promise((resolve) => {
+        release = resolve
+      })
+      return {
+        handler: http.post('*/api/members/:id/send-welcome', async () => {
+          await answered
+          return new HttpResponse(null, { status: 200 })
+        }),
+        release: () => release(),
+      }
+    }
+
+    it('while sending, Escape does not close it and the footer Close is disabled', async () => {
+      const send = held()
+      server.use(send.handler)
+      const onClose = vi.fn()
+      const user = setupUser()
+      renderWithProviders(<WelcomeLetter open onClose={onClose} member={person(101)} />)
+
+      try {
+        await user.click(screen.getByRole('button', { name: /send welcome letter/i }))
+        await screen.findByRole('button', { name: /sending/i })
+
+        await user.keyboard('{Escape}')
+        expect(onClose, 'Escape closed the dialog while the letter was still sending').not.toHaveBeenCalled()
+
+        const dialog = screen.getByRole('dialog')
+        // BOTH ways out named Close -- the header's X (held by `busy`) and the footer's own button (which `busy`
+        // cannot reach, so the dialog disables it) -- and there must be two, or one of them went missing.
+        const closes = within(dialog).getAllByRole('button', { name: /^Close$/ })
+        expect(closes).toHaveLength(2)
+        closes.forEach((button) => expect(button).toBeDisabled())
+      } finally {
+        send.release()
+      }
+    })
+
+    it('the must-pass: once the send has answered, Escape closes it again', async () => {
+      // 🔑 Without this, a dialog that could NEVER be closed would pass the test above.
+      server.use(sent())
+      const onClose = vi.fn()
+      const user = setupUser()
+      renderWithProviders(<WelcomeLetter open onClose={onClose} member={person(101)} />)
+
+      await user.click(screen.getByRole('button', { name: /send welcome letter/i }))
+      await screen.findByText('Welcome Letter Sent')
+      await user.keyboard('{Escape}')
+
+      expect(onClose).toHaveBeenCalled()
+    })
+  })
 })
