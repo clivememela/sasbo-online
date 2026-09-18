@@ -35,7 +35,7 @@ async function fillValidMember(user) {
   await fill(user, 'First Name(s)', 'Synthetic')
   await fill(user, 'Surname', 'Testperson')
   await user.click(screen.getByRole('button', { name: /Employment & Bank/i }))
-  await user.selectOptions(labelled('Payment Type'), 'Payroll')
+  await user.selectOptions(labelled('Payment Type'), 'Payroll Deduction')
   await user.click(screen.getByRole('button', { name: /Personal Information/i }))
   await user.selectOptions(labelled('Identity Type'), 'I.D. Number')
   await fill(user, 'I.D. Number', '9001010000080')
@@ -111,5 +111,83 @@ describe('Capture Member, saving and leaving', () => {
 
     expect(back).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('dialog', { name: 'Discard this member?' })).not.toBeInTheDocument()
+  })
+  // ── what a FAILED save says, and what a successful one leaves behind (design arc P9: R3-F2, R3-OBS-2b) ──
+
+  const noticeText = async () => {
+    await waitFor(() => expect(document.querySelector('[aria-labelledby$="save-notice-title"]')).not.toBeNull())
+    return document.querySelector('[aria-labelledby$="save-notice-title"]').textContent
+  }
+
+  it('④ 🔴 a save that never answered does NOT say "not saved" -- it says to check the register first', async () => {
+    // A timeout or a dropped connection does not mean the server did nothing. "This member was not saved" invites a
+    // second press, and the second press is a second member.
+    server.use(...pageFixtures, http.post('*/api/members', () => HttpResponse.error()))
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+    await fillValidMember(user)
+    await user.click(screen.getByRole('button', { name: /Save Member/i }))
+
+    const text = await noticeText()
+    expect(text).toMatch(/could not confirm/i)
+    expect(text).toMatch(/check the register/i)
+    expect(text).not.toMatch(/was not saved/i)
+  })
+
+  it('⑤ the must-pass: a save the server REFUSED still says plainly that it was not saved', async () => {
+    server.use(
+      ...pageFixtures,
+      http.post('*/api/members', () => HttpResponse.json({ message: 'Identity number already on record' }, { status: 409 })),
+    )
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+    await fillValidMember(user)
+    await user.click(screen.getByRole('button', { name: /Save Member/i }))
+
+    const text = await noticeText()
+    expect(text).toMatch(/was not saved/i)
+    expect(text).toMatch(/already on record/i)
+  })
+
+  it("⑥ the server's per-field errors land under their fields, not only in the summary", async () => {
+    server.use(
+      ...pageFixtures,
+      http.post('*/api/members', () =>
+        HttpResponse.json(
+          { message: 'Validation failed', validationErrors: { identityNumber: 'must be unique' } },
+          { status: 400 },
+        )),
+    )
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+    await fillValidMember(user)
+    await user.click(screen.getByRole('button', { name: /Save Member/i }))
+
+    await waitFor(() => expect(labelled('I.D. Number')).toHaveAttribute('aria-invalid', 'true'))
+    expect(screen.getAllByText('must be unique').length).toBeGreaterThan(0)
+  })
+
+  it('⑦ 🔴 after a successful capture the form is empty again, so a second press cannot post the member twice', async () => {
+    let posts = 0
+    server.use(
+      ...pageFixtures,
+      http.post('*/api/members', async ({ request }) => {
+        posts += 1
+        return HttpResponse.json({ id: posts, ...(await request.json()) })
+      }),
+    )
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+    await fillValidMember(user)
+    await user.click(screen.getByRole('button', { name: /Save Member/i }))
+    await screen.findByText('Member captured successfully!')
+
+    // The welcome letter offer opens over the form; close it the way a clerk would.
+    const letter = screen.queryByRole('dialog')
+    if (letter) await user.keyboard('{Escape}')
+
+    await waitFor(() => expect(labelled('First Name(s)')).toHaveValue(''))
+    await user.click(screen.getByRole('button', { name: /Save Member/i }))
+    expect(posts, 'the same member was posted again').toBe(1)
   })
 })

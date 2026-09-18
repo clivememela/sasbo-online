@@ -27,7 +27,7 @@ const MEMBER = {
   surname: 'Focus',
   initials: 'S',
   status: 'Active',
-  paymentType: 'Payroll',
+  paymentType: 'Payroll Deduction',
 }
 
 describe('focus and the member record', () => {

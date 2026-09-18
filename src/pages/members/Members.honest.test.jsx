@@ -28,7 +28,7 @@ const MEMBER = {
   surname: 'Subscriber',
   identityNumber: '9001010000080',
   status: 'Active',
-  paymentType: 'Payroll',
+  paymentType: 'Payroll Deduction',
 }
 const boom = () => HttpResponse.json({ status: 500, error: 'boom' }, { status: 500 })
 

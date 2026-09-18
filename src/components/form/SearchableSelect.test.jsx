@@ -268,3 +268,147 @@ describe('SearchableSelect — the 16px rule, mutation-checked', () => {
     }
   })
 })
+
+/**
+ * `allowCustom` -- LIST FIRST, TYPING ALLOWED (02.5 / CM-37).
+ *
+ * ⚖️ SPECIFIED BY THE DESIGN ARC, WHICH OWNS THIS PRIMITIVE, and built here on their instruction
+ * (sasbo-online-30, 2026-09-17): a new capability on a shared control is not one of P9's findings, so
+ * it goes on the capture branch and they review it before merge. Their conditions are the cases below.
+ *
+ * WHY IT IS NEEDED AT ALL: the seeded job-grade list is per-bank and incomplete -- SASBO's own data
+ * carries grades no bank row has -- so an administrator who cannot type a grade cannot capture the
+ * member. The server is already built for it: `jobGradeMatching` in `api-vocabulary.json` publishes
+ * the MATCHED / CAPTURED / CLEARED outcomes and the normalisation, and `MemberDto.jobGradeOutcome`
+ * reports which happened.
+ *
+ * 🔑 THE DEFAULT IS THE LOAD-BEARING HALF. This control is consumed by Members, Recruiters and
+ * Capture; one changed default is three screens changed in silence. Every case below that asserts the
+ * custom behaviour is PAIRED with the same interaction and no prop -- without that pair, deleting the
+ * guard passes.
+ */
+describe('SearchableSelect — allowCustom', () => {
+  const typeAndBlur = async (user, text) => {
+    const combobox = screen.getByRole('combobox', { name: 'Job Grade' })
+    await user.click(combobox)
+    await user.type(combobox, text)
+    await user.tab()
+    return combobox
+  }
+
+  it('a typed value that matches no option SURVIVES blur, through the same onChange', async () => {
+    const user = setupUser()
+    const onChange = vi.fn()
+    renderWithProviders(
+      <SearchableSelect label="Job Grade" value="" onChange={onChange} options={BANKS} allowCustom />,
+    )
+
+    await typeAndBlur(user, 'Prokureur')
+
+    // The same callback and the same argument shape a chosen option uses -- `(value, option)`, with
+    // no option, because there is not one. No second callback and no new event vocabulary.
+    expect(onChange).toHaveBeenCalledWith('Prokureur', undefined)
+  })
+
+  it('🔑 the must-pass: the same typed value is DISCARDED when the prop is absent', async () => {
+    const user = setupUser()
+    const onChange = vi.fn()
+    renderWithProviders(
+      <SearchableSelect label="Job Grade" value="" onChange={onChange} options={BANKS} />,
+    )
+
+    await typeAndBlur(user, 'Prokureur')
+
+    expect(
+      onChange,
+      'Without allowCustom this control is list-only. If a typed value escapes here, the default has ' +
+        'changed for Members and Recruiters too, and neither asked for it.',
+    ).not.toHaveBeenCalled()
+  })
+
+  it('a typed value that DOES match an option still resolves to the option, not to the text', async () => {
+    const user = setupUser()
+    const onChange = vi.fn()
+    renderWithProviders(
+      <SearchableSelect label="Job Grade" value="" onChange={onChange} options={BANKS} allowCustom />,
+    )
+
+    await typeAndBlur(user, 'Nedbank')
+
+    // The stored value is the option's, not the label the user happened to type.
+    expect(onChange).toHaveBeenCalledWith('nedbank', BANKS[2])
+  })
+
+  it('choosing from the list still works, and still wins over what was typed', async () => {
+    const user = setupUser()
+    const onChange = vi.fn()
+    renderWithProviders(
+      <SearchableSelect label="Job Grade" value="" onChange={onChange} options={BANKS} allowCustom />,
+    )
+
+    const combobox = screen.getByRole('combobox', { name: 'Job Grade' })
+    await user.click(combobox)
+    await user.type(combobox, 'Ned')
+    await user.click(screen.getByRole('option', { name: 'Nedbank' }))
+
+    expect(onChange).toHaveBeenCalledWith('nedbank', BANKS[2])
+    expect(onChange).toHaveBeenCalledTimes(1)
+  })
+
+  it('blanks and whitespace are not values', async () => {
+    const user = setupUser()
+    const onChange = vi.fn()
+    renderWithProviders(
+      <SearchableSelect label="Job Grade" value="" onChange={onChange} options={BANKS} allowCustom />,
+    )
+
+    await typeAndBlur(user, '   ')
+
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('Escape abandons what was typed rather than committing it', async () => {
+    // Escape means "never mind" everywhere else in this control; allowCustom must not turn it into
+    // a second way to commit.
+    const user = setupUser()
+    const onChange = vi.fn()
+    renderWithProviders(
+      <SearchableSelect label="Job Grade" value="" onChange={onChange} options={BANKS} allowCustom />,
+    )
+
+    const combobox = screen.getByRole('combobox', { name: 'Job Grade' })
+    await user.click(combobox)
+    await user.type(combobox, 'Prokureur')
+    await user.keyboard('{Escape}')
+    await user.tab()
+
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('says that typing is allowed, in the semantics a screen reader reads', async () => {
+    // The half most likely to be dropped: a sighted user discovers typing by trying it, a screen
+    // reader user is only told. The control is no longer list-only, so it must not read as readonly.
+    renderWithProviders(
+      <SearchableSelect label="Job Grade" value="" onChange={() => {}} options={BANKS} allowCustom />,
+    )
+
+    const combobox = screen.getByRole('combobox', { name: 'Job Grade' })
+    expect(combobox).toHaveAttribute('aria-autocomplete', 'list')
+    expect(combobox).not.toHaveAttribute('aria-readonly')
+  })
+
+  it('keeps the touch and type floors it shares with every other consumer', async () => {
+    const user = setupUser()
+    renderWithProviders(
+      <SearchableSelect label="Job Grade" value="" onChange={() => {}} options={BANKS} allowCustom />,
+    )
+
+    const combobox = screen.getByRole('combobox', { name: 'Job Grade' })
+    expect(combobox.className).toMatch(/\bfield-text\b/)
+    await user.click(combobox)
+    for (const option of screen.getAllByRole('option')) {
+      expect(option.className).toMatch(/\btouch-size\b/)
+      expect(option.className).toMatch(/\bfield-text\b/)
+    }
+  })
+})

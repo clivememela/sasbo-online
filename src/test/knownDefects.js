@@ -56,30 +56,6 @@
 const define = (row, headline, detail) => ({ row, headline, detail })
 
 export const DEFECTS = {
-  A6: define(
-    'A6',
-    'the payment-type branch is dead code',
-    'usePaymentTypeValidation compares the payment type against "Payroll Deduction". ' +
-      'PAYMENT_TYPE_OPTIONS cannot produce that string -- it offers "Payroll". The ' +
-      'branch can therefore never be true, so isPayrollDeduction is permanently false ' +
-      'and every field it disables is permanently enabled. The server still carries a ' +
-      'PAYROLL_DEDUCTION shim in PaymentType.fromString, which is what proves this is ' +
-      'drift between the two halves rather than a typo in one of them.',
-  ),
-
-  A7: define(
-    'A7',
-    'the passport date-of-birth rule never fires',
-    'CaptureMember branches on identityType === "Passport" while its own dropdown ' +
-      'offers "Passport Number". The same shape as A6, on a different field: neither ' +
-      'side is wrong alone, they simply do not agree, and the consequence is a rule ' +
-      'that has never once run in production. IT IS IN TWO SCREENS, not one: this row ' +
-      'named only CaptureMember until P4 scanned for the class rather than the ' +
-      'instance and found the same comparison in Members.jsx (validation and the ' +
-      'date-of-birth field). Corrected 2026-09-05 -- an under-reported row is how a ' +
-      'fix gets called complete while half the defect is still shipping.',
-  ),
-
   A9: define(
     'A9',
     'the client re-implements a rule the server publishes, and they disagree',
@@ -91,6 +67,25 @@ export const DEFECTS = {
       'repair that activates untested behaviour.',
   ),
 
+// A6 is RETIRED, 2026-09-17, by the capture-member re-port. It read: "the payment-type branch is
+// dead code -- usePaymentTypeValidation compares against 'Payroll Deduction' and
+// PAYMENT_TYPE_OPTIONS offers 'Payroll', so the branch can never be true."
+//
+// The BROWSER is what moved, not the hook. The server's PaymentType is PAYROLL("Payroll
+// Deduction") and it is now on main (829f252), published in `api-vocabulary.json`, so the option
+// takes the server's name and `Members.jsx` folds the legacy stored value onto it instead of the
+// other way about. `usePaymentTypeValidation.test.jsx` keeps the scan that pinned this, flipped:
+// exactly one offered option now reaches the branch.
+//
+// ⚠️ A9 IS UNCHANGED AND STAYS OPEN, and that is the honest reading of the pair. A9's own text
+// warned that fixing A6 "switches on code nothing has ever tested". What it switches on is
+// reachable now, but it is still not RUNNING: no screen imports usePaymentTypeValidation --
+// checked again on the day A6 closed -- so both screens carry their own `paymentType === "Debit
+// Order"` test and the hook's hardcoded rule reaches no member. Closing A6 changed the hook's
+// reachability, not the application's behaviour, and A9's pin is what still says so.
+//
+// A7 is RETIRED, 2026-09-17, by the capture-member re-port: both screens compare against
+// IDENTITY_TYPE_PASSPORT, so a passport member needs a date of birth on Capture AND Edit.
 // A11 is RETIRED, 2026-09-09, by the design arc's 03.1.
 //
 // It read: "no error boundary -- one render error blanks the whole application".
@@ -339,34 +334,12 @@ export const DEFECTS = {
       'than excluding it, so it stays visible in the output of every run.',
   ),
 
-  A37: define(
-    'A37',
-    'a member with COSATU positions crashes the member register on render',
-    'MemberDto.cosatuPositions is a STRING on the server: ' +
-      'StringArrayToCommaSeparatedDeserializer folds an incoming array into "PEC,CEC" on ' +
-      'the way in and nothing unfolds it on the way out. Members.jsx calls .join(", ") on ' +
-      'it. The `?.length > 0` guard beside the call does NOT protect, and that is the ' +
-      'whole trap: a non-empty string has a length, so the guard passes and the call ' +
-      'throws "cosatuPositions.join is not a function". The detail view does not render ' +
-      'at all for any member whose positions are set. ' +
-      'Verified 2026-09-08 from both sides: the DTO field type and the call site. ' +
-      '\u26a0\ufe0f The BLAST RADIUS shrank on 2026-09-09 and the defect did not: this used to take ' +
-      'the whole shell with it (old row A11, no boundary anywhere). With ErrorBoundary now ' +
-      'beside the outlet it is a broken panel with a way back -- still a member whose record ' +
-      'cannot be opened, and still this row.',
-  ),
-
-  A38: define(
-    'A38',
-    'the same asymmetry one field over, currently latent',
-    'Members.jsx calls .join(", ") on selectedMember.becStructures behind the identical ' +
-      '`?.length > 0` guard. It does not crash today only because the server has no ' +
-      'becStructures field at all, so the value is undefined and the guard is false. It ' +
-      'becomes A37 the day that field is added and returns a delimited string -- which is ' +
-      'the shape this API already uses for the neighbouring one. Recorded now because the ' +
-      'cost of finding it later is a second production crash.',
-  ),
 }
+
+// A37 and A38 are RETIRED, 2026-09-17, by the capture-member re-port: memberService.normalizeMember
+// unfolds the server's delimited list fields for every consumer, and the Structures tab no longer
+// renders either list (stakeholder shape, 2026-09-17). Proved in Members.structures.test.jsx (a
+// string-shaped record opens, reads and edits) and memberService.normalize.test.js.
 
 DEFECTS.A29 = define(
   'A29',

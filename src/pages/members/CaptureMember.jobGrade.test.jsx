@@ -127,6 +127,24 @@ async function openEmploymentTab(user) {
   await user.click(screen.getByRole('button', { name: /^Employment & Bank/ }))
 }
 
+/**
+ * ⚠️ JOB GRADE IS A COMBOBOX NOW, NOT A NATIVE `<select>` -- 02.5/CM-37, the same commit that let a
+ * grade be typed. `allowCustom` exists only on `SearchableSelect`, and a native select cannot accept
+ * a value that is not one of its options, so the control had to change for the capability to exist.
+ *
+ * Everything the assertions below are ABOUT is unchanged: the option's text is the bare grade code
+ * and the value it carries is the same code. What changed is that the options exist only while the
+ * list is open, so each one opens it first.
+ */
+const gradeCombobox = () =>
+  screen.getByText(/^Job Grade/).closest('div').querySelector('input')
+
+async function openGrades(user) {
+  const input = gradeCombobox()
+  await user.click(input)
+  return input
+}
+
 describe('the job-grade dropdown', () => {
   it('shows the grade CODE as its text and carries the same code as its value', async () => {
     const user = setupUser()
@@ -142,10 +160,15 @@ describe('the job-grade dropdown', () => {
     // 🔑 SINCE MAIN a23fb81 (2026-09-16) THE TEXT IS THE BARE GRADE, not "C1 - Clerk -
     // Permanent": the fixture still sends the long label, and the service now forces
     // the label to the grade. The `[object Object]` regression this pins is unchanged.
+    await openGrades(user)
     const clerk = await waitFor(() => screen.getByRole('option', { name: 'C1' }))
 
-    expect(clerk).toHaveValue('C1')
+    // In a listbox the stored value rides on `aria-selected`/the commit rather than on a DOM
+    // `value`, so the pairing is asserted where it now lives: the row reads 'C1', and choosing it
+    // puts 'C1' -- not the decorated label -- in the field.
     expect(clerk.textContent).toBe('C1')
+    await user.click(clerk)
+    await waitFor(() => expect(gradeCombobox()).toHaveValue('C1'))
   })
 
   it('renders a grade with no description as its bare code, with no dangling separator', async () => {
@@ -160,9 +183,10 @@ describe('the job-grade dropdown', () => {
     // type reached the browser as `"BA1 -"`. It is fixed on the server and
     // asserted there; this is the assertion from the side a user actually sees,
     // and it is the reason the fixture above carries a one-part grade at all.
+    await openGrades(user)
     const bare = await waitFor(() => screen.getByRole('option', { name: 'BA1' }))
 
-    expect(bare).toHaveValue('BA1')
+    expect(bare.textContent).toBe('BA1')
     expect(bare.textContent).not.toMatch(/-\s*$/)
   })
 
@@ -176,7 +200,12 @@ describe('the job-grade dropdown', () => {
     // state the form OPENS in -- the one every administrator sees first -- and
     // because it proves the two assertions above are about grades that arrived
     // from the server rather than about anything the component had already.
-    expect(await screen.findByText('No job grades available')).toBeInTheDocument()
+    // The empty state is the combobox's PLACEHOLDER now rather than an option row -- the same
+    // sentence, in the place a combobox has to put it. Still asserted for the same reason: it is
+    // the state the form opens in, and it proves the two assertions above are about grades that
+    // arrived from the server rather than anything the component already held.
+    await waitFor(() =>
+      expect(gradeCombobox()).toHaveAttribute('placeholder', 'No job grades available'))
   })
 })
 
@@ -201,15 +230,14 @@ describe('changing the bank -- main e56dbe4', () => {
     )
   })
 
-  /** Choose C1 for the first bank, and hand back the select it was chosen in. */
+  /** Choose C1 for the first bank, and hand back the control it was chosen in. */
   async function chooseClerkForFirstBank(user) {
     renderWithProviders(<CaptureMember />)
     await chooseBank(user)
 
-    const clerk = await screen.findByRole('option', { name: 'C1' })
-    const grade = clerk.closest('select')
-    await user.selectOptions(grade, 'C1')
-    return grade
+    await openGrades(user)
+    await user.click(await screen.findByRole('option', { name: 'C1' }))
+    return gradeCombobox()
   }
 
   it('keeps a grade chosen after the bank -- the must-pass half', async () => {
@@ -234,9 +262,7 @@ describe('changing the bank -- main e56dbe4', () => {
     await user.type(bankInput, 'Capitec')
     await user.click(await screen.findByRole('option', { name: SECOND_BANK.bankName }))
 
-    await waitFor(() =>
-      expect(screen.getByRole('option', { name: 'C1' }).closest('select')).toHaveValue(''),
-    )
+    await waitFor(() => expect(gradeCombobox()).toHaveValue(''))
   })
 })
 
@@ -290,7 +316,10 @@ describe("when the job grades cannot be fetched -- A25’s second clause", () =>
     server.use(http.get('*/api/job-grades', () => HttpResponse.json(GRADES)))
     await user.click(screen.getByRole('button', { name: 'Try again' }))
 
-    expect(await screen.findByRole('option', { name: 'C1' })).toHaveValue('C1')
+    // The grades arrived: the field is a working combobox again, and C1 is in its list.
+    await waitFor(() => expect(screen.queryByText('Job Grade could not be loaded.')).not.toBeInTheDocument())
+    await openGrades(user)
+    expect(await screen.findByRole('option', { name: 'C1' })).toBeInTheDocument()
   })
 
   it('leaves the rest of the form working -- the failure is per-panel', async () => {
@@ -324,5 +353,101 @@ describe("when the job grades cannot be fetched -- A25’s second clause", () =>
 
     expect(await screen.findByText('Job Grade could not be loaded.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * 02.5 / CM-37 -- LIST FIRST, TYPING ALLOWED, AND THE SCREEN SAYS WHICH HAPPENED.
+ *
+ * The seeded grade list is per-bank and incomplete: SASBO's own data carries grades no bank row has,
+ * so an administrator who cannot type one cannot capture the member at all. The server is already
+ * built for it -- `jobGradeMatching` in `api-vocabulary.json` publishes the normalisation and the
+ * MATCHED / CAPTURED / CLEARED outcomes, and `MemberDto.jobGradeOutcome` reports which one occurred.
+ *
+ * 🔑 THE NEAR MISS IS A PROMPT, NEVER A SUBSTITUTION. `SBG4` for `SBG04` is the realistic mistake
+ * where grades are zero-padded. Silently correcting it is the failure this whole unit exists to fix:
+ * a grade that appeared to save, saved as something else, and said nothing.
+ *
+ * ⚖️ The `allowCustom` prop this rests on was specified by the design arc, which owns
+ * `SearchableSelect`, and is tested at the primitive in `SearchableSelect.test.jsx`. What is tested
+ * HERE is the call site: that the grade reaches the payload, and that the near-miss prompt appears
+ * without changing anything.
+ */
+describe('the job grade can be typed, not only chosen', () => {
+  const typeGrade = async (user, text) => {
+    const label = await screen.findByText(/^Job Grade/)
+    const input = label.closest('div').querySelector('input')
+    await user.click(input)
+    await user.type(input, text)
+    await user.tab()
+    return input
+  }
+
+  it('🔴 a grade that is on no list survives, and is what gets posted', async () => {
+    let posted
+    server.use(http.post('*/api/members', async ({ request }) => {
+      posted = await request.json()
+      return HttpResponse.json({ id: 1, ...posted })
+    }))
+
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+    const field = (text) => screen.getByLabelText(new RegExp(`^${text}`))
+
+    // Personal Information first: the form renders ONE tab at a time, and `chooseBank` moves to
+    // Employment & Bank -- so anything typed here has to be typed before that.
+    await screen.findByLabelText(/^First Name\(s\)/)
+    await user.type(field('First Name'), 'Synthetic')
+    await user.type(field('Surname'), 'Testperson')
+    await user.selectOptions(field('Identity Type'), 'I.D. Number')
+    await user.type(field('I.D. Number'), '9001010000080')
+
+    await chooseBank(user)
+    await user.selectOptions(field('Payment Type'), 'Payroll Deduction')
+
+    // "Prokureur" is a real Old Mutual grade and is on no bank's seeded list here.
+    await typeGrade(user, 'Prokureur')
+
+    await user.click(screen.getByRole('button', { name: /save member/i }))
+    await waitFor(() => expect(posted).toBeDefined())
+    expect(posted.jobGrade).toBe('Prokureur')
+  })
+
+  it('🔑 offers the near miss as a question, and does NOT change what was typed', async () => {
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+    await chooseBank(user)
+    await screen.findByText(/^Job Grade/)
+
+    const input = await typeGrade(user, 'C01')
+
+    // The prompt names the grade it suspects...
+    expect(await screen.findByText(/C1/)).toBeInTheDocument()
+    // ...and the field still holds exactly what the administrator typed.
+    expect(input, 'a near miss that rewrites the field is the defect, not the fix').toHaveValue('C01')
+  })
+
+  it('the must-pass: a grade that IS on the list raises no near-miss prompt', async () => {
+    // Without this, the prompt could be permanent markup no condition controls.
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+    await chooseBank(user)
+    await screen.findByText(/^Job Grade/)
+
+    await typeGrade(user, 'C1')
+
+    expect(screen.queryByText(/Did you mean/i)).not.toBeInTheDocument()
+  })
+
+  it('and typing a grade that matches the list case-insensitively stores the LIST spelling', async () => {
+    // Rule 2 of §6c: `ba2` becomes `BA2`, or the same grade exists twice depending on how it was
+    // entered. The comparison ignores case; the STORED form is the list's.
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+    await chooseBank(user)
+    await screen.findByText(/^Job Grade/)
+
+    const input = await typeGrade(user, 'ba1')
+    await waitFor(() => expect(input).toHaveValue('BA1'))
   })
 })

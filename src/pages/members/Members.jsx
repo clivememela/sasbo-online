@@ -6,17 +6,17 @@ import {
     Pencil, Check,
 } from "lucide-react";
 import { memberService } from "../../services/memberService.js";
-import { recruiterService } from "../../services/recruiterService.js";
 import { jobGradeService } from "../../services/jobGradeService.js";
 import { bankService } from "../../services/bankService.js";
-import { TextInput, SearchableSelect, SelectInput, Button, CheckboxGroup, DateField, Field, controlClasses } from "../../components/form";
+import { TextInput, SearchableSelect, SelectInput, Button, DateField } from "../../components/form";
 import StatusChip, { CANCELLED_STATUSES } from "../../components/common/StatusChip.jsx";
 import Table from "../../components/table/Table.jsx";
 import { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
 import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
-    BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS,
+    BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, IDENTITY_TYPE_PASSPORT,
+    DEBIT_DAY_OPTIONS, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
 } from "../../config/memberConstants.js";
 import {
     validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID
@@ -34,6 +34,8 @@ import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
 import { writeMayHaveLanded } from "../../services/parseApiError.js";
 import { formatDate, parseDate, sameDate, today } from "../../lib/format.js";
+import { sanitiseField, validateField } from "../../utils/inputRules.js";
+import { branchNamesForBank } from "../../utils/bankBranches.js";
 import { cn } from "../../lib/utils";
 import { personName } from "../../lib/names.js";
 
@@ -153,17 +155,17 @@ const FIELD_TO_TAB_MAP = {
     personalEmail: "personal",
     workEmail: "personal",
     phone: "personal",
+    workTel: "personal",
+    homeTel: "personal",
     employeeNumber: "employment",
+    ibtNo: "employment",
     employmentType: "employment",
     jobGrade: "employment",
     bankName: "employment",
     branch: "employment",
     paymentType: "employment",
     bankAccountNumber: "employment",
-    debitDay: "employment",
-    shopStewardElectionDate: "structures",
-    becCommitteeId: "structures",
-    becExecutivePosition: "structures"
+    debitDay: "employment"
 };
 
 export const SASBO_BEC_BRANCHES = [
@@ -213,7 +215,20 @@ export const SASBO_BEC_BRANCHES = [
     { id: "bec-44", name: "BankservAfrica & Financial Infrastructure Committee", region: "Corporate National" }
 ];
 
-const normalizePaymentType = (paymentType) => paymentType === "Payroll Deduction" ? "Payroll" : paymentType;
+/**
+ * The stored value, folded onto the name the form offers.
+ *
+ * 🔑 THE FOLD RUNS THE OTHER WAY NOW (A6). It used to turn the server's "Payroll Deduction" into
+ * the browser's "Payroll"; the browser was the one that had drifted, so the browser is what moved.
+ * `PaymentType` on the server is `PAYROLL("Payroll Deduction")` and that is what the option says.
+ *
+ * ⚠️ The fold itself is NOT redundant and must not be deleted with the rename. `MemberDto.paymentType`
+ * is a String passed through from storage, not the enum, so members captured under the old spelling
+ * still arrive as "Payroll". Without this, opening such a record would show a payment type that is
+ * not one of the options, and the first save would report a change the administrator never made.
+ */
+const normalizePaymentType = (paymentType) =>
+    paymentType === PAYMENT_TYPE_PAYROLL_LEGACY ? PAYMENT_TYPE_PAYROLL : paymentType;
 
 const getInitialFilters = (locationState) => ({
     ...EMPTY_FILTERS,
@@ -253,6 +268,8 @@ const RECORD_FIELD_LABELS = {
     isBecExecutive: "BEC Executive",
     becExecutivePosition: "BEC Executive Position",
     isCosatu: "COSATU Member",
+    isCosatuLocal: "COSATU Local structure",
+    isCosatuRegional: "COSATU Regional structure",
     cosatuLocal: "COSATU Local",
     cosatuRegion: "Region within Local",
     cosatuPositions: "COSATU Positions",
@@ -260,6 +277,15 @@ const RECORD_FIELD_LABELS = {
 
 /** Never listed: identifiers, and a name the form derives from a field that is listed (the committee's id). */
 const UNLISTED_KEYS = ["id", "membershipNumber", "memberId", "becCommitteeName"];
+
+/**
+ * A stored yes/no as a person reads it. `null` is its own answer on the read side -- Shop Steward
+ * and BEC had no column until V29 (CM-05), so for every earlier member nobody ever answered.
+ */
+const yesNo = (flag, unanswered = "No") => (flag === true ? "Yes" : flag === false ? "No" : unanswered);
+
+/** COSATU is stored as V19's "Y"/"N"; older records carry a boolean. */
+const isCosatuMember = (member) => member?.isCosatu === "Y" || member?.isCosatu === true;
 
 /** A value as the form holds it, for comparing: a yes/no flag as a boolean, a list as its joined text. */
 const comparable = (key, value) => {
@@ -316,8 +342,8 @@ const getChangedFields = (draft, original) => Object.keys(draft)
  * it re-fetches forever, which looks exactly like a slow backend.
  */
 const REFERENCE_LOADERS = {
-    'lead recruiters': () => recruiterService.getRoles(),
     banks: () => bankService.getBankNames(),
+    'bank branches': () => bankService.getBankListing(),
 };
 
 /**
@@ -396,7 +422,6 @@ export default function Members() {
      * panel says which list is missing. That is the line between `error` and `partial`.
      */
     const refs = useReferenceData(REFERENCE_LOADERS);
-    const roles = refs.data['lead recruiters'];
     const bankNames = refs.data.banks;
 
     /**
@@ -492,7 +517,14 @@ export default function Members() {
     const paymentTypeOptions = PAYMENT_TYPE_OPTIONS;
     const statusOptions = STATUS_OPTIONS;
     const bankOptions = bankNames;
-    const branchOptions = BRANCH_OPTIONS;
+    // The same branch rule as Capture Member: the bank's own branches together with the fourteen names. One rule on
+    // both screens -- two screens holding one member with two vocabularies is how A6 and A7 happened.
+    const bankListing = refs.data['bank branches'];
+    const branchOptionsFor = useCallback(
+        (bankName) => (bankName ? [...new Set([...branchNamesForBank(bankListing, bankName), ...BRANCH_OPTIONS])] : BRANCH_OPTIONS),
+        [bankListing],
+    );
+    const branchOptions = branchOptionsFor(editForm.bankName);
     const genderOptions = GENDER_OPTIONS;
     const [jobGradeOptions, setJobGradeOptions] = useState([]);
     /*
@@ -520,14 +552,19 @@ export default function Members() {
         return () => window.removeEventListener("keydown", onKeyDown);
     }, []);
 
+    /**
+     * 🔴 R4-F1, the edit twin of Capture Member's: Initials are derived from First Name(s) until the administrator
+     * types them. Reset whenever a record is loaded or an edit begins, so one member's typed initials do not stop the
+     * next member's from deriving.
+     */
+    const initialsTyped = useRef(false);
+
     useEffect(() => {
+        initialsTyped.current = false;
         if (selectedMember) {
+            // List fields arrive as lists: memberService.normalizeMember unfolds the server's
+            // "PEC,CEC" once, for every consumer (A37 / A38).
             const normalized = { ...selectedMember, paymentType: normalizePaymentType(selectedMember.paymentType) };
-            if (typeof normalized.cosatuPositions === "string" && normalized.cosatuPositions) {
-                normalized.cosatuPositions = normalized.cosatuPositions.split(",").map(s => s.trim()).filter(Boolean);
-            } else if (!Array.isArray(normalized.cosatuPositions)) {
-                normalized.cosatuPositions = [];
-            }
             setEditForm(normalized);
             if (prevMemberIdRef.current !== selectedMember.membershipNumber) {
                 setActiveTab("personal");
@@ -594,12 +631,7 @@ export default function Members() {
             return;
         }
         const start = { ...selectedMember, paymentType: normalizePaymentType(selectedMember?.paymentType) };
-        // 🔴 THE SERVER SENDS COSATU POSITIONS AS ONE STRING ("PEC,CEC"), AND THIS COPIED IT RAW (`06.5`). The effect above
-        // makes it a list when the record loads; entering edit mode copied the record again and undid that, so the
-        // checkbox group was handed a string -- unticking a position threw, and ticking one saved the string's letters.
-        if (typeof start.cosatuPositions === "string") {
-            start.cosatuPositions = start.cosatuPositions.split(",").map((s) => s.trim()).filter(Boolean);
-        }
+        initialsTyped.current = false;
         setEditForm(start);
         setEditBaseline(JSON.stringify(start));
         setFieldErrors({});
@@ -608,18 +640,13 @@ export default function Members() {
 
     const handleEditChange = useCallback((field) => (event) => {
         let rawValue = event && event.target ? event.target.value : event;
-
-        if (field === "identityNumber" && editForm.identityType === "I.D. Number" && rawValue.length > 13) {
-            rawValue = rawValue.substring(0, 13);
-        }
+        if (field === "initials") initialsTyped.current = true;
 
         const hasNonNumericInput =
             field === "identityNumber" && editForm.identityType === "I.D. Number" &&
             /\D/.test(rawValue);
-        const value =
-            field === "identityNumber" && editForm.identityType === "I.D. Number"
-                ? rawValue.replace(/\D/g, "")
-                : rawValue;
+        // One typing rule for both member screens (utils/inputRules.js).
+        const value = sanitiseField(field, rawValue, { identityType: editForm.identityType });
 
         setEditForm((prev) => {
             const next = { ...prev, [field]: value };
@@ -628,9 +655,12 @@ export default function Members() {
             // loading: a grade belongs to a bank, so choosing a DIFFERENT bank clears it.
             if (field === "bankName" && value !== prev.bankName) {
                 next.jobGrade = "";
+                // A branch the new bank does not offer goes with the old bank; the fourteen names stay for every bank.
+                if (value && prev.branch && !branchOptionsFor(value).includes(prev.branch)) next.branch = "";
             }
 
-            if (field === "firstNames") {
+            // R4-F1: derived until typed -- see `initialsTyped`.
+            if (field === "firstNames" && !initialsTyped.current) {
                 next.initials = value
                     .trim()
                     .split(/\s+/)
@@ -671,7 +701,7 @@ export default function Members() {
             }
             return newErrors;
         });
-    }, [editForm.identityType]);
+    }, [editForm.identityType, branchOptionsFor]);
 
     const validateEditForm = () => {
         const errors = {};
@@ -685,7 +715,7 @@ export default function Members() {
             errors.identityNumber = "Identity Number must be exactly 13 digits when I.D. Number is selected";
         }
 
-        if (editForm.identityType === "Passport" && !editForm.dateOfBirth) {
+        if (editForm.identityType === IDENTITY_TYPE_PASSPORT && !editForm.dateOfBirth) {
             errors.dateOfBirth = "Date of Birth is strictly required when Passport is selected";
         }
 
@@ -695,12 +725,22 @@ export default function Members() {
             if (!editForm.branch?.trim()) errors.branch = "Bank Branch selection is required for Debit Orders";
         }
 
-        if (editForm.isShopSteward && !editForm.shopStewardElectionDate) {
-            errors.shopStewardElectionDate = "Shop Stewards must have an Election Date specified.";
+        // Shape checks on what the administrator CHANGED in this edit, and only on fields this screen shows. A stored
+        // value nobody touched is left alone: rules written today would otherwise make older members unsaveable over a
+        // field on another tab. The emails have no control on Edit Member, and Bank Account Number is hidden under
+        // Payroll, so neither can block a save the administrator has no way to fix.
+        const original = editBaseline ? JSON.parse(editBaseline) : {};
+        const shapeChecked = ["initials", "phone", "workTel", "homeTel", "ibtNo", "dateOfBirth"];
+        if (editForm.paymentType === "Debit Order") shapeChecked.push("bankAccountNumber");
+        for (const key of shapeChecked) {
+            if (errors[key] || String(editForm[key] ?? "") === String(original[key] ?? "")) continue;
+            const message = validateField(key, editForm[key], { identityType: editForm.identityType });
+            if (message) errors[key] = message;
         }
-        if (editForm.isBec && !editForm.becCommitteeId) {
-            errors.becCommitteeId = "Please select an active primary BEC Committee before continuing.";
-        }
+
+        // No COSATU-requires-BEC check here: the form cannot express the contradiction (COSATU is only
+        // offered under BEC = Yes, and BEC = No clears it), and a legacy member stored as COSATU with no BEC
+        // answer must stay saveable unchanged -- the server's validateStructures owns both halves.
         return errors;
     };
 
@@ -1526,7 +1566,7 @@ export default function Members() {
                             {activeTab === "personal" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
                                     <Detail label="Title" value={editForm.title} isEditing={isEditing} options={titleOptions} onChange={handleEditChange("title")} />
-                                    <Detail label="Initials" value={editForm.initials} isEditing={isEditing} onChange={handleEditChange("initials")} />
+                                    <Detail label="Initials" value={editForm.initials} isEditing={isEditing} onChange={handleEditChange("initials")} error={fieldErrors.initials} />
                                     <Detail label="First Name(s)" value={editForm.firstNames} isEditing={isEditing} onChange={handleEditChange("firstNames")} error={fieldErrors.firstNames} required kind="name" />
                                     <Detail label="Surname" value={editForm.surname} isEditing={isEditing} onChange={handleEditChange("surname")} error={fieldErrors.surname} required kind="name" />
                                     <Detail label="Identity Type" value={editForm.identityType} isEditing={isEditing} options={idTypeOptions} onChange={handleEditChange("identityType")} error={fieldErrors.identityType} required />
@@ -1537,7 +1577,7 @@ export default function Members() {
                                         onChange={handleEditChange("identityNumber")}
                                         error={fieldErrors.identityNumber}
                                         disabled={!editForm.identityType}
-                                        kind="identifier"
+                                        kind={editForm.identityType === IDENTITY_TYPE_PASSPORT ? "reference" : "identifier"}
                                         required
                                     />
                                     {/* 🔴 `04.2`: was a native <input type="date"> reached through
@@ -1551,7 +1591,7 @@ export default function Members() {
                                         <DateField
                                             label="Date of Birth"
                                             value={editForm.dateOfBirth || ""}
-                                            required={editForm.identityType === "Passport"}
+                                            required={editForm.identityType === IDENTITY_TYPE_PASSPORT}
                                             error={fieldErrors.dateOfBirth || undefined}
                                             max="today"
                                             onChange={(e) => setEditForm(prev => ({ ...prev, dateOfBirth: e.target.value }))}
@@ -1561,9 +1601,9 @@ export default function Members() {
                                     )}
                                     <Detail label="Gender" value={editForm.gender} isEditing={isEditing} options={editForm.identityType === "I.D. Number" ? null : genderOptions} onChange={handleEditChange("gender")} disabled={editForm.identityType === "I.D. Number"} />
                                     <Detail label="Race" value={editForm.race} isEditing={isEditing} options={raceOptions} onChange={handleEditChange("race")} />
-                                    <Detail label="Cellphone Number" value={editForm.phone} isEditing={isEditing} onChange={handleEditChange("phone")} kind="tel" />
-                                    <Detail label="Work Tel" value={editForm.workTel} isEditing={isEditing} onChange={handleEditChange("workTel")} kind="tel" />
-                                    <Detail label="Home Tel" value={editForm.homeTel} isEditing={isEditing} onChange={handleEditChange("homeTel")} kind="tel" />
+                                    <Detail label="Cellphone Number" value={editForm.phone} isEditing={isEditing} onChange={handleEditChange("phone")} kind="tel" error={fieldErrors.phone} />
+                                    <Detail label="Work Tel" value={editForm.workTel} isEditing={isEditing} onChange={handleEditChange("workTel")} kind="tel" error={fieldErrors.workTel} />
+                                    <Detail label="Home Tel" value={editForm.homeTel} isEditing={isEditing} onChange={handleEditChange("homeTel")} kind="tel" error={fieldErrors.homeTel} />
                                     <div className="col-span-full">
                                         {isEditing ? (
                                             <AddressAutocomplete label="Residential Address" value={editForm.address} onChange={handleEditChange("address")} placeholder="Update residential location address strings..." />
@@ -1576,7 +1616,7 @@ export default function Members() {
 
                             {activeTab === "employment" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
-                                    <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="identifier" />
+                                    <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="reference" />
                                     <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} {...refs.field('banks')} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
                                     <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
                                     <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGrade} onChange={handleEditChange("jobGrade")} disabled={!editForm.bankName} loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
@@ -1590,13 +1630,13 @@ export default function Members() {
                                                 label="Debit Day"
                                                 value={editForm.debitDay}
                                                 isEditing={isEditing}
-                                                options={["20", "25", "31"]}
+                                                options={DEBIT_DAY_OPTIONS}
                                                 error={fieldErrors.debitDay}
                                                 onChange={handleEditChange("debitDay")}
                                             />
                                         </>
                                     )}
-                                    <Detail label="IBT No." value={editForm.ibtNo} isEditing={isEditing} onChange={handleEditChange("ibtNo")} kind="identifier" />
+                                    <Detail label="IBT No." value={editForm.ibtNo} isEditing={isEditing} onChange={handleEditChange("ibtNo")} kind="identifier" error={fieldErrors.ibtNo} />
                                     <div className="col-span-full">
                                         {isEditing ? (
                                             <AddressAutocomplete label="Bank Work Address" value={editForm.bankAddress} onChange={handleEditChange("bankAddress")} placeholder="Search coordinates..." />
@@ -1621,11 +1661,22 @@ export default function Members() {
 
                             {activeTab === "representatives" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
-                                    {/* Main (client bf547c1, 4a7a67b): renamed to the words the union uses, and
-                                        read-only on the record -- a recruiter is assigned where the member is
-                                        captured, not reassigned from here. */}
-                                    <Detail label="Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={isEditing} disabled={true} />
-                                    <Detail label="Area's Recruiter" value={editForm.areasRep} isEditing={isEditing} disabled={true} />
+                                    {/* 🗣️ 03.9 -- ALL THREE, AND NONE OF THEM EDITABLE FROM HERE. The stakeholder:
+                                        recruitment "should only show ... should not be editable from there". It showed
+                                        TWO, and not because the third was hidden: "Recruiter Type" had no field
+                                        anywhere until 03.8 gave the capture screen one.
+
+                                        🔑 "Area's Recruiter" is GONE rather than relabelled (R2/RE-3). It read
+                                        `areasRep`, which held a PERSON chosen from the recruiter list, under an
+                                        area-shaped name. `areaRecruited` is a different field carrying a different
+                                        kind of thing; showing the old value under the new label would have been the
+                                        same defect with a corrected word on it.
+
+                                        Read-only here, editable on capture: a recruiter is assigned where the member
+                                        is captured, and these three are a historical fact about that moment. */}
+                                    <Detail label="Recruiter Type" value={editForm.recruitedHow} isEditing={false} />
+                                    <Detail label="Area Recruited" value={editForm.areaRecruited} isEditing={false} />
+                                    <Detail label="Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={false} />
                                 </div>
                             )}
 
@@ -1635,206 +1686,71 @@ export default function Members() {
                                         <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">SASBO structures</h3>
                                     </div>
 
+                                    {/* 🗣️ THE STAKEHOLDER'S SHAPE, 2026-09-17, and the owner's "only these fields":
+                                        Shop Steward? · BEC Member? → COSATU Member? → the two COSATU structures.
+                                        🔴 COSATU IS NESTED UNDER BEC AGAIN, AND THIS TIME IT IS THE RULE, NOT A DEFECT.
+                                        `04.2` (N5 / BR-15) un-nested it because nothing then said BEC was a
+                                        prerequisite; the stakeholder has now said it is -- "for a member to participate
+                                        in COSATU structures, they have to be within the BEC structure" -- and the server
+                                        refuses COSATU without BEC (`MemberValidator.validateStructures`). A COSATU Local
+                                        and a COSATU Region are structures a member SITS ON, so each is a yes/no, not a
+                                        name. BEC committee, recruiter, structure-representative and executive
+                                        sub-questions, the election date and COSATU positions are gone from the screen:
+                                        none of them had a column (CM-05), so nothing they held was ever stored. */}
                                     {isEditing ? (
                                         <div className="space-y-6">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <Detail label="Shop Steward?" value={editForm.isShopSteward ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
-                                                    const isYes = e.target.value === "Yes";
-                                                    setEditForm(prev => ({ ...prev, isShopSteward: isYes, ...(!isYes ? { shopStewardElectionDate: "" } : {}) }));
-                                                }} />
-                                                {editForm.isShopSteward && (
-                                                    <div className="animate-slideDown">
-                                                        {/* 🔴 `03.3`: was a native <input type="date"> with a <label> that named
-                                                            no control -- the label had no htmlFor, so a screen reader reached an
-                                                            unnamed date box. DateField carries its own real label. */}
-                                                        <DateField
-                                                            label="Shop Steward Election Date"
-                                                            required
-                                                            value={editForm.shopStewardElectionDate || ""}
-                                                            error={fieldErrors.shopStewardElectionDate || undefined}
-                                                            max="today"
-                                                            hint="ago"
-                                                            onChange={(e) => setEditForm(prev => ({ ...prev, shopStewardElectionDate: e.target.value }))}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
+                                            <Detail label="Shop Steward?" value={yesNo(editForm.isShopSteward)} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
+                                                setEditForm(prev => ({ ...prev, isShopSteward: e.target.value === "Yes" }));
+                                            }} />
 
                                             <div className="border-t border-line pt-4">
-                                                <Detail label="BEC (Branch Executive Committee) Member?" value={editForm.isBec ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
+                                                <Detail label="BEC (Branch Executive Committee) Member?" value={yesNo(editForm.isBec)} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
                                                     const isYes = e.target.value === "Yes";
+                                                    // Leaving BEC leaves COSATU with it: the one cannot be held without the other.
                                                     setEditForm(prev => ({
                                                         ...prev,
                                                         isBec: isYes,
-                                                        ...(!isYes ? { becCommitteeId: "", isBecRecruiter: false, becRecruiterRole: "", isBecStructureRep: false, becStructures: [], isBecExecutive: false, becExecutivePosition: "" } : {})
+                                                        ...(!isYes ? { isCosatu: "N", isCosatuLocal: false, isCosatuRegional: false } : {}),
                                                     }));
                                                 }} />
-                                            </div>
 
-                                            {editForm.isBec && (
-                                                <div className="mt-4 space-y-6 border-l border-line pl-4">
-                                                    {/* 🔴 THE COMMITTEE SELECT HAD NO ACCESSIBLE NAME EITHER — the
-                                                        same defect as A28, one dialog over, and invisible to the
-                                                        a11y gate because that scans the LIST page. The <label> above
-                                                        it carried no `htmlFor`. `Field` hands down a real id without
-                                                        forcing the control to be an <input>, which is what lets the
-                                                        44 committees keep their <optgroup> grouping by region —
-                                                        genuinely useful at this length, and something no listbox
-                                                        primitive here offers. */}
-                                                    <Field label="Select BEC Committee (Single Selection — 44 Available)" required error={fieldErrors.becCommitteeId}>
-                                                        {({ id, describedBy, invalid }) => (
-                                                            <select
-                                                                id={id}
-                                                                aria-invalid={invalid}
-                                                                aria-describedby={describedBy}
-                                                                value={editForm.becCommitteeId || ""}
-                                                                className={controlClasses({ invalid, className: "touch-target" })}
-                                                                onChange={(e) => {
-                                                                    const selectedId = e.target.value;
-                                                                    const foundBranch = SASBO_BEC_BRANCHES.find(b => b.id === selectedId);
-                                                                    setEditForm(prev => ({ ...prev, becCommitteeId: selectedId, becCommitteeName: foundBranch ? foundBranch.name : "" }));
-                                                                }}
-                                                            >
-                                                                <option value="">Select Committee...</option>
-                                                                {Object.entries(SASBO_BEC_BRANCHES.reduce((acc, branch) => {
-                                                                    (acc[branch.region] = acc[branch.region] || []).push(branch);
-                                                                    return acc;
-                                                                }, {})).map(([regionName, branchesInRegion]) => (
-                                                                    <optgroup key={regionName} label={regionName.toUpperCase()}>
-                                                                        {branchesInRegion.map(b => (
-                                                                            <option key={b.id} value={b.id}>{b.name}</option>
-                                                                        ))}
-                                                                    </optgroup>
-                                                                ))}
-                                                            </select>
-                                                        )}
-                                                    </Field>
-
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                        <Detail label="BEC Recruiter?" value={editForm.isBecRecruiter ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
-                                                            const isYes = e.target.value === "Yes";
-                                                            setEditForm(prev => ({ ...prev, isBecRecruiter: isYes, ...(!isYes ? { becRecruiterRole: "" } : {}) }));
-                                                        }} />
-                                                        {editForm.isBecRecruiter && (
-                                                            <Detail label="BEC Recruiter Role" value={editForm.becRecruiterRole} isEditing={true} {...refs.field('lead recruiters')} options={roles.map(r => r.name)} onChange={(e) => setEditForm(prev => ({ ...prev, becRecruiterRole: e.target.value }))} />
-                                                        )}
-                                                    </div>
-
-                                                    <div className="space-y-3">
-                                                        <Detail label="BEC Structure Representative?" value={editForm.isBecStructureRep ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
-                                                            const isYes = e.target.value === "Yes";
-                                                            setEditForm(prev => ({ ...prev, isBecStructureRep: isYes, ...(!isYes ? { becStructures: [] } : {}) }));
-                                                        }} />
-                                                        {editForm.isBecStructureRep && (
-                                                            <CheckboxGroup
-                                                                legend="BEC structures represented"
-                                                                options={["INC / IC", "NCF / SJC", "Vice President (VP)", "President", "MANCOM", "Resolutions Committee"]}
-                                                                selected={editForm.becStructures || []}
-                                                                onToggle={(next) => setEditForm(prev => ({ ...prev, becStructures: next }))}
-                                                            />
-                                                        )}
-                                                    </div>
-
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                        <Detail label="BEC Executive?" value={editForm.isBecExecutive ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
-                                                            const isYes = e.target.value === "Yes";
-                                                            setEditForm(prev => ({ ...prev, isBecExecutive: isYes, ...(!isYes ? { becExecutivePosition: "" } : {}) }));
-                                                        }} />
-                                                        {editForm.isBecExecutive && (
-                                                            <Detail label="Select Executive Position" value={editForm.becExecutivePosition} isEditing={true} options={["Chairperson", "Deputy Chairperson", "Secretary", "Deputy Secretary", "Treasurer"]} onChange={(e) => setEditForm(prev => ({ ...prev, becExecutivePosition: e.target.value }))} />
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* 🔴 N5 / BR-15 — COSATU IS OUT FROM UNDER `isBec`, AND THAT IS A DATA
-                                                MODEL FIX, NOT A LAYOUT ONE.
-                                                `07cd8ec` nested this whole block inside `editForm.isBec &&` while
-                                                leaving it ungated in `CaptureMember.jsx`, so the same member could
-                                                be captured as COSATU and then have it disappear from their record
-                                                the moment they were not a BEC member. `V19` models COSATU as
-                                                PARALLEL to BEC, and a stakeholder confirmed via the owner on
-                                                2026-09-09 that "everyone is a member and linked up with Area,
-                                                Region and all other elements" — no eligibility gate. Two
-                                                independent sources, so the nesting is the defect.
-                                                🟡 What is still open is narrower and blocks nothing: whether a
-                                                member's COSATU Local/Region is the SAME Area/Region already held
-                                                against them (a lookup) or COSATU's own structure (free text, as
-                                                below). BR-15. */}
-                                            <div className="border-t border-line pt-4">
-                                                <Detail label="COSATU Member?" value={editForm.isCosatu === "Y" || editForm.isCosatu === true ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
-                                                    const isYes = e.target.value === "Yes";
-                                                    setEditForm(prev => ({
-                                                        ...prev,
-                                                        isCosatu: isYes ? "Y" : "N",
-                                                        ...(!isYes ? { cosatuLocal: "", cosatuRegion: "", cosatuPositions: [] } : {})
-                                                    }));
-                                                }} />
-                                                {(editForm.isCosatu === "Y" || editForm.isCosatu === true) && (
+                                                {editForm.isBec === true && (
                                                     <div className="mt-4 space-y-4 border-l border-line pl-4">
-                                                        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-accent-ink">COSATU structure</p>
-                                                        {/* 🔴 BR-14 — THE TWO UNLABELLED CHECKBOXES ARE GONE, replaced
-                                                            by the two labelled free-text fields `V19` actually
-                                                            describes. What was here rendered `<label>` elements with
-                                                            a checkbox and NO TEXT AT ALL: an empty accessible name,
-                                                            two of them, side by side, so a screen-reader user met two
-                                                            anonymous checkboxes and a sighted user met two bare
-                                                            boxes. They also wrote "COSATU Local" and "Region within
-                                                            Local" into `cosatuPositions`, the POSITIONS array —
-                                                            structure recorded as though it were a role. The
-                                                            `cosatuPositions` wire shape agreed with the Capture
-                                                            Member arc is positions only. */}
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                            <Detail label="COSATU Local" value={editForm.cosatuLocal || ""} isEditing={true} onChange={(e) => setEditForm(prev => ({ ...prev, cosatuLocal: e.target.value }))} />
-                                                            <Detail label="Region within Local" value={editForm.cosatuRegion || ""} isEditing={true} onChange={(e) => setEditForm(prev => ({ ...prev, cosatuRegion: e.target.value }))} />
-                                                        </div>
-                                                        <CheckboxGroup
-                                                            legend="COSATU Positions — Multiple Allowed"
-                                                            options={["PEC", "CEC", "Treasurer", "Chairperson", "Secretary"]}
-                                                            labelFor={(pos) =>
-                                                                pos === "PEC" ? "PEC (Provincial Executive Committee)" :
-                                                                pos === "CEC" ? "CEC (Central Executive Committee)" : pos}
-                                                            selected={editForm.cosatuPositions || []}
-                                                            onToggle={(next) => setEditForm(prev => ({ ...prev, cosatuPositions: next }))}
-                                                        />
+                                                        <Detail label="COSATU Member?" value={isCosatuMember(editForm) ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
+                                                            const isYes = e.target.value === "Yes";
+                                                            setEditForm(prev => ({
+                                                                ...prev,
+                                                                isCosatu: isYes ? "Y" : "N",
+                                                                ...(!isYes ? { isCosatuLocal: false, isCosatuRegional: false } : {}),
+                                                            }));
+                                                        }} />
+
+                                                        {isCosatuMember(editForm) && (
+                                                            <div className="grid grid-cols-1 gap-4 border-l border-line pl-4 md:grid-cols-2">
+                                                                <Detail label="Sits on a COSATU Local structure?" value={yesNo(editForm.isCosatuLocal)} isEditing={true} options={["Yes", "No"]} onChange={(e) => setEditForm(prev => ({ ...prev, isCosatuLocal: e.target.value === "Yes" }))} />
+                                                                <Detail label="Sits on a COSATU Regional structure?" value={yesNo(editForm.isCosatuRegional)} isEditing={true} options={["Yes", "No"]} onChange={(e) => setEditForm(prev => ({ ...prev, isCosatuRegional: e.target.value === "Yes" }))} />
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <div className="space-y-3">
-                                                <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Core Appointments</h4>
-                                                <Detail label="Shop Steward status" value={selectedMember.isShopSteward ? "Yes" : "No"} isEditing={false} />
-                                                {selectedMember.isShopSteward && <Detail label="Election Date" value={selectedMember.shopStewardElectionDate} isEditing={false} />}
-                                                <Detail label="BEC Member status" value={selectedMember.isBec ? "Yes" : "No"} isEditing={false} />
-                                                {selectedMember.isBec && <Detail label="Assigned BEC Committee" value={SASBO_BEC_BRANCHES.find(b => b.id === selectedMember.becCommitteeId)?.name || selectedMember.becCommitteeName} isEditing={false} />}
-                                            </div>
-                                            <div className="space-y-3 pt-4 md:pt-0">
-                                                <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Specialized Assignments</h4>
-                                                {selectedMember.isBec && (
-                                                    <>
-                                                        <Detail label="BEC Recruiter" value={selectedMember.isBecRecruiter ? `Yes (${selectedMember.becRecruiterRole || 'Standard'})` : "No"} isEditing={false} />
-                                                        <Detail label="Structure Representative Roles" value={selectedMember.isBecStructureRep && selectedMember.becStructures?.length > 0 ? selectedMember.becStructures.join(", ") : "None Assigned"} isEditing={false} />
-                                                        <Detail label="BEC Executive Position" value={selectedMember.isBecExecutive ? selectedMember.becExecutivePosition : "None"} isEditing={false} />
-                                                    </>
-                                                )}
-
-                                                {/* Read side, un-nested to match the edit side. Before this it sat
-                                                    inside `selectedMember.isBec &&`, so a COSATU member who was not
-                                                    BEC had their COSATU record simply not shown. */}
-                                                <div className="pt-3 mt-3 border-t border-line">
-                                                    <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-accent-ink">COSATU Structure</h5>
-                                                    <Detail label="COSATU Member" value={selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true ? "Yes" : "No"} isEditing={false} />
-                                                    {(selectedMember.isCosatu === "Y" || selectedMember.isCosatu === true) && (
-                                                        <div className="grid grid-cols-1 gap-3 mt-2">
-                                                            <Detail label="COSATU Local" value={selectedMember.cosatuLocal} isEditing={false} />
-                                                            <Detail label="Region within Local" value={selectedMember.cosatuRegion} isEditing={false} />
-                                                            <Detail label="Positions Held" value={selectedMember.cosatuPositions?.length > 0 ? selectedMember.cosatuPositions.join(", ") : "None"} isEditing={false} />
-                                                        </div>
+                                        <div className="space-y-3">
+                                            <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Core Appointments</h4>
+                                            <Detail label="Shop Steward" value={yesNo(selectedMember.isShopSteward, "Not recorded")} isEditing={false} />
+                                            <Detail label="BEC Member" value={yesNo(selectedMember.isBec, "Not recorded")} isEditing={false} />
+                                            {(selectedMember.isBec === true || isCosatuMember(selectedMember)) && (
+                                                <div className="space-y-3 border-l border-line pl-4">
+                                                    <Detail label="COSATU Member" value={isCosatuMember(selectedMember) ? "Yes" : "No"} isEditing={false} />
+                                                    {isCosatuMember(selectedMember) && (
+                                                        <>
+                                                            <Detail label="COSATU Local structure" value={yesNo(selectedMember.isCosatuLocal, "Not recorded")} isEditing={false} />
+                                                            <Detail label="COSATU Regional structure" value={yesNo(selectedMember.isCosatuRegional, "Not recorded")} isEditing={false} />
+                                                        </>
                                                     )}
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
