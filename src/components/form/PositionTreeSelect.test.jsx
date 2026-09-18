@@ -1,5 +1,6 @@
 // @vitest-environment jsdom -- drives a cascade of real selects
 import { describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { screen } from '@testing-library/react'
 
 import PositionTreeSelect from './PositionTreeSelect'
@@ -127,5 +128,51 @@ describe('PositionTreeSelect — the 16px rule, mutation-checked', () => {
     for (const name of ['Position', 'Within Gauteng Region', 'Within Johannesburg Branch']) {
       expect(screen.getByLabelText(name).className).toMatch(/\bfield-text\b/)
     }
+  })
+})
+
+describe('PositionTreeSelect — when the CALLER clears the selection', () => {
+  /*
+   * 🔴 WRITTEN BECAUSE A DELETION PROOF FOUND NOTHING WATCHING. `10.4`, batch 7.
+   *
+   * When the caller empties `selectedIds` -- Recruiters does it when "elected rep" is set back to No -- the cascade
+   * forgets every level. That was an effect; `10.4` moved it into render. Deleted outright, the whole suite stayed
+   * GREEN: the cascade test above passes one `[]` and never changes it, so it only ever proved the OTHER half
+   * (a caller that does not clear must not be overridden). This is the half that does clear.
+   */
+  function Caller() {
+    const [ids, setIds] = useState([])
+    return (
+      <>
+        <button type="button" onClick={() => setIds([])}>
+          the caller clears it
+        </button>
+        <PositionTreeSelect structures={TREE} selectedIds={ids} onChange={setIds} label="Position" />
+      </>
+    )
+  }
+
+  it('a caller that empties the selection empties every level', async () => {
+    const user = setupUser()
+    renderWithProviders(<Caller />)
+
+    await user.selectOptions(screen.getByLabelText('Position'), '1')
+    await user.selectOptions(screen.getByLabelText('Within Gauteng Region'), '11')
+
+    await user.click(screen.getByRole('button', { name: 'the caller clears it' }))
+
+    expect(screen.getByLabelText('Position')).toHaveValue('')
+    expect(screen.queryByLabelText('Within Gauteng Region')).toBeNull()
+  })
+
+  it('the must-pass: a caller that feeds each choice back keeps it -- the clear does not fight the keyboard', async () => {
+    const user = setupUser()
+    renderWithProviders(<Caller />)
+
+    await user.selectOptions(screen.getByLabelText('Position'), '1')
+    await user.selectOptions(screen.getByLabelText('Within Gauteng Region'), '11')
+
+    expect(screen.getByLabelText('Position')).toHaveValue('1')
+    expect(screen.getByLabelText('Within Gauteng Region')).toHaveValue('11')
   })
 })

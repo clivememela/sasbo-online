@@ -89,12 +89,29 @@ export default function AddressAutocomplete({
     sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
   }, [placesLib]);
 
-  // Sync external value changes (e.g. a form reset) into the local query.
-  useEffect(() => {
+  /*
+   * 🔴 A VALUE THE FORM CHANGES REACHES THE FIELD -- DURING RENDER, WITH A PREVIOUS-VALUE GUARD (`10.4`).
+   *
+   * A reset, or a record loaded into the form, changes `value` from outside; the field keeps its own
+   * `query` so it can be typed into, and has to adopt the new value when that happens. This was an effect
+   * keyed on `[value]` that also needed an `eslint-disable-next-line react-hooks/exhaustive-deps` to stop
+   * it re-running on every keystroke -- and `react-hooks/set-state-in-effect` makes the effect an error
+   * this phase.
+   *
+   * The render-phase form is React's own answer ("storing information from previous renders"): remember
+   * the last `value` seen, and adopt a new one when it differs. Same trigger as the effect had, so the
+   * suppression goes with it -- one fewer disable comment in the tree -- and the frame in which a reset
+   * form still showed the old text is never committed. `value !== query` is still the guard that stops
+   * the parent's echo of each keystroke from fighting the keyboard.
+   *
+   * `AddressAutocomplete.test.jsx` holds both directions now; before this phase only the outbound one had
+   * a witness.
+   */
+  const [seenValue, setSeenValue] = useState(value);
+  if (value !== seenValue) {
+    setSeenValue(value);
     if (value !== undefined && value !== query) setQuery(value || '');
-    // Only when `value` changes externally -- not on every keystroke.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
+  }
 
   const fetchPredictions = useCallback(
     async (input) => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, Button } from "../../components/form";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
@@ -24,11 +24,26 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  /*
+   * 🔴 A NEW `selectedBank` RESEEDS THE FORM -- DURING RENDER, GUARDED BY THE LAST ONE SEEN (`10.4`).
+   *
+   * This was an effect keyed on `selectedBank`, which `react-hooks/set-state-in-effect` makes an error this
+   * phase. The render-phase form is React's documented one, and it runs on exactly the same trigger: an
+   * IDENTITY change of `selectedBank`.
+   *
+   * ⚠️ A `key` ON THE MODAL WOULD HAVE BEEN THE WRONG TOOL, and it is the fix that looks right. The open path
+   * is already a fresh mount (`BankBranch.jsx` renders two conditionally-mounted instances), so the only time
+   * this ever did work is AFTER A SAVE: `onUpdated` hands back a NEW object with the SAME id. A
+   * `key={selectedBank.id}` would not remount on that, and would silently drop the reset. Identity is the
+   * right thing to compare, which is what this does.
+   */
+  const [seenBank, setSeenBank] = useState(selectedBank);
+  if (selectedBank !== seenBank) {
+    setSeenBank(selectedBank);
     setForm(selectedBank || EMPTY);
     setIsEditing(false);
     setFieldErrors({});
-  }, [selectedBank]);
+  }
 
   const set = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
