@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import Logo from "./common/Logo";
 import SidebarItem from "./common/SidebarItem";
 import ThemeToggle from "./common/ThemeToggle";
@@ -41,7 +41,7 @@ const findAncestors = (items, target, path = []) => {
  * phone treatment (R-RESP) rather than the mock's 68px icon rail; the mock only ever
  * specified a desk.
  */
-export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
+function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
   const location = useLocation();
   const [expandedItems, setExpandedItems] = useState({});
   const [prevSelectedCardHref, setPrevSelectedCardHref] = useState(null);
@@ -167,7 +167,7 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
           <a
             href="/home"
             aria-label="SASBO Online home"
-            className="flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+            className="touch-size flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
           >
             <Logo className="size-10 shrink-0 object-contain" />
             <span className="grid min-w-0 leading-[1.15]">
@@ -211,8 +211,14 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
 
             `content-start` alone is the whole fix. It stops the stretch `flex: 1` would cause,
             the rows are their own 36px, the gap is the mock's 2px, and the pitch is identical
-            on every route because nothing is being divided. */}
-        <div className="scroll-quiet grid content-start gap-0.5 overflow-y-auto [&>*]:self-start">
+            on every route because nothing is being divided.
+
+            🔑 `flex-1` IS THE OTHER HALF OF `.nav { flex: 1 }`, AND IT LEFT WITH THE STRETCH
+            (`06.3`). The comp's foot sits at the bottom of the rail on every screen because the
+            list takes the height between the wordmark and the foot. Without it the foot rode
+            under the list -- 515px down on Members, 447 on Home -- and moved whenever a section
+            opened. `flex-1` gives the list that height; `content-start` keeps the rows out of it. */}
+        <div className="scroll-quiet grid min-h-0 flex-1 content-start gap-0.5 overflow-y-auto [&>*]:self-start">
           {navItems.map((item) => (
             <SidebarItem
               key={item.href}
@@ -237,7 +243,8 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
                 key={item.href}
                 to={item.href}
                 className={cn(
-                  "flex h-9 items-center gap-3 rounded-lg px-2.5 text-sm font-medium text-nav-ink",
+                  // `touch-size`: the rail's foot takes the same 44px rows on a coarse pointer as the list (`07.2`).
+                  "touch-size flex h-9 items-center gap-3 rounded-lg px-2.5 text-sm font-medium text-nav-ink",
                   "transition-[background-color,color] duration-(--duration-instant)",
                   "hover-hover:hover:bg-nav-hover hover-hover:hover:text-ink",
                   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
@@ -254,3 +261,10 @@ export default function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref 
     </>
   );
 }
+
+/*
+ * Memoised because the topbar's search lives in `AppLayout`, so every keystroke re-renders the shell, and the rail's
+ * props never change with it. The route and the theme still reach it through context. Its props must stay stable: an
+ * inline callback passed here would quietly undo this.
+ */
+export default memo(Sidebar);

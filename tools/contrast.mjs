@@ -38,7 +38,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 import { launch, sleep } from './cdp.mjs';
 
-import { ROUTES as ALL_ROUTES, pageReady, populationComplaints, storeTheme, themeDimensionComplaints, themeReadout } from './probe.mjs';
+import { AXE_CONTRAST as RUN_AXE, ROUTES as ALL_ROUTES, pageReady, populationComplaints, storeTheme, themeDimensionComplaints, themeReadout } from './probe.mjs';
 
 
 const args = process.argv.slice(2);
@@ -63,40 +63,8 @@ const THEMES = ['light', 'dark'];
 const AXE = readFileSync('node_modules/axe-core/axe.min.js', 'utf8');
 
 
-/**
- * Run axe with ONLY `color-contrast` on, and return all three buckets.
- *
- * The pass count is how this run proves it examined anything: zero violations out of zero
- * examined nodes is the vacuous green every guard in this repository carries a floor against.
- *
- * 🔴 AND `resultTypes` IS DELIBERATELY ABSENT, HAVING BEEN THERE ONCE AND LIED. The first
- * version passed `resultTypes: ['violations', 'incomplete']` as an optimisation. That option
- * does not merely choose what to REPORT -- for every bucket not listed, axe keeps **one node
- * and discards the rest**. So `passCount` came back as exactly 1 per combination, 100 across
- * 100 runs, and the non-vacuity floor below fired on a number that was an artefact of the
- * caller's own option rather than a fact about the pages.
- *
- * 🔑 THE FLOOR CAUGHT IT, WHICH IS THE ONLY REASON IT WAS SEEN -- and it caught a defect in
- * the INSTRUMENT, not in the application, which is the third time this arc has had that exact
- * result. Without the floor the run would have reported 100 combinations swept and one
- * violation found, and the missing 4,000-odd examined nodes would have gone unnoticed
- * entirely, because a small number and a large one both read as "it ran".
- */
-const RUN_AXE = `(async () => {
-  const r = await window.axe.run(document, {
-    runOnly: { type: 'rule', values: ['color-contrast'] },
-  });
-  const node = (n) => ({
-    target: Array.isArray(n.target) ? n.target.join(' ') : String(n.target),
-    summary: (n.failureSummary || '').replace(/\\s+/g, ' ').slice(0, 300),
-    data: (n.any || []).map((c) => c.data).filter(Boolean),
-  });
-  return {
-    violations: r.violations.flatMap((v) => v.nodes.map(node)),
-    incomplete: r.incomplete.flatMap((v) => v.nodes.map(node)),
-    passCount: r.passes.reduce((n, p) => n + p.nodes.length, 0),
-  };
-})()`;
+// The axe call -- `color-contrast` only, all three buckets, and why `resultTypes` is absent (T26) -- is probe.mjs's
+// `AXE_CONTRAST`, shared with surfaces.mjs (`07.3` inside `07.2`'s states).
 
 const rows = [];
 let cdp;

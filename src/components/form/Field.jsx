@@ -108,7 +108,8 @@ export default function Field({
  */
 export function controlClasses({ invalid, className } = {}) {
   return cn(
-    'field-text w-full rounded-lg border px-3 py-2 font-normal normal-case tracking-normal',
+    // `touch-size`: 44px on a coarse pointer (index.css) -- a replaced element draws no ::after, so `touch-target` cannot.
+    'field-text touch-size w-full rounded-lg border px-3 py-2 font-normal normal-case tracking-normal',
     // 🔴 `placeholder:` IS `ink-muted`, NOT `ink-faint`, AND THE DIFFERENCE IS EVERY FORM IN
     // THE APPLICATION. A placeholder is text, so WCAG 1.4.3 applies to it -- and `ink-faint`
     // measures 3.65:1 at worst in dark and 4.15:1 on `bg-raised` in light, against a 4.5:1

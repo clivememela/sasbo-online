@@ -47,6 +47,26 @@ describe('SelectInput — the states', () => {
     expect(screen.queryByText('Loading…')).toBeNull()
   })
 
+  it('failed: the CHOICES are unavailable -- a retry is offered, and it does NOT read as an empty list (F-P54)', async () => {
+    // 🔴 THE SHAPE `06.4` EXISTS FOR. Before it, a list that failed reached this control as an empty
+    // one, and "No options available" told an administrator the bank had none -- so they picked the
+    // closest one they could see. The "empty" case above is this test's must-pass: same `options={[]}`,
+    // and only `loadError` tells the two apart.
+    const user = setupUser()
+    const retry = vi.fn()
+    renderWithProviders(
+      <SelectInput label="Bank" value="" onChange={() => {}} options={[]} loadError="The banks list could not be loaded." onRetryLoad={retry} />,
+    )
+
+    expect(screen.getByLabelText('Bank')).toBeDisabled()
+    expect(screen.getByText('Unavailable')).toBeInTheDocument()
+    expect(screen.getByText('Bank could not be loaded.')).toBeInTheDocument()
+    expect(screen.queryByText('No options available')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: /try again/i }))
+    expect(retry).toHaveBeenCalledOnce()
+  })
+
   it('invalid: aria-invalid plus an announced message whose id resolves', () => {
     renderWithProviders(
       <SelectInput label="Title" value="" onChange={() => {}} options={TITLES} error="Choose a title" />,
@@ -149,6 +169,13 @@ describe('SelectInput — the 16px rule, mutation-checked', () => {
   // broken: the 74 sub-16px controls came from `text-sm` on a WRAPPER in three shared
   // primitives, not from the tag. See TextInput.test.jsx for why this asserts the
   // mechanism and the browser proves the pixels.
+  // `07.2`: a <select> is a replaced element and draws no ::after, so `touch-target` gives it nothing. See
+  // TextInput.test.jsx for the rule; the browser half is tools/surfaces.mjs.
+  it('the select wears touch-size, so a coarse pointer gets a 44px target', () => {
+    renderWithProviders(<SelectInput label="Title" value="" onChange={() => {}} options={TITLES} />)
+    expect(screen.getByLabelText('Title').className).toMatch(/\btouch-size\b/)
+  })
+
   it('the select wears field-text, and no smaller type overrides it', () => {
     renderWithProviders(<SelectInput label="Title" value="" onChange={() => {}} options={TITLES} />)
     const select = screen.getByLabelText('Title')

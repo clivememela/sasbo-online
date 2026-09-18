@@ -22,12 +22,20 @@ export default function Pager({
   end,
   noun = 'rows',
   loading = false,
+  error = false,
   hint,
   children,
   className,
 }) {
   const text = loading ? (
     `Loading ${noun}…`
+  ) : error ? (
+    /* 🔴 K1 (`06.3`). A list that never arrived is not a list in which nothing matched. With the
+       register unreachable, the count is 0 only because nothing loaded -- and this foot used to
+       read "No members match" two lines under "The register could not be reached", which is
+       A27's confident wrong answer surviving one component down. The mock never said it either:
+       its offline foot takes no count at all. */
+    `Could not load ${noun}`
   ) : count === 0 ? (
     `No ${noun} match`
   ) : (
@@ -56,7 +64,7 @@ export default function Pager({
           variant="pagination"
           size="sm"
           onClick={() => onPageChange(Math.max(1, page - 1))}
-          disabled={loading || page <= 1}
+          disabled={loading || error || page <= 1}
         >
           <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />
           Previous
@@ -65,7 +73,7 @@ export default function Pager({
           variant="pagination"
           size="sm"
           onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-          disabled={loading || page >= totalPages}
+          disabled={loading || error || page >= totalPages}
         >
           Next
           <ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" />

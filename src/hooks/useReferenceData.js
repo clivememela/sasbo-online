@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import reportError from '../lib/reportError';
+import { ERROR_KINDS } from '../services/parseApiError.js';
 
 /**
  * THE REFERENCE LISTS A SCREEN NEEDS, AND WHICH OF THEM DID NOT ARRIVE. `06.1b`, EH-D9.
@@ -52,6 +53,7 @@ import reportError from '../lib/reportError';
  *   loading: boolean,
  *   state: 'loading'|'ready'|'partial'|'error',
  *   retry: () => void,
+ *   field: (name: string) => { options: unknown[], loading: boolean, loadError: unknown, onRetryLoad: () => void },
  * }}
  */
 export default function useReferenceData(loaders) {
@@ -59,6 +61,9 @@ export default function useReferenceData(loaders) {
 
   const [data, setData] = useState(() => Object.fromEntries(names.map((n) => [n, []])));
   const [failed, setFailed] = useState([]);
+  // The rejection itself, per failed list -- so a field can say whether retrying could work
+  // (`DataState` reads `retryable` off it) rather than always offering a button.
+  const [reasons, setReasons] = useState({});
   const [loading, setLoading] = useState(names.length > 0);
 
   // Same pattern, and the same reason, as `useAsyncOptions`: a result that arrives after a
@@ -90,6 +95,7 @@ export default function useReferenceData(loaders) {
 
       const nextData = {};
       const nextFailed = [];
+      const nextReasons = {};
 
       results.forEach((result, index) => {
         const name = entries[index][0];
@@ -99,21 +105,23 @@ export default function useReferenceData(loaders) {
           return;
         }
 
-        // A superseded request is not a failure and must not be reported as one.
-        if (result.reason?.kind === 'abort') {
-          nextData[name] = [];
-          return;
-        }
+        // 🔴 A SUPERSEDED REQUEST IS NOT A FAILURE, AND NOT AN EMPTY LIST EITHER (§16, EH-D3:
+        // "leaves the entry exactly as it was"). This wrote `[]` for it, so a list that had
+        // loaded read as a list with nothing in it -- the lie this hook exists to prevent. The
+        // entry is left out of `nextData`, and the merge below keeps what was there.
+        if (result.reason?.kind === ERROR_KINDS.ABORT) return;
 
         nextData[name] = [];
         nextFailed.push(name);
+        nextReasons[name] = result.reason;
         // 🔑 ONE SINK, AND THE CONTEXT IS A NAME. `reportError` emits `kind`, `status`,
         // `retryable` and the refused FIELD NAMES -- never the message, never the envelope.
         reportError(`reference:${name}`, result.reason);
       });
 
-      setData(nextData);
+      setData((previous) => ({ ...previous, ...nextData }));
       setFailed(nextFailed);
+      setReasons(nextReasons);
       setLoading(false);
     });
   }, []);
@@ -141,5 +149,21 @@ export default function useReferenceData(loaders) {
         ? 'error'
         : 'partial';
 
-  return { data, failed, loading, state, retry: run };
+  /*
+   * 🔑 ONE SPREAD PER FIELD. A select fed by a reference list needs four facts -- its options,
+   * whether they are still coming, whether they failed, and how to ask again -- and every screen
+   * was wiring the first and dropping the other three, so a failed list rendered as "No options
+   * available" (F-P54). `<SelectInput {...refs.field('banks')} />` cannot forget one.
+   */
+  const field = useCallback(
+    (name) => ({
+      options: data[name] ?? [],
+      loading,
+      loadError: failed.includes(name) ? (reasons[name] ?? `The ${name} list could not be loaded.`) : null,
+      onRetryLoad: run,
+    }),
+    [data, loading, failed, reasons, run],
+  );
+
+  return { data, failed, loading, state, retry: run, field };
 }

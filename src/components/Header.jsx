@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, Menu, Search } from "lucide-react";
 import Breadcrumbs from "./common/Breadcrumbs";
 import Button from "./form/Button";
 import { MENU_BUTTON_ID, SIDEBAR_ID } from "./shellIds";
 import { cn } from "../lib/utils";
+import useMediaQuery from "../hooks/useMediaQuery";
 
 /**
  * THE TOPBAR. card.html's `.topbar`, and it is 60px.
@@ -64,19 +65,7 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
    * 640px is Tailwind's `sm`, the same boundary the topbar's own ⌘K hint appears at, so the
    * two changes happen together rather than a step apart.
    */
-  const [narrow, setNarrow] = useState(() =>
-    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      ? window.matchMedia('(max-width: 639px)').matches
-      : false);
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return;
-    const query = window.matchMedia('(max-width: 639px)');
-    const onChange = (event) => setNarrow(event.matches);
-    setNarrow(query.matches);
-    query.addEventListener('change', onChange);
-    return () => query.removeEventListener('change', onChange);
-  }, []);
+  const narrow = useMediaQuery('(max-width: 639px)');
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -118,7 +107,7 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
         "sticky top-0 z-10 grid h-15 shrink-0 items-center gap-3 border-b border-line bg-surface px-4 text-ink",
         "topbar",
         "grid-cols-[auto_minmax(0,1fr)_auto]",
-        "lg:grid-cols-[auto_minmax(220px,440px)_1fr] lg:gap-5 lg:px-7",
+        "lg:grid-cols-[max-content_minmax(220px,440px)_1fr] lg:gap-5 lg:px-7",
       )}
     >
       <div className="flex min-w-0 items-center gap-2">
@@ -161,7 +150,15 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
             gives up a single character of where you are. The old squeeze cannot come back
             because the thing it squeezed is the thing that now yields last. The search's
             ceiling comes down 520 → 440 in the same breath: at 1280, on the deepest route in
-            the application, the difference is exactly what the trail needed. */}
+            the application, the difference is exactly what the trail needed.
+
+            🔴 AND IT STILL TRUNCATED -- THE GRID DID IT, NOT THE CRUMBS (`06.3`, measured). An
+            `auto` track whose item has `min-w-0` has a minimum of zero, so the grid shared its
+            free space EVENLY between the trail and the search: at 1440 with a record open the
+            trail was handed 118 of the 120px it needed ("Ho… › Membe…"), at 1280 57 of 58
+            ("Membe…"). The trail's track is `max-content` now, so it is always its own width,
+            the search gives way toward its 220px floor first, and where even that cannot fit,
+            the `topbar` container query has already dropped the crumbs ahead of the page. */}
         <div className="hidden min-w-0 min-[1101px]:block">
           <Breadcrumbs />
         </div>
@@ -169,7 +166,8 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
 
       <label
         className={cn(
-          "flex h-[38px] min-w-0 items-center gap-2.5 rounded-[10px] border border-line-strong bg-surface-2 px-3",
+          // `touch-size`: the label is the search's target -- a tap on it focuses the field -- and 44px on a coarse pointer.
+          "touch-size flex h-[38px] min-w-0 items-center gap-2.5 rounded-[10px] border border-line-strong bg-surface-2 px-3",
           "transition-[border-color,box-shadow,background-color] duration-(--duration-instant)",
           "focus-within:border-brand focus-within:bg-surface focus-within:shadow-[0_0_0_3px_var(--color-brand-ring)]",
         )}

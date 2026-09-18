@@ -37,7 +37,7 @@ const MEMBER = {
   surname: 'Gradeholder',
   identityNumber: '9001010000080',
   status: 'Active',
-  paymentType: 'Payroll',
+  paymentType: 'Payroll Deduction',
   bankName: 'ABSA',
   jobGrade: 'G7',
 }

@@ -11,8 +11,9 @@ import { server } from '../test/msw/server'
  * the browser reference journey both. Whatever shape it has is the shape every
  * other domain is told to copy, so a defect here propagates by instruction.
  *
- * Second, it swallows failures in TWO places and only one of them is visible
- * to the four-case error contract:
+ * Second, it swallowed failures in TWO places -- both closed now, the first in
+ * 06.1a and the second in 06.4 -- and only one was visible to the four-case
+ * error contract:
  *
  *   line 148  `return []` after logging, in getBankNames        <- the contract
  *                                                                  sees this
@@ -23,7 +24,8 @@ import { server } from '../test/msw/server'
  * The second one is the interesting one. `getBankListing` fetches branches,
  * then fetches banks to attach each branch's universal branch code. If the
  * BANKS call fails, the outer promise still RESOLVES -- with branches whose
- * universal codes are silently missing. The four-case contract fails every
+ * universal codes are missing, which `getBankListingDetailed` now reports
+ * rather than hiding (F-P54). The four-case contract fails every
  * endpoint at once, so the outer call fails too and the swallow never shows.
  * It takes a test that fails exactly one of the two requests, which is what
  * this file does.
@@ -74,6 +76,9 @@ describe('bankService.getBankListing', () => {
 
   describe('the second swallow -- the inner /api/banks failure', () => {
     /*
+     * ✅ CLOSED IN 06.4, F-P54: the inner lookup's failure is now REPORTED, by
+     * `getBankListingDetailed` below, and the rows keep their shape. As it read before:
+     *
      * ⚠️ THE INNER FALLBACK SURVIVES 06.1a, AND IT IS NO LONGER A13 -- IT IS A CLASSIFICATION.
      *
      * A13 is closed: the listing's PRIMARY call (`/api/banks/branches`) rejects properly now. What
@@ -97,21 +102,46 @@ describe('bankService.getBankListing', () => {
           'intended degradation; a blank page is not.',
       ).toHaveLength(2)
 
-        // This is the damage, asserted rather than described -- and it is worse
-        // than "the codes are blank". When the banks call fails, `banksResult`
-        // is [] and the method returns `branches` UNMAPPED, so the
-        // `universalBranchCode` key is ABSENT rather than empty.
-        //
-        // So the resolved SHAPE depends on whether a request the caller never
-        // made succeeded. On the happy path every branch carries the key; on
-        // this path none of them do. A consumer reading
-        // `branch.universalBranchCode.trim()` works all day and throws the
-        // first time /api/banks has a bad minute -- and the stack trace points
-        // at the screen, not at the swallow three layers down that caused it.
-        expect(listing.map((b) => b.universalBranchCode)).toEqual([undefined, undefined])
-        expect(Object.hasOwn(listing[0], 'universalBranchCode')).toBe(false)
+        // ✅ THE SHAPE DEFECT, CLOSED IN `06.4`. When the banks call failed, `banksResult` was [] and
+        // the method returned `branches` UNMAPPED, so the `universalBranchCode` key was ABSENT rather
+        // than empty: the resolved shape depended on whether a request the caller never made succeeded,
+        // and a consumer reading `branch.universalBranchCode.trim()` threw the first time /api/banks had
+        // a bad minute. Every branch carries the key now, and unknown is ''. That the codes are missing
+        // is `getBankListingDetailed`'s to say, below.
+        expect(listing.map((b) => b.universalBranchCode)).toEqual(['', ''])
+        expect(Object.hasOwn(listing[0], 'universalBranchCode')).toBe(true)
       },
     )
+  })
+})
+
+describe('bankService.getBankListingDetailed -- the codes say whether they arrived (06.4)', () => {
+  it('when /api/banks fails, the listing still arrives, and says its codes did not', async () => {
+    // 🔴 F-P54. The failure was `.catch(() => [])`, so Bank Listing printed a dash for every code and a
+    // search by code said nothing matched. A page cannot say what its service will not tell it.
+    server.use(branchesOk(), banksFail())
+    const { branches, codes, codesError } = await bankService.getBankListingDetailed()
+
+    expect(branches).toHaveLength(2)
+    expect(codes).toBe('failed')
+    expect(codesError).toBeTruthy()
+  })
+
+  it('the must-pass: when both calls succeed, the codes are ready and attached', async () => {
+    server.use(branchesOk(), banksOk())
+    const { branches, codes, codesError } = await bankService.getBankListingDetailed()
+
+    expect(codes).toBe('ready')
+    expect(codesError).toBeNull()
+    expect(branches.map((b) => b.universalBranchCode)).toEqual(['051001', '632005'])
+  })
+
+  it('a failed BRANCHES request still rejects -- the listing itself is not an enrichment', async () => {
+    server.use(
+      http.get('*/api/banks/branches', () => HttpResponse.json({ status: 500, error: 'boom' }, { status: 500 })),
+      banksOk(),
+    )
+    await expect(bankService.getBankListingDetailed()).rejects.toThrow()
   })
 })
 

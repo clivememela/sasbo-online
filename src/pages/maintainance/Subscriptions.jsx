@@ -12,13 +12,18 @@ import StatusChip from "../../components/common/StatusChip.jsx";
 import TableScroller from "../../components/table/TableScroller.jsx";
 import DataState from "../../components/common/DataState.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
+import reportError from "../../lib/reportError.js";
 
 // 🔴 `text-sm` WAS 13px, WHICH IS THE iOS ZOOM TRAP, AND THE 16px CHECK COULD NOT SEE
 // IT. That check matches `text-sm` on the TAG; these classes arrive through this variable,
 // so four controls sat under the floor while the measurement read zero. `field-text` is
 // the design's size on a fine pointer and 16px on a coarse one, which is the whole reason
 // the utility exists.
-const inputCls = 'w-full px-2 py-1 rounded border border-line-strong bg-surface-2 text-ink field-text';
+// `touch-size`: an in-row input is a replaced element, so it GROWS to 44px on a coarse pointer (`07.2`; index.css).
+const inputCls = 'w-full px-2 py-1 rounded border border-line-strong bg-surface-2 text-ink field-text touch-size';
+
+/** A head cell of this hand-built table -- the same classes as `RecruitmentChannel.jsx`'s `HEAD_CELL`. */
+const HEAD_CELL = 'whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5';
 
 /**
  * The bank list behind this screen's filter. `06.1b`, EH-D9.
@@ -39,7 +44,13 @@ export default function Subscriptions() {
         isCoreBanking: '',
     });
     const [allSubscriptions, setAllSubscriptions] = useState([]);
-    const [loading, setLoading] = useState(false);
+    // 🔴 IT STARTED `false`, SO THE FIRST FRAME SAID "No subscriptions match your search." -- a confident
+    // empty answer to a request not yet sent (`06.4`). The mount effect sets it too; this is the frame before.
+    const [loading, setLoading] = useState(true);
+    // 🔴 A FAILED SAVE IS NOT A FAILED LOAD. It went into `error`, which replaced the whole list with "We could
+    // not load the subscriptions." -- the rows that had loaded vanished, and the change that failed was never
+    // mentioned (`06.4`). It is its own notice now, and the row stays open with the change in it.
+    const [saveError, setSaveError] = useState(null);
     const [error, setError] = useState(null);
     // Bumped by the retry control, and a dependency of the load effect, so "try again"
     // re-runs exactly the effect that failed rather than duplicating its body.
@@ -94,19 +105,22 @@ export default function Subscriptions() {
 
     const handleCancel = (e) => {
         e.stopPropagation();
+        setSaveError(null);
         setEditingId(null);
         setEditData({});
     };
 
     const handleSave = async (e) => {
         e.stopPropagation();
+        setSaveError(null);
         try {
             await subscriptionsService.update(editingId, editData);
             setAllSubscriptions(prev => prev.map(s => s.id === editingId ? { ...editData } : s));
             setEditingId(null);
             setEditData({});
         } catch (err) {
-            setError(String(err));
+            reportError('Subscriptions.save', err);
+            setSaveError({ bankName: editData.bankName, error: err });
         }
     };
 
@@ -123,6 +137,7 @@ export default function Subscriptions() {
                     value={filters.bankName}
                     onChange={(v) => setFilters(prev => ({ ...prev, bankName: v }))}
                     placeholder="All banks"
+                    {...refs.field('banks')}
                     options={[{ value: '', label: 'All banks' }, ...bankNames.map(b => ({ value: b, label: b }))]}
                 />
                 <SelectInput
@@ -137,8 +152,8 @@ export default function Subscriptions() {
             <Sheet className="mt-4">
 
                 {/* 🔴 IT WAS A BARE `Error: {String(err)}` BANNER WITH NO WAY OUT. Two things
-                    changed: the sentence is the server's own rather than a stringified
-                    Error, and there is a retry -- an error state whose only affordance is
+                    changed: the sentence is written for the person reading it rather than a
+                    stringified Error, and there is a retry -- an error state whose only affordance is
                     reloading the page is a dead end (EH-D4). */}
                 {error && (
                     <div className="mx-5 mt-4 rounded-lg bg-surface-2 p-3">
@@ -151,15 +166,18 @@ export default function Subscriptions() {
                     </div>
                 )}
 
-                {/* The fourth state: the list loaded, its filter's options did not. */}
-                {!error && refs.state !== 'loading' && refs.state !== 'ready' && (
+                {/* The fourth state -- the list loaded, its filter's options did not -- is the Bank field's own
+                    now (`06.4`): the field says it could not be loaded and offers the retry where the choice is
+                    made, so the sheet no longer repeats it. */}
+                {saveError && (
                     <div className="mx-5 mt-4 rounded-lg bg-surface-2 p-3">
                         <DataState
-                            state="partial"
+                            state="error"
+                            layout="row"
                             compact
-                            onRetry={refs.retry}
-                            title="The bank filter has no options."
-                            message="The bank list did not load. The subscriptions below are complete and can still be filtered by the other fields."
+                            error={saveError.error}
+                            title={`The changes to ${saveError.bankName || 'this subscription'} were not saved.`}
+                            message="The row is still open with your changes. Check them and save again."
                         />
                     </div>
                 )}
@@ -194,12 +212,12 @@ export default function Subscriptions() {
                         <caption className="sr-only">Bank subscriptions and their debit details</caption>
                         <thead className="sticky top-0 bg-surface-2 z-10">
                             <tr>
-                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Bank Name</th>
-                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">ACB Debit Day</th>
-                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Amount</th>
-                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Core Banking</th>
-                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Status</th>
-                                <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5">Registration Date</th>
+                                <th className={HEAD_CELL}>Bank Name</th>
+                                <th className={HEAD_CELL}>ACB Debit Day</th>
+                                <th className={HEAD_CELL}>Amount</th>
+                                <th className={HEAD_CELL}>Core Banking</th>
+                                <th className={HEAD_CELL}>Status</th>
+                                <th className={HEAD_CELL}>Registration Date</th>
                                 <th className="whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-center text-xs font-semibold uppercase tracking-[0.08em] text-head-ink">Actions</th>
                             </tr>
                         </thead>

@@ -11,13 +11,14 @@ import DataState from '../../components/common/DataState.jsx';
 import reportError from '../../lib/reportError.js';
 
 /*
- * 📐 THE CHROME OF AN IN-ROW EDITOR -- one constant, and the same one `Subscriptions.jsx:21`
- * uses. These two inputs are not fields on a form; they are a cell that becomes a control for
+ * 📐 THE CHROME OF AN IN-ROW EDITOR -- one constant, with the same classes as `Subscriptions.jsx`'s
+ * `inputCls`. These two inputs are not fields on a form; they are a cell that becomes a control for
  * as long as a rename lasts. So they take the compact chrome rather than `TextInput`'s label
  * block, which would double the row's height mid-edit. The page's own search, which IS a
  * field, went the other way: it is a `TextInput` inside a `Criteria` row now.
  */
-const CELL_INPUT = 'w-full rounded border border-line-strong bg-surface-2 px-2 py-1 field-text text-ink';
+// `touch-size`: an in-row input is a replaced element, so it GROWS to 44px on a coarse pointer (`07.2`; index.css).
+const CELL_INPUT = 'w-full rounded border border-line-strong bg-surface-2 px-2 py-1 field-text text-ink touch-size';
 
 const HEAD_CELL = 'whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5';
 
@@ -204,14 +205,14 @@ export default function RecruitmentChannel() {
                             onClick={handleAdd}
                             disabled={!newName.trim() || saving}
                             aria-label="Add this recruitment channel"
-                            className="touch-target rounded-md p-1.5 text-status-active transition hover-hover:hover:bg-status-active-bg disabled:opacity-40">
+                            className="touch-size rounded-md p-1.5 text-status-active transition hover-hover:hover:bg-status-active-bg disabled:opacity-40">
                             <Check size={16} />
                         </button>
                         <button
                             type="button"
                             onClick={() => setShowAdd(false)}
                             aria-label="Cancel adding a recruitment channel"
-                            className="touch-target rounded-md p-1.5 text-ink-muted transition hover-hover:hover:bg-surface-2">
+                            className="touch-size rounded-md p-1.5 text-ink-muted transition hover-hover:hover:bg-surface-2">
                             <X size={16} />
                         </button>
                     </div>
@@ -318,14 +319,14 @@ export default function RecruitmentChannel() {
                                                     onClick={() => handleEdit(r)}
                                                     disabled={!editName.trim() || saving}
                                                     aria-label={`Save the new name for ${r.name}`}
-                                                    className="touch-target rounded-md p-1.5 text-status-active transition hover-hover:hover:bg-status-active-bg disabled:opacity-40">
+                                                    className="touch-size rounded-md p-1.5 text-status-active transition hover-hover:hover:bg-status-active-bg disabled:opacity-40">
                                                     <Check size={14} />
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => setEditingId(null)}
                                                     aria-label="Stop renaming and keep the current name"
-                                                    className="touch-target rounded-md p-1.5 text-ink-muted transition hover-hover:hover:bg-surface-2">
+                                                    className="touch-size rounded-md p-1.5 text-ink-muted transition hover-hover:hover:bg-surface-2">
                                                     <X size={14} />
                                                 </button>
                                             </div>
@@ -335,7 +336,7 @@ export default function RecruitmentChannel() {
                                                 onClick={() => { setEditingId(r.id); setEditName(r.name); }}
                                                 disabled={saving}
                                                 aria-label={`Rename ${r.name}`}
-                                                className="touch-target rounded-md p-1.5 text-brand-ink transition hover-hover:hover:bg-brand-soft disabled:opacity-40">
+                                                className="touch-size rounded-md p-1.5 text-brand-ink transition hover-hover:hover:bg-brand-soft disabled:opacity-40">
                                                 <Pencil size={14} />
                                             </button>
                                         )}
@@ -347,7 +348,7 @@ export default function RecruitmentChannel() {
                                             onClick={() => setPendingDelete(r)}
                                             disabled={saving}
                                             aria-label={`Delete ${r.name}`}
-                                            className="touch-target rounded-md p-1.5 text-status-suspended transition hover-hover:hover:bg-status-suspended-bg disabled:opacity-40">
+                                            className="touch-size rounded-md p-1.5 text-status-suspended transition hover-hover:hover:bg-status-suspended-bg disabled:opacity-40">
                                             <Trash2 size={14} />
                                         </button>
                                     </td>

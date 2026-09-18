@@ -159,19 +159,21 @@ export default function Table({
       const alignment =
         column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : null;
       const hideBelowMd = priority === 'secondary' ? 'hidden md:table-cell' : null;
+      // R-RESP-I: truncate ONLY here; the full value is in the panel.
+      const bodyClass = cn(
+        bodyCell,
+        alignment,
+        hideBelowMd,
+        column.truncate && 'max-w-[16rem] truncate',
+        column.nowrap !== false && 'whitespace-nowrap',
+        column.className,
+      );
       return {
         ...column,
         priority,
         headClass: cn(headCell, alignment, hideBelowMd, column.headClassName),
-        // R-RESP-I: truncate ONLY here; the full value is in the panel.
-        bodyClass: cn(
-          bodyCell,
-          alignment,
-          hideBelowMd,
-          column.truncate && 'max-w-[16rem] truncate',
-          column.nowrap !== false && 'whitespace-nowrap',
-          column.className,
-        ),
+        bodyClass,
+        skeletonClass: cn(bodyClass, 'py-[15px]'),
       };
     });
     return {
@@ -182,6 +184,20 @@ export default function Table({
 
   const expandable = collapsed.length > 0;
   const columnCount = visible.length + (expandable ? 1 : 0);
+
+  // The same reasoning, for what a ROW wears: two answers per render -- selected or not -- merged twice, not once per
+  // row, and the expander cell's once rather than once per row and per skeleton.
+  const rowClasses = [false, true].map((selected) =>
+    cn(
+      // `touch-size`: a 44px row on a coarse pointer, so a row's expander and its action never land on the next row's
+      // (`07.2`; the row rule is in index.css, because a row's height is set through its cells).
+      'touch-size [content-visibility:auto] [contain-intrinsic-size:auto_var(--size-row)]',
+      'transition-colors duration-(--duration-instant)',
+      onRowSelect && 'cursor-pointer',
+      selected ? 'bg-brand-soft' : 'hover-hover:hover:bg-surface-2',
+    ),
+  );
+  const expanderCellClass = cn(bodyCell, 'w-10 md:hidden');
 
   const toggle = (key) =>
     setExpanded((current) => {
@@ -301,14 +317,15 @@ export default function Table({
                     skeleton, and then found no control inside it.) */}
                 {Array.from({ length: SKELETON_ROWS }, (_, index) => (
                   <tr key={`skeleton-${index}`} data-skeleton="" aria-hidden="true">
-                    {expandable && <td data-expander="" className={cn(bodyCell, 'w-10 md:hidden')} />}
+                    {expandable && <td data-expander="" className={expanderCellClass} />}
                     {visible.map((column, columnIndex) => (
-                      <td key={column.key} data-col={column.key} data-fit={column.fit} className={cn(column.bodyClass, 'py-[15px]')}>
+                      <td key={column.key} data-col={column.key} data-fit={column.fit} className={column.skeletonClass}>
                         <span
-                          className={cn(
-                            'skeleton',
-                            columnIndex === visible.length - 1 && 'h-[22px] w-[72px] rounded-full',
-                          )}
+                          className="skeleton"
+                          // The status column's pill as a style, not utilities: `.skeleton` is unlayered, so it
+                          // beat `h-[22px] w-[72px] rounded-full` and drew the pill as a 12px bar (the `06.3`
+                          // critique) -- the fix FigureStrip's skeleton already took.
+                          style={columnIndex === visible.length - 1 ? { width: 72, height: 22, borderRadius: 9999 } : undefined}
                         />
                       </td>
                     ))}
@@ -366,15 +383,10 @@ export default function Table({
                       aria-current={isSelected ? 'true' : undefined}
                       onClick={onRowSelect ? selectFromRow(row) : undefined}
                       style={enterKey !== undefined ? { '--i': Math.min(index, 10) } : undefined}
-                      className={cn(
-                        '[content-visibility:auto] [contain-intrinsic-size:auto_var(--size-row)]',
-                        'transition-colors duration-(--duration-instant)',
-                        onRowSelect && 'cursor-pointer',
-                        isSelected ? 'bg-brand-soft' : 'hover-hover:hover:bg-surface-2',
-                      )}
+                      className={rowClasses[isSelected ? 1 : 0]}
                     >
                       {expandable && (
-                        <td data-expander="" className={cn(bodyCell, 'w-10 md:hidden')}>
+                        <td data-expander="" className={expanderCellClass}>
                           <button
                             type="button"
                             onClick={() => toggle(key)}

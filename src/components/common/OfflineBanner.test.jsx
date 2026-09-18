@@ -27,6 +27,18 @@ afterEach(() => {
 })
 
 describe('OfflineBanner', () => {
+  it('`07.2`: both of its buttons give a coarse pointer a 44px target', () => {
+    // Measured under real touch emulation, *Dismiss* offered a 63×27 target. Both buttons wear `touch-target`, the
+    // utility that adds a 44px hit area on a coarse pointer without growing the button.
+    setBrowserOnline(true)
+    render(<OfflineBanner lastNetworkFailureAt={Date.now()} onRetry={() => {}} />)
+    fire('online')
+
+    for (const name of [/try again/i, /dismiss/i]) {
+      expect(screen.getByRole('button', { name }).className).toMatch(/\btouch-target\b/)
+    }
+  })
+
   it('renders nothing at all when the connection is fine', () => {
     // The must-pass half. Every assertion below would also pass against a banner that was
     // permanently visible, and a permanent banner is one people stop reading.
@@ -44,6 +56,28 @@ describe('OfflineBanner', () => {
 
     expect(screen.getByTestId('offline-banner')).toHaveAttribute('data-offline', 'true')
     expect(screen.getByRole('alert')).toBeInTheDocument()
+  })
+
+  it('K2: on a rejection while the browser is online, it says the server could not be reached -- not that you are offline', () => {
+    // 🔴 `06.3` CRITIQUE, CAPTURED TWICE. A server that refused the connection, on working wifi, was told
+    // "You are offline" -- and so was a register that had just loaded, when only its bank list failed. The
+    // browser cannot tell a down server from a dropped connection, so the sentence must not pick one.
+    setBrowserOnline(true)
+    render(<OfflineBanner lastNetworkFailureAt={Date.now()} />)
+
+    const banner = screen.getByTestId('offline-banner')
+    expect(banner.textContent).toMatch(/could not reach its server/i)
+    expect(banner.textContent).not.toMatch(/you are offline/i)
+  })
+
+  it('K2, the must-pass: when the browser itself says offline, the banner still says so', () => {
+    setBrowserOnline(true)
+    render(<OfflineBanner />)
+    fire('offline')
+
+    const banner = screen.getByTestId('offline-banner')
+    expect(banner.textContent).toMatch(/you are offline/i)
+    expect(banner.textContent).not.toMatch(/could not reach its server/i)
   })
 
   it('appears on the browser’s own `offline` event', () => {

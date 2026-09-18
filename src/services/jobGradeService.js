@@ -45,21 +45,20 @@ export const jobGradeService = {
     if (!bankIdentifier) return [];
     // If the identifier looks like a code (no spaces, short), use as-is; otherwise try to resolve.
     let bankCode = String(bankIdentifier || '').trim();
-    try {
-      if (bankCode.includes(' ')) {
-        // Attempt to resolve human-readable bank name to a universal code via bankService
-        const listing = await bankService.getBankListing();
-        const normalized = String(bankCode).trim().toLowerCase();
-        const found = listing.find((b) => {
-          const bn = String(b.bankName || b.name || '').trim().toLowerCase();
-          return bn === normalized || bn.includes(normalized) || normalized.includes(bn);
-        });
-        if (found && found.universalBranchCode) bankCode = found.universalBranchCode;
-      }
-    } catch {
-      // The NAME->CODE lookup only. A failure here means the code could not be resolved, so the
-      // query below runs with whatever the caller passed -- which is the right degradation, and is
-      // not the same thing as swallowing the job-grade request itself.
+    if (bankCode.includes(' ')) {
+      // 🔴 THE NAME->CODE LOOKUP NO LONGER SWALLOWS ITS FAILURE (`06.4`, F-P54). It fell through to the
+      // query below with the bank's NAME, which no bank code matches -- so a failed lookup rendered as
+      // "this bank has no job grades", A25 again one call earlier. Without the code the grades cannot be
+      // asked for, so the rejection goes to the caller's error state and its retry. A name the listing
+      // does not know is still queried as given: that is an answer, not a failure.
+      const { branches, codes, codesError } = await bankService.getBankListingDetailed();
+      if (codes === 'failed') throw codesError;
+      const normalized = bankCode.toLowerCase();
+      const found = branches.find((b) => {
+        const bn = String(b.bankName || b.name || '').trim().toLowerCase();
+        return bn === normalized || bn.includes(normalized) || normalized.includes(bn);
+      });
+      if (found && found.universalBranchCode) bankCode = found.universalBranchCode;
     }
 
     const qs = `?bankCode=${encodeURIComponent(String(bankCode))}`;

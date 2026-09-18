@@ -42,6 +42,28 @@ describe('PositionTreeSelect — the states', () => {
     expect(screen.getByLabelText('Position')).toHaveAttribute('aria-busy', 'true')
   })
 
+  it('a tree that FAILED to load says so, with a retry -- it does not vanish as an empty one does (06.4)', async () => {
+    // 🔴 `structures.length === 0 && !loading` returned null for a failure too, so the field disappeared
+    // from the recruiter dialogs and nothing said a list was missing. The case above is the must-pass: a
+    // tree that is genuinely empty still renders nothing.
+    const user = setupUser()
+    const onRetryLoad = vi.fn()
+    renderWithProviders(
+      <PositionTreeSelect
+        structures={[]}
+        selectedIds={[]}
+        onChange={() => {}}
+        label="Position"
+        loadError="The structures list could not be loaded."
+        onRetryLoad={onRetryLoad}
+      />,
+    )
+
+    expect(screen.getByText('Position could not be loaded.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /try again/i }))
+    expect(onRetryLoad).toHaveBeenCalled()
+  })
+
   it('a pre-selection reconstructs the whole cascade', () => {
     renderWithProviders(
       <PositionTreeSelect structures={TREE} selectedIds={[111]} onChange={() => {}} label="Position" />,

@@ -8,7 +8,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { IDENTITY_TYPE_OPTIONS } from '../../config/memberConstants'
-import { DEFECTS, disabled, pin } from '../../test/knownDefects'
+
 import { setupUser } from '../../test/user'
 
 /**
@@ -95,12 +95,14 @@ const save = async (user) => {
  * `PaymentType.requiresBankAccount()` -- so a round-trip test that ignored it
  * would be testing an impossible capture.
  *
- * Choosing "Payroll" is also the honest half of register A9: the option is
- * real, the server agrees no bank account is needed, and the client's own
- * `isPayrollDeduction` branch STILL does not fire, because it compares against
- * "Payroll Deduction" (A6). The capture below therefore succeeds for the right
- * reason and the dead branch stays dead -- which is exactly the state
- * `usePaymentTypeValidation.test.jsx` pins.
+ * Choosing "Payroll Deduction" is also the honest half of register A9. A6 is
+ * now CLOSED -- the option is spelled the way the server spells it, so
+ * `usePaymentTypeValidation`'s `isPayrollDeduction` branch is reachable at
+ * last. A9 is not: no screen imports that hook, so the rule it carries still
+ * comes from a hardcoded string rather than from the server's published
+ * `requiresBankAccount()`, and the capture below succeeds because the FORM's
+ * own `paymentType === "Debit Order"` test agrees with the server, not because
+ * anything consulted it. `usePaymentTypeValidation.test.jsx` pins that.
  *
  * The form is TABBED and renders only the active tab, so Payment Type has to
  * be reached by opening "Employment & Bank" first. That is worth doing through
@@ -114,7 +116,7 @@ const openTab = async (user, label) => {
 
 const choosePayroll = async (user) => {
   await openTab(user, /Employment & Bank/i)
-  await user.selectOptions(labelled('Payment Type'), 'Payroll')
+  await user.selectOptions(labelled('Payment Type'), 'Payroll Deduction')
   await openTab(user, /Personal Information/i)
 }
 
@@ -239,7 +241,7 @@ describe('the identity-type vocabulary', () => {
     await save(user)
   }
 
-  it.skip(disabled(DEFECTS.A7, 'a passport capture must require a date of birth'), async () => {
+  it('A7 (fixed): a passport capture must require a date of birth', async () => {
     // Written to the standard. Unlike an I.D. Number, a passport number
     // carries no date to derive from -- so if the form does not insist on one,
     // the record is simply incomplete, and nothing downstream can tell that
@@ -251,17 +253,4 @@ describe('the identity-type vocabulary', () => {
     expect(alerts, 'a native alert() is back').toEqual([])
   })
 
-  it(pin(DEFECTS.A7, 'a passport capture still saves with no date of birth'), async () => {
-    // The consequence of A7, executed rather than described. The rule exists
-    // in the code -- `identityType === "Passport" && !dateOfBirth` -- and has
-    // never once run, because the dropdown only offers "Passport Number".
-    await capturePassportMember(setupUser())
-
-    await waitFor(() => expect(posted).toBeDefined())
-    expect(
-      posted.dateOfBirth,
-      'A7 has been fixed -- the form now refuses a passport capture with no date of ' +
-        'birth. Delete this pin, un-skip the test above, and close the row.',
-    ).toBeFalsy()
-  })
 })

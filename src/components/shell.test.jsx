@@ -304,6 +304,33 @@ describe('the shell — every id relationship RESOLVES, `05.4`', () => {
   })
 })
 
+describe('the shell — a coarse pointer gets a 44px target, `07.2`', () => {
+  beforeEach(() => {
+    server.use(...smokeHandlers)
+  })
+
+  it('the topbar search and every rail row wear touch-size', async () => {
+    appRoute()
+    await screen.findByRole('button', { name: /open navigation menu/i })
+
+    // Measured under real touch emulation: the search offered a 38px target -- its whole label, since a tap on the
+    // label focuses the field -- and the drawer's rows were 36px apart with a 24px disclosure in each, so a 44px
+    // square around one control landed on its neighbour. `touch-size` grows each to 44px on a coarse pointer only.
+    const search = screen.getByRole('searchbox')
+    expect(search.closest('label').className).toMatch(/\btouch-size\b/)
+
+    // EVERY row the rail offers a finger -- the wordmark, each section's link (whose row carries the class, so the link
+    // and its disclosure share one 44px row), the foot's links and the theme switch -- not a sample of them.
+    const rail = screen.getByRole('navigation', { name: /main/i })
+    const rows = [...within(rail).getAllByRole('link'), within(rail).getByRole('button', { name: /^appearance/i })]
+    expect(rows.length, 'the rail offered no rows to check -- the query, not the rail, is broken').toBeGreaterThan(5)
+    for (const row of rows) {
+      const wearer = row.closest('.touch-size')
+      expect(wearer && rail.contains(wearer), `"${row.textContent.trim()}" has no touch-size row in the rail`).toBe(true)
+    }
+  })
+})
+
 describe('the shell — BR-18, the banner is not the page heading', () => {
   beforeEach(() => {
     server.use(...smokeHandlers)
