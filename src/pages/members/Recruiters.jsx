@@ -180,8 +180,22 @@ export function Recruiters() {
         if (notice?.tone === 'error' && !dialogOpen) noticeRef.current?.focus();
     }, [notice, dialogOpen]);
 
+    /*
+     * 🔴 THE LOADING RESET MOVED TO THE RETRY PATH (`10.4`), AND THIS ONE HAD SEVEN CALLERS.
+     *
+     * `refreshAll` is called on mount, by Try again, and by five write handlers that reload the
+     * lists after a save. The line that `react-hooks/set-state-in-effect` flagged was already
+     * written defensively -- `current === 'ready' ? 'ready' : 'loading'` -- and that guard is
+     * the proof this change is behaviour-preserving rather than a judgement:
+     *
+     *   on mount          `listState` is already 'loading'        -> no-op
+     *   after a write     the table is 'ready', so the guard holds -> no-op
+     *   on Try again      'error' -> 'loading'                     -> THE ONLY REAL CASE
+     *
+     * So the five write handlers keep calling `refreshAll` unchanged, and the one case that
+     * mattered is now stated plainly at the place it happens, in `retryAll`.
+     */
     const refreshAll = useCallback(() => {
-        setListState((current) => (current === 'ready' ? 'ready' : 'loading'));
         return Promise.all([
             memberService.getMembers(),
             recruitmentChannelService.getAll(),
@@ -200,6 +214,8 @@ export function Recruiters() {
     useEffect(() => {
         refreshAll();
     }, [refreshAll]);
+
+    const retryAll = useCallback(() => { setListState('loading'); refreshAll(); }, [refreshAll]);
 
     const BANK_NAMES = useMemo(() => [...new Set(banksData.map(b => b?.bankName).filter(Boolean))].sort(), [banksData]);
     const PROVINCES = useMemo(() => provincesData.map(p => p?.name).filter(Boolean).sort(), [provincesData]);
@@ -849,7 +865,7 @@ export function Recruiters() {
                         rowKey="id"
                         loading={listState === 'loading'}
                         error={listState === 'error' ? 'We could not load the recruiters.' : null}
-                        onRetry={refreshAll}
+                        onRetry={retryAll}
                         emptyTitle="No recruiters match these criteria"
                         emptyMessage="Clear the criteria to see every recruiter, or add a new one."
                         emptyAction={<Button onClick={handleClear}>Clear</Button>}

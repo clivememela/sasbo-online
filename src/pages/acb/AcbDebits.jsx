@@ -45,12 +45,27 @@ export default function AcbDebits() {
      */
     const [listState, setListState] = useState('loading');
 
-    const loadMembers = useCallback(() => {
-        setListState('loading');
-        return memberService.getMembers()
-            .then((data) => { setMembersList(data ?? []); setListState('ready'); })
-            .catch((err) => { reportError('AcbDebits.loadMembers', err); setListState('error'); });
-    }, []);
+    /*
+     * 🔴 THE LOADING RESET LIVES ON THE RETRY PATH, NOT INSIDE THE FETCH (`10.4`).
+     *
+     * `react-hooks/set-state-in-effect` is an error as of this phase, and it was right: the effect
+     * below called a function whose FIRST statement set state synchronously, so every mount paid a
+     * cascading render for a transition that had already happened.
+     *
+     * 🔑 IT WAS A NO-OP ON MOUNT ANYWAY, which is what makes this behaviour-preserving rather than a
+     * judgement call: `listState` already INITIALISES to 'loading', so setting it to 'loading' again
+     * on the way in changed nothing anybody could see. What the line genuinely does is on the RETRY
+     * path -- press Try again after a failure and the screen must go back to loading rather than sit
+     * on the error until the answer lands. That is exactly where it now is.
+     *
+     * So the fetch owns its own outcome (ready or error) and the caller owns the intent to reload.
+     * `retryMembers` is the retry; the effect calls the plain fetch and sets nothing.
+     */
+    const loadMembers = useCallback(() => memberService.getMembers()
+        .then((data) => { setMembersList(data ?? []); setListState('ready'); })
+        .catch((err) => { reportError('AcbDebits.loadMembers', err); setListState('error'); }), []);
+
+    const retryMembers = useCallback(() => { setListState('loading'); loadMembers(); }, [loadMembers]);
 
     useEffect(() => { loadMembers(); }, [loadMembers]);
 
@@ -245,7 +260,7 @@ export default function AcbDebits() {
                             rowKey="id"
                             loading={listState === 'loading'}
                             error={listState === 'error' ? 'We could not load the member list.' : null}
-                            onRetry={loadMembers}
+                            onRetry={retryMembers}
                             emptyTitle="No members match your search."
                             emptyMessage="Try a different membership or identity number."
                             dense

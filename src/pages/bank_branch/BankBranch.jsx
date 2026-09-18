@@ -25,12 +25,27 @@ export default function BankBranch() {
    */
   const [listState, setListState] = useState('loading');
 
-  const loadBanks = useCallback(() => {
-    setListState('loading');
-    return bankService.getBanks()
-      .then((data) => { setBanks(data ?? []); setListState('ready'); })
-      .catch((err) => { reportError('BankBranch.load', err); setListState('error'); });
-  }, []);
+  /*
+   * 🔴 THE LOADING RESET LIVES ON THE RETRY PATH, NOT INSIDE THE FETCH (`10.4`).
+   *
+   * `react-hooks/set-state-in-effect` is an error as of this phase, and it was right: the effect
+   * below called a function whose FIRST statement set state synchronously, so every mount paid a
+   * cascading render for a transition that had already happened.
+   *
+   * 🔑 IT WAS A NO-OP ON MOUNT ANYWAY, which is what makes this behaviour-preserving rather than a
+   * judgement call: `listState` already INITIALISES to 'loading', so setting it to 'loading' again
+   * on the way in changed nothing anybody could see. What the line genuinely does is on the RETRY
+   * path -- press Try again after a failure and the screen must go back to loading rather than sit
+   * on the error until the answer lands. That is exactly where it now is.
+   *
+   * So the fetch owns its own outcome (ready or error) and the caller owns the intent to reload.
+   * `retryBanks` is the retry; the effect calls the plain fetch and sets nothing.
+   */
+  const loadBanks = useCallback(() => bankService.getBanks()
+    .then((data) => { setBanks(data ?? []); setListState('ready'); })
+    .catch((err) => { reportError('BankBranch.load', err); setListState('error'); }), []);
+
+  const retryBanks = useCallback(() => { setListState('loading'); loadBanks(); }, [loadBanks]);
 
   useEffect(() => { loadBanks(); }, [loadBanks]);
   const [filters, setFilters] = useState({
@@ -167,7 +182,7 @@ export default function BankBranch() {
             rowKey="id"
             loading={listState === 'loading'}
             error={listState === 'error' ? 'We could not load the bank branches.' : null}
-            onRetry={loadBanks}
+            onRetry={retryBanks}
             emptyTitle="No branches match these criteria"
             emptyMessage="Try a different bank, branch or area."
             dense

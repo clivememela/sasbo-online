@@ -483,8 +483,14 @@ export default function Members() {
         setPrintScope(null);
     }, []);
 
+    /*
+     * 🔴 THE LOADING RESET IS ON THE RETRY PATH NOW (`10.4`), not inside the fetch the effect
+     * calls. `react-hooks/set-state-in-effect` is an error as of this phase and it was right.
+     *
+     * 🔑 A NO-OP ON MOUNT: `listState` already initialises to "loading". The line only ever did
+     * work when a human pressed Try again after a failure, and that is `retryMembers`.
+     */
     const loadMembers = useCallback(() => {
-        setListState("loading");
         return memberService.getMembers().then(res => {
             const list = Array.isArray(res) ? res : (res.data || res.members || []);
             setMembersList(list);
@@ -498,6 +504,11 @@ export default function Members() {
     }, []);
 
     // The two reference lists are `useReferenceData`'s now; this owns the register alone.
+    const retryMembers = useCallback(() => {
+        setListState("loading");
+        loadMembers();
+    }, [loadMembers]);
+
     useEffect(() => {
         loadMembers();
     }, [loadMembers]);
@@ -1321,7 +1332,7 @@ export default function Members() {
                         loading={listState === "loading"}
                         error={listState === "error" ? "The register could not be reached" : null}
                         errorMessage="The server did not answer, so this is not an empty result. Nothing you typed has been lost."
-                        onRetry={loadMembers}
+                        onRetry={retryMembers}
                         emptyTitle={query ? `No member matches “${deferredSearch.trim()}”` : "No members match these criteria"}
                         emptyMessage={
                             query
