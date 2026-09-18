@@ -114,4 +114,42 @@ describe('Subscriptions', () => {
       expect(screen.queryByText(/could not be loaded/i)).not.toBeInTheDocument()
     })
   })
+
+  describe('④ the list itself, when it fails and is retried', () => {
+    /*
+     * 🔴 NAKED UNTIL `10.4`, AND `10.4` IS WHAT MOVED IT. The load's two resets --
+     * `setLoading(true)` and `setError(null)` -- sat inside the effect, which
+     * `react-hooks/set-state-in-effect` makes an error this phase, so they moved onto the Try again
+     * control that bumps `attempt`. ①-③ above cover the first frame, a save and the BANK list; none
+     * of them ever retried THE LIST. So the path that just changed had no witness at all.
+     *
+     * ⚠️ AND ONE OF THOSE TWO LINES IS LOAD-BEARING IN A WAY A RETRY TEST CAN EASILY MISS.
+     * Nothing else ever clears `error`, so without `setError(null)` a retry that SUCCEEDS still
+     * draws the failure banner -- above the list it has just loaded. A test that only checks the
+     * rows arrive passes against exactly that bug. The second assertion below is the one that
+     * holds it.
+     */
+    it('Try again reloads the list, and the failure it replaced is GONE, not left above the rows', async () => {
+      const user = setupUser()
+      server.use(http.get('*/api/subscriptions', boom))
+      renderWithProviders(<Subscriptions />)
+
+      const retry = await screen.findByRole('button', { name: /try again/i })
+      // Swapped BEFORE the press, never after: a handler changed after the click races the
+      // request the click has already issued, which is a flake written on purpose.
+      server.use(http.get('*/api/subscriptions', () => HttpResponse.json([SUB])))
+      await user.click(retry)
+
+      expect(await screen.findByRole('button', { name: 'Edit the subscription for Synthetic Bank' })).toBeInTheDocument()
+      expect(screen.queryByText(/could not load the subscriptions/i)).not.toBeInTheDocument()
+    })
+
+    it('the must-pass: a list that fails says so, and does not claim to be empty', async () => {
+      server.use(http.get('*/api/subscriptions', boom))
+      renderWithProviders(<Subscriptions />)
+
+      expect(await screen.findByText(/could not load the subscriptions/i)).toBeInTheDocument()
+      expect(screen.queryByText(EMPTY)).not.toBeInTheDocument()
+    })
+  })
 })

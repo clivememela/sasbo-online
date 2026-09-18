@@ -101,8 +101,6 @@ export default function RecruitmentChannel() {
     // effect's dependency, and a fresh identity each render is a re-fetch each render --
     // which on screen is indistinguishable from a slow backend.
     const refresh = useCallback(() => {
-        setListState('loading');
-        setLoadError(null);
         return recruitmentChannelService.getAll()
             .then((data) => {
                 setRecruipmentChannels(Array.isArray(data) ? data : []);
@@ -114,6 +112,28 @@ export default function RecruitmentChannel() {
                 setListState('error');
             });
     }, []);
+
+    /*
+     * 🔴 THE RESET IS ON EVERY PATH EXCEPT THE MOUNT (`10.4`), AND THAT DISTINCTION IS THE WHOLE CARE HERE.
+     *
+     * `react-hooks/set-state-in-effect` flagged the effect below, because `refresh` set state synchronously
+     * before its fetch. On MOUNT that was a no-op -- `listState` already initialises to 'loading' and
+     * `loadError` to null -- so hoisting it out of the effect costs nothing there.
+     *
+     * ⚠️ BUT THIS SCREEN IS NOT THE OTHER FOUR LOADERS: `refresh` HAS FIVE NON-EFFECT CALLERS, not one.
+     * Besides Try again, the four write handlers (add, rename, enable/disable, delete) reload the table
+     * afterwards, and TODAY THAT SHOWS THE LOADING STATE while the reloaded rows are fetched. Hoisting the
+     * reset onto the retry path alone would have silently deleted that -- after a rename the table would sit
+     * on the stale rows with no sign anything was happening, which is a real behaviour change smuggled in as
+     * a lint fix. So `reloadChannels` is what all five call, and the effect alone calls the bare fetch.
+     *
+     * `RecruitmentChannel.reload.test.jsx` holds it: nothing asserted that flash before this phase.
+     */
+    const reloadChannels = useCallback(() => {
+        setListState('loading');
+        setLoadError(null);
+        return refresh();
+    }, [refresh]);
 
     useEffect(() => { refresh(); }, [refresh]);
 
@@ -131,7 +151,7 @@ export default function RecruitmentChannel() {
         setSaving(true);
         try {
             await recruitmentChannelService.create(name);
-            await refresh();
+            await reloadChannels();
             setNewName('');
             setShowAdd(false);
         } catch (err) {
@@ -148,7 +168,7 @@ export default function RecruitmentChannel() {
         setSaving(true);
         try {
             await recruitmentChannelService.update(r.id, { name, enabled: r.enabled });
-            await refresh();
+            await reloadChannels();
             setEditingId(null);
         } catch (err) {
             setNotice(writeFailureNotice(err, what));
@@ -162,7 +182,7 @@ export default function RecruitmentChannel() {
         setSaving(true);
         try {
             await recruitmentChannelService.update(r.id, { name: r.name, enabled: !r.enabled });
-            await refresh();
+            await reloadChannels();
         } catch (err) {
             setNotice(writeFailureNotice(err, what));
         } finally {
@@ -187,7 +207,7 @@ export default function RecruitmentChannel() {
         try {
             await recruitmentChannelService.remove(r.id);
             setPendingDelete(null);
-            await refresh();
+            await reloadChannels();
         } catch (err) {
             reportError('RecruitmentChannel.remove', err);
             // R3-F2: only a refusal proves nothing was deleted; a lost answer may have deleted it.
@@ -312,7 +332,7 @@ export default function RecruitmentChannel() {
                                             <DataState
                                                 state="error"
                                                 error={loadError}
-                                                onRetry={refresh}
+                                                onRetry={reloadChannels}
                                                 title="We could not load the recruiter types."
                                             />
                                         )}
