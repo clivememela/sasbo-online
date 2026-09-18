@@ -160,6 +160,14 @@ export const SURFACES = [
   { name: 'record-structures', route: '/members', ready: ROWS,
     steps: [OPEN_FIRST_MEMBER, step('open Structures', clickByText(`${PANEL} button`, '/Structures/i'), TEXT('SASBO structures'))],
     present: { TAB: TEXT('SASBO structures') } },
+  /*
+   * 🔴 THE MEMBERSHIP TAB HAD NO SURFACE, AND IT IS WHERE THE RECORD'S ONLY VISIBLE DATE LIVES. R3-F1 changed how
+   * Date Joined prints, and nothing photographed it: `record-open` is the Personal tab and `record-structures` is
+   * Structures. A change with no capture is a change nobody can prove did what it says.
+   */
+  { name: 'record-membership', route: '/members', ready: ROWS,
+    steps: [OPEN_FIRST_MEMBER, step('open Membership & Subscriptions', clickByText(`${PANEL} button`, '/Membership/i'), TEXT('Date Joined Sasbo'))],
+    present: { TAB: TEXT('Date Joined Sasbo') } },
   { name: 'record-edit', route: '/members', ready: ROWS, steps: [OPEN_FIRST_MEMBER, EDIT_RECORD], present: { EDITING: TEXT('Save changes') } },
   { name: 'record-save-confirm', route: '/members', ready: ROWS,
     steps: [OPEN_EDITABLE_MEMBER, EDIT_RECORD, CHANGE_PHONE,

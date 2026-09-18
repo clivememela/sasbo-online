@@ -131,7 +131,22 @@ try {
     return out;
   };
 
+  /*
+   * 🔴 EVERY SURFACE IS PHOTOGRAPHED WITH MOTION OFF, AND WITHOUT THAT THE CAPTURES DO NOT REPEAT (T44).
+   *
+   * `matrix --still` has emulated `prefers-reduced-motion: reduce` since `05.1`; this tool never did, and the
+   * record panel is the arc's most animated surface -- the column travels over `--duration-panel`, the card lands
+   * and sweeps, the rows stagger, the tabs slide. Measured 2026-09-17 on ONE unchanged build: two runs of the same
+   * four record surfaces differed by up to 7,344 pixels, while the real change being measured moved 26. An
+   * instrument whose noise floor is larger than its signal cannot answer the question it is there for, and
+   * 'photograph it again' is precisely what the anti-flake rule forbids.
+   *
+   * ⚠️ IT IS ALSO THE MORE HONEST MEASUREMENT. Contrast and touch targets are properties of the SETTLED surface;
+   * a ratio read off a frame that is still fading is a ratio of something nobody sees. The reduced-motion
+   * treatment is the arc's own (06.2), not an absence of design.
+   */
   const arrive = async (route, theme, width) => {
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     await metrics(width);
     await send('Emulation.setTouchEmulationEnabled', isPhone(width) ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
     await evaluate(storeTheme(theme === 'dark'));

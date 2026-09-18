@@ -19,7 +19,7 @@ import {
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS,
 } from "../../config/memberConstants.js";
 import {
-    validateSAID, validateEmail, formatDate, extractDateOfBirthFromSAID, extractGenderFromSAID
+    validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID
 } from "../../utils/validateSAID.js";
 import PageTitle from "../../components/common/PageTitle.jsx";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
@@ -33,7 +33,7 @@ import Sheet from "../../components/common/Sheet.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
 import { writeMayHaveLanded } from "../../services/parseApiError.js";
-import { parseDate, sameDate, today } from "../../lib/format.js";
+import { formatDate, parseDate, sameDate, today } from "../../lib/format.js";
 import { cn } from "../../lib/utils";
 import { personName } from "../../lib/names.js";
 
@@ -270,12 +270,19 @@ const comparable = (key, value) => {
     return value;
 };
 
+/** The record's date fields, by name. conventions §15 gives them all one shape: `yyyy/mm/dd`. */
+const DATE_KEYS = new Set(["dateOfBirth", "joinDate", "electionDate"]);
+
 /** A value as a person reads it. */
 const readable = (key, value) => {
     const shown = comparable(key, value);
     if (typeof shown === "boolean") return shown ? "Yes" : "No";
     if (key === "becCommitteeId") return SASBO_BEC_BRANCHES.find((branch) => branch.id === shown)?.name ?? (shown || "—");
     if (key === "becStructures" || key === "cosatuPositions") return shown ? String(shown).split(",").join(", ") : "none";
+    // R3-F1: a LocalDate arrives as [y, m, d], and `comparable` joins an array with commas -- so an untouched date
+    // read "1988,6,15", and a changed one "1988,6,15 → 1988-06-15". Dates are NAMED, never sniffed: a value that
+    // merely looks like one is not one, and the record holds exactly these three.
+    if (DATE_KEYS.has(key)) return formatDate(value);
     return shown === "" ? "—" : String(shown);
 };
 
@@ -962,16 +969,6 @@ export default function Members() {
         setPage(1);
     };
 
-    const formatBackendDate = (dateVal) => {
-        // Empty, not "-": `Detail` prints the record's own "—" for a value that is not there,
-        // and a hyphen beside it read as a different mark for the same absence (`06.3`).
-        if (!dateVal) return "";
-        if (Array.isArray(dateVal)) {
-            const [year, month, day] = dateVal;
-            return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-        }
-        return String(dateVal).split("T")[0];
-    };
     /**
      * The register's columns. R-RESP-K: every column declares what it is worth, so a phone
      * shows three real columns and puts the rest in the row's detail panel instead of
@@ -1549,7 +1546,7 @@ export default function Members() {
                                             onChange={(e) => setEditForm(prev => ({ ...prev, dateOfBirth: e.target.value }))}
                                         />
                                     ) : (
-                                        <Detail label="Date of Birth" value={editForm.dateOfBirth} isEditing={false} />
+                                        <Detail label="Date of Birth" value={editForm.dateOfBirth ? formatDate(editForm.dateOfBirth) : ""} isEditing={false} />
                                     )}
                                     <Detail label="Gender" value={editForm.gender} isEditing={isEditing} options={editForm.identityType === "I.D. Number" ? null : genderOptions} onChange={handleEditChange("gender")} disabled={editForm.identityType === "I.D. Number"} />
                                     <Detail label="Race" value={editForm.race} isEditing={isEditing} options={raceOptions} onChange={handleEditChange("race")} />
@@ -1601,7 +1598,7 @@ export default function Members() {
 
                             {activeTab === "membership" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
-                                    <Detail label="Date Joined Sasbo" value={formatBackendDate(selectedMember.joinDate)} isEditing={false} />
+                                    <Detail label="Date Joined Sasbo" value={selectedMember.joinDate ? formatDate(selectedMember.joinDate) : ""} isEditing={false} />
                                     <Detail label="Account Membership Status" value={editForm.status} isEditing={isEditing} options={statusOptions} onChange={handleEditChange("status")} />
                                     <h4 className="col-span-full mt-1.5 border-t border-line pt-[18px] text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Sasbo Subscription Fee Details</h4>
                                     {/* 🔴 A MEMBER WITH NO SUBSCRIPTION ON FILE WAS SHOWN R182.77, MONTHLY (`06.4`) -- two invented

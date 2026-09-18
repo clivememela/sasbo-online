@@ -32,6 +32,7 @@
  * application. It is `assertBuiltClient()` here, so a tool cannot omit it by forgetting.
  */
 import { spawn } from 'node:child_process';
+import { rmSync } from 'node:fs';
 
 const CHROME = 'C:/Users/mfazl/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe';
 
@@ -79,11 +80,19 @@ export async function launch(tag, { flags = [] } = {}) {
     );
   }
   const port = base + Math.floor(Math.random() * 40);
+  const profileDir = `${process.env.TEMP}/${tag}-profile-${port}-${Date.now().toString(36)}`;
 
   const chrome = spawn(CHROME, [
     '--headless=new', '--disable-gpu', '--hide-scrollbars',
     `--remote-debugging-port=${port}`, '--no-first-run',
-    `--user-data-dir=${process.env.TEMP}/${tag}-profile-${port}`,
+    /*
+     * 🔴 A PROFILE PER RUN, NEVER PER PORT (T40, T43). The port is drawn from a 40-wide range, so runs collided on
+     * the same profile directory -- and a REUSED profile is how a page came back holding the last run's theme
+     * (T40), and the likeliest reason a first navigation twice failed to become ready inside 30s (T43) while a
+     * probe on a clean profile reached the same URL in under a second. A measurement must not inherit state from
+     * the measurement before it. The directory is removed on close, so this does not fill the disk.
+     */
+    `--user-data-dir=${profileDir}`,
     ...flags,
     'about:blank',
   ], { stdio: 'ignore' });
@@ -290,6 +299,9 @@ export async function launch(tag, { flags = [] } = {}) {
   const close = () => {
     try { ws.close(); } catch { /* already closed */ }
     chrome.kill();
+    // Best effort: Chrome may still hold a handle for a moment, and a profile left behind is litter,
+    // never a failed run.
+    try { rmSync(profileDir, { recursive: true, force: true }); } catch { /* Chrome still has it */ }
   };
 
   return { send, evaluate, metrics, waitFor, assertBuiltClient, close, port, sleep, on, intercept };
