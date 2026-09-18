@@ -132,10 +132,18 @@ export const FLOORS = {
   ENVELOPE_KEYS: 3,
 
   /**
-   * Test source files the defect-population guard walks. Actual on 2026-09-07:
-   * 18. Previously written as a bare `8` at its call site.
+   * Test source files the defect-population guard walks -- every `.test.js` and `.test.jsx` under `src/`. Actual on
+   * 2026-09-07: 18. Previously written as a bare `8` at its call site.
+   *
+   * 🔒 RAISED AT `10.4`, 2026-09-18: **8 -> 75**, against a measured **121** through the same glob.
+   * At 8 the floor had **113 files of headroom** -- a walk that silently lost `src/pages/` and
+   * `src/components/` together would still have cleared it, and that is the partial-scan hole this
+   * registry exists to close ("headroom is silence, in the amount of the headroom"). 75 is about
+   * 62% of the actual, the same proportion as `SRC_JSX_FILES` and `PAGE_FILES`: far enough under
+   * that deleting a batch of obsolete tests does not redden it, close enough that losing a
+   * directory does. `testingAndErrorHandling.md` §5 scheduled this raise for `10.4`.
    */
-  TEST_SOURCE_FILES: 8,
+  TEST_SOURCE_FILES: 75,
 
   /**
    * Register rows declared in `knownDefects.js`. Actual on 2026-09-10: **15**
@@ -180,7 +188,13 @@ export const FLOORS = {
    * false for its single most load-bearing floor. Moved here unchanged; it is
    * not re-tuned by this pass.
    */
-  SUITE_TESTS: 260,
+  //
+  // 🔒 RAISED AT `10.4`, 2026-09-18: **260 -> 700**, against a MEASURED **1,103 tests in 123 files**
+  // (`npm test`, this worktree, `4ea88a4`'s gate). At 260 the floor sat 843 tests below the suite
+  // -- three quarters of it could have stopped being discovered without a sound. 700 is ~63% of
+  // the actual, the proportion the other population floors here use. It is still a canary, not a
+  // target: it will not be raised to follow the suite, only re-measured when someone quotes it.
+  SUITE_TESTS: 700,
 
   /**
    * Endpoints the route smoke ACTUALLY REQUESTED, counted by
