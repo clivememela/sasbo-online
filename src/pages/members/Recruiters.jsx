@@ -102,6 +102,23 @@ export function Recruiters() {
     const [newRepSearch, setNewRepSearch] = useState('');
     const [newRepMember, setNewRepMember] = useState(null);
     const [newRepDetails, setNewRepDetails] = useState(EMPTY_REP_DETAILS);
+
+    /*
+     * 🔴 THE TWO SEARCH DIALOGS OPEN ONTO THEIR SEARCH FIELD, AND IT USED TO BE `autoFocus` (`10.4`).
+     *
+     * ⚠️ REMOVING THE ATTRIBUTE WITHOUT REPLACING IT IS A REAL REGRESSION, NOT A NEUTRAL TIDY-UP. `autoFocus`
+     * worked here by a timing accident: React focuses during COMMIT, Radix's focus scope runs in a PASSIVE
+     * effect afterwards and only acts if it finds no focus inside the content -- so it found the search field
+     * already focused and left it. Delete the attribute and Radix focuses the first tabbable thing instead,
+     * which is the header's Close button, because the header renders before the children. You would open a
+     * search dialog and your first keystroke would go nowhere.
+     *
+     * So the decision moves into the primitive: `Modal`'s `initialFocusRef`, which says out loud what the
+     * attribute was achieving by accident. `Modal.initialFocus.test.jsx` holds the primitive; the pair in
+     * `Recruiters.focus.test.jsx` holds these two call sites.
+     */
+    const addMemberSearchRef = useRef(null);
+    const addRepSearchRef = useRef(null);
     const [selectedRepDetail, setSelectedRepDetail] = useState(null);
     const [editingRep, setEditingRep] = useState(false);
     const [editRepFields, setEditRepFields] = useState({ name: '', email: '', phone: '' });
@@ -969,6 +986,7 @@ export function Recruiters() {
                     title="Add member to recruiter"
                     description={selectedRep.name}
                     size="lg"
+                    initialFocusRef={addMemberSearchRef}
                     footer={<Button onClick={handleCloseAddMember}>Cancel</Button>}
                 >
                         <DialogNotice notice={notice} onDismiss={() => setNotice(null)} />
@@ -976,7 +994,7 @@ export function Recruiters() {
                             <TextInput
                                 label="Search members"
                                 kind="search"
-                                autoFocus
+                                ref={addMemberSearchRef}
                                 value={addSearch}
                                 onChange={e => setAddSearch(e.target.value)}
                                 placeholder="Search by name, membership no. or bank…"
@@ -1168,6 +1186,7 @@ export function Recruiters() {
                     title="Add Recruiter"
                     description="A recruiter must be an existing member"
                     size="md"
+                    initialFocusRef={addRepSearchRef}
                     footer={
                         <>
                             <Button onClick={handleCloseAddRep}>Cancel</Button>
@@ -1194,7 +1213,7 @@ export function Recruiters() {
                             <TextInput
                                 label="Search members"
                                 kind="search"
-                                autoFocus
+                                ref={addRepSearchRef}
                                 value={newRepSearch}
                                 onChange={e => setNewRepSearch(e.target.value)}
                                 placeholder="Search by name, membership no. or bank…"

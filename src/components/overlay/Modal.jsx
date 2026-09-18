@@ -86,6 +86,18 @@ export default function Modal({
    * where it is, disabled, and only while the write is in flight.
    */
   busy = false,
+  /**
+   * 🔴 WHICH CONTROL GETS THE CARET WHEN THIS DIALOG OPENS (`10.4`). Pass a ref and that element is focused;
+   * omit it and Radix's default stands, which focuses the first tabbable thing in the content -- the header's
+   * Close button, because the header renders before `{children}`.
+   *
+   * ⚠️ IT REPLACES `autoFocus`, WHICH IS NOT THE SAME THING WRITTEN DIFFERENTLY. `autoFocus` worked here only by
+   * a timing accident: React focuses in the COMMIT phase and Radix's focus scope runs in a PASSIVE effect
+   * afterwards, finds focus already placed inside the content, and leaves it. That is invisible, version-
+   * dependent, and `jsx-a11y/no-autofocus` is an error as of this phase. This says the same thing out loud,
+   * through the mechanism Radix provides for it.
+   */
+  initialFocusRef,
 }) {
   if (import.meta.env?.DEV && !title) {
     throw new Error(
@@ -189,6 +201,20 @@ export default function Modal({
           onEscapeKeyDown={onEscapeKeyDown}
           onPointerDownOutside={block}
           onInteractOutside={block}
+          // 🔑 A TERNARY IS SAFE HERE, unlike the `aria-describedby` spread above, and the
+          // difference is worth stating because the two sit ten lines apart. That one is an
+          // ARIA attribute, where a present key holding `undefined` REMOVES Radix's own
+          // wiring; this is an event handler, where an absent handler and an `undefined` one
+          // are the same thing, so the default behaviour is genuinely untouched when no ref
+          // is passed. The must-pass in `Modal.initialFocus.test.jsx` is what proves it.
+          onOpenAutoFocus={
+            initialFocusRef
+              ? (event) => {
+                  event.preventDefault()
+                  initialFocusRef.current?.focus()
+                }
+              : undefined
+          }
           onCloseAutoFocus={returnFocus}
           className={cn(
             'relative z-50 w-[calc(100%-2rem)]',
