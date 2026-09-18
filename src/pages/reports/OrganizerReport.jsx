@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import TextInput from '../../components/form/TextInput';
 import DateField from '../../components/form/DateField';
 import Button from '../../components/form/Button';
@@ -115,17 +115,22 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
         adminDeptSignature: '', dateCaptured: '',
     });
 
-    useEffect(() => {
-        if (filters) {
-            setFormData(prev => ({
-                ...prev,
-                bank: filters.bankName || prev.bank,
-                branchDepartment: filters.branch || prev.branchDepartment,
-                raNumber: filters.randomAccessNumber || prev.raNumber,
-                area: filters.area || prev.area,
-            }));
-        }
-    }, [filters]);
+    /*
+     * 🔴 AN UNREACHABLE EFFECT, DELETED. Register row **A60**; `10.4`, and [F-P60]. Same
+     * defect as `GeneralForm.jsx`,
+     * whose comment carries the full account.
+     *
+     * `Forms.jsx:60` renders this as `<OrganizerReport embedded />` and `App.jsx:92` as
+     * `<OrganizerReport />`. Neither passes `filters`, and nothing ever has -- so `if (filters)`
+     * was permanently false and this effect could not run.
+     *
+     * ⚠️ The prop stays in the signature so the real defect is not buried with the dead code:
+     * the Bank, Branch, Area and R/A No the user types into `Forms.jsx` are DISCARDED, and this
+     * report opens with all four blank. Wiring them through is a change to what the screen does
+     * and waits on the owner; when it is granted, seed the form with a `key` or during render,
+     * never by restoring an effect like this one -- it would overwrite what the user had
+     * already typed every time a criterion changed.
+     */
 
     // `useCallback` with no dependencies: `setFormData`'s updater form reads the previous
     // state, so this handler never needs to close over `formData` and never has to change.
