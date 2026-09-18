@@ -127,7 +127,12 @@ export default defineConfig([
        * second disable comment anywhere is a visible decision rather than a habit.
        */
       'no-console': 'error',
-      // ── jsx-a11y, at `warn` and DELIBERATELY NOT `error` (design arc, 00.5) ───────────
+      // ── jsx-a11y, AT `error` SINCE `10.4` (design arc) — it was `warn` from `00.5` until then ──
+      //
+      // 🔒 FLIPPED 2026-09-18, AT A MEASURED ZERO. `eslint .` reported 0 errors and 0 warnings on the
+      // commit before this one, so the flip could not turn anything red by itself; from here, a new
+      // violation fails the gate. The history below is why it waited that long, and it is kept because
+      // the reason is the lesson.
       //
       // 🔴 THE LEVEL IS THE WHOLE POINT. MobiZone turned this on at `error` mid-arc, could
       // not land anything until the backlog was cleared, and turned it back off -- so the
@@ -163,21 +168,34 @@ export default defineConfig([
       ...Object.fromEntries(
         Object.entries(jsxA11y.flatConfigs.recommended.rules).map(([rule, config]) => {
           const [severity, ...options] = Array.isArray(config) ? config : [config]
-          return [rule, severity === 'off' ? 'off' : ['warn', ...options]]
+          return [rule, severity === 'off' ? 'off' : ['error', ...options]]
         })
       ),
-      // ── R-ROB-I: the five React Compiler rules come back, at `warn` (design arc, 00.5) ──
+      // ── R-ROB-I: the five React Compiler rules, AT `error` SINCE `10.4` — `warn` from `00.5` ──
+      //
+      // 🔒 FLIPPED AT A MEASURED ZERO, AFTER NINE BATCHES AND NOT ONE SUPPRESSION. Twenty-three sites
+      // were fixed at the cause (F-P60): no `eslint-disable` was added for any of them, and two that were
+      // already in the tree went. Two things were learned that belong beside the level:
+      //
+      //   ⚠️ THE RULE HAS A BLIND SPOT, SO ZERO IS NOT A POPULATION CLAIM. An unrelated early `return`
+      //   before a synchronous `setState` hides it from `set-state-in-effect`, and so does wrapping the
+      //   body in an `async` function inside the effect. `useReferenceData.js` passed this way by
+      //   accident and was fixed anyway. The count says what the rule can SEE.
+      //   ⚠️ SO DO NOT "FIX" A NEW ONE WITH A DECOY `return`. That is a suppression wearing a guard's
+      //   clothes: the gate goes green and the code does not change. Move the state to where it belongs
+      //   -- derive it, set it in the handler that caused it, or let the promise set it.
+      //
       //
       // These were switched OFF because the code violates them today. That is the reason to
       // SEE them, not the reason to hide them -- they are the React Compiler's own rules, and
       // an app that breaks them is an app the compiler cannot optimise. Same schedule and same
       // level as jsx-a11y above: visible and counted now, mapped to owning phases, flipped to
       // `error` by `10.4` once the worklist is clear. `00.5` is the unit that owes this.
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/set-state-in-render': 'warn',
-      'react-hooks/purity': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-hooks/static-components': 'warn',
+      'react-hooks/set-state-in-effect': 'error',
+      'react-hooks/set-state-in-render': 'error',
+      'react-hooks/purity': 'error',
+      'react-hooks/immutability': 'error',
+      'react-hooks/static-components': 'error',
       'react-refresh/only-export-components': 'off',
     },
   },
