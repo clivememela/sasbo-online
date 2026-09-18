@@ -10,6 +10,7 @@ import { recruitmentChannelService } from '../../services/recruitmentChannelServ
 import DataState from '../../components/common/DataState.jsx';
 import reportError from '../../lib/reportError.js';
 import DialogNotice from '../../components/common/DialogNotice.jsx';
+import { focusOnMount } from '../../lib/focusOnMount.js';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 
 /*
@@ -51,32 +52,10 @@ export default function RecruitmentChannel() {
     const [showAdd, setShowAdd] = useState(false);
     const [newName, setNewName] = useState('');
 
-    /*
-     * 🔴 THE CARET FOLLOWS THE REVEAL, AND IT USED TO BE `autoFocus` (`10.4`).
-     *
-     * Both inputs below appear only when the user asks for them -- the add row on "Add a channel", the rename
-     * cell on the pencil -- and both are bare `<input>`s that NO focus manager is watching. There is no Radix
-     * here and no dialog, so deleting `autoFocus` would not move the caret elsewhere; it would leave it NOWHERE,
-     * and the user would press the button, start typing and watch nothing happen.
-     *
-     * 🔑 THE RULE IS RIGHT AND THE ATTRIBUTE WAS WRONG. `jsx-a11y/no-autofocus` objects to the DECLARATIVE form
-     * because it can fire on page load and take the caret from someone who never asked for it. Focus moved in
-     * response to a user's own click is exactly what it wants instead -- which is this, and which is the shape
-     * the `notice` effect above and `Sidebar.jsx` already use. `RecruitmentChannel.focus.test.jsx` holds all
-     * three halves: the caret arrives on each reveal, on the row that was pressed, and NOT before either.
-     */
-    const newNameRef = useRef(null);
-    const editNameRef = useRef(null);
-
-    useEffect(() => {
-        if (showAdd) newNameRef.current?.focus();
-    }, [showAdd]);
-
-    // Keyed on WHICH row, not on whether any row is being renamed: switching straight from
-    // renaming one channel to renaming another must move the caret with it.
-    useEffect(() => {
-        if (editingId !== null) editNameRef.current?.focus();
-    }, [editingId]);
+    // 🔴 THE CARET FOLLOWS THE REVEAL (`10.4`): both inline inputs below take `ref={focusOnMount}`. They mount exactly
+    // when the user asks for them, so focusing on mount is the whole rule -- see `lib/focusOnMount.js` for why this
+    // replaced `autoFocus`, and then the ref-and-effect pair that was here first. `RecruitmentChannel.focus.test.jsx`
+    // holds it: the caret arrives on each reveal, on the row that was pressed, and never before.
 
     /*
      * 🔴 A LIVE A27 THE REGISTER NEVER NAMED, AND IT WAS THE WORST SHAPE OF IT: this
@@ -265,7 +244,7 @@ export default function RecruitmentChannel() {
                 {showAdd && (
                     <div className="flex items-center gap-2 border-b border-line bg-brand-soft p-3">
                         <input
-                            ref={newNameRef}
+                            ref={focusOnMount}
                             value={newName}
                             onChange={e => setNewName(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleAdd()}
@@ -353,7 +332,7 @@ export default function RecruitmentChannel() {
                                     <td className="px-3.5 py-[11px] text-ink first:pl-5">
                                         {editingId === r.id ? (
                                             <input
-                                                ref={editNameRef}
+                                                ref={focusOnMount}
                                                 value={editName}
                                                 onChange={e => setEditName(e.target.value)}
                                                 aria-label={`Rename ${r.name}`}
