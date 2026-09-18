@@ -146,10 +146,37 @@ export async function launch(tag, { flags = [] } = {}) {
     return () => listeners.get(method).delete(fn);
   };
 
+  /**
+   * 🔴 EVERY CDP CALL HAS A DEADLINE, AND WITHOUT ONE A HUNG BROWSER HANGS THE RUN FOR EVER.
+   *
+   * Measured 2026-09-18, P9's closing gate: `surfaces.mjs` stopped after 178 of 252 rows and sat there. Its last
+   * capture and its last log line were both written at 11:30:03; at 12:29:39 nothing had moved, the node process had
+   * burned 39.34s of CPU and burned no more between two readings a second apart, and ten Chrome processes were still
+   * alive. It was blocked in `await send(...)` on a reply that was never coming -- there was no timer, so the promise
+   * simply never settled and the tool could not even say which surface it died on.
+   *
+   * ⚠️ A TIMEOUT HERE IS NOT A RETRY AND NOT A THRESHOLD NEGOTIATION. It turns an infinite wait into a NAMED failure:
+   * the caller sees which method stopped answering, the run ends, and the gate is red instead of pending. 30s is far
+   * beyond any real CDP round trip on this box (the slowest measured, a full-page screenshot under memory pressure,
+   * is under 3s), so it cannot fire for a call that was merely slow.
+   */
+  const SEND_CEILING_MS = 30_000;
+
   const send = (method, params = {}) =>
     new Promise((resolve, reject) => {
       const msg = { id: ++id, method, params };
-      pending.set(msg.id, { resolve, reject });
+      const deadline = setTimeout(() => {
+        if (!pending.has(msg.id)) return;
+        pending.delete(msg.id);
+        reject(new Error(
+          `CDP ${method} did not answer within ${SEND_CEILING_MS / 1000}s. The browser stopped responding; this is ` +
+          `the instrument, not the page. Re-running is not evidence -- see T45.`,
+        ));
+      }, SEND_CEILING_MS);
+      pending.set(msg.id, {
+        resolve: (value) => { clearTimeout(deadline); resolve(value); },
+        reject: (error) => { clearTimeout(deadline); reject(error); },
+      });
       ws.send(JSON.stringify(msg));
     });
 

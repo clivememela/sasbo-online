@@ -20,6 +20,7 @@ import useReferenceData from '../../hooks/useReferenceData.js';
 import reportError from '../../lib/reportError.js';
 import { cn } from '../../lib/utils';
 import { formalName } from '../../lib/names.js';
+import { formatDate } from '../../lib/format.js';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 
 const PAGE_SIZE = 20;
@@ -48,6 +49,16 @@ const REFERENCE_LOADERS = {
     roles: () => recruiterService.getRoles(),
     'recruitment channels': () => recruitmentChannelService.getAll(),
 };
+
+/**
+ * A date as this screen's dialogs print it (R3-OBS-3, taken 2026-09-18). The server sends `[y, m, d]`, and React
+ * renders an array by concatenating it -- so Date Joined read `201941` for a member who joined on 1 April 2019, and
+ * a recruiter's Election Date did the same. It is R3-F1's defect, one dialog away from where batch 5 fixed it.
+ *
+ * EMPTY STAYS EMPTY, because `DRow` prints its own em dash for a value that is not there; `formatDate` would print a
+ * second one. Same rule, same shape, as `Members.jsx`'s `recordDate`.
+ */
+const recordDate = (value) => (value ? formatDate(value) : '');
 
 /**
  * 🔴 R3-F2, WIDENED 2026-09-18: "could not be saved" is a claim about the SERVER, and only a refusal supports it.
@@ -1092,7 +1103,7 @@ export function Recruiters() {
                                 <DRow label="Recruiter Type" value={RECRUITMENT_CHANNELS.find(rt => rt.id === selectedRepDetail.recruiterTypeId)?.name || '—'} />
                                 <DRow label="Role" value={ROLES.find(r => r.id === selectedRepDetail.roleId)?.name || '—'} />
                                 <DRow label="Elected Rep" value={selectedRepDetail.isElectedRep ? 'Yes' : 'No'} />
-                                {selectedRepDetail.isElectedRep && <DRow label="Election Date" value={selectedRepDetail.electionDate || '—'} />}
+                                {selectedRepDetail.isElectedRep && <DRow label="Election Date" value={recordDate(selectedRepDetail.electionDate)} />}
                                 <DRow label="Structures" value={(selectedRepDetail.structureIds || []).map(sid => STRUCTURES.find(s => s.id === sid)?.name).filter(Boolean).join(', ') || '—'} />
                                 <DRow label="Members Recruited" value={selectedRepDetail.count} />
                             </div>
@@ -1282,7 +1293,7 @@ export function Recruiters() {
                                 </Section>
                                 <Section title="Membership">
                                     <DRow label="Membership No." value={selectedMember.membershipNumber} />
-                                    <DRow label="Date Joined" value={selectedMember.joinDate} />
+                                    <DRow label="Date Joined" value={recordDate(selectedMember.joinDate)} />
                                     <DRow label="Status" value={selectedMember.status} />
                                     <DRow label="Monthly Subs" value={selectedMember.monthlySubscription} />
                                     <DRow label="Current Balance" value={selectedMember.currentBalance} />
