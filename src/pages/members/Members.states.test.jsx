@@ -9,6 +9,7 @@ import { expectErrorState } from '../../test/assertions'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { deferred } from '../../test/deferred'
 
 /**
  * THE THREE-STATE RULE, TESTED WHERE IT IS CLAIMED.
@@ -88,16 +89,13 @@ const membersRespond = (body, status = 200) =>
  * replaces.
  */
 const membersRespondWhenReleased = () => {
-  let release
-  const answered = new Promise((resolve) => {
-    release = resolve
-  })
+  const answer = deferred()
   return {
     handler: http.get('*/api/members', async () => {
-      await answered
+      await answer.promise
       return HttpResponse.json(MEMBERS)
     }),
-    release: () => release(),
+    release: () => answer.resolve(),
   }
 }
 

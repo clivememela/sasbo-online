@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { deferred } from '../../test/deferred'
 
 /**
  * 🔴 R3-F4 (P9's independent review): THE RECORD FETCHED JOB GRADES ON EVERY OPEN, UNSEQUENCED.
@@ -135,14 +136,11 @@ describe('the record’s job grades', () => {
      * to key the result by bank and attempt and show it only while it is CURRENT, which closes
      * this gap as a consequence. Written against the code BEFORE that fix, so it is red first.
      */
-    let answerCapitec
-    const capitecAnswered = new Promise((resolve) => {
-      answerCapitec = resolve
-    })
+    const capitec = deferred()
     server.use(
       http.get('*/api/job-grades', async ({ request }) => {
         if (new URL(request.url).searchParams.get('bankCode') === 'Capitec') {
-          await capitecAnswered
+          await capitec.promise
           return HttpResponse.json([{ value: 'CAPITEC-ONLY', label: 'CAPITEC-ONLY' }])
         }
         return HttpResponse.json([{ value: 'ABSA-ONLY', label: 'ABSA-ONLY' }])
@@ -165,7 +163,7 @@ describe('the record’s job grades', () => {
         'ABSA’s grades were still offered under Capitec while Capitec’s were loading',
       ).toBeNull()
     } finally {
-      answerCapitec()
+      capitec.resolve()
     }
 
     // The must-pass: the new bank's grades DO arrive, so "not offered" above is the gap closing,

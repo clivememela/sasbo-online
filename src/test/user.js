@@ -26,4 +26,5 @@ import userEvent from '@testing-library/user-event'
  * next component test will otherwise be written with the default and
  * rediscover this the slow way.
  */
-export const setupUser = () => userEvent.setup({ delay: null })
+// Options pass straight through -- e.g. `{ advanceTimers: vi.advanceTimersByTime }` under fake timers.
+export const setupUser = (options = {}) => userEvent.setup({ delay: null, ...options })

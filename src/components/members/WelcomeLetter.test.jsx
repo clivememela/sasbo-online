@@ -8,6 +8,7 @@ import WelcomeLetter from './WelcomeLetter'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { setupUser } from '../../test/user'
+import { deferred } from '../../test/deferred'
 
 /**
  * THE WELCOME LETTER, AFTER A MEMBER IS CAPTURED. Three register rows, each written red first:
@@ -184,16 +185,13 @@ describe('the welcome letter dialog', () => {
      * The send is HELD until the test releases it, so "while sending" is a state the test is in, not a race.
      */
     function held() {
-      let release
-      const answered = new Promise((resolve) => {
-        release = resolve
-      })
+      const answer = deferred()
       return {
         handler: http.post('*/api/members/:id/send-welcome', async () => {
-          await answered
+          await answer.promise
           return new HttpResponse(null, { status: 200 })
         }),
-        release: () => release(),
+        release: () => answer.resolve(),
       }
     }
 

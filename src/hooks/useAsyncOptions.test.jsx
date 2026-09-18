@@ -5,17 +5,9 @@ import { useState } from 'react'
 
 import useAsyncOptions from './useAsyncOptions'
 import { networkError } from '../services/parseApiError'
+import { deferred } from '../test/deferred'
 
 /** A promise whose settlement this test controls, so "out of order" is arranged, not raced. */
-function deferred() {
-  let resolve
-  let reject
-  const promise = new Promise((res, rej) => {
-    resolve = res
-    reject = rej
-  })
-  return { promise, resolve, reject }
-}
 
 function Probe({ fetcher, query, enabled }) {
   const { options, loading, error, isEmpty } = useAsyncOptions(fetcher, [query], { enabled })

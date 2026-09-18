@@ -7,6 +7,7 @@ import RecruitmentChannel from './RecruitmentChannel'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { setupUser } from '../../test/user'
+import { deferred } from '../../test/deferred'
 
 /**
  * 🔴 THE BEHAVIOUR `10.4` ALMOST DELETED BY ACCIDENT, WHICH NOTHING WAS ASSERTING. `10.4`, batch 5.
@@ -35,16 +36,13 @@ const CHANNELS = [{ id: 1, name: 'Walk-in', enabled: true }]
 
 /** A list answer that does not arrive until this test says so. */
 function channelsWhenReleased(body) {
-  let release
-  const answered = new Promise((resolve) => {
-    release = resolve
-  })
+  const answer = deferred()
   return {
     handler: http.get('*/api/recruitment-channels', async () => {
-      await answered
+      await answer.promise
       return HttpResponse.json(body)
     }),
-    release: () => release(),
+    release: () => answer.resolve(),
   }
 }
 

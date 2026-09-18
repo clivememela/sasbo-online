@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 
 import useReferenceData from './useReferenceData'
 import { apiErrorFrom, networkError } from '../services/parseApiError'
+import { deferred } from '../test/deferred'
 
 /**
  * THE FOURTH STATE. `06.1b`, EH-D9, and the DoD's first box.
@@ -231,14 +232,11 @@ describe('useReferenceData', () => {
      * retry's answer is HELD here, and the state is read while it is.
      */
     const user = userEvent.setup()
-    let release
-    const held = new Promise((resolve) => {
-      release = resolve
-    })
+    const held = deferred()
     const banks = vi
       .fn()
       .mockRejectedValueOnce(await http500())
-      .mockImplementationOnce(() => held)
+      .mockImplementationOnce(() => held.promise)
     const loaders = { banks, roles: vi.fn().mockResolvedValue(['Organiser']) }
 
     render(<Probe loaders={loaders} />)
@@ -248,7 +246,7 @@ describe('useReferenceData', () => {
       await user.click(screen.getByRole('button', { name: 'Try again' }))
       expect(screen.getByTestId('state')).toHaveTextContent('loading')
     } finally {
-      release(['Absa'])
+      held.resolve(['Absa'])
     }
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('ready'))
   })
