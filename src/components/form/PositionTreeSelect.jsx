@@ -2,6 +2,9 @@ import { useCallback, useMemo, useState } from 'react';
 
 import SelectInput from './SelectInput';
 
+/** No ids: stable, so an omitted `selectedIds` has one identity across renders (see the guard below). */
+const NO_IDS = [];
+
 /**
  * Cascading selects for a position in the structure tree. `03.2a`.
  *
@@ -30,12 +33,6 @@ import SelectInput from './SelectInput';
  *   onChange     callback(selectedIds: number[])
  *   levelLabels  optional captions, one per depth
  */
-/** Nothing chosen at any level. One stable object, so clearing an already-clear tree is not an update. */
-const NO_SELECTION = {};
-
-/** No ids: stable, so an omitted `selectedIds` has one identity across renders (see the guard below). */
-const NO_IDS = [];
-
 export default function PositionTreeSelect({
   structures = [],
   selectedIds = NO_IDS,
@@ -81,12 +78,11 @@ export default function PositionTreeSelect({
 
   // Reset when the caller clears the selection (e.g. electedRep toggled back to N).
   //
-  // 🔑 THE BAIL MATTERS MORE THAN IT LOOKS. `selectedIds` defaults to a new `[]` and call
-  // sites pass computed arrays, so this effect runs on EVERY parent render. Setting a fresh
-  // `{}` each time is never state-equal, so each parent render cost a second full render of
-  // this component -- which invalidated the `levels` memo, produced new `options` identities,
-  // and so defeated the `normaliseOptions` memo inside every `SelectInput` in the cascade.
-  // Returning `previous` when it is already empty stops the whole chain.
+  // 🔑 THE BAIL MATTERS MORE THAN IT LOOKS, and it is the `Object.keys(...).length !== 0` check
+  // below. Setting a fresh `{}` when the tree is already clear is never state-equal, so it would
+  // cost a second full render of this component -- invalidating the `levels` memo, producing new
+  // `options` identities, and defeating the `normaliseOptions` memo inside every `SelectInput` in
+  // the cascade. Clearing only a tree that has something in it stops that whole chain.
   //
   // 🔴 NOW DURING RENDER, KEYED ON THE SAME TRIGGER THE EFFECT HAD (`10.4`): a NEW `selectedIds` from the caller.
   // `react-hooks/set-state-in-effect` makes the effect this was an error. The trigger is copied exactly, and the
@@ -104,7 +100,7 @@ export default function PositionTreeSelect({
   const [seenSelectedIds, setSeenSelectedIds] = useState(selectedIds);
   if (selectedIds !== seenSelectedIds) {
     setSeenSelectedIds(selectedIds);
-    if (selectedIds.length === 0 && Object.keys(selectionsByLevel).length !== 0) setSelectionsByLevel(NO_SELECTION);
+    if (selectedIds.length === 0 && Object.keys(selectionsByLevel).length !== 0) setSelectionsByLevel({});
   }
 
   // One entry per visible level: the options at that depth.

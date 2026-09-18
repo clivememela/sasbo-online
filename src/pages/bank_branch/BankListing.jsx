@@ -35,8 +35,6 @@ export default function BankListing() {
     return [];
   };
 
-  // Named, so the table's retry can re-run exactly what the mount ran. An error state
-  // whose button cannot repeat the request is an error state with a dead end in it.
   /*
    * 🔴 THE TWO RESETS MOVED TO THE RETRY PATH (`10.4`). `react-hooks/set-state-in-effect` was
    * right: the effect below called this, and this set state synchronously before any await.
@@ -64,6 +62,8 @@ export default function BankListing() {
       });
   }, []);
 
+  // The table's retry: it resets what the mount never needed to, then re-runs exactly the fetch
+  // the mount ran. An error state whose button cannot repeat the request is a dead end.
   const retryBanks = useCallback(() => {
     setIsLoading(true);
     setError("");

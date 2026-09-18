@@ -7,9 +7,6 @@ import { cn } from '../../lib/utils';
 import reportError from '../../lib/reportError';
 import Field, { controlClasses } from './Field';
 
-/** No suggestions: one stable empty list, so a cleared field does not hand the listbox a new array per render. */
-const NO_PREDICTIONS = [];
-
 /**
  * Address input backed by Google Places. `03.2a`.
  *
@@ -45,7 +42,7 @@ export default function AddressAutocomplete({
 }) {
   const listboxId = useId();
   const [query, setQuery] = useState(value || '');
-  const [predictions, setPredictions] = useState(NO_PREDICTIONS);
+  const [predictions, setPredictions] = useState([]);
   // 🔴 A SUGGESTION LOOKUP THAT FAILED LOOKED EXACTLY LIKE AN ADDRESS GOOGLE DID NOT KNOW (`06.4`): the list
   // simply never opened, and the person typing waited for suggestions that were not coming. The field says so
   // now -- and that what they type is kept, which is true: `onChange` carries every keystroke.
@@ -78,7 +75,7 @@ export default function AddressAutocomplete({
    * so that a slow box cannot let a fresh answer hide the stale one.
    */
   const searchable = query.trim().length >= 3;
-  if (!searchable && predictions.length > 0) setPredictions(NO_PREDICTIONS);
+  if (!searchable && predictions.length > 0) setPredictions([]);
 
   // Declared here, above the effects that read it: `const` is not hoisted, and the
   // outside-dismiss effect below runs before the render body reaches the JSX.

@@ -505,12 +505,12 @@ export default function Members() {
         });
     }, []);
 
-    // The two reference lists are `useReferenceData`'s now; this owns the register alone.
     const retryMembers = useCallback(() => {
         setListState("loading");
         loadMembers();
     }, [loadMembers]);
 
+    // The two reference lists are `useReferenceData`'s now; this owns the register alone.
     useEffect(() => {
         loadMembers();
     }, [loadMembers]);
@@ -568,7 +568,7 @@ export default function Members() {
     const jobGradeKey = isEditing && editForm.bankName
         ? JSON.stringify([editForm.bankName, jobGradeAttempt])
         : null;
-    const currentJobGrades = jobGradeKey !== null && jobGradeResult?.key === jobGradeKey ? jobGradeResult : null;
+    const currentJobGrades = jobGradeResult?.key === jobGradeKey ? jobGradeResult : null;
     const jobGrade = currentJobGrades?.options ?? NO_JOB_GRADES;
     const jobGradeError = currentJobGrades?.error ?? null;
 
@@ -589,8 +589,13 @@ export default function Members() {
 
     /**
      * 🔴 R4-F1, the edit twin of Capture Member's: Initials are derived from First Name(s) until the administrator
-     * types them. Reset whenever a record is loaded or an edit begins, so one member's typed initials do not stop the
+     * types them. Reset whenever an edit BEGINS (`handleEditToggle`), so one member's typed initials do not stop the
      * next member's from deriving.
+     *
+     * ♻️ IT USED TO BE RESET ON RECORD LOAD AS WELL, AND THAT RESET HAD NO CONSEQUENCE. The flag is read only while
+     * editing, every way into editing passes through `handleEditToggle`, and no path opens a different member in the
+     * middle of an edit -- opening one ends the edit first, and a save ends it itself. A deletion proof in `10.4`
+     * confirmed it (removed, `Members.recordSeed.test.jsx` ③ stayed green), and P10's refactor pass removed it.
      */
     const initialsTyped = useRef(false);
 
@@ -605,7 +610,7 @@ export default function Members() {
      *     the last member seen, React's documented form, which also means a newly opened record never paints
      *     one frame with the previous member's form;
      *   - `prevMemberIdRef` is not moved but REPLACED: the last member seen is exactly what it held;
-     *   - resetting `initialsTyped` stays an effect, because it writes a ref and sets no state.
+     *   - the `initialsTyped` reset that was also here turned out to be dead weight -- see `initialsTyped`.
      *
      * ⚠️ THE SECTION RESETS BY MEMBERSHIP NUMBER, NOT BY OBJECT, and that has to survive: a save replaces the
      * record with a new object carrying the same number, and comparing identities would throw the user back to
@@ -627,10 +632,6 @@ export default function Members() {
             setFieldErrors({});
         }
     }
-
-    useEffect(() => {
-        initialsTyped.current = false;
-    }, [selectedMember]);
 
     useEffect(() => {
         /*

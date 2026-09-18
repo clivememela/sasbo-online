@@ -29,8 +29,8 @@ import { setupUser } from '../../test/user'
  * comparing by identity instead of number turns ② red. Removing the LOAD-TIME initials reset turns NOTHING red: ③
  * still passes, because `handleEditToggle` resets the same flag whenever an edit BEGINS, and there is no way to edit
  * the next member without passing through it. So ③ is a real witness of R4-F1 across members -- held by the
- * edit-start reset, not by the one `10.4` moved. The load-time reset has no consequence this file could construct;
- * it is left in place (P10 moves behaviour, it does not delete it) and handed to RF as possibly redundant.
+ * edit-start reset, not by the one `10.4` moved. The load-time reset had no consequence this file could construct,
+ * and P10's refactor pass traced every path into editing and removed it.
  */
 
 const MEMBERS = [

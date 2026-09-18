@@ -116,9 +116,8 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
     });
 
     /*
-     * 🔴 AN UNREACHABLE EFFECT, DELETED. Register row **A60**; `10.4`, and [F-P60]. Same
-     * defect as `GeneralForm.jsx`,
-     * whose comment carries the full account.
+     * 🔴 AN UNREACHABLE EFFECT, DELETED. Register row **A60**; `10.4`, and [F-P60]. Same defect as
+     * `GeneralForm.jsx`, whose comment carries the full account.
      *
      * `Forms.jsx:60` renders this as `<OrganizerReport embedded />` and `App.jsx:92` as
      * `<OrganizerReport />`. Neither passes `filters`, and nothing ever has -- so `if (filters)`

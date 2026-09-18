@@ -2,6 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ERROR_KINDS } from '../services/parseApiError.js';
 
+/** No options: one stable array, so a disabled or unanswered field is not handed a new one each render. */
+const NO_OPTIONS = [];
+
+/** The answer before any request has settled. `request: -1` matches no request, so the first one is loading. */
+const NO_ANSWER = { request: -1, options: NO_OPTIONS, error: null };
+
+/** Same inputs as last render, compared element by element with `Object.is` -- exactly as React compares deps. */
+const sameInputs = (a, b) => a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
+
 /**
  * OPTIONS THAT ARRIVE OUT OF ORDER MUST NOT OVERWRITE NEWER ONES. `03.2b`, R-ROB-G.
  *
@@ -16,11 +25,12 @@ import { ERROR_KINDS } from '../services/parseApiError.js';
  * not one of them sequences. This is the fix as a hook rather than as a rule, because a
  * rule is something 27 rebuilt routes each have to remember (contract ⑮).
  *
- * 🔑 **A SEQUENCE NUMBER, NOT A CANCELLATION.** `AbortController` cancels the *request*,
- * which is worth doing and is not sufficient: an already-resolved promise still runs its
- * `.then`. So each call takes a ticket, and a result is applied only if its ticket is
- * still the newest. Both are used — abort to stop the network, the ticket to stop the
- * write.
+ * 🔑 **SUPERSEDED, NOT ONLY CANCELLED.** `AbortController` cancels the *request*, which is
+ * worth doing and is not sufficient: an already-resolved promise still runs its `.then`. So
+ * each request's effect owns a `superseded` flag that its cleanup sets -- new inputs, a
+ * refetch, or unmount -- and an answer is applied only while its request is still current.
+ * Both are used: abort to stop the network, the flag to stop the write. *(Until `10.4` this
+ * was a ref-held ticket number; the effect's own lifetime now does the same job.)*
  *
  * ⚠️ **AN ABORT IS NOT A FAILURE.** A superseded request is dropped silently and the state
  * is left exactly as it was — no error, no empty list, no spinner stuck on. That is the
@@ -36,15 +46,6 @@ import { ERROR_KINDS } from '../services/parseApiError.js';
  * @param deps      re-fetch when these change, exactly like an effect's dependency list.
  * @param options   `{ enabled }` — skip entirely while false (a dependent field with no parent yet).
  */
-/** No options: one stable array, so a disabled or unanswered field is not handed a new one each render. */
-const NO_OPTIONS = [];
-
-/** The answer before any request has settled. `request: -1` matches no request, so the first one is loading. */
-const NO_ANSWER = { request: -1, options: NO_OPTIONS, error: null };
-
-/** Same inputs as last render, compared element by element with `Object.is` -- exactly as React compares deps. */
-const sameInputs = (a, b) => a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
-
 export default function useAsyncOptions(fetcher, deps = [], { enabled = true } = {}) {
   const fetcherRef = useRef(fetcher);
 

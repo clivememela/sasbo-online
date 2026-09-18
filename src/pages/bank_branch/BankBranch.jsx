@@ -26,20 +26,9 @@ export default function BankBranch() {
   const [listState, setListState] = useState('loading');
 
   /*
-   * 🔴 THE LOADING RESET LIVES ON THE RETRY PATH, NOT INSIDE THE FETCH (`10.4`).
-   *
-   * `react-hooks/set-state-in-effect` is an error as of this phase, and it was right: the effect
-   * below called a function whose FIRST statement set state synchronously, so every mount paid a
-   * cascading render for a transition that had already happened.
-   *
-   * 🔑 IT WAS A NO-OP ON MOUNT ANYWAY, which is what makes this behaviour-preserving rather than a
-   * judgement call: `listState` already INITIALISES to 'loading', so setting it to 'loading' again
-   * on the way in changed nothing anybody could see. What the line genuinely does is on the RETRY
-   * path -- press Try again after a failure and the screen must go back to loading rather than sit
-   * on the error until the answer lands. That is exactly where it now is.
-   *
-   * So the fetch owns its own outcome (ready or error) and the caller owns the intent to reload.
-   * `retryBanks` is the retry; the effect calls the plain fetch and sets nothing.
+   * 🔴 THE LOADING RESET LIVES ON THE RETRY PATH, NOT INSIDE THE FETCH (`10.4`). Same change, and the same
+   * reason, as `AcbDebits.jsx`, whose comment carries the full account: the reset was a no-op on mount, so
+   * the fetch owns its outcome and `retryBanks` owns the intent to reload.
    */
   const loadBanks = useCallback(() => bankService.getBanks()
     .then((data) => { setBanks(data ?? []); setListState('ready'); })

@@ -189,7 +189,9 @@ export function Recruiters() {
      * the proof this change is behaviour-preserving rather than a judgement:
      *
      *   on mount          `listState` is already 'loading'        -> no-op
-     *   after a write     the table is 'ready', so the guard holds -> no-op
+     *   after a write     the table is 'ready', so the guard holds -> no-op. That is structural, not luck:
+     *                     every write needs a ROW or a MEMBER from this same load, so no write can start
+     *                     from a failed one. A write reachable from the error screen would break this.
      *   on Try again      'error' -> 'loading'                     -> THE ONLY REAL CASE
      *
      * So the five write handlers keep calling `refreshAll` unchanged, and the one case that
@@ -553,7 +555,6 @@ export function Recruiters() {
             setSaving(false);
         }
     };
-
 
     const handleAddRep = async () => {
         if (!newRepMember) return;
