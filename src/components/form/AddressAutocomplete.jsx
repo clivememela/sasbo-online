@@ -7,6 +7,9 @@ import { cn } from '../../lib/utils';
 import reportError from '../../lib/reportError';
 import Field, { controlClasses } from './Field';
 
+/** No suggestions: one stable empty list, so a cleared field does not hand the listbox a new array per render. */
+const NO_PREDICTIONS = [];
+
 /**
  * Address input backed by Google Places. `03.2a`.
  *
@@ -42,7 +45,7 @@ export default function AddressAutocomplete({
 }) {
   const listboxId = useId();
   const [query, setQuery] = useState(value || '');
-  const [predictions, setPredictions] = useState([]);
+  const [predictions, setPredictions] = useState(NO_PREDICTIONS);
   // 🔴 A SUGGESTION LOOKUP THAT FAILED LOOKED EXACTLY LIKE AN ADDRESS GOOGLE DID NOT KNOW (`06.4`): the list
   // simply never opened, and the person typing waited for suggestions that were not coming. The field says so
   // now -- and that what they type is kept, which is true: `onChange` carries every keystroke.
@@ -53,6 +56,29 @@ export default function AddressAutocomplete({
   const sessionTokenRef = useRef(null);
 
   const placesLib = useMapsLibrary('places');
+
+  /*
+   * 🔴 BELOW THREE CHARACTERS THE SUGGESTIONS ARE CLEARED -- DURING RENDER, NOT AFTER IT (`10.4`).
+   *
+   * They used to be cleared by the debounce effect (`setPredictions([])`), which
+   * `react-hooks/set-state-in-effect` makes an error this phase. Two replacements were weighed and one
+   * was wrong:
+   *
+   *   HIDE the list while the query is short (derive it) -- rejected. That clears nothing; it only
+   *   stops SHOWING the old list. Back out of "12 Synthetic" to "12", type " S", and the suggestions
+   *   for the abandoned query reappear under the new one until the new lookup answers.
+   *
+   *   CLEAR it during render, guarded -- this. Same semantics as before, exactly: short query, no
+   *   suggestions, and they are gone rather than hidden. React re-renders before anything commits, so
+   *   the one frame the effect used to leave (a short query still showing its old list) is never drawn.
+   *   The guard is what makes it terminate. It also clears a LATE answer for a longer query that lands
+   *   after the user has backed out, which the effect -- keyed on `query` -- never saw.
+   *
+   * `AddressAutocomplete.suggestions.test.jsx` holds the backed-out case, with the second lookup held
+   * so that a slow box cannot let a fresh answer hide the stale one.
+   */
+  const searchable = query.trim().length >= 3;
+  if (!searchable && predictions.length > 0) setPredictions(NO_PREDICTIONS);
 
   // Declared here, above the effects that read it: `const` is not hoisted, and the
   // outside-dismiss effect below runs before the render body reaches the JSX.
@@ -115,13 +141,10 @@ export default function AddressAutocomplete({
 
   // Debounce the predictions fetch.
   useEffect(() => {
-    if (!query || query.trim().length < 3) {
-      setPredictions([]);
-      return undefined;
-    }
+    if (!searchable) return undefined;
     const timer = setTimeout(() => fetchPredictions(query), 300);
     return () => clearTimeout(timer);
-  }, [query, fetchPredictions]);
+  }, [query, searchable, fetchPredictions]);
 
   // 🔑 `pointerdown`, and ONLY WHILE OPEN -- matching `SearchableSelect`, which documents
   // why: `mousedown` alone misses touch on iOS. This file shipped the `mousedown` version in

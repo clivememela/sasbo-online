@@ -120,4 +120,56 @@ describe('the record’s job grades', () => {
     ).toBeNull()
     expect(within(grade).getByRole('option', { name: 'CAPITEC-ONLY' })).toBeInTheDocument()
   })
+  it('③ while a new bank’s grades are loading, the OLD bank’s are not on offer', async () => {
+    /*
+     * 🔴 R3-F4's HAZARD, ONE STEP EARLIER THAN ② CAUGHT IT. `10.4`.
+     *
+     * ② proves an older bank's LATE answer cannot overwrite a newer one. It does not look at the
+     * gap BEFORE the newer answer lands -- and in that gap the list still held the old bank's
+     * grades, because nothing cleared them when the bank changed; only the next answer did. So
+     * switch ABSA -> Capitec on a slow connection and ABSA's grades sat under "Capitec", one
+     * click from being saved against the wrong bank. That is the defect R3-F4 exists to prevent,
+     * reached by waiting instead of by racing.
+     *
+     * Found while taking `react-hooks/set-state-in-effect` to zero: the fix for that warning is
+     * to key the result by bank and attempt and show it only while it is CURRENT, which closes
+     * this gap as a consequence. Written against the code BEFORE that fix, so it is red first.
+     */
+    let answerCapitec
+    const capitecAnswered = new Promise((resolve) => {
+      answerCapitec = resolve
+    })
+    server.use(
+      http.get('*/api/job-grades', async ({ request }) => {
+        if (new URL(request.url).searchParams.get('bankCode') === 'Capitec') {
+          await capitecAnswered
+          return HttpResponse.json([{ value: 'CAPITEC-ONLY', label: 'CAPITEC-ONLY' }])
+        }
+        return HttpResponse.json([{ value: 'ABSA-ONLY', label: 'ABSA-ONLY' }])
+      }),
+    )
+    const user = await openTheRecord()
+    await user.click(screen.getByRole('button', { name: /Edit Member/i }))
+
+    // ABSA's list is in, and is on offer -- the starting point is real, not assumed.
+    const grade = await screen.findByLabelText(/^Job Grade/i)
+    await within(grade).findByRole('option', { name: 'ABSA-ONLY' })
+
+    const bank = await screen.findByLabelText(/^Bank Where Employed/i)
+    await within(bank).findByRole('option', { name: 'Capitec' })
+    try {
+      await user.selectOptions(bank, 'Capitec')
+
+      expect(
+        within(screen.getByLabelText(/^Job Grade/i)).queryByRole('option', { name: 'ABSA-ONLY' }),
+        'ABSA’s grades were still offered under Capitec while Capitec’s were loading',
+      ).toBeNull()
+    } finally {
+      answerCapitec()
+    }
+
+    // The must-pass: the new bank's grades DO arrive, so "not offered" above is the gap closing,
+    // not a list that has stopped working.
+    await within(screen.getByLabelText(/^Job Grade/i)).findByRole('option', { name: 'CAPITEC-ONLY' })
+  })
 })

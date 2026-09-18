@@ -88,4 +88,76 @@ describe('AddressAutocomplete — the suggestion lookup', () => {
     expect(await screen.findByRole('option', { name: /12 Synthetic Street/ })).toBeInTheDocument()
     expect(screen.queryByText(/could not be loaded/i)).not.toBeInTheDocument()
   })
+
+  it('suggestions for a query you backed out of do not come back when you type again', async () => {
+    /*
+     * 🔴 THE SEMANTIC `10.4` HAD TO KEEP, AND THE ONE THE OBVIOUS FIX WOULD HAVE LOST.
+     *
+     * Below three characters there are no suggestions: the list was CLEARED by an effect, which
+     * `react-hooks/set-state-in-effect` makes an error this phase. The natural replacement -- hide
+     * the list while the query is short, i.e. derive it -- does not clear anything. It only stops
+     * SHOWING the old list, so the moment the query is long enough again the suggestions for the
+     * query you abandoned reappear under the one you are now typing, until the new lookup answers.
+     * Today they are gone; they must stay gone.
+     *
+     * The second lookup is HELD until this test releases it. Without that, on a slow box the
+     * debounce could fire and the fresh answer replace the stale one before the assertion ran --
+     * and the test would pass against the very bug it is here to catch.
+     */
+    const first = {
+      suggestions: [
+        {
+          placePrediction: {
+            placeId: 'old',
+            text: { text: '12 Synthetic Street, Johannesburg' },
+            structuredFormat: { mainText: { text: '12 Synthetic Street' }, secondaryText: { text: 'Johannesburg' } },
+          },
+        },
+      ],
+    }
+    let releaseSecond
+    const second = new Promise((resolve) => {
+      releaseSecond = () =>
+        resolve({
+          suggestions: [
+            {
+              placePrediction: {
+                placeId: 'new',
+                text: { text: '12 Sandton Drive, Sandton' },
+                structuredFormat: { mainText: { text: '12 Sandton Drive' }, secondaryText: { text: 'Sandton' } },
+              },
+            },
+          ],
+        })
+    })
+    fetchAutocompleteSuggestions.mockResolvedValueOnce(first).mockImplementationOnce(() => second)
+
+    const user = setupUser()
+    renderWithProviders(<Harness />)
+    const input = screen.getByLabelText('Residential Address')
+
+    await user.type(input, '12 Synthetic')
+    expect(await screen.findByRole('option', { name: /12 Synthetic Street/ })).toBeInTheDocument()
+
+    // Back out below three characters: the old list goes.
+    await user.clear(input)
+    await user.type(input, '12')
+    expect(screen.queryByRole('option')).not.toBeInTheDocument()
+
+    try {
+      // Long enough again -- and the second lookup is not allowed to answer yet.
+      await user.type(input, ' S')
+
+      expect(
+        screen.queryByRole('option', { name: /12 Synthetic Street/ }),
+        'the suggestions for the abandoned query came back under the new one',
+      ).toBeNull()
+    } finally {
+      releaseSecond()
+    }
+
+    // The must-pass: the NEW query's suggestion does arrive, so "nothing shown" above was the
+    // stale list staying gone, not the lookup having stopped working.
+    expect(await screen.findByRole('option', { name: /12 Sandton Drive/ })).toBeInTheDocument()
+  })
 })

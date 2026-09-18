@@ -41,6 +41,9 @@ import { personName } from "../../lib/names.js";
 
 const PAGE_SIZE = memberService.getPageSize();
 
+/** The job-grade list when there is no current answer: stable, so the select is not handed a new array each render. */
+const NO_JOB_GRADES = [];
+
 /*
  * 🔴 HOW LONG THE RECORD OUTLIVES THE CLICK THAT CLOSED IT. This is `--duration-panel` in
  * `index.css`, and the two are commented at both ends because nothing else keeps them in
@@ -362,7 +365,7 @@ export default function Members() {
     const navigate = useNavigate();
     const location = useLocation();
     const [filters, setFilters] = useState(() => getInitialFilters(location.state));
-    const [page, setPage] = useState(1);
+    const [requestedPage, setPage] = useState(1);
     const [selectedMember, setSelectedMember] = useState(null);
 
     /*
@@ -537,16 +540,38 @@ export default function Members() {
     );
     const branchOptions = branchOptionsFor(editForm.bankName);
     const genderOptions = GENDER_OPTIONS;
-    const [jobGradeOptions, setJobGradeOptions] = useState([]);
     /*
      * ✅ A25's SECOND CLAUSE, `06.1b` -- the other of the two callers. Same reasoning as the
      * one written out at `CaptureMember.jsx`: `getByBank` no longer swallows a failure into
      * the (empty) static list, so this panel renders the failure with a retry instead of
      * telling an administrator that the member's bank has no job grades on file.
      */
-    const [jobGradeError, setJobGradeError] = useState(null);
     const [jobGradeAttempt, setJobGradeAttempt] = useState(0);
-    const jobGrade = jobGradeOptions;
+    /*
+     * 🔴 ONE RESULT, KEYED BY THE QUESTION IT ANSWERS, AND SHOWN ONLY WHILE IT IS THE CURRENT ONE (`10.4`).
+     *
+     * The grades and their failure used to be two pieces of state that the fetch effect RESET on the way in
+     * (`setJobGradeOptions([])`, `setJobGradeError(null)`) -- which `react-hooks/set-state-in-effect` makes an
+     * error this phase. Keying the result by `[bank, attempt]` removes every one of those resets, because a
+     * result for another bank or another attempt is simply not current, so it is not shown. Nothing has to be
+     * cleared for it to disappear.
+     *
+     * 🔑 AND IT CLOSES A GAP R3-F4 LEFT OPEN. The resets only ran when the NEXT answer landed, so switching
+     * ABSA -> Capitec while editing left ABSA's grades on offer under "Capitec" for as long as Capitec took to
+     * answer -- one click from saving a grade against the wrong bank, which is the very thing R3-F4's ticket
+     * was added to prevent, reached by waiting rather than by racing. Here the old bank's list stops being
+     * current the instant the bank changes. `Members.jobGradeSequencing.test.jsx` ③ was red on that before
+     * this change.
+     *
+     * Not editing, or no bank: no key, no grades -- grades are per bank, so an empty list is the honest answer.
+     */
+    const [jobGradeResult, setJobGradeResult] = useState(null);
+    const jobGradeKey = isEditing && editForm.bankName
+        ? JSON.stringify([editForm.bankName, jobGradeAttempt])
+        : null;
+    const currentJobGrades = jobGradeKey !== null && jobGradeResult?.key === jobGradeKey ? jobGradeResult : null;
+    const jobGrade = currentJobGrades?.options ?? NO_JOB_GRADES;
+    const jobGradeError = currentJobGrades?.error ?? null;
 
     useEffect(() => {
         const onKeyDown = (e) => {
@@ -608,30 +633,23 @@ export default function Members() {
          * used most, for something nobody could see. And the fetch had no ticket: switching bank A → B with A's
          * answer arriving last put A's grades under bank B, where one of them could then be saved.
          */
-        if (!isEditing || !editForm.bankName) {
-            // No bank, no grades: grades are per bank, so an empty list is the honest answer.
-            setJobGradeOptions([]);
-            setJobGradeError(null);
-            return;
-        }
+        if (jobGradeKey === null) return undefined;
 
         let superseded = false;
-        setJobGradeError(null);
         jobGradeService.getByBank(editForm.bankName)
             .then((grades) => {
                 if (superseded) return;
-                setJobGradeOptions(Array.isArray(grades) ? grades : []);
+                setJobGradeResult({ key: jobGradeKey, options: Array.isArray(grades) ? grades : [], error: null });
             })
             .catch((error) => {
                 // An abort is the caller superseding itself, not a failure (§16, EH-D3).
                 if (superseded || error?.kind === 'abort') return;
-                setJobGradeOptions([]);
-                setJobGradeError(error);
+                setJobGradeResult({ key: jobGradeKey, options: [], error });
             });
         return () => {
             superseded = true;
         };
-    }, [isEditing, editForm.bankName, jobGradeAttempt]);
+    }, [jobGradeKey, editForm.bankName]);
 
 
     const handleEditToggle = () => {
@@ -959,6 +977,35 @@ export default function Members() {
         );
     }, [deferredFilters, membersList, query]);
 
+    /*
+     * 🔴 THE PAGE IS DERIVED, NOT CLAMPED AFTER THE FACT (`10.4`) -- AND THE CLAMP WAS A LIE FOR ONE FRAME.
+     *
+     * It used to be an effect: `setPage(p => Math.min(p, totalPages))`. `react-hooks/set-state-in-effect`
+     * flagged it, and the warning was describing a real frame. Search from page 3 for a surname five members
+     * share, and React rendered once with `page` still 3 and one page in total -- an EMPTY slice -- COMMITTED
+     * it, and drew **No member matches "..."** over members it was about to show. Only then did the effect
+     * bring the page down. A false statement about the union's own register, for one frame, on every search
+     * made from a later page.
+     *
+     * Criteria never showed it (they reset to page 1 themselves); only the TOPBAR search shrinks the list
+     * without doing so, which is why that is the one path that needed a clamp at all. And no test could see
+     * it, because every test mounts this page without the shell that supplies the search.
+     * `Members.pageClamp.test.jsx` mounts it under one, and watches the empty title for the whole transition.
+     *
+     * Derived during render, there is no frame in which the page can be out of range.
+     *
+     * ⚠️ AND DERIVING ALONE WOULD HAVE BROKEN SOMETHING ELSE, WHICH IS WHY THE SECOND LINE EXISTS. The effect
+     * clamped PERMANENTLY: search from page 3, land on page 1, clear the search, and you stay on page 1. A bare
+     * `Math.min` leaves what was asked for at 3, so clearing the search would have thrown the user back to
+     * page 3 of the full register -- a page they never chose for that list. So what was asked for follows
+     * what can be shown, during render. That is React's documented adjustment ("storing information from
+     * previous renders"): the re-render happens before anything commits, so the stale frame is never drawn,
+     * and the guard is what makes it terminate. The test file's third case holds this half.
+     */
+    const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE)), [filteredMembers]);
+    const page = Math.min(requestedPage, totalPages);
+    if (requestedPage !== page) setPage(page);
+
     /* The rows re-enter when the question changes: a new query, a new criterion, a new page. */
     const enterKey = useMemo(
         () => JSON.stringify([deferredFilters, query, page]),
@@ -1015,11 +1062,6 @@ export default function Members() {
             ).length,
         };
     }, [membersList]);
-
-    const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE)), [filteredMembers]);
-    useEffect(() => {
-        setPage((currentPage) => Math.min(currentPage, totalPages));
-    }, [totalPages]);
 
     const startIndex = (page - 1) * PAGE_SIZE;
     const endIndex = Math.min(startIndex + PAGE_SIZE, filteredMembers.length);
