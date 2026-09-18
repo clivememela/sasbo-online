@@ -413,7 +413,6 @@ export default function Members() {
     const [activeTab, setActiveTab] = useState("personal");
     const [showSavedNotification, setShowSavedNotification] = useState(false);
     const [fieldErrors, setFieldErrors] = useState({});
-    const prevMemberIdRef = useRef(null);
     const [membersList, setMembersList] = useState([]);
 
     /*
@@ -595,24 +594,42 @@ export default function Members() {
      */
     const initialsTyped = useRef(false);
 
-    useEffect(() => {
-        initialsTyped.current = false;
+    /*
+     * 🔴 THE RECORD RESEEDS DURING RENDER NOW, AND THE REF THAT REMEMBERED THE LAST MEMBER IS STATE (`10.4`).
+     *
+     * This was one effect keyed on `selectedMember` -- an error under `react-hooks/set-state-in-effect` this
+     * phase -- and it could not simply be lifted into render, because it also WROTE two refs, and a ref written
+     * during render is its own violation. So it splits:
+     *
+     *   - the state it seeds (form, section, errors, edit mode) moves into a render-phase update guarded by
+     *     the last member seen, React's documented form, which also means a newly opened record never paints
+     *     one frame with the previous member's form;
+     *   - `prevMemberIdRef` is not moved but REPLACED: the last member seen is exactly what it held;
+     *   - resetting `initialsTyped` stays an effect, because it writes a ref and sets no state.
+     *
+     * ⚠️ THE SECTION RESETS BY MEMBERSHIP NUMBER, NOT BY OBJECT, and that has to survive: a save replaces the
+     * record with a new object carrying the same number, and comparing identities would throw the user back to
+     * Personal after every save. `Members.recordSeed.test.jsx` ② is the must-pass that says so.
+     */
+    const [seenMember, setSeenMember] = useState(null);
+    if (selectedMember !== seenMember) {
+        const previousNumber = seenMember?.membershipNumber ?? null;
+        setSeenMember(selectedMember);
         if (selectedMember) {
             // List fields arrive as lists: memberService.normalizeMember unfolds the server's
             // "PEC,CEC" once, for every consumer (A37 / A38).
-            const normalized = { ...selectedMember, paymentType: normalizePaymentType(selectedMember.paymentType) };
-            setEditForm(normalized);
-            if (prevMemberIdRef.current !== selectedMember.membershipNumber) {
-                setActiveTab("personal");
-            }
-            prevMemberIdRef.current = selectedMember.membershipNumber;
+            setEditForm({ ...selectedMember, paymentType: normalizePaymentType(selectedMember.paymentType) });
+            if (previousNumber !== selectedMember.membershipNumber) setActiveTab("personal");
             setFieldErrors({});
         } else {
             setIsEditing(false);
             setEditForm({});
-            prevMemberIdRef.current = null;
             setFieldErrors({});
         }
+    }
+
+    useEffect(() => {
+        initialsTyped.current = false;
     }, [selectedMember]);
 
     useEffect(() => {

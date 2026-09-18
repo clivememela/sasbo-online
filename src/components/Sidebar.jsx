@@ -74,20 +74,28 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
    * that only expands on a click leaves a deep link -- /members/capture from a bookmark --
    * with its own section collapsed above it.
    */
-  useEffect(() => {
+  //
+  // 🔴 DURING RENDER, THE SAME WAY AS THE SELECTED CARD ABOVE (`10.4`). This was an effect on the pathname, which
+  // `react-hooks/set-state-in-effect` makes an error this phase; the file already had the render-phase form for the
+  // card, so the route gets the same one. A deep link now arrives with its section open on the FIRST paint, rather
+  // than one frame later. `shell.routeExpansion.test.jsx` holds it.
+  const [prevPathname, setPrevPathname] = useState(null);
+  if (location.pathname !== prevPathname) {
+    setPrevPathname(location.pathname);
     const ancestors = findAncestors(navItems, location.pathname);
-    if (!ancestors) return;
-    setExpandedItems(prev => {
-      const next = { ...prev };
-      let changed = false;
-      // The whole chain, the current section included: Members open shows Capture Member
-      // and Labels under it, which is how the mock draws the rail on the register.
-      ancestors.forEach(href => {
-        if (!next[href]) { next[href] = true; changed = true; }
+    if (ancestors) {
+      setExpandedItems(prev => {
+        const next = { ...prev };
+        let changed = false;
+        // The whole chain, the current section included: Members open shows Capture Member
+        // and Labels under it, which is how the mock draws the rail on the register.
+        ancestors.forEach(href => {
+          if (!next[href]) { next[href] = true; changed = true; }
+        });
+        return changed ? next : prev;
       });
-      return changed ? next : prev;
-    });
-  }, [location.pathname]);
+    }
+  }
 
   const toggleExpand = (href) => {
     setExpandedItems(prev => ({
