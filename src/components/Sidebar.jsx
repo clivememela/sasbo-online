@@ -34,6 +34,15 @@ const findAncestors = (items, target, path = []) => {
 };
 
 /**
+ * The width below which the rail is a DRAWER rather than furniture, as a media query.
+ *
+ * ⚠️ IT MUST AGREE WITH TAILWIND'S `lg:` BELOW, and nothing enforces that. If the two ever disagree, the desk rail
+ * is `inert` while fully visible -- a silent, total keyboard lockout of the navigation. Named here so the pairing is
+ * at least visible to the next reader; one shared breakpoint source is a job for the arc's closing refactor.
+ */
+const BELOW_DESK = "(max-width: 1023px)";
+
+/**
  * THE RAIL. card.html's `.side`: the quiet second layer -- a full step below the page
  * ground, 256px, the wordmark at the top, the navigation as 36px rows, and the foot
  * carrying Appearance and Log out.
@@ -93,12 +102,15 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
    * the drawer's own close button -- the first control in it, and the way back out -- matching where Escape returns
    * focus from. Only below the desk breakpoint: at `lg` the rail is static furniture nobody "opened".
    */
-  const belowDesk = useMediaQuery("(max-width: 1023px)");
-  const drawerRef = useRef(null);
+  const belowDesk = useMediaQuery(BELOW_DESK);
+  const closeRef = useRef(null);
 
   useEffect(() => {
     if (!sideBarOpen || !belowDesk) return;
-    drawerRef.current?.querySelector('[aria-label="Close navigation menu"]')?.focus();
+    // 🔑 A REF, NOT A SELECTOR ON THE LABEL. The first spelling found the button by
+    // `[aria-label="Close navigation menu"]`, which bound this behaviour to a copy string 100 lines away: rename
+    // the label and focus silently stops moving, with nothing red to say so. P9's refactor pass.
+    closeRef.current?.focus();
   }, [sideBarOpen, belowDesk]);
 
   /**
@@ -168,7 +180,6 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
          * Pixel-neutral -- `inert` has no rendering of its own, and the drawer is already translated away.
          */
         inert={belowDesk && !sideBarOpen}
-        ref={drawerRef}
         className={cn(
           "fixed z-20 flex h-dvh w-64 flex-col border-r border-line bg-bg-raised px-3 pb-3 pt-3.5",
           "shadow-(--shadow-2) transition-transform duration-(--duration-base) ease-(--ease-out)",
@@ -207,6 +218,7 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
               44px coarse-pointer hit area and the focus ring. Positioned over the row's
               corner so the wordmark keeps its full width beside it. */}
           <Button
+            ref={closeRef}
             size="icon"
             variant="ghost"
             className="absolute -top-1 right-0 lg:hidden"

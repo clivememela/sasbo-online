@@ -18,7 +18,7 @@ import { setupUser } from '../test/user'
  * stops depending on load. Same rule as `setupUser`'s `delay: null`: fix the wall-clock dependence, never the
  * threshold.
  */
-import Home from '../pages/Home.jsx'
+import '../pages/Home.jsx'
 
 /**
  * 🔴 R1-F2 and R1-F4 (P9's independent review), on the rail.
@@ -90,10 +90,6 @@ describe('the phone drawer, closed', () => {
 describe('the rail wordmark (R1-F4)', () => {
   beforeEach(() => {
     server.use(...smokeHandlers)
-  })
-
-  it('preloads the route module, so the waits below are not on a dynamic import', () => {
-    expect(Home).toBeTypeOf('function')
   })
 
   it('is a router link, not a document navigation', async () => {

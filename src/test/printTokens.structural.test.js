@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { assertNonVacuousScan } from './assertNonVacuousScan.js'
 import { REPO_ROOT } from './sourceScan.js'
 
 /**
@@ -62,8 +63,10 @@ const darkTokens = (css) => {
 describe('printing never inherits the dark theme (R5-F1)', () => {
   it('every custom property the dark theme sets is reset for paper', () => {
     const tokens = darkTokens(CSS)
-    // A non-vacuity floor: a parser that found nothing would otherwise report a clean file.
-    expect(tokens.length, 'almost no dark custom properties were found -- the scan is not reading this stylesheet').toBeGreaterThan(40)
+    // The shared non-vacuity canary, not a bare threshold: it carries this repository's one message about what a
+    // low count MEANS (fix the walker; never lower the floor), which is the sentence that stops the next person
+    // lowering it. `src/test/floors.js` names the bare-threshold habit as the defect it exists to end.
+    assertNonVacuousScan(tokens, 40, 'the dark-theme token scan')
 
     const printed = printBlock(CSS).text
     const survivors = tokens.filter((token) => !printed.includes(`${token}:`))

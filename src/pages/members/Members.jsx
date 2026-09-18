@@ -270,6 +270,14 @@ const comparable = (key, value) => {
     return value;
 };
 
+/**
+ * A record date as the panel shows it (R3-F1), and the one rule the deleted `formatBackendDate` used to carry:
+ * EMPTY stays empty. `formatDate` answers the em dash for a missing value and `Detail` prints its own for an empty
+ * one, so calling it unguarded put a literal "—" inside a disabled edit FIELD -- which a capture caught and no test
+ * did. Written once because it was written three times.
+ */
+const recordDate = (value) => (value ? formatDate(value) : "");
+
 /** The record's date fields, by name. conventions §15 gives them all one shape: `yyyy/mm/dd`. */
 const DATE_KEYS = new Set(["dateOfBirth", "joinDate", "electionDate"]);
 
@@ -750,47 +758,50 @@ export default function Members() {
     const commitSave = async () => {
         if (savingRecord) return;
         setSavingRecord(true);
+        // ONE exit, whatever happens below: the write's own `catch` returns early, and the refresh that follows
+        // has a `try` of its own, so a third path added later would otherwise leave the record busy for ever.
         try {
-            await memberService.updateMember(editForm);
-        } catch (error) {
-            reportError("Members.save", error);
-            // 06.1 owns the shared error CONTRACT; what this wave owes the screen is that
-            // a failed save is visible on the screen the member is looking at, rather than
-            // in a dialog they dismiss and a console they never open.
-            // 🔴 R3-F2: "Nothing was written" only after a refusal. A timeout, a lost connection or a 5xx may have saved
-            // the change, and a clerk told otherwise redoes it.
-            setPendingSave(null);
-            setSaveNotice(writeMayHaveLanded(error)
-                ? {
-                    kind: "unconfirmed",
-                    messages: ["We did not get an answer about these changes, so they may have been saved. Reload the register and check this member before trying again."],
-                }
-                : {
-                    kind: "failed",
-                    messages: ["We could not save these changes. Nothing was written — please try again."],
-                });
-            setSavingRecord(false);
-            return;
-        }
+            try {
+                await memberService.updateMember(editForm);
+            } catch (error) {
+                reportError("Members.save", error);
+                // 06.1 owns the shared error CONTRACT; what this wave owes the screen is that
+                // a failed save is visible on the screen the member is looking at, rather than
+                // in a dialog they dismiss and a console they never open.
+                // 🔴 R3-F2: "Nothing was written" only after a refusal. A timeout, a lost connection or a 5xx may have saved
+                // the change, and a clerk told otherwise redoes it.
+                setPendingSave(null);
+                setSaveNotice(writeMayHaveLanded(error)
+                    ? {
+                        kind: "unconfirmed",
+                        messages: ["We did not get an answer about these changes, so they may have been saved. Reload the register and check this member before trying again."],
+                    }
+                    : {
+                        kind: "failed",
+                        messages: ["We could not save these changes. Nothing was written — please try again."],
+                    });
+                return;
+            }
 
-        // The save landed. What follows is the register catching up, and its failure is not the save's (R3-F2): it
-        // shared the write's `try`, so a good save followed by a failed refresh was reported as not written.
-        setPendingSave(null);
-        setSelectedMember({ ...editForm });
-        setEditBaseline(null);
-        setIsEditing(false);
-        setSavedName([editForm.firstNames, editForm.surname].filter(Boolean).join(" "));
-        setShowSavedNotification(true);
-        window.setTimeout(() => setShowSavedNotification(false), 2600);
-        try {
-            const refreshed = await memberService.getMembers();
-            setMembersList(Array.isArray(refreshed) ? refreshed : (refreshed.data || refreshed.members || []));
-        } catch (error) {
-            reportError("Members.refreshAfterSave", error);
-            setSaveNotice({
-                kind: "stale",
-                messages: ["The changes were saved, but the register could not be refreshed, so its rows may show the old values until the page is reloaded."],
-            });
+            // The save landed. What follows is the register catching up, and its failure is not the save's (R3-F2): it
+            // shared the write's `try`, so a good save followed by a failed refresh was reported as not written.
+            setPendingSave(null);
+            setSelectedMember({ ...editForm });
+            setEditBaseline(null);
+            setIsEditing(false);
+            setSavedName(personName(editForm));
+            setShowSavedNotification(true);
+            window.setTimeout(() => setShowSavedNotification(false), 2600);
+            try {
+                const refreshed = await memberService.getMembers();
+                setMembersList(Array.isArray(refreshed) ? refreshed : (refreshed.data || refreshed.members || []));
+            } catch (error) {
+                reportError("Members.refreshAfterSave", error);
+                setSaveNotice({
+                    kind: "stale",
+                    messages: ["The changes were saved, but the register could not be refreshed, so its rows may show the old values until the page is reloaded."],
+                });
+            }
         } finally {
             setSavingRecord(false);
         }
@@ -1535,7 +1546,7 @@ export default function Members() {
                                         now. The I.D.-derived case stays read-only text: it is
                                         computed from the identity number, not typed. */}
                                     {editForm.identityType === "I.D. Number" ? (
-                                        <Detail label="Date of Birth" value={editForm.dateOfBirth ? formatDate(editForm.dateOfBirth) : ""} isEditing={isEditing} disabled onChange={handleEditChange("dateOfBirth")} />
+                                        <Detail label="Date of Birth" value={recordDate(editForm.dateOfBirth)} isEditing={isEditing} disabled onChange={handleEditChange("dateOfBirth")} />
                                     ) : isEditing ? (
                                         <DateField
                                             label="Date of Birth"
@@ -1546,7 +1557,7 @@ export default function Members() {
                                             onChange={(e) => setEditForm(prev => ({ ...prev, dateOfBirth: e.target.value }))}
                                         />
                                     ) : (
-                                        <Detail label="Date of Birth" value={editForm.dateOfBirth ? formatDate(editForm.dateOfBirth) : ""} isEditing={false} />
+                                        <Detail label="Date of Birth" value={recordDate(editForm.dateOfBirth)} isEditing={false} />
                                     )}
                                     <Detail label="Gender" value={editForm.gender} isEditing={isEditing} options={editForm.identityType === "I.D. Number" ? null : genderOptions} onChange={handleEditChange("gender")} disabled={editForm.identityType === "I.D. Number"} />
                                     <Detail label="Race" value={editForm.race} isEditing={isEditing} options={raceOptions} onChange={handleEditChange("race")} />
@@ -1598,7 +1609,7 @@ export default function Members() {
 
                             {activeTab === "membership" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
-                                    <Detail label="Date Joined Sasbo" value={selectedMember.joinDate ? formatDate(selectedMember.joinDate) : ""} isEditing={false} />
+                                    <Detail label="Date Joined Sasbo" value={recordDate(selectedMember.joinDate)} isEditing={false} />
                                     <Detail label="Account Membership Status" value={editForm.status} isEditing={isEditing} options={statusOptions} onChange={handleEditChange("status")} />
                                     <h4 className="col-span-full mt-1.5 border-t border-line pt-[18px] text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Sasbo Subscription Fee Details</h4>
                                     {/* 🔴 A MEMBER WITH NO SUBSCRIPTION ON FILE WAS SHOWN R182.77, MONTHLY (`06.4`) -- two invented

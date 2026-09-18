@@ -18,7 +18,7 @@ import { setupUser } from './user'
  * stops depending on load. Same rule as `setupUser`'s `delay: null`: fix the wall-clock dependence, never the
  * threshold.
  */
-import Home from '../pages/Home.jsx'
+import '../pages/Home.jsx'
 
 /**
  * 🔴 R1-F1 (P9's independent review): AFTER ONE PAGE THREW, THE ERROR PAGE STAYED ON EVERY ROUTE.
@@ -47,10 +47,6 @@ describe('the error boundary, after a route has thrown', () => {
     // React logs a render error before the boundary catches it; the log is not the assertion.
     vi.spyOn(console, 'error').mockImplementation(() => {})
     server.use(...smokeHandlers)
-  })
-
-  it('preloads the route module, so the waits below are not on a dynamic import', () => {
-    expect(Home).toBeTypeOf('function')
   })
 
   it('a rail link leaves the failed page behind', async () => {

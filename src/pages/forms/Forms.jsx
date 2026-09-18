@@ -4,6 +4,7 @@ import GeneralForm from "./GeneralForm.jsx";
 import LocationListing from "../reports/LocationListing.jsx";
 import MembershipApplication from "./MembershipApplication.jsx";
 import {TextInput, Button, FilterForm, SearchableSelect} from "../../components/form";
+import { fieldValue } from "../../lib/fieldValue.js";
 import { FileSearch } from "lucide-react";
 import PageTitle from '../../components/common/PageTitle';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
@@ -32,18 +33,12 @@ export function Forms(){
      * 🔴 R2-F5 (FIX-NOW, found in P9's execution): THIS CRASHED THE WHOLE SCREEN THE MOMENT A FORM TYPE WAS CHOSEN.
      *
      * `SearchableSelect` reports a choice as `onChange(value, option)` -- a VALUE, not an event -- and this read
-     * `event.target.value`, so picking anything threw `Cannot read properties of undefined (reading 'value')` and the
-     * route fell to the error boundary. The picker is the only control here, so the entire Forms feature was
-     * unreachable in the built app. Members and Recruiters already accepted both shapes; these two call sites did not.
-     *
-     * Both shapes are taken here rather than splitting the handler in two, because the same `field` is fed by
-     * `TextInput` (an event) and by `SearchableSelect` (a value), and a second handler is a second thing to forget.
+     * `event.target.value`, so picking anything threw and the route fell to the error boundary. The picker is the
+     * only control here, so the entire Forms feature was unreachable in the built app. `fieldValue` is that rule,
+     * in one place: P9's refactor pass found these same three lines written twice.
      */
     const handleInputChange = (field) => (eventOrValue) => {
-        const value = eventOrValue && typeof eventOrValue === 'object' && 'target' in eventOrValue
-            ? eventOrValue.target.value
-            : eventOrValue ?? '';
-        setFilters((prev) => ({ ...prev, [field]: value }));
+        setFilters((prev) => ({ ...prev, [field]: fieldValue(eventOrValue) }));
     };
 
     const handleSubmit = (e) => {

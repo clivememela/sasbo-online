@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState, useEffect } from "react";
 import { Plus, Printer } from "lucide-react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, SearchableSelect, Button } from "../../components/form";
+import { fieldValue } from "../../lib/fieldValue.js";
 import BankBranchModal from "./BankBranchModal.jsx";
 import PageTitle from '../../components/common/PageTitle';
 import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
@@ -63,14 +64,11 @@ export default function BankBranch() {
 
   /*
    * 🔴 R2-F5's SECOND SITE (FIX-NOW, found in P9's execution): choosing a bank threw and took the register with it.
-   * `SearchableSelect` reports a VALUE, `TextInput` an event, and this read `event.target.value` from both. See
-   * `Forms.jsx` for the same fix and the reason one handler takes both shapes.
+   * `SearchableSelect` reports a VALUE, `TextInput` an event, and this read `event.target.value` from both.
+   * `fieldValue` states that rule once -- see its own file for what it cost to learn.
    */
   const handleInputChange = (field) => (eventOrValue) => {
-    const value = eventOrValue && typeof eventOrValue === 'object' && 'target' in eventOrValue
-      ? eventOrValue.target.value
-      : eventOrValue ?? '';
-    setFilters((prev) => ({ ...prev, [field]: value }));
+    setFilters((prev) => ({ ...prev, [field]: fieldValue(eventOrValue) }));
     setPage(1);
   };
 
