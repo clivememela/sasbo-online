@@ -7,6 +7,17 @@ Currently, two official plugins are available:
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
 - [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
+## Building a new screen
+
+Read these first. None of them assumes you know how the application got here.
+
+- **[`SCREEN-CONTRACT.md`](SCREEN-CONTRACT.md)** — the rules every new screen must satisfy, each with the
+  defect that put it there and the test that fails if it is broken.
+- **[`DESIGN.md`](DESIGN.md)** — the design system: tokens, type, and the named rules the build follows.
+- **[`COMPONENTS.md`](COMPONENTS.md)** — every shared component, every state it can be in, and when to use it.
+
+`npm run lint` fails on any warning. `npm test` is the whole suite.
+
 ## Running the tests
 
 ```bash
