@@ -197,6 +197,45 @@ export default defineConfig([
       'react-hooks/immutability': 'error',
       'react-hooks/static-components': 'error',
       'react-refresh/only-export-components': 'off',
+      /*
+       * 🔴 NO NATIVE BROWSER DIALOGS, AND NO NATIVE DATE INPUT -- AS LINT RULES, NOT SOURCE SCANS (P10's refactor pass).
+       *
+       * They began life in `10.4` as two vitest source-scans (regex over comment-blanked source). Lint had just gone
+       * hard (`--max-warnings 0`), and the review of that phase showed the scans missing what the AST cannot miss:
+       * `type={cond ? 'date' : 'text'}`, and any `<` inside an attribute value before `type` (the scan's window closed
+       * there) -- and, the other way, convicting the word "confirm (" inside a string literal. An AST rule sees a CALL
+       * to a GLOBAL, and a `type` attribute ON an `<input>`, and nothing else. It also fails in the editor, at
+       * authoring time, not only when the suite runs. The canary pair lives in `src/test/eslintJsxUsage.test.js`,
+       * which already lints fixtures through this exact config.
+       *
+       *   why no `alert`/`confirm`/`prompt`: unstyleable, unthemeable, thread-blocking, OK/Cancel only -- and passed an
+       *     `Error` they print "[object Error]". 22 when the arc opened; `ConfirmDialog` and in-dialog notices replaced
+       *     every one.
+       *   why no native date input: the owner's ruling is that the date field is CHOOSE-ONLY. `DateField` is the one
+       *     control and `<Field type="date">` routes to it -- which is why the rule looks at the `<input>` ELEMENT,
+       *     not at the string `type="date"`.
+       */
+      'no-restricted-globals': ['error', ...['alert', 'confirm', 'prompt'].map((name) => ({
+        name,
+        message: `Native ${name}() is not used here: ConfirmDialog for a question, a notice inside the dialog for an outcome (SCREEN-CONTRACT.md §5).`,
+      }))],
+      'no-restricted-properties': ['error', ...['window', 'globalThis', 'self'].flatMap((object) =>
+        ['alert', 'confirm', 'prompt'].map((property) => ({
+          object,
+          property,
+          message: `Native ${property}() is not used here: ConfirmDialog for a question, a notice inside the dialog for an outcome (SCREEN-CONTRACT.md §5).`,
+        })),
+      )],
+      'no-restricted-syntax': ['error',
+        {
+          selector: "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'] Literal[value=/^(date|datetime-local|month|week)$/]",
+          message: 'No native date input: the date field is choose-only. Use DateField, or <Field type="date">, which routes to it (SCREEN-CONTRACT.md §4).',
+        },
+        {
+          selector: "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'] TemplateElement[value.cooked=/^(date|datetime-local|month|week)$/]",
+          message: 'No native date input: the date field is choose-only. Use DateField, or <Field type="date">, which routes to it (SCREEN-CONTRACT.md §4).',
+        },
+      ],
     },
   },
   {
@@ -227,6 +266,12 @@ export default defineConfig([
       'tools/**',
       'scripts/**',
     ],
-    rules: { 'no-console': 'off' },
+    rules: {
+      'no-console': 'off',
+      // A test may stub or assert on a native dialog; these rules are about what ships.
+      'no-restricted-globals': 'off',
+      'no-restricted-properties': 'off',
+      'no-restricted-syntax': 'off',
+    },
   },
 ])

@@ -114,7 +114,8 @@ body never does is a hang, and it was a live defect on a row the register had al
   shipped, in two different dialogs.
 - Input: [`DateField`](src/components/form/DateField.jsx), or `<Field type="date">`, which routes to
   it. **Native `<input type="date">` is banned** — the owner's ruling is that the date field is
-  choose-only — and `src/test/dateInputs.structural.test.js` fails the suite on one.
+  choose-only — and `npm run lint` fails on one (`no-restricted-syntax`, which reads the element, so a
+  conditional or computed `type` is caught too).
 - **A date-only value never passes through `Date` or `toISOString`.** `new Date("2019-04-01")` parses
   as midnight **UTC**, so `toISOString().split("T")[0]` is a day out for two hours of every South
   African day. `src/lib/format.js` explains this at length; read it before you reach for `Date`.
@@ -128,8 +129,8 @@ body never does is a hang, and it was a live defect on a row the register had al
 - **Exactly one `<h1>` per route.** Held by `src/test/headingContract.test.jsx`, which mounts every
   path-bearing route and counts.
 - **No native `alert()`, `confirm()` or `prompt()`.** They cannot be styled or themed, they block the
-  thread, and passed an `Error` they print `[object Error]`. Held by
-  `src/test/nativeDialogs.structural.test.js`. Use `ConfirmDialog` for a question, a notice for an
+  thread, and passed an `Error` they print `[object Error]`. `npm run lint` fails on one
+  (`no-restricted-globals` / `no-restricted-properties`). Use `ConfirmDialog` for a question, a notice for an
   outcome.
 - **No `console.*` in `src/`.** It is a privacy gate, not a tidiness one: this application once
   logged whole member records — names, identity numbers, bank accounts — and `Auth.jsx` logged

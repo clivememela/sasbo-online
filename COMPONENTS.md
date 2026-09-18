@@ -344,7 +344,7 @@ for the wrong reason).
 **What it is for.** Every date in this application. It replaced ten native `<input type="date">`.
 
 **When rather than a neighbour.** Always, for a date. **Native `<input type="date">` is banned**, and
-`src/test/dateInputs.structural.test.js` fails the suite on one. The guard is aimed at the
+`npm run lint` fails on one (`no-restricted-syntax` in `eslint.config.js`). The rule is aimed at the
 *element*, not at the string `type="date"` — which is live and correct in five places, because
 `CaptureMember.jsx`'s and `OrganizerReport.jsx`'s `Field` routers send that kind to this component.
 The count was 10 when the arc opened and is 0 today.
@@ -401,7 +401,7 @@ handling, and no day could be pressed (R2-F1). The target is read from the DOM w
 can be typed into it", the wire format, bounds, both grids, the readout, Today/Clear, the full
 keyboard set, the ARIA-grid single tab stop, the bottom sheet, both themes, and two mutation-checked
 scans including *"is not a native date input, which is the thing this unit removes"*. Also held by
-`src/test/dateInputs.structural.test.js` repository-wide, and by `Modal.test.jsx`, which drives it
+the `no-restricted-syntax` lint rule repository-wide, and by `Modal.test.jsx`, which drives it
 inside a dialog.
 
 ---
@@ -691,7 +691,7 @@ identical from outside and only the second is felt after the dialog has closed.
 restore, Escape, scroll lock, the required name, `titleHidden`, the `dvh` cap and body scroll,
 `dismissible={false}`, and a DateField-inside-a-dialog block. `src/components/overlay/Modal.busy.test.jsx`
 — the three blocked exits **each paired with a must-pass** proving they work when not busy.
-Repository-wide: `src/test/nativeDialogs.structural.test.js`.
+Repository-wide: the `no-restricted-globals` / `no-restricted-properties` lint rules in `eslint.config.js`.
 
 ---
 
@@ -1828,8 +1828,8 @@ rather than conventions.
 
 | Guard | What it holds |
 | --- | --- |
-| `src/test/dateInputs.structural.test.js` | no native `<input type="date">` — the `DateField` ban |
-| `src/test/nativeDialogs.structural.test.js` | no `window.confirm`/`alert`/`prompt` — the `ConfirmDialog` ban |
+| `eslint.config.js` — `no-restricted-syntax` | no native `<input type="date">` — the `DateField` ban *(a lint rule since P10's refactor pass; its canary pair is in `eslintJsxUsage.test.js`)* |
+| `eslint.config.js` — `no-restricted-globals` / `-properties` | no `alert`/`confirm`/`prompt`, bare or via `window` — the `ConfirmDialog` ban |
 | `src/test/tableScroller.structural.test.js` | no table outside a `TableScroller` |
 | `src/test/listStates.test.js` | no page whose only outcome is data |
 | `src/components/common/pagerError.structural.test.js` | no pager that cannot say its list failed |
