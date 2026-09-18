@@ -74,6 +74,20 @@ const writeFailure = (err, what, whereToCheck) => (writeMayHaveLanded(err)
     ? `${what} could not be confirmed. Reload ${whereToCheck} and check before trying again.`
     : `${what} was not saved. ${messageOf(err)}`.trim());
 
+/**
+ * The Add Recruiter dialog's empty form, at module scope so the two places that need it --
+ * the initial state and `handleCloseAddRep` -- cannot drift apart. `10.4`.
+ *
+ * 🔑 IT IS ALSO WHY THE DECLARATION MOVED. `react-hooks/immutability` reported
+ * *"`setNewRepDetails` is accessed before it is declared"*: the `useState` sat about 150
+ * lines BELOW the callback that uses it, between two unrelated handlers. The code was
+ * correct -- a setter is referentially stable, so the closure always saw it -- but the
+ * compiler cannot track a binding used above its declaration, and this arc's rule is to fix
+ * the fact rather than silence the reporter. The declaration now sits with the other
+ * `newRep*` state, and the literal it was duplicating is this constant.
+ */
+const EMPTY_REP_DETAILS = { roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] };
+
 export function Recruiters() {
     const [members, setMembers] = useState([]);
     const [reps, setReps] = useState([]);
@@ -87,6 +101,7 @@ export function Recruiters() {
     const [showAddRep, setShowAddRep] = useState(false);
     const [newRepSearch, setNewRepSearch] = useState('');
     const [newRepMember, setNewRepMember] = useState(null);
+    const [newRepDetails, setNewRepDetails] = useState(EMPTY_REP_DETAILS);
     const [selectedRepDetail, setSelectedRepDetail] = useState(null);
     const [editingRep, setEditingRep] = useState(false);
     const [editRepFields, setEditRepFields] = useState({ name: '', email: '', phone: '' });
@@ -359,7 +374,7 @@ export function Recruiters() {
 
     const handleCloseMemberModal = useCallback(() => setSelectedMember(null), []);
     const handleCloseAddMember = useCallback(() => setShowAddMember(false), []);
-    const handleCloseAddRep = useCallback(() => { setShowAddRep(false); setNewRepDetails({ roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] }); }, []);
+    const handleCloseAddRep = useCallback(() => { setShowAddRep(false); setNewRepDetails(EMPTY_REP_DETAILS); }, []);
     const handleCloseRepDetail = useCallback(() => {
         setSelectedRepDetail(null);
         setEditingRep(false);
@@ -506,7 +521,6 @@ export function Recruiters() {
         }
     };
 
-    const [newRepDetails, setNewRepDetails] = useState({ roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] });
 
     const handleAddRep = async () => {
         if (!newRepMember) return;
@@ -534,7 +548,7 @@ export function Recruiters() {
             await refreshAll();
             setShowAddRep(false);
             setNewRepMember(null);
-            setNewRepDetails({ roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] });
+            setNewRepDetails(EMPTY_REP_DETAILS);
             setSelectedRep({ id: createdRep?.id, name: repName });
             succeed(`${repName} is a recruiter now.`);
         } catch (err) {
