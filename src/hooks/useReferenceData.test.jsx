@@ -222,6 +222,37 @@ describe('useReferenceData', () => {
     expect(screen.getByTestId('banks')).toHaveTextContent('Absa')
   })
 
+  it('retry goes back to LOADING while the loaders run again -- the half the recovery test cannot see', async () => {
+    /*
+     * 🔴 `10.4` MOVED THIS. `run` set `loading` synchronously on the way into the mount effect -- the exact shape
+     * `react-hooks/set-state-in-effect` flags, which this file passed only because an unrelated early `return`
+     * blinds the rule (F-P60). The reset now lives on the retry alone. The recovery test above cannot witness it:
+     * it asserts the screen ends `ready`, which is true whether or not it ever went back to loading. So the
+     * retry's answer is HELD here, and the state is read while it is.
+     */
+    const user = userEvent.setup()
+    let release
+    const held = new Promise((resolve) => {
+      release = resolve
+    })
+    const banks = vi
+      .fn()
+      .mockRejectedValueOnce(await http500())
+      .mockImplementationOnce(() => held)
+    const loaders = { banks, roles: vi.fn().mockResolvedValue(['Organiser']) }
+
+    render(<Probe loaders={loaders} />)
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('partial'))
+
+    try {
+      await user.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(screen.getByTestId('state')).toHaveTextContent('loading')
+    } finally {
+      release(['Absa'])
+    }
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('ready'))
+  })
+
   it('does not re-fetch on every render', async () => {
     // 🔴 THE INFINITE-REQUEST LOOP, ASSERTED. A fetching effect that depends on a rebuilt
     // object re-fires forever, and on screen that is indistinguishable from a slow backend --
