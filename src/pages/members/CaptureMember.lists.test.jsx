@@ -13,7 +13,7 @@ import { setupUser } from '../../test/user'
  * THE LISTS, WHERE THEY ARE CHOSEN. `06.4`.
  *
  * 🔴 When the bank or recruiter list failed, the form said so once, in a notice above its tabs. Bank Where
- * Employed, Recruiter and Area's Recruiter -- two tabs away from that notice -- read as pickers with nothing in
+ * Employed and the Recruitment Channel pickers -- two tabs away from that notice -- read as pickers with nothing in
  * them, and a capture could go on without the bank or the recruiter that was simply never offered.
  *
  * The handlers go BEFORE the catch-all in one `use` call: msw answers with the first match, and the catch-all
@@ -37,14 +37,41 @@ describe('Capture Member, when a list it offers failed', () => {
     expect(await screen.findByText('Bank Where Employed could not be loaded.')).toBeInTheDocument()
   })
 
-  it('says so at Recruiter and Area’s Recruiter', async () => {
+  /**
+   * 🔑 THREE FIELDS, THREE LISTS, THREE SEPARATE FAILURES -- and that is the point of the table below
+   * rather than one case per field. The tab used to hold two pickers reading ONE endpoint, so a single
+   * failure covered both and the test could not tell whether each field was consulting its own source.
+   * Since 03.3/03.8/03.10 each reads a different one: Recruiter Type the recruitment channels, Area
+   * Recruited the areas, Recruiter `/api/recruiters`. Driven as a table so that failing one list and
+   * asserting the OTHER TWO STAY QUIET is what proves the wiring, not just the message.
+   */
+  it.each([
+    ['Recruiter Type', '*/api/recruitment-channels'],
+    ['Area Recruited', '*/api/areas'],
+    ['Recruiter', '*/api/recruiters'],
+  ])('says so at %s, and only there', async (label, endpoint) => {
+    server.use(http.get(endpoint, boom), ...pageFixtures)
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+
+    await user.click(screen.getByRole('button', { name: /^Recruitment Channel/ }))
+    expect(await screen.findByText(`${label} could not be loaded.`)).toBeInTheDocument()
+    expect(
+      screen.getAllByText(/could not be loaded/i),
+      'one list failed; a second message means a field is reading a list that is not its own',
+    ).toHaveLength(1)
+  })
+
+  it('⚠️ and the old shared endpoint no longer feeds this tab at all (S6/R5)', async () => {
+    // The must-pass for 03.10: `/api/representatives` administers representatives and is Edit Member's.
+    // If the capture screen still read it, failing it would put a message on this tab.
     server.use(http.get('*/api/representatives', boom), ...pageFixtures)
     const user = setupUser()
     renderWithProviders(<CaptureMember />)
 
     await user.click(screen.getByRole('button', { name: /^Recruitment Channel/ }))
-    expect(await screen.findByText('Recruiter could not be loaded.')).toBeInTheDocument()
-    expect(screen.getByText("Area's Recruiter could not be loaded.")).toBeInTheDocument()
+    await screen.findByText(/^Recruiter Type/)
+    expect(screen.queryByText(/could not be loaded/i)).not.toBeInTheDocument()
   })
 
   it('the must-pass: lists that loaded say nothing of the kind', async () => {

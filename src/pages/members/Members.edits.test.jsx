@@ -21,7 +21,7 @@ import { setupUser } from '../../test/user'
  *   ③ an edit with NO changes switches without asking, and the next member opens to be read
  *   ④ the close button asks too
  *   ⑤ the confirmation stays open, busy, until the save has answered -- and then closes and says so
- *   ⑥ COSATU positions that arrive as the server's one string can be unticked in edit mode, and are saved as a list
+ *   ⑥ COSATU positions that arrive as the server's one string are saved back as a list, untouched
  */
 
 const ALPHA = {
@@ -33,7 +33,7 @@ const ALPHA = {
   identityType: 'I.D. Number',
   identityNumber: '9001010000080',
   status: 'Active',
-  paymentType: 'Payroll',
+  paymentType: 'Payroll Deduction',
 }
 const BRAVO = { ...ALPHA, id: 8, membershipNumber: 'M0008', surname: 'Bravo', identityNumber: '8506155000084' }
 
@@ -127,9 +127,11 @@ describe('the member record, mid-edit', () => {
     expect(await screen.findByText(/record saved/)).toBeInTheDocument()
   })
 
-  it("⑥ COSATU positions that arrive as the server's string can be unticked in edit mode, and are saved as a list", async () => {
-    // 🔴 `MemberDto.cosatuPositions` is a String ("PEC,CEC"). Entering edit mode copied the record raw, so the checkbox
-    // group got a string: unticking a position called `.filter` on it and threw, and nothing was left to save.
+  it("⑥ COSATU positions that arrive as the server's string are saved back as a list, untouched", async () => {
+    // 🔴 `MemberDto.cosatuPositions` is a String ("PEC,CEC"). Entering edit mode copied the record raw, so an edit
+    // anywhere on the record wrote the string back, or threw on `.filter`. Positions are no longer on the Structures
+    // tab (2026-09-17), which makes this the case that matters: data the screen does not show must survive a save of
+    // something else. `memberService.normalizeMember` unfolds it once.
     let saved
     server.use(
       http.get('*/api/members', () => HttpResponse.json([{ ...ALPHA, isCosatu: 'Y', cosatuPositions: 'PEC,CEC' }, BRAVO])),
@@ -142,14 +144,34 @@ describe('the member record, mid-edit', () => {
     renderWithProviders(<MembersPage />)
     await user.click(await screen.findByRole('button', { name: /open the record for.*Alpha/i }))
     await user.click(await screen.findByRole('button', { name: /Edit Member/i }))
-    await user.click(screen.getByRole('button', { name: /Sasbo Structures/i }))
-
-    await user.click(await screen.findByRole('checkbox', { name: /^CEC/ }))
+    const initials = await panel().findByLabelText(/^Initials/)
+    await user.clear(initials)
+    await user.type(initials, 'Q')
     await user.click(screen.getByRole('button', { name: /^Save changes$/ }))
     const dialog = await screen.findByRole('dialog', { name: 'Save these changes?' })
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
     await waitFor(() => expect(saved).toBeDefined())
-    expect(saved.cosatuPositions).toEqual(['PEC'])
+    expect(saved.cosatuPositions).toEqual(['PEC', 'CEC'])
+  })
+  it('⑦ A7 (fixed): a passport member with no date of birth is not saved, and is told why', async () => {
+    // 🔴 The second site of A7: Edit Member required a date of birth when identityType === "Passport", and the only
+    // option is "Passport Number", so the rule never ran and a passport member saved with no date on file.
+    let saved
+    server.use(
+      http.get('*/api/members', () => HttpResponse.json([{ ...ALPHA, identityType: 'Passport Number', identityNumber: 'A12345678' }, BRAVO])),
+      http.put('*/api/members/:id', async ({ request }) => {
+        saved = await request.json()
+        return HttpResponse.json(saved)
+      }),
+    )
+    const user = await editAlpha({ change: true })
+
+    await user.click(screen.getByRole('button', { name: /^Save changes$/ }))
+
+    // Twice by design: under the field, and in the save summary that names every problem.
+    expect((await screen.findAllByText(/Date of Birth is strictly required/i)).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('dialog', { name: 'Save these changes?' })).not.toBeInTheDocument()
+    expect(saved).toBeUndefined()
   })
 })

@@ -31,8 +31,11 @@ const MEMBER = {
   identityType: 'I.D. Number',
   identityNumber: '9001010000080',
   status: 'Active',
-  paymentType: 'Payroll',
+  paymentType: 'Payroll Deduction',
+  // COSATU is only offered under BEC = Yes (stakeholder, 2026-09-17), so the record is a BEC member.
+  isBec: true,
   isCosatu: 'Y',
+  isCosatuLocal: true,
   // ⚠️ A LIST, NOT THE SERVER'S STRING, AND ON PURPOSE. With the string, the read-only Structures view this record
   // returns to after "Nothing on this record has changed" throws on `.join` -- register row A37, pinned as open in
   // `Members.cosatu.test.jsx` and not this file's subject. The string shape in EDIT mode is covered by
@@ -77,20 +80,23 @@ describe('the save confirmation', () => {
     const listed = await listedChanges(user)
 
     expect(listed).toEqual(
-      expect.arrayContaining(['Initials: S → Q', 'COSATU Member: Yes → No', 'COSATU Positions: PEC, CEC → none']),
+      expect.arrayContaining(['Initials: S → Q', 'COSATU Member: Yes → No', 'COSATU Local structure: Yes → No']),
     )
     expect(listed.join('\n'), 'the confirmation shows a field key, not the name the form gives it').not.toMatch(
-      /isCosatu|cosatuPositions|cosatuLocal|cosatuRegion/,
+      /isCosatu|isCosatuLocal|cosatuPositions/,
     )
   })
 
-  it('② ticking a position and unticking it again leaves nothing to save', async () => {
+  it('② answering a structure question and answering it back leaves nothing to save', async () => {
+    // Was "ticking a position and unticking it again": COSATU positions left the Structures tab (2026-09-17). The
+    // property is the same -- a value changed and changed back is not a change, and a list the member never
+    // touched (the server's "PEC,CEC" string beside the form's own list) is not reported as one.
     const user = setupUser()
     await editTheRecord(user)
     await user.click(screen.getByRole('button', { name: /Sasbo Structures/i }))
-    const treasurer = await screen.findByRole('checkbox', { name: /^Treasurer/ })
-    await user.click(treasurer)
-    await user.click(treasurer)
+    const local = await screen.findByLabelText(/^Sits on a COSATU Local structure\?/)
+    await user.selectOptions(local, 'No')
+    await user.selectOptions(local, 'Yes')
 
     await user.click(screen.getByRole('button', { name: /^Save changes$/ }))
 

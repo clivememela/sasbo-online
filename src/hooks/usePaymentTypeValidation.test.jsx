@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
 
 import { usePaymentTypeValidation } from './usePaymentTypeValidation'
-import { PAYMENT_TYPE_OPTIONS } from '../config/memberConstants'
+import { PAYMENT_TYPE_OPTIONS, PAYMENT_TYPE_PAYROLL } from '../config/memberConstants'
 import { server } from '../test/msw/server'
 import { DEFECTS, disabled, pin } from '../test/knownDefects'
 import { committedVocabulary } from '../test/apiContractScan.js'
@@ -12,18 +12,20 @@ import { committedVocabulary } from '../test/apiContractScan.js'
  * TESTED AGAINST THE REAL OPTION VALUES, AND AGAINST THE SERVER'S RULE.
  *
  * The temptation here is to write the test against the strings the hook
- * currently compares. That would encode the defect: the hook compares against
- * `'Payroll Deduction'`, and `PAYMENT_TYPE_OPTIONS` cannot produce that string.
- * A test written to the hook's own vocabulary passes forever while the branch
- * it covers has never once executed in production.
+ * currently compares. That would have encoded A6: the hook compared against
+ * `'Payroll Deduction'` while `PAYMENT_TYPE_OPTIONS` could only produce
+ * `'Payroll'`, so a test written to the hook's own vocabulary would have
+ * passed forever while the branch it covers had never once executed.
  *
- * So every case below is driven from `PAYMENT_TYPE_OPTIONS` -- the values a
- * member can actually choose -- and checked against the rule the SERVER owns.
+ * A6 is closed -- the OPTION moved to the server's spelling, 2026-09-17 -- and
+ * the shape below is what kept it visible until it did. Every case is driven
+ * from `PAYMENT_TYPE_OPTIONS`, the values a member can actually choose, and
+ * checked against the rule the SERVER owns.
  *
  * THE SERVER'S RULE, transcribed from `PaymentType.java`:
  *
- *     DEBIT_ORDER("Debit Order")  requiresBankAccount() -> true
- *     PAYROLL("Payroll")          requiresBankAccount() -> false
+ *     DEBIT_ORDER("Debit Order")      requiresBankAccount() -> true
+ *     PAYROLL("Payroll Deduction")    requiresBankAccount() -> false
  *
  * IT IS NO LONGER TRANSCRIBED. P3 wrote the rule out by hand here and said in
  * this comment that "Phase 4's vocabulary guard is what keeps this
@@ -51,7 +53,7 @@ describe('usePaymentTypeValidation', () => {
   it('the options this hook must handle are the ones the form offers', () => {
     // Pins the vocabulary itself. If someone adds a payment type, this is the
     // first thing that says the rule table below has not been extended.
-    expect(PAYMENT_TYPE_OPTIONS).toEqual(['Debit Order', 'Payroll'])
+    expect(PAYMENT_TYPE_OPTIONS).toEqual(['Debit Order', 'Payroll Deduction'])
     expect(Object.keys(SERVER_RULE).sort()).toEqual([...PAYMENT_TYPE_OPTIONS].sort())
   })
 
@@ -76,38 +78,38 @@ describe('usePaymentTypeValidation', () => {
     })
   })
 
-  describe('the dead branch', () => {
-    it.skip(
-      disabled(DEFECTS.A6, 'choosing Payroll must switch on the payroll branch'),
-      () => {
-        const { isPayrollDeduction, bankAccountFieldDisabled, debitDayFieldDisabled } =
-          render('Payroll')
-        expect(isPayrollDeduction).toBe(true)
-        expect(bankAccountFieldDisabled).toBe(true)
-        expect(debitDayFieldDisabled).toBe(true)
-      },
-    )
-
-    it(pin(DEFECTS.A6, 'no selectable option can switch the payroll branch on'), () => {
-      // The reason this is a pin and not just a skipped test: the branch is
-      // unreachable, so nothing else in the suite -- or in production -- can
-      // observe it changing. Written as a scan over every option so that
-      // ADDING the missing option is what turns it red.
+  /**
+   * A6, CLOSED 2026-09-17 -- and this is what it was flipped to.
+   *
+   * The pin here used to assert that NO option could switch the payroll branch on, and it is the
+   * test that went red when `PAYMENT_TYPE_OPTIONS` took the server's spelling. Both halves of the
+   * pair are gone; what replaces them is the same scan, asserting the opposite: exactly one of the
+   * options the form offers reaches the branch, and it is the one the server calls PAYROLL.
+   *
+   * Kept as a SCAN over the options rather than as `render('Payroll Deduction')` for the reason the
+   * pin was written that way -- a hand-written string here would agree with the hook forever, which
+   * is precisely how A6 survived. Driving it from the options means renaming the option again
+   * reddens this.
+   */
+  describe('the branch A6 left unreachable', () => {
+    it('exactly one offered option switches the payroll branch on', () => {
       const switchedOn = PAYMENT_TYPE_OPTIONS.filter((o) => render(o).isPayrollDeduction)
       expect(
         switchedOn,
-        'A6 has been fixed: a real option now switches the payroll branch on. Note that ' +
-          'this makes A9 LIVE -- the bank-account rule the branch controls is hardcoded ' +
-          'in the client and has never executed. Un-skip the A6 test, then look at A9 ' +
-          'before shipping.',
-      ).toEqual([])
+        'The payroll branch is once again unreachable from the form, or reachable from more ' +
+          'than one option. That was A6: a rule that reads correctly and never runs.',
+      ).toEqual([PAYMENT_TYPE_PAYROLL])
     })
 
-    it('names the value the hook is actually comparing against', () => {
-      // The evidence for the register row, asserted rather than described: the
-      // string the hook wants is one no option produces.
-      expect(render('Payroll Deduction').isPayrollDeduction).toBe(true)
-      expect(PAYMENT_TYPE_OPTIONS).not.toContain('Payroll Deduction')
+    it('and it disables the two fields payroll members do not fill in', () => {
+      const { bankAccountFieldDisabled, debitDayFieldDisabled } = render(PAYMENT_TYPE_PAYROLL)
+      expect(bankAccountFieldDisabled).toBe(true)
+      expect(debitDayFieldDisabled).toBe(true)
+    })
+
+    it('the option the browser offers is the one the server publishes', () => {
+      // Read from the generated artifact, not typed: this is the comparison A6 got wrong.
+      expect(Object.keys(SERVER_RULE)).toContain(PAYMENT_TYPE_PAYROLL)
     })
   })
 
@@ -156,11 +158,11 @@ describe('usePaymentTypeValidation', () => {
         initialProps: { t: 'Debit Order' },
       })
       expect(result.current.isBankAccountRequired).toBe(true)
-      rerender({ t: 'Payroll' })
+      rerender({ t: PAYMENT_TYPE_PAYROLL })
       expect(
         result.current.isBankAccountRequired,
         'The memo returned a stale answer after the payment type changed. The form would ' +
-          'keep demanding a bank account after the member switched to Payroll.',
+          'keep demanding a bank account after the member switched to payroll.',
       ).toBe(false)
     })
 

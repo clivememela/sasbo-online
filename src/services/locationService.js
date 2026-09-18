@@ -45,4 +45,19 @@ export const locationService = {
       credentials: 'include',
       signal,
     })),
+
+  /**
+   * Every area, for Capture Member's "Area Recruited" (03.3, R2/RE-3).
+   *
+   * ⚠️ NOT `getAreas()` with the argument left off. `AreaController.getAll` ignores the query string
+   * entirely and answers the whole table, so `getAreas(undefined)` would work today and silently start
+   * filtering by the string "undefined" the day somebody gives that endpoint a filter. Two callers with
+   * two different needs get two methods; the endpoint literal stays at the call site so
+   * `apiContract`'s static scan can still see it.
+   */
+  getAllAreas: () =>
+    requestJson((signal) => fetch(apiUrl('/api/areas'), {
+      credentials: 'include',
+      signal,
+    })),
 };
