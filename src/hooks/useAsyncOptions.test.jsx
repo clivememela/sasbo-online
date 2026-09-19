@@ -5,17 +5,9 @@ import { useState } from 'react'
 
 import useAsyncOptions from './useAsyncOptions'
 import { networkError } from '../services/parseApiError'
+import { deferred } from '../test/deferred'
 
 /** A promise whose settlement this test controls, so "out of order" is arranged, not raced. */
-function deferred() {
-  let resolve
-  let reject
-  const promise = new Promise((res, rej) => {
-    resolve = res
-    reject = rej
-  })
-  return { promise, resolve, reject }
-}
 
 function Probe({ fetcher, query, enabled }) {
   const { options, loading, error, isEmpty } = useAsyncOptions(fetcher, [query], { enabled })
@@ -188,5 +180,71 @@ describe('useAsyncOptions — the four states, kept apart', () => {
     const fetcher = vi.fn().mockResolvedValue({ content: ['Absa'] })
     render(<Probe fetcher={fetcher} query="x" enabled />)
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('empty'))
+  })
+})
+
+describe('useAsyncOptions — what `10.4` rebuilt, witnessed', () => {
+  /*
+   * 🔴 THE HOOK WAS REBUILT IN `10.4`, AND THESE ARE THE PARTS THE CONTRACT ABOVE DID NOT LOOK AT.
+   *
+   * `react-hooks/set-state-in-effect` made the old shape an error: it flipped `{ loading: true }` on the way INTO
+   * the fetch effect. It now keys each answer by request and DERIVES `loading`. The tests above cover the ticket, the
+   * abort and the four states; three behaviours of the old shape were covered by nothing, and each is a way the
+   * rebuild could have been wrong while every existing test stayed green:
+   *
+   *   ① a RELOAD keeps the options it already has while it waits (the old `{ ...current, loading: true }`);
+   *   ② DISABLING empties the options, so re-enabling never flashes a list from before;
+   *   ③ a fetcher that THROWS before returning a promise becomes the error state (the old try/catch, now a Promise
+   *      executor -- which still calls the fetcher synchronously).
+   */
+  function Harness({ fetcher }) {
+    const [query, setQuery] = useState('a')
+    const [enabled, setEnabled] = useState(true)
+    return (
+      <>
+        <button type="button" onClick={() => setQuery('b')}>next query</button>
+        <button type="button" onClick={() => setEnabled((e) => !e)}>toggle</button>
+        <Probe fetcher={fetcher} query={query} enabled={enabled} />
+      </>
+    )
+  }
+
+  it('① a reload keeps the options it already has while the new answer is on its way', async () => {
+    const second = deferred()
+    const fetcher = vi.fn().mockResolvedValueOnce(['Absa']).mockReturnValueOnce(second.promise)
+    render(<Harness fetcher={fetcher} />)
+    await waitFor(() => expect(screen.getByTestId('options')).toHaveTextContent('Absa'))
+
+    act(() => screen.getByRole('button', { name: 'next query' }).click())
+
+    expect(screen.getByTestId('state')).toHaveTextContent('loading')
+    expect(screen.getByTestId('options')).toHaveTextContent('Absa')
+    await act(async () => second.resolve(['Capitec']))
+    expect(screen.getByTestId('options')).toHaveTextContent('Capitec')
+  })
+
+  it('② disabling empties the options, and re-enabling does not flash the old list', async () => {
+    const again = deferred()
+    const fetcher = vi.fn().mockResolvedValueOnce(['Absa']).mockReturnValueOnce(again.promise)
+    render(<Harness fetcher={fetcher} />)
+    await waitFor(() => expect(screen.getByTestId('options')).toHaveTextContent('Absa'))
+
+    act(() => screen.getByRole('button', { name: 'toggle' }).click())
+    expect(screen.getByTestId('options')).toBeEmptyDOMElement()
+
+    act(() => screen.getByRole('button', { name: 'toggle' }).click())
+    expect(screen.getByTestId('state')).toHaveTextContent('loading')
+    expect(screen.getByTestId('options'), 'the list from before disabling came back').toBeEmptyDOMElement()
+    await act(async () => again.resolve(['Nedbank']))
+  })
+
+  it('③ a fetcher that throws before it returns a promise is the error state, not a crash', async () => {
+    const fetcher = vi.fn(() => {
+      throw new Error('bad input')
+    })
+    render(<Probe fetcher={fetcher} query="x" enabled />)
+
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('error'))
+    expect(fetcher).toHaveBeenCalledTimes(1)
   })
 })

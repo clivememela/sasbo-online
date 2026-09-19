@@ -124,3 +124,63 @@ describe('no-unused-vars can tell a used component from a dead one', () => {
     ).toMatch(/'Icon' is defined but never used/)
   })
 })
+
+/*
+ * 🔴 THE CANARY PAIR FOR THE RULES THAT REPLACED `10.4`'s SOURCE SCANS -- linted through the real config here rather
+ * than in a new file, because each ESLint instance is a ~150 MB worker on this machine.
+ *
+ * Both halves, for the reason `assertDetectorCanary` states: a rule that matches nothing passes the acquit half, and
+ * one that matches everything passes the convict half. The convict list carries the shapes the regex scans MISSED --
+ * the conditional `type`, a `<` inside an attribute before it -- and the acquit list a shape they WRONGLY convicted,
+ * so the move is proved to be an improvement and not only a relocation.
+ */
+const RESTRICTED = new Set(['no-restricted-globals', 'no-restricted-properties', 'no-restricted-syntax'])
+const restricted = async (code) => {
+  const [result] = await eslint.lintText(code, { filePath: 'src/__restrictedFixture.jsx' })
+  return result.messages.filter((m) => RESTRICTED.has(m.ruleId))
+}
+
+const MUST_CONVICT = {
+  'a bare confirm()': "export const f = () => confirm('Delete?')",
+  'window.alert()': 'export const f = (e) => window.alert(e)',
+  'globalThis.prompt()': "export const f = () => globalThis.prompt('Name?')",
+  'confirm destructured from window': "const { confirm } = window; export const f = () => confirm('x')",
+  'a native date input': 'export const F = () => <input type="date" />',
+  'datetime-local, in braces': "export const F = () => <input type={'datetime-local'} />",
+  'a conditional type (the regex scan missed this)': "export const F = ({ d }) => <input type={d ? 'date' : 'text'} />",
+  'a < inside an attribute before type (the regex scan missed this)':
+    'export const F = ({ a, b }) => <input min={a < b ? 1 : 2} type="date" />',
+  'a handler with => before type': 'export const F = ({ s }) => <input onChange={(e) => s(e)} type="month" />',
+}
+const MUST_ACQUIT = {
+  'Field routes type="date" to DateField': 'export const F = ({ Field }) => <Field type="date" />',
+  'an ordinary input': 'export const F = () => <input type="text" />',
+  'setConfirmed, and a ConfirmDialog handler': 'export const f = ({ setConfirmed, onConfirm }) => { setConfirmed(true); onConfirm() }',
+  'a LOCAL function named confirm': 'const confirm = (x) => x; export const f = () => confirm(1)',
+  'the word inside a string (the regex scan convicted this)': "export const s = 'please confirm (twice)'",
+  'role="alert"': 'export const F = () => <div role="alert" />',
+  'a method that is not the global': "export const f = (dialogs) => dialogs.alert('x')",
+}
+
+describe('the native-dialog and native-date-input rules convict what they must, and nothing else', () => {
+  beforeAll(async () => {
+    await eslint.lintText('export {}\n', { filePath: 'src/__restrictedFixture.jsx' })
+  }, 120_000)
+
+  it('convicts every shape it is written to catch', async () => {
+    const missed = []
+    for (const [name, code] of Object.entries(MUST_CONVICT)) {
+      if ((await restricted(code)).length === 0) missed.push(name)
+    }
+    expect(missed, 'A rule stopped seeing a native dialog or date input; the gate is blind to it now.').toEqual([])
+  })
+
+  it('the must-pass: acquits every shape that is correct', async () => {
+    const convicted = []
+    for (const [name, code] of Object.entries(MUST_ACQUIT)) {
+      const found = await restricted(code)
+      if (found.length) convicted.push(`${name}: ${found.map((m) => m.ruleId).join(', ')}`)
+    }
+    expect(convicted, 'A rule convicted correct code -- fix the rule, never the code it accuses.').toEqual([])
+  })
+})

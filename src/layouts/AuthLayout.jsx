@@ -1,11 +1,13 @@
 import { Suspense } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Footer from '../components/Footer';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import RoutePending from '../components/common/RoutePending';
 import ThemeToggle from '../components/common/ThemeToggle';
 
 export default function AuthLayout() {
+  const { pathname } = useLocation();
+
   return (
     <div className="bg-bg min-h-dvh transition-colors duration-300 flex flex-col">
       {/* 🔑 04.1 MERGED THE SECOND THEME BUTTON AWAY. This was a hand-rolled copy of
@@ -21,7 +23,9 @@ export default function AuthLayout() {
       <div className="flex-1 flex flex-col">
         {/* The auth screens are lazy too, and they are the FIRST thing anyone loads --
             so this is the outlet most likely to meet a chunk that never arrives. */}
-        <ErrorBoundary>
+        {/* Keyed by route for the reason `Main` gives (R1-F1): a boundary that has caught renders its fallback
+            whatever its children become, so /login would keep showing the failure of /forgot-password. */}
+        <ErrorBoundary key={pathname}>
           <Suspense fallback={<RoutePending />}>
             <Outlet />
           </Suspense>

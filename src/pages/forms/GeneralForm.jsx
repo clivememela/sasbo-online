@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import TextInput from '../../components/form/TextInput';
 import Button from '../../components/form/Button';
 
@@ -15,15 +15,31 @@ export default function GeneralForm({ filters }) {
         telNo: ''
     });
 
-    useEffect(() => {
-        if (filters) {
-            setBankDetails(prev => ({
-                ...prev,
-                bank: filters.bankName || prev.bank,
-                raNo: filters.randomAccessNumber || prev.raNo,
-            }));
-        }
-    }, [filters]);
+    /*
+     * 🔴 THE EFFECT THAT USED TO BE HERE WAS UNREACHABLE, AND SO IS EVERYTHING ELSE `filters`
+     * TOUCHES ON THIS SCREEN. Register row **A60**; `10.4`, and [F-P60].
+     *
+     * `Forms.jsx` asks the user for Bank, Branch, Area and R/A No, keeps them in its own
+     * `filters` state, uses `filters.formType` to decide which form to render -- and then
+     * renders it with NO PROPS: `Forms.jsx:65` is `<GeneralForm />`. Nothing in `src` has ever
+     * passed `filters` to anything; `git log -S'filters={filters}'` on `Forms.jsx` is empty.
+     *
+     * So `filters` is `undefined` in every consumer, `if (filters)` was permanently false, and
+     * this effect could not run. It is deleted rather than fixed, because there is nothing to
+     * fix in it.
+     *
+     * ⚠️ THE PROP STAYS IN THE SIGNATURE ON PURPOSE, AND SO DOES THIS COMMENT. Deleting the
+     * dead effect quietly would bury the actual defect: the four criteria the user types are
+     * DISCARDED, and the `'ABSA BANK'` and `'94'` above are not defaults behind a filter --
+     * they are hardcoded values wearing a filter's clothes, printed whatever was entered.
+     *
+     * Wiring the criteria through changes what this screen DOES, so it waits on the owner
+     * rather than being smuggled in with a lint fix. When it is granted, note that
+     * `filters={filters}` alone is not the fix: it would make an effect like the deleted one
+     * live AND wrong for a second reason -- it would overwrite whatever the user had typed
+     * into the form every time a criterion changed. Seed it with a `key` on the rendered form
+     * or during render; never with an effect.
+     */
 
     const handleNonMemberChange = (index, field, value) => {
         const updated = [...nonMembers];
@@ -94,7 +110,7 @@ export default function GeneralForm({ filters }) {
                             type="text"
                             placeholder="Name"
                             aria-label={`Name of non-member ${member.id}`}
-                            className="flex-1 bg-transparent border-none focus:outline-none field-text py-1 text-ink placeholder-ink-faint"
+                            className="flex-1 bg-transparent border-none focus:outline-none field-text py-1 text-ink placeholder:text-ink-muted"
                             value={member.name}
                             onChange={(e) => handleNonMemberChange(idx, 'name', e.target.value)}
                         />
@@ -102,8 +118,8 @@ export default function GeneralForm({ filters }) {
                             type="text"
                             placeholder="Ind."
                             maxLength={2}
-                            aria-label={`Industry code for non-member ${member.id}`}
-                            className="w-14 bg-transparent border-none focus:outline-none field-text py-1 text-center text-ink placeholder-ink-faint uppercase"
+                            aria-label={`Indicator for non-member ${member.id}`}
+                            className="w-14 bg-transparent border-none focus:outline-none field-text py-1 text-center text-ink placeholder:text-ink-muted uppercase"
                             value={member.indicator}
                             onChange={(e) => handleNonMemberChange(idx, 'indicator', e.target.value)}
                         />

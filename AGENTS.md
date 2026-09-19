@@ -110,9 +110,12 @@ Note: The project also uses the `@tailwindcss/vite` plugin (configured in `vite.
 > `shadcn`), was imported by nothing, and provided no UI patterns to reference. shadcn/ui **is** the adopted
 > component approach for this project *(decision D2)*, but it is installed per-component with
 > `npx shadcn@latest add <component>`, which copies source into the repo rather than adding a dependency.
-> It has not been initialised yet — that is unit `03.1` of the design arc.
+> It **was initialised** in unit `03.1` of the design arc (`components.json` exists), but **no shadcn component has
+> been added**: the primitives under `src/components/` are this project's own, built on Radix and the token layer.
+> ⚠️ `components.json` aliases `ui` to `@/components/ui`, which does not exist — and `npx shadcn add` would write
+> raw colour utilities that `paletteLiterals.test.js` rejects. Read `COMPONENTS.md` before adding one.
 
-- **Print / modal helpers**: Components use simple print utilities and modal overlays. Look for `no-print` and `print-area` CSS classes (used in pages such as `src/pages/bank/BankBranch.jsx`) and calls to `globalThis.print()` for printable views. Modals are typically controlled by boolean state (e.g., `showAddBank`) and rendered as fixed overlays with backdrop blur.
+- **Print / modal helpers**: Printable views use the `no-print` and `print-area` CSS classes (e.g. `src/pages/bank_branch/BankBranch.jsx`) and `globalThis.print()`. **Every dialog is the shared `Modal` / `ConfirmDialog`** in `src/components/overlay/Modal.jsx` (Radix): it owns the focus trap, Escape, returning focus, `busy` (no way out while a write runs) and `initialFocusRef`. Do not hand-roll a fixed overlay, and do not use `alert`/`confirm`/`prompt` — `npm run lint` fails on them. The rules a new screen inherits are in `SCREEN-CONTRACT.md`.
 
 ### State Management
 - **React Context**: `ThemeContext.jsx` manages dark/light mode globally — this is the only global state

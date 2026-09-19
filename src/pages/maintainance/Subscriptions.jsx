@@ -65,12 +65,21 @@ export default function Subscriptions() {
        neither of them the design's. `formatDateLong` is the one every other surface reads,
        and it already knows the API's `[y, m, d]`. */
 
+    /*
+     * 🔴 THE TWO RESETS MOVED TO THE RETRY CONTROL (`10.4`), which is the only thing that can
+     * bump `attempt`. `react-hooks/set-state-in-effect` is an error as of this phase.
+     *
+     * 🔑 NOTHING MOVES ON SCREEN, and the reason is worth stating rather than trusting: on mount
+     * both were no-ops (`loading` initialises to `true`, `error` to `null`), and on a retry they
+     * now run in the SAME RENDER as the `attempt` bump that re-triggers this effect -- so the
+     * committed frames are identical either way. The effect that follows sets state only from
+     * its own promise, which is what the rule is asking for.
+     *
+     * ⚠️ `setError(null)` IS STILL LOAD-BEARING and must stay on that path: nothing else ever
+     * unsets `error`, so a SUCCESSFUL retry without it would leave the failure banner sitting
+     * above the list it had just loaded.
+     */
     useEffect(() => {
-        setLoading(true);
-        // ⚠️ CLEARED ON EVERY ATTEMPT, and its absence would have made the retry look broken:
-        // nothing else ever unsets `error`, so a SUCCESSFUL retry would have left the failure
-        // banner sitting above the list it had just loaded.
-        setError(null);
         subscriptionsService.getAll()
             .then(data => setAllSubscriptions(data))
             // 🔴 IT WAS `setError(String(err))`, WHICH RENDERS "Error: Error: ..." ON SCREEN.
@@ -160,7 +169,7 @@ export default function Subscriptions() {
                         <DataState
                             state="error"
                             error={error}
-                            onRetry={() => setAttempt((n) => n + 1)}
+                            onRetry={() => { setLoading(true); setError(null); setAttempt((n) => n + 1); }}
                             title="We could not load the subscriptions."
                         />
                     </div>

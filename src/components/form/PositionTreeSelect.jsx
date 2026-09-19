@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import SelectInput from './SelectInput';
+
+/** No ids: stable, so an omitted `selectedIds` has one identity across renders (see the guard below). */
+const NO_IDS = [];
 
 /**
  * Cascading selects for a position in the structure tree. `03.2a`.
@@ -32,7 +35,7 @@ import SelectInput from './SelectInput';
  */
 export default function PositionTreeSelect({
   structures = [],
-  selectedIds = [],
+  selectedIds = NO_IDS,
   onChange,
   label,
   placeholder = 'Select...',
@@ -75,16 +78,30 @@ export default function PositionTreeSelect({
 
   // Reset when the caller clears the selection (e.g. electedRep toggled back to N).
   //
-  // 🔑 THE BAIL MATTERS MORE THAN IT LOOKS. `selectedIds` defaults to a new `[]` and call
-  // sites pass computed arrays, so this effect runs on EVERY parent render. Setting a fresh
-  // `{}` each time is never state-equal, so each parent render cost a second full render of
-  // this component -- which invalidated the `levels` memo, produced new `options` identities,
-  // and so defeated the `normaliseOptions` memo inside every `SelectInput` in the cascade.
-  // Returning `previous` when it is already empty stops the whole chain.
-  useEffect(() => {
-    if (selectedIds.length !== 0) return;
-    setSelectionsByLevel((previous) => (Object.keys(previous).length === 0 ? previous : {}));
-  }, [selectedIds]);
+  // 🔑 THE BAIL MATTERS MORE THAN IT LOOKS, and it is the `Object.keys(...).length !== 0` check
+  // below. Setting a fresh `{}` when the tree is already clear is never state-equal, so it would
+  // cost a second full render of this component -- invalidating the `levels` memo, producing new
+  // `options` identities, and defeating the `normaliseOptions` memo inside every `SelectInput` in
+  // the cascade. Clearing only a tree that has something in it stops that whole chain.
+  //
+  // 🔴 NOW DURING RENDER, KEYED ON THE SAME TRIGGER THE EFFECT HAD (`10.4`): a NEW `selectedIds` from the caller.
+  // `react-hooks/set-state-in-effect` makes the effect this was an error. The trigger is copied exactly, and the
+  // first attempt at this did NOT copy it: it cleared whenever `selectedIds` was empty, on every render. The effect
+  // only ran when the prop CHANGED -- so a caller that passes one `[]` and never re-renders keeps the user's choice,
+  // and `PositionTreeSelect.test.jsx`'s cascade test, which is exactly that caller, went red on the first attempt.
+  // Remembering the last `selectedIds` seen is what "when it changes" means during render.
+  //
+  // ⚠️ WHICH IS WHY THE DEFAULT IS NOW `NO_IDS` AND NOT `[]`. A default `[]` is a new array every render; compared
+  // by identity during render it would never settle, and the component would re-render until React stopped it.
+  // Both callers pass `selectedIds`, so the default changes nothing they can observe.
+  //
+  // It cannot fight a choice being made: `handleSelect` sets this state AND calls `onChange` in one handler, so a
+  // caller that feeds the selection back sends a non-empty `selectedIds` in the same render as the new selection.
+  const [seenSelectedIds, setSeenSelectedIds] = useState(selectedIds);
+  if (selectedIds !== seenSelectedIds) {
+    setSeenSelectedIds(selectedIds);
+    if (selectedIds.length === 0 && Object.keys(selectionsByLevel).length !== 0) setSelectionsByLevel({});
+  }
 
   // One entry per visible level: the options at that depth.
   const levels = useMemo(() => {

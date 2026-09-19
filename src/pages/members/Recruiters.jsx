@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useRef, useState, useEffect, useCallback } from 'react';
-import { AlertCircle, CheckCircle2, ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
+import { ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
 import Pager from '../../components/common/Pager.jsx';
@@ -15,10 +15,13 @@ import { bankService } from '../../services/bankService.js';
 import { locationService } from '../../services/locationService.js';
 import { validateEmail } from '../../utils/validateSAID.js';
 import DataState from '../../components/common/DataState.jsx';
+import DialogNotice, { NoticeIcon, noticeTone } from '../../components/common/DialogNotice.jsx';
 import useReferenceData from '../../hooks/useReferenceData.js';
 import reportError from '../../lib/reportError.js';
 import { cn } from '../../lib/utils';
 import { formalName } from '../../lib/names.js';
+import { formatDate } from '../../lib/format.js';
+import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 
 const PAGE_SIZE = 20;
 
@@ -47,6 +50,44 @@ const REFERENCE_LOADERS = {
     'recruitment channels': () => recruitmentChannelService.getAll(),
 };
 
+/**
+ * A date as this screen's dialogs print it (R3-OBS-3, taken 2026-09-18). The server sends `[y, m, d]`, and React
+ * renders an array by concatenating it -- so Date Joined read `201941` for a member who joined on 1 April 2019, and
+ * a recruiter's Election Date did the same. It is R3-F1's defect, one dialog away from where batch 5 fixed it.
+ *
+ * EMPTY STAYS EMPTY, because `DRow` prints its own em dash for a value that is not there; `formatDate` would print a
+ * second one. Same rule, same shape, as `Members.jsx`'s `recordDate`.
+ */
+const recordDate = (value) => (value ? formatDate(value) : '');
+
+/**
+ * 🔴 R3-F2, WIDENED 2026-09-18: "could not be saved" is a claim about the SERVER, and only a refusal supports it.
+ *
+ * This screen already worded its recruiter REMOVAL honestly ("may be only partly removed ... reload and check"),
+ * because that one obviously half-writes. The other three said flatly that nothing happened -- and a create whose
+ * answer never arrived, announced as "could not be created", is how a recruiter gets made twice.
+ *
+ * `writeMayHaveLanded` in `parseApiError.js` is the one place the rule lives; this chooses the sentence and names
+ * where to go and look.
+ */
+const writeFailure = (err, what, whereToCheck) => (writeMayHaveLanded(err)
+    ? `${what} could not be confirmed. Reload ${whereToCheck} and check before trying again.`
+    : `${what} was not saved. ${messageOf(err)}`.trim());
+
+/**
+ * The Add Recruiter dialog's empty form, at module scope so the two places that need it --
+ * the initial state and `handleCloseAddRep` -- cannot drift apart. `10.4`.
+ *
+ * 🔑 IT IS ALSO WHY THE DECLARATION MOVED. `react-hooks/immutability` reported
+ * *"`setNewRepDetails` is accessed before it is declared"*: the `useState` sat about 150
+ * lines BELOW the callback that uses it, between two unrelated handlers. The code was
+ * correct -- a setter is referentially stable, so the closure always saw it -- but the
+ * compiler cannot track a binding used above its declaration, and this arc's rule is to fix
+ * the fact rather than silence the reporter. The declaration now sits with the other
+ * `newRep*` state, and the literal it was duplicating is this constant.
+ */
+const EMPTY_REP_DETAILS = { roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] };
+
 export function Recruiters() {
     const [members, setMembers] = useState([]);
     const [reps, setReps] = useState([]);
@@ -60,6 +101,24 @@ export function Recruiters() {
     const [showAddRep, setShowAddRep] = useState(false);
     const [newRepSearch, setNewRepSearch] = useState('');
     const [newRepMember, setNewRepMember] = useState(null);
+    const [newRepDetails, setNewRepDetails] = useState(EMPTY_REP_DETAILS);
+
+    /*
+     * 🔴 THE TWO SEARCH DIALOGS OPEN ONTO THEIR SEARCH FIELD, AND IT USED TO BE `autoFocus` (`10.4`).
+     *
+     * ⚠️ REMOVING THE ATTRIBUTE WITHOUT REPLACING IT IS A REAL REGRESSION, NOT A NEUTRAL TIDY-UP. `autoFocus`
+     * worked here by a timing accident: React focuses during COMMIT, Radix's focus scope runs in a PASSIVE
+     * effect afterwards and only acts if it finds no focus inside the content -- so it found the search field
+     * already focused and left it. Delete the attribute and Radix focuses the first tabbable thing instead,
+     * which is the header's Close button, because the header renders before the children. You would open a
+     * search dialog and your first keystroke would go nowhere.
+     *
+     * So the decision moves into the primitive: `Modal`'s `initialFocusRef`, which says out loud what the
+     * attribute was achieving by accident. `Modal.initialFocus.test.jsx` holds the primitive; the pair in
+     * `Recruiters.focus.test.jsx` holds these two call sites.
+     */
+    const addMemberSearchRef = useRef(null);
+    const addRepSearchRef = useRef(null);
     const [selectedRepDetail, setSelectedRepDetail] = useState(null);
     const [editingRep, setEditingRep] = useState(false);
     const [editRepFields, setEditRepFields] = useState({ name: '', email: '', phone: '' });
@@ -121,8 +180,24 @@ export function Recruiters() {
         if (notice?.tone === 'error' && !dialogOpen) noticeRef.current?.focus();
     }, [notice, dialogOpen]);
 
+    /*
+     * 🔴 THE LOADING RESET MOVED TO THE RETRY PATH (`10.4`), AND THIS ONE HAD SEVEN CALLERS.
+     *
+     * `refreshAll` is called on mount, by Try again, and by five write handlers that reload the
+     * lists after a save. The line that `react-hooks/set-state-in-effect` flagged was already
+     * written defensively -- `current === 'ready' ? 'ready' : 'loading'` -- and that guard is
+     * the proof this change is behaviour-preserving rather than a judgement:
+     *
+     *   on mount          `listState` is already 'loading'        -> no-op
+     *   after a write     the table is 'ready', so the guard holds -> no-op. That is structural, not luck:
+     *                     every write needs a ROW or a MEMBER from this same load, so no write can start
+     *                     from a failed one. A write reachable from the error screen would break this.
+     *   on Try again      'error' -> 'loading'                     -> THE ONLY REAL CASE
+     *
+     * So the five write handlers keep calling `refreshAll` unchanged, and the one case that
+     * mattered is now stated plainly at the place it happens, in `retryAll`.
+     */
     const refreshAll = useCallback(() => {
-        setListState((current) => (current === 'ready' ? 'ready' : 'loading'));
         return Promise.all([
             memberService.getMembers(),
             recruitmentChannelService.getAll(),
@@ -141,6 +216,8 @@ export function Recruiters() {
     useEffect(() => {
         refreshAll();
     }, [refreshAll]);
+
+    const retryAll = useCallback(() => { setListState('loading'); refreshAll(); }, [refreshAll]);
 
     const BANK_NAMES = useMemo(() => [...new Set(banksData.map(b => b?.bankName).filter(Boolean))].sort(), [banksData]);
     const PROVINCES = useMemo(() => provincesData.map(p => p?.name).filter(Boolean).sort(), [provincesData]);
@@ -332,7 +409,7 @@ export function Recruiters() {
 
     const handleCloseMemberModal = useCallback(() => setSelectedMember(null), []);
     const handleCloseAddMember = useCallback(() => setShowAddMember(false), []);
-    const handleCloseAddRep = useCallback(() => { setShowAddRep(false); setNewRepDetails({ roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] }); }, []);
+    const handleCloseAddRep = useCallback(() => { setShowAddRep(false); setNewRepDetails(EMPTY_REP_DETAILS); }, []);
     const handleCloseRepDetail = useCallback(() => {
         setSelectedRepDetail(null);
         setEditingRep(false);
@@ -473,13 +550,11 @@ export function Recruiters() {
             await refreshAll();
             succeed(`${formalName(member) || 'That member'} was removed from ${selectedRep?.name ?? 'the recruiter'}.`);
         } catch (err) {
-            fail(`That member could not be removed from the recruiter. ${err?.message || ''}`.trim());
+            fail(writeFailure(err, `${formalName(member) || 'That member'}'s removal from the recruiter`, 'the recruiter'));
         } finally {
             setSaving(false);
         }
     };
-
-    const [newRepDetails, setNewRepDetails] = useState({ roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] });
 
     const handleAddRep = async () => {
         if (!newRepMember) return;
@@ -507,11 +582,11 @@ export function Recruiters() {
             await refreshAll();
             setShowAddRep(false);
             setNewRepMember(null);
-            setNewRepDetails({ roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] });
+            setNewRepDetails(EMPTY_REP_DETAILS);
             setSelectedRep({ id: createdRep?.id, name: repName });
             succeed(`${repName} is a recruiter now.`);
         } catch (err) {
-            fail(`That recruiter could not be created. ${err?.message || ''}`.trim());
+            fail(writeFailure(err, 'That recruiter', 'the list'));
         } finally {
             setSaving(false);
         }
@@ -791,7 +866,7 @@ export function Recruiters() {
                         rowKey="id"
                         loading={listState === 'loading'}
                         error={listState === 'error' ? 'We could not load the recruiters.' : null}
-                        onRetry={refreshAll}
+                        onRetry={retryAll}
                         emptyTitle="No recruiters match these criteria"
                         emptyMessage="Clear the criteria to see every recruiter, or add a new one."
                         emptyAction={<Button onClick={handleClear}>Clear</Button>}
@@ -928,6 +1003,7 @@ export function Recruiters() {
                     title="Add member to recruiter"
                     description={selectedRep.name}
                     size="lg"
+                    initialFocusRef={addMemberSearchRef}
                     footer={<Button onClick={handleCloseAddMember}>Cancel</Button>}
                 >
                         <DialogNotice notice={notice} onDismiss={() => setNotice(null)} />
@@ -935,7 +1011,7 @@ export function Recruiters() {
                             <TextInput
                                 label="Search members"
                                 kind="search"
-                                autoFocus
+                                ref={addMemberSearchRef}
                                 value={addSearch}
                                 onChange={e => setAddSearch(e.target.value)}
                                 placeholder="Search by name, membership no. or bank…"
@@ -1076,7 +1152,7 @@ export function Recruiters() {
                                 <DRow label="Recruiter Type" value={RECRUITMENT_CHANNELS.find(rt => rt.id === selectedRepDetail.recruiterTypeId)?.name || '—'} />
                                 <DRow label="Role" value={ROLES.find(r => r.id === selectedRepDetail.roleId)?.name || '—'} />
                                 <DRow label="Elected Rep" value={selectedRepDetail.isElectedRep ? 'Yes' : 'No'} />
-                                {selectedRepDetail.isElectedRep && <DRow label="Election Date" value={selectedRepDetail.electionDate || '—'} />}
+                                {selectedRepDetail.isElectedRep && <DRow label="Election Date" value={recordDate(selectedRepDetail.electionDate)} />}
                                 <DRow label="Structures" value={(selectedRepDetail.structureIds || []).map(sid => STRUCTURES.find(s => s.id === sid)?.name).filter(Boolean).join(', ') || '—'} />
                                 <DRow label="Members Recruited" value={selectedRepDetail.count} />
                             </div>
@@ -1104,7 +1180,7 @@ export function Recruiters() {
                                                     setEditingRep(false);
                                                     succeed('Those recruiter details are saved.');
                                                 } catch (err) {
-                                                    fail(`Those recruiter details could not be saved. ${err?.message || ''}`.trim());
+                                                    fail(writeFailure(err, 'Those recruiter details', 'the recruiter'));
                                                 } finally {
                                                     setSaving(false);
                                                 }
@@ -1127,6 +1203,7 @@ export function Recruiters() {
                     title="Add Recruiter"
                     description="A recruiter must be an existing member"
                     size="md"
+                    initialFocusRef={addRepSearchRef}
                     footer={
                         <>
                             <Button onClick={handleCloseAddRep}>Cancel</Button>
@@ -1153,7 +1230,7 @@ export function Recruiters() {
                             <TextInput
                                 label="Search members"
                                 kind="search"
-                                autoFocus
+                                ref={addRepSearchRef}
                                 value={newRepSearch}
                                 onChange={e => setNewRepSearch(e.target.value)}
                                 placeholder="Search by name, membership no. or bank…"
@@ -1266,7 +1343,7 @@ export function Recruiters() {
                                 </Section>
                                 <Section title="Membership">
                                     <DRow label="Membership No." value={selectedMember.membershipNumber} />
-                                    <DRow label="Date Joined" value={selectedMember.joinDate} />
+                                    <DRow label="Date Joined" value={recordDate(selectedMember.joinDate)} />
                                     <DRow label="Status" value={selectedMember.status} />
                                     <DRow label="Monthly Subs" value={selectedMember.monthlySubscription} />
                                     <DRow label="Current Balance" value={selectedMember.currentBalance} />
@@ -1295,7 +1372,6 @@ export function Recruiters() {
                     ? `${[pendingRemoveMember.initials, pendingRemoveMember.surname].filter(Boolean).join(' ')} will no longer be on ${selectedRep?.name ?? 'this recruiter'}'s list.`
                     : undefined}
                 confirmLabel="Remove from recruiter"
-                loading={saving}
                 onConfirm={handleRemove}
             />
 
@@ -1304,7 +1380,6 @@ export function Recruiters() {
                 onOpenChange={closeOn(() => setPendingRemoveRep(null))}
                 title="Remove this recruiter?"
                 confirmLabel="Remove recruiter"
-                loading={saving}
                 onConfirm={handleRemoveRep}
             >
                 {/* 🔑 The consequence is SPELLED OUT, and it is the reason this one could
@@ -1361,42 +1436,6 @@ function Section({ title, children }) {
         <div className="space-y-3">
             <h4 className="border-b border-line pb-1 text-xs font-bold uppercase tracking-widest text-brand-ink">{title}</h4>
             {children}
-        </div>
-    );
-}
-
-/**
- * What a notice wears for its tone. The page's notice and `DialogNotice` spelt out the same two tones and the same two
- * icons, character for character; the frame around each differs, and stays with it.
- */
-function noticeTone(tone) {
-    return tone === 'ok'
-        ? 'border-status-active-dot bg-status-active-bg text-status-active'
-        : 'border-status-suspended-dot bg-status-suspended-bg text-status-suspended';
-}
-
-function NoticeIcon({ tone }) {
-    return tone === 'ok'
-        ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
-        : <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />;
-}
-
-/**
- * A failure said INSIDE the dialog it happened in. `06.4`.
- *
- * `role="alert"` rather than the page notice's focus: the dialog owns focus, and pulling it out of a form
- * the user is still filling in would be worse than the silence this replaces.
- */
-function DialogNotice({ notice, onDismiss }) {
-    if (!notice) return null;
-    return (
-        <div
-            role={notice.tone === 'ok' ? 'status' : 'alert'}
-            className={cn('mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm', noticeTone(notice.tone))}
-        >
-            <NoticeIcon tone={notice.tone} />
-            <p className="flex-1">{notice.message}</p>
-            <Button size="sm" variant="ghost" onClick={onDismiss}>Dismiss</Button>
         </div>
     );
 }

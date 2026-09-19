@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState, useEffect } from "react";
 import { Plus, Printer } from "lucide-react";
 import { bankService } from "../../services/bankService.js";
 import { TextInput, SearchableSelect, Button } from "../../components/form";
+import { fieldValue } from "../../lib/fieldValue.js";
 import BankBranchModal from "./BankBranchModal.jsx";
 import PageTitle from '../../components/common/PageTitle';
 import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
@@ -24,12 +25,16 @@ export default function BankBranch() {
    */
   const [listState, setListState] = useState('loading');
 
-  const loadBanks = useCallback(() => {
-    setListState('loading');
-    return bankService.getBanks()
-      .then((data) => { setBanks(data ?? []); setListState('ready'); })
-      .catch((err) => { reportError('BankBranch.load', err); setListState('error'); });
-  }, []);
+  /*
+   * 🔴 THE LOADING RESET LIVES ON THE RETRY PATH, NOT INSIDE THE FETCH (`10.4`). Same change, and the same
+   * reason, as `AcbDebits.jsx`, whose comment carries the full account: the reset was a no-op on mount, so
+   * the fetch owns its outcome and `retryBanks` owns the intent to reload.
+   */
+  const loadBanks = useCallback(() => bankService.getBanks()
+    .then((data) => { setBanks(data ?? []); setListState('ready'); })
+    .catch((err) => { reportError('BankBranch.load', err); setListState('error'); }), []);
+
+  const retryBanks = useCallback(() => { setListState('loading'); loadBanks(); }, [loadBanks]);
 
   useEffect(() => { loadBanks(); }, [loadBanks]);
   const [filters, setFilters] = useState({
@@ -61,8 +66,13 @@ export default function BankBranch() {
   const endIndex = Math.min(startIndex + PAGE_SIZE, filteredBanks.length);
   const visibleBanks = filteredBanks.slice(startIndex, endIndex);
 
-  const handleInputChange = (field) => (event) => {
-    setFilters((prev) => ({ ...prev, [field]: event.target.value }));
+  /*
+   * 🔴 R2-F5's SECOND SITE (FIX-NOW, found in P9's execution): choosing a bank threw and took the register with it.
+   * `SearchableSelect` reports a VALUE, `TextInput` an event, and this read `event.target.value` from both.
+   * `fieldValue` states that rule once -- see its own file for what it cost to learn.
+   */
+  const handleInputChange = (field) => (eventOrValue) => {
+    setFilters((prev) => ({ ...prev, [field]: fieldValue(eventOrValue) }));
     setPage(1);
   };
 
@@ -161,7 +171,7 @@ export default function BankBranch() {
             rowKey="id"
             loading={listState === 'loading'}
             error={listState === 'error' ? 'We could not load the bank branches.' : null}
-            onRetry={loadBanks}
+            onRetry={retryBanks}
             emptyTitle="No branches match these criteria"
             emptyMessage="Try a different bank, branch or area."
             dense

@@ -9,6 +9,7 @@ import { expectErrorState } from '../../test/assertions'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { deferred } from '../../test/deferred'
 
 /**
  * THE THREE-STATE RULE, TESTED WHERE IT IS CLAIMED.
@@ -55,12 +56,48 @@ const MEMBERS = [
 const membersRespond = (body, status = 200) =>
   http.get('*/api/members', () => HttpResponse.json(body, { status }))
 
-/** A slow answer, so the loading state is observable rather than a race. */
-const membersRespondSlowly = () =>
-  http.get('*/api/members', async () => {
-    await new Promise((r) => setTimeout(r, 50))
-    return HttpResponse.json(MEMBERS)
-  })
+/**
+ * An answer that does not arrive until the test says so, so the loading state is observable
+ * BY CONSTRUCTION rather than by winning a race.
+ *
+ * 🔴 IT USED TO BE A 50ms `setTimeout`, AND THAT WAS A REAL, REPRODUCED FLAKE. Found by the
+ * Capture Member session on 2026-09-18 and handed here: always this file, always the LOADING
+ * test, always its closing `findByText`, with the captured DOM showing the skeleton still
+ * rendering. The mechanism is that testing-library's `findBy*` carries its OWN 1000ms default
+ * -- NOT vitest's `testTimeout: 20_000` from `vite.config.js` -- so "eventually" was pinned to
+ * one second, and one second had to contain mounting the whole members page in jsdom PLUS the
+ * deliberate 50ms PLUS React's commit. On a loaded box it did not.
+ *
+ * 🔑 THE FIX IS NOT A LONGER TIMEOUT, AND THE DIFFERENCE IS THE WHOLE POINT. Raising 1000 to
+ * 5000 was the proposal and it was declined in writing: a wider window is the same race with a
+ * longer fuse, and it makes the flake rarer without making it absent -- which is strictly
+ * worse, because a flake that fires once a month is one nobody can ever diagnose. At the
+ * observed rate it was reproducible in minutes, and that is what made the mechanism findable.
+ * So the WALL-CLOCK DEPENDENCE goes instead: nothing here is timed, and the request answers
+ * when this test releases it.
+ *
+ * It is also strictly stronger than what it replaces. The three loading assertions below used
+ * to pass because 50ms happened to be longer than a mount -- a duration comparison. They are
+ * now guaranteed: the handler CANNOT answer before `release()`, whatever the box is doing.
+ * (That was latent rather than live: RTL flushes the commit inside `act()` before the
+ * assertions run, so it is not known ever to have fired.)
+ *
+ * ⚠️ THE ORDER IS LOAD-BEARING, AND IT READS LIKE A HELPER RATHER THAN A PROTOCOL. Create it
+ * and `server.use()` it BEFORE rendering, and keep `release` reachable from the test body. Get
+ * that wrong and the request is never released, so the test HANGS to vitest's 20s
+ * `testTimeout` instead of failing at 1s -- slower and more confusing than the flake this
+ * replaces.
+ */
+const membersRespondWhenReleased = () => {
+  const answer = deferred()
+  return {
+    handler: http.get('*/api/members', async () => {
+      await answer.promise
+      return HttpResponse.json(MEMBERS)
+    }),
+    release: () => answer.resolve(),
+  }
+}
 
 let consoleError
 
@@ -109,13 +146,22 @@ describe('the Members list', () => {
       // A request that has not answered yet is not an answer. The page used to render
       // its empty table synchronously on mount, so the FIRST thing every user saw,
       // every time, was "no members" -- which then flickered into data.
-      server.use(membersRespondSlowly())
+      const members = membersRespondWhenReleased()
+      server.use(members.handler)
       renderWithProviders(<MembersPage />)
 
-      expect(screen.getByRole('status')).toBeInTheDocument()
-      expect(screen.queryByText(EMPTY_TEXT)).not.toBeInTheDocument()
-      // K1: nor does it print a row of zeros while it waits.
-      expect(within(screen.getByTestId('figure-strip')).queryByText('0')).not.toBeInTheDocument()
+      try {
+        expect(screen.getByRole('status')).toBeInTheDocument()
+        expect(screen.queryByText(EMPTY_TEXT)).not.toBeInTheDocument()
+        // K1: nor does it print a row of zeros while it waits.
+        expect(within(screen.getByTestId('figure-strip')).queryByText('0')).not.toBeInTheDocument()
+      } finally {
+        // 🔑 `finally`, SO A FAILING ASSERTION CANNOT LEAVE A PENDING REQUEST BEHIND IT. An
+        // unreleased handler would sit unresolved for the rest of the file and muddy the
+        // diagnosis of whatever failed -- the next author would be reading a hung request
+        // that their own test did not cause.
+        members.release()
+      }
 
       // ...and it does eventually finish. Without this the test above would also pass
       // against a page that renders a spinner and never anything else -- which is A22's
@@ -173,6 +219,48 @@ describe('the Members list', () => {
 
       expect(await screen.findByText(/Testperson/)).toBeInTheDocument()
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+
+    it('the retry goes back to LOADING, rather than sitting on the error until the answer lands', async () => {
+      /*
+       * 🔴 THE BEHAVIOUR `10.4` MOVED, AND NOTHING WAS ASSERTING IT.
+       *
+       * `setListState("loading")` used to be the first line of `loadMembers`, which the mount
+       * effect called -- a `react-hooks/set-state-in-effect` error as of this phase. It was a
+       * no-op on mount (the state already initialises to "loading"), so it was hoisted out of
+       * the fetch and onto the retry path, where it is the only place it ever did work.
+       *
+       * ⚠️ THE EXISTING RETRY TEST ABOVE CANNOT SEE THAT. It asserts the request re-runs and the
+       * rows arrive, which stays true whether or not the screen ever goes back to loading -- so
+       * wiring `onRetry` to the wrong function would have left it green while the user pressed
+       * Try again and watched the error message sit there until the data appeared. Six retry
+       * sites were rewired in that batch; this is what proves the wiring.
+       *
+       * Deterministic on purpose: the second answer is held until this test releases it, so the
+       * loading assertion is guaranteed rather than winning a race against a real delay.
+       */
+      const user = setupUser()
+      server.use(membersRespond({ status: 500 }, 500))
+      renderWithProviders(<MembersPage />)
+
+      await screen.findByRole('alert')
+      const { retry } = await expectErrorState({ emptyText: EMPTY_TEXT })
+
+      const second = membersRespondWhenReleased()
+      server.use(second.handler)
+      try {
+        await user.click(retry)
+
+        expect(screen.getByRole('status')).toBeInTheDocument()
+        // The must-pass beside it: the failure it replaced is GONE. A screen that stacked the
+        // spinner on top of the old error would satisfy the line above and still be wrong.
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      } finally {
+        second.release()
+      }
+
+      expect(await screen.findByText(/Testperson/)).toBeInTheDocument()
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
     })
 
     it('CAN be told apart from a genuinely empty list', async () => {

@@ -35,12 +35,18 @@ export default function BankListing() {
     return [];
   };
 
-  // Named, so the table's retry can re-run exactly what the mount ran. An error state
-  // whose button cannot repeat the request is an error state with a dead end in it.
+  /*
+   * 🔴 THE TWO RESETS MOVED TO THE RETRY PATH (`10.4`). `react-hooks/set-state-in-effect` was
+   * right: the effect below called this, and this set state synchronously before any await.
+   *
+   * 🔑 BOTH WERE NO-OPS ON MOUNT -- `isLoading` initialises to `true` and `error` to `""` -- so
+   * taking them out of the mount path changes nothing that renders. They matter only when a
+   * human presses Try again, which is what `retryBanks` is.
+   *
+   * ⚠️ `setError("")` IS NOT OPTIONAL ON THAT PATH. Nothing else ever clears it, so a retry that
+   * succeeded without it would draw the refreshed listing underneath the old failure message.
+   */
   const loadBanks = useCallback(() => {
-    setIsLoading(true);
-    setError("");
-
     return bankService
       .getBankListingDetailed()
       .then(({ branches, codes: codesState, codesError }) => {
@@ -55,6 +61,14 @@ export default function BankListing() {
         setIsLoading(false);
       });
   }, []);
+
+  // The table's retry: it resets what the mount never needed to, then re-runs exactly the fetch
+  // the mount ran. An error state whose button cannot repeat the request is a dead end.
+  const retryBanks = useCallback(() => {
+    setIsLoading(true);
+    setError("");
+    loadBanks();
+  }, [loadBanks]);
 
   useEffect(() => {
     loadBanks();
@@ -154,7 +168,7 @@ export default function BankListing() {
             state="partial"
             layout="row"
             compact
-            onRetry={loadBanks}
+            onRetry={retryBanks}
             title="Universal branch codes could not be loaded."
             message="Every bank below is listed, but not its code, so a search by code cannot be answered until they load."
           />
@@ -181,7 +195,7 @@ export default function BankListing() {
             rowKey="id"
             loading={isLoading}
             error={error || null}
-            onRetry={loadBanks}
+            onRetry={retryBanks}
             emptyTitle="No banks match these criteria"
             emptyMessage="Try a different bank name, abbreviation or branch code."
           />

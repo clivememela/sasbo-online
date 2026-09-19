@@ -9,6 +9,9 @@ import { ConfirmDialog, closeOn } from '../../components/overlay/Modal.jsx';
 import { recruitmentChannelService } from '../../services/recruitmentChannelService.js';
 import DataState from '../../components/common/DataState.jsx';
 import reportError from '../../lib/reportError.js';
+import DialogNotice from '../../components/common/DialogNotice.jsx';
+import { focusOnMount } from '../../lib/focusOnMount.js';
+import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 
 /*
  * 📐 THE CHROME OF AN IN-ROW EDITOR -- one constant, with the same classes as `Subscriptions.jsx`'s
@@ -21,6 +24,17 @@ import reportError from '../../lib/reportError.js';
 const CELL_INPUT = 'w-full rounded border border-line-strong bg-surface-2 px-2 py-1 field-text text-ink touch-size';
 
 const HEAD_CELL = 'whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5';
+
+/**
+ * 🔴 R3-F2, WIDENED: "could not be saved" is a claim about the SERVER, and only a refusal supports it.
+ *
+ * The delete learnt this first; add, rename and enable/disable were left saying it after a timeout or a lost
+ * connection, when the change may well have landed -- and an administrator who believes that adds the channel twice.
+ * `writeMayHaveLanded` is the one place the rule lives (`parseApiError.js`); this is the sentence it chooses.
+ */
+const writeFailureNotice = (err, what) => (writeMayHaveLanded(err)
+    ? `${what} could not be confirmed. Reload the list and check before trying again.`
+    : `${what} was not saved. ${messageOf(err)}`.trim());
 
 export default function RecruitmentChannel() {
     const [notice, setNotice] = useState(null);
@@ -37,6 +51,11 @@ export default function RecruitmentChannel() {
     const [editName, setEditName] = useState('');
     const [showAdd, setShowAdd] = useState(false);
     const [newName, setNewName] = useState('');
+
+    // 🔴 THE CARET FOLLOWS THE REVEAL (`10.4`): both inline inputs below take `ref={focusOnMount}`. They mount exactly
+    // when the user asks for them, so focusing on mount is the whole rule -- see `lib/focusOnMount.js` for why this
+    // replaced `autoFocus`, and then the ref-and-effect pair that was here first. `RecruitmentChannel.focus.test.jsx`
+    // holds it: the caret arrives on each reveal, on the row that was pressed, and never before.
 
     /*
      * 🔴 A LIVE A27 THE REGISTER NEVER NAMED, AND IT WAS THE WORST SHAPE OF IT: this
@@ -61,8 +80,6 @@ export default function RecruitmentChannel() {
     // effect's dependency, and a fresh identity each render is a re-fetch each render --
     // which on screen is indistinguishable from a slow backend.
     const refresh = useCallback(() => {
-        setListState('loading');
-        setLoadError(null);
         return recruitmentChannelService.getAll()
             .then((data) => {
                 setRecruipmentChannels(Array.isArray(data) ? data : []);
@@ -75,6 +92,28 @@ export default function RecruitmentChannel() {
             });
     }, []);
 
+    /*
+     * 🔴 THE RESET IS ON EVERY PATH EXCEPT THE MOUNT (`10.4`), AND THAT DISTINCTION IS THE WHOLE CARE HERE.
+     *
+     * `react-hooks/set-state-in-effect` flagged the effect below, because `refresh` set state synchronously
+     * before its fetch. On MOUNT that was a no-op -- `listState` already initialises to 'loading' and
+     * `loadError` to null -- so hoisting it out of the effect costs nothing there.
+     *
+     * ⚠️ BUT THIS SCREEN IS NOT THE OTHER FOUR LOADERS: `refresh` HAS FIVE NON-EFFECT CALLERS, not one.
+     * Besides Try again, the four write handlers (add, rename, enable/disable, delete) reload the table
+     * afterwards, and TODAY THAT SHOWS THE LOADING STATE while the reloaded rows are fetched. Hoisting the
+     * reset onto the retry path alone would have silently deleted that -- after a rename the table would sit
+     * on the stale rows with no sign anything was happening, which is a real behaviour change smuggled in as
+     * a lint fix. So `reloadChannels` is what all five call, and the effect alone calls the bare fetch.
+     *
+     * `RecruitmentChannel.reload.test.jsx` holds it: nothing asserted that flash before this phase.
+     */
+    const reloadChannels = useCallback(() => {
+        setListState('loading');
+        setLoadError(null);
+        return refresh();
+    }, [refresh]);
+
     useEffect(() => { refresh(); }, [refresh]);
 
     const filtered = useMemo(() => {
@@ -85,43 +124,46 @@ export default function RecruitmentChannel() {
     }, [recruitmentChannels, search]);
 
     const handleAdd = async () => {
+        const what = 'That recruitment channel';
         const name = newName.trim();
         if (!name) return;
         setSaving(true);
         try {
             await recruitmentChannelService.create(name);
-            await refresh();
+            await reloadChannels();
             setNewName('');
             setShowAdd(false);
         } catch (err) {
-            setNotice(`That change could not be saved. ${err?.message || ''}`.trim());
+            setNotice(writeFailureNotice(err, what));
         } finally {
             setSaving(false);
         }
     };
 
     const handleEdit = async (r) => {
+        const what = `The new name for ${r.name}`;
         const name = editName.trim();
         if (!name) return;
         setSaving(true);
         try {
             await recruitmentChannelService.update(r.id, { name, enabled: r.enabled });
-            await refresh();
+            await reloadChannels();
             setEditingId(null);
         } catch (err) {
-            setNotice(`That change could not be saved. ${err?.message || ''}`.trim());
+            setNotice(writeFailureNotice(err, what));
         } finally {
             setSaving(false);
         }
     };
 
     const handleToggleEnabled = async (r) => {
+        const what = `The change to ${r.name}`;
         setSaving(true);
         try {
             await recruitmentChannelService.update(r.id, { name: r.name, enabled: !r.enabled });
-            await refresh();
+            await reloadChannels();
         } catch (err) {
-            setNotice(`That change could not be saved. ${err?.message || ''}`.trim());
+            setNotice(writeFailureNotice(err, what));
         } finally {
             setSaving(false);
         }
@@ -132,17 +174,27 @@ export default function RecruitmentChannel() {
     // SUPPRESSIBLE -- a user who ticks "don't show me these again" silently loses every
     // confirmation in the application.
     const [pendingDelete, setPendingDelete] = useState(null);
+    // A failed delete is said in the dialog that is still open (R4-F1): the page notice renders under its scrim.
+    const [deleteNotice, setDeleteNotice] = useState(null);
+    const askToDelete = (r) => { setDeleteNotice(null); setPendingDelete(r); };
 
     const handleDelete = async () => {
         const r = pendingDelete;
         if (!r) return;
         setSaving(true);
+        setDeleteNotice(null);
         try {
             await recruitmentChannelService.remove(r.id);
             setPendingDelete(null);
-            await refresh();
+            await reloadChannels();
         } catch (err) {
-            setNotice(`That change could not be saved. ${err?.message || ''}`.trim());
+            reportError('RecruitmentChannel.remove', err);
+            // R3-F2: only a refusal proves nothing was deleted; a lost answer may have deleted it.
+            setDeleteNotice({
+                message: writeMayHaveLanded(err)
+                    ? `The delete of ${r.name} could not be confirmed. Reload the list and check before trying again.`
+                    : `${r.name} was not deleted. ${messageOf(err)}`,
+            });
         } finally {
             setSaving(false);
         }
@@ -192,7 +244,7 @@ export default function RecruitmentChannel() {
                 {showAdd && (
                     <div className="flex items-center gap-2 border-b border-line bg-brand-soft p-3">
                         <input
-                            autoFocus
+                            ref={focusOnMount}
                             value={newName}
                             onChange={e => setNewName(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleAdd()}
@@ -259,7 +311,7 @@ export default function RecruitmentChannel() {
                                             <DataState
                                                 state="error"
                                                 error={loadError}
-                                                onRetry={refresh}
+                                                onRetry={reloadChannels}
                                                 title="We could not load the recruiter types."
                                             />
                                         )}
@@ -280,7 +332,7 @@ export default function RecruitmentChannel() {
                                     <td className="px-3.5 py-[11px] text-ink first:pl-5">
                                         {editingId === r.id ? (
                                             <input
-                                                autoFocus
+                                                ref={focusOnMount}
                                                 value={editName}
                                                 onChange={e => setEditName(e.target.value)}
                                                 aria-label={`Rename ${r.name}`}
@@ -345,7 +397,7 @@ export default function RecruitmentChannel() {
                                     <td className="px-3.5 py-[11px] pr-5">
                                         <button
                                             type="button"
-                                            onClick={() => setPendingDelete(r)}
+                                            onClick={() => askToDelete(r)}
                                             disabled={saving}
                                             aria-label={`Delete ${r.name}`}
                                             className="touch-size rounded-md p-1.5 text-status-suspended transition hover-hover:hover:bg-status-suspended-bg disabled:opacity-40">
@@ -378,7 +430,9 @@ export default function RecruitmentChannel() {
                 confirmLabel="Delete recruiter type"
                 loading={saving}
                 onConfirm={handleDelete}
-            />
+            >
+                <DialogNotice notice={deleteNotice} onDismiss={() => setDeleteNotice(null)} />
+            </ConfirmDialog>
         </Page>
     );
 }
