@@ -211,6 +211,19 @@ This is a 16 GB box shared by several concurrent sessions, and it will lie to yo
 
 ---
 
+## Open requests — not rules yet
+
+Things another part of the project has asked this contract for, recorded so they are not lost. None is built.
+
+- **A *Terminated* member status** *(requested by the ACB arc; confirmed needed by SASBO's answers of 2026-09-18)*. A
+  member whose debit order has failed three months running is terminated, and ACB's screens must show it. That needs a
+  status token pair (text and background) and a `StatusChip` variant that meet AA **on the page and on the membership
+  card's metal**, both themes, like the five statuses that exist. Note SASBO's own meaning of the neighbouring status:
+  *Suspended* is "still pending and not terminated as yet". The status vocabulary itself belongs to the Capture Member
+  arc; this contract owns only how it looks. Build it with the first screen that needs it, not before.
+
+---
+
 ## 9 · When a rule here is wrong
 
 Some of it will be, eventually. The rule is: **re-aim the predicate at the fact, and never contort
