@@ -30,6 +30,7 @@ import { debitDateSentence } from "@/utils/debitDate.js";
 import { nearMisses, resolveToOption } from "@/utils/jobGradeMatch.js";
 import { nameKey } from "@/utils/nameKey.js";
 import { personName } from "@/lib/names.js";
+import { fieldValue } from "@/lib/fieldValue.js";
 import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
     formatDate } from "@/utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
@@ -258,8 +259,10 @@ export default function CaptureMember() {
         ? debitDateSentence(form.debitDay)
         : null;
 
+    // An event from a text field, or a bare value from a select: `fieldValue` reads either (RF -- the selects
+    // below were wrapping their value in a fake event so this line could read `event.target.value`).
     const handleChange = (field) => (event) => {
-        let rawValue = event.target.value;
+        let rawValue = fieldValue(event);
         if (field === "initials") initialsTyped.current = true;
         if (field === "bankAddress") setBankAddressTyped(true);
         if (field === "ibtNo") setIbtNoTyped(true);
@@ -520,7 +523,7 @@ export default function CaptureMember() {
             {(refs.state === 'partial' || refs.state === 'error') && (
                 <div className="mb-4 rounded-lg bg-surface p-3 shadow-(--shadow-1)">
                     <DataState
-                        state={refs.state === 'error' ? 'error' : 'partial'}
+                        state={refs.state}
                         compact
                         onRetry={refs.retry}
                         title={
@@ -838,7 +841,7 @@ function Field({ label, value, onChange, className = "", options = null, type = 
                    one of the two branches. Found when Job Grade became searchable and its "No job
                    grades available" disappeared. */
                 emptyLabel={emptyLabel}
-                onChange={(next) => onChange?.({ target: { value: next } })}
+                onChange={onChange}
                 placeholder="Search..."
             />
         );
@@ -852,7 +855,7 @@ function Field({ label, value, onChange, className = "", options = null, type = 
                 loading={loading}
                 loadError={loadError}
                 onRetryLoad={onRetryLoad}
-                onChange={(next) => onChange?.({ target: { value: next } })}
+                onChange={onChange}
                 placeholder="Select..."
                 emptyLabel={emptyLabel}
             />

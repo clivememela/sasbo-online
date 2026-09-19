@@ -136,6 +136,9 @@ export default function Subscriptions() {
 
     const handleField = (field, value) => setEditData(prev => ({ ...prev, [field]: value }));
 
+    /** The row being edited, by name, for its controls' labels -- spelled five times before (RF). */
+    const editName = editData.bankName || 'this subscription';
+
     return (
         <Page>
             <PageTitle title="Subscriptions" subtitle="Each bank's subscription: the debit day, the amount, and whether it runs through core banking." />
@@ -240,13 +243,13 @@ export default function Subscriptions() {
                                 narrow, and the second sentence is the one that invites them
                                 to widen the filter and try again forever. conventions §8: the
                                 empty copy renders ONLY when data genuinely resolved empty. */}
-                            {!loading && !error && subscriptions.length === 0 ? (
+                            {error ? null : !loading && subscriptions.length === 0 ? (
                                 <tr>
                                     <td colSpan={7} className="px-4 py-6 text-center text-sm text-ink-muted">
                                         No subscriptions match your search.
                                     </td>
                                 </tr>
-                            ) : error ? null : subscriptions.map((sub) => (
+                            ) : subscriptions.map((sub) => (
                                 <tr
                                     key={sub.id}
                                     onClick={() => handleRowClick(sub)}
@@ -256,19 +259,19 @@ export default function Subscriptions() {
                                         <>
                                             <td className={`${BODY_CELL} text-ink`}>{editData.bankName}</td>
                                             <td className={BODY_CELL}>
-                                                <input type="number" aria-label={`ACB debit day for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.acbDebitDay ?? ''} onChange={(e) => handleField('acbDebitDay', parseInt(e.target.value))} onClick={e => e.stopPropagation()} />
+                                                <input type="number" aria-label={`ACB debit day for ${editName}`} className={inputCls} value={editData.acbDebitDay ?? ''} onChange={(e) => handleField('acbDebitDay', parseInt(e.target.value))} onClick={e => e.stopPropagation()} />
                                             </td>
                                             <td className={BODY_CELL}>
-                                                <input type="number" step="0.01" aria-label={`Subscription amount for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.subscriptionAmount ?? ''} onChange={(e) => handleField('subscriptionAmount', parseFloat(e.target.value))} onClick={e => e.stopPropagation()} />
+                                                <input type="number" step="0.01" aria-label={`Subscription amount for ${editName}`} className={inputCls} value={editData.subscriptionAmount ?? ''} onChange={(e) => handleField('subscriptionAmount', parseFloat(e.target.value))} onClick={e => e.stopPropagation()} />
                                             </td>
                                             <td className={BODY_CELL}>
-                                                <select aria-label={`Core banking for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.isCoreBanking === true ? 'true' : 'false'} onChange={(e) => handleField('isCoreBanking', e.target.value === 'true')} onClick={e => e.stopPropagation()}>
+                                                <select aria-label={`Core banking for ${editName}`} className={inputCls} value={editData.isCoreBanking === true ? 'true' : 'false'} onChange={(e) => handleField('isCoreBanking', e.target.value === 'true')} onClick={e => e.stopPropagation()}>
                                                     <option value="true">Yes</option>
                                                     <option value="false">No</option>
                                                 </select>
                                             </td>
                                             <td className={BODY_CELL}>
-                                                <select aria-label={`Status for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.status || ''} onChange={(e) => handleField('status', e.target.value)} onClick={e => e.stopPropagation()}>
+                                                <select aria-label={`Status for ${editName}`} className={inputCls} value={editData.status || ''} onChange={(e) => handleField('status', e.target.value)} onClick={e => e.stopPropagation()}>
                                                     <option value="ACTIVE">ACTIVE</option>
                                                     <option value="PENDING">PENDING</option>
                                                     <option value="CANCELLED">CANCELLED</option>
@@ -282,7 +285,7 @@ export default function Subscriptions() {
                                             <td className="whitespace-nowrap px-3.5 py-[11px] text-right first:pl-5">
                                                 <span className="inline-flex gap-2">
                                                     <Button size="sm" onClick={handleCancel} aria-label="Discard these changes">Cancel</Button>
-                                                    <Button size="sm" variant="primary" onClick={handleSave} aria-label={`Save changes to ${editData.bankName || 'this subscription'}`}>Save</Button>
+                                                    <Button size="sm" variant="primary" onClick={handleSave} aria-label={`Save changes to ${editName}`}>Save</Button>
                                                 </span>
                                             </td>
                                         </>
@@ -292,9 +295,9 @@ export default function Subscriptions() {
                                                 seeing: an em dash says "no bank on this row", a blank
                                                 cell says nothing and reads as a rendering fault. */}
                                             <td className="px-3.5 py-[11px] font-medium text-ink first:pl-5">{sub.bankName || '—'}</td>
-                                            <td className="px-3.5 py-[11px] tabular-nums first:pl-5">{sub.acbDebitDay ?? '—'}</td>
-                                            <td className="px-3.5 py-[11px] tabular-nums first:pl-5">{formatZar(sub.subscriptionAmount)}</td>
-                                            <td className="px-3.5 py-[11px] text-ink-muted first:pl-5">{sub.isCoreBanking ? 'Yes' : 'No'}</td>
+                                            <td className={`${BODY_CELL} tabular-nums`}>{sub.acbDebitDay ?? '—'}</td>
+                                            <td className={`${BODY_CELL} tabular-nums`}>{formatZar(sub.subscriptionAmount)}</td>
+                                            <td className={`${BODY_CELL} text-ink-muted`}>{sub.isCoreBanking ? 'Yes' : 'No'}</td>
                                             <td className={BODY_CELL}>
                                                 {/* ♻️ THE FOURTH COPY OF THE STATUS CHIP, and the one
                                                     that was wrong in the most damaging direction: it knew
@@ -310,7 +313,7 @@ export default function Subscriptions() {
                                                     is on the wire, not ours to change here. */}
                                                 <StatusChip status={sub.status} />
                                             </td>
-                                            <td className="px-3.5 py-[11px] text-ink-muted first:pl-5">{formatDateLong(sub.registrationDate)}</td>
+                                            <td className={`${BODY_CELL} text-ink-muted`}>{formatDateLong(sub.registrationDate)}</td>
                                             {/* 🔴 IT SAID "click to edit" -- a hint where a control belongs,
                                                 and the only way in was a mouse on the row. The row still
                                                 opens on a click as a pointer convenience; this is the

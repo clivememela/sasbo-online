@@ -195,7 +195,7 @@ export default function AcbDebits() {
             header: 'Name',
             priority: 'essential',
             truncate: true,
-            cell: (m) => `${m.title ? `${m.title} ` : ''}${m.initials || ''} ${m.surname || ''}`.trim() || '\u2014',
+            cell: (m) => formalName(m) || '\u2014',
         },
         { key: 'identityNumber', header: 'ID Number', priority: 'secondary', truncate: true, cell: (m) => m.identityNumber || '\u2014' },
         { key: 'bankName', header: 'Bank', priority: 'secondary', truncate: true, cell: (m) => m.bankName || '\u2014' },

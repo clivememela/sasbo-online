@@ -1,6 +1,6 @@
 // @vitest-environment jsdom -- the record's job-grade list: when it is fetched, and whose answer wins
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, screen, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 
 import MembersPage from './Members'
@@ -9,6 +9,7 @@ import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
 import { deferred } from '../../test/deferred'
+import { jobGradeService } from '../../services/jobGradeService.js'
 
 /**
  * 🔴 R3-F4 (P9's independent review): THE RECORD FETCHED JOB GRADES ON EVERY OPEN, UNSEQUENCED.
@@ -57,43 +58,42 @@ describe('the record’s job grades', () => {
     )
   })
 
+  // The service spies below are per test: a spy left in place carries its calls into the next test, and ② looks
+  // its bank's call up by name.
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('① a record that is only being read asks for no job grades', async () => {
-    let calls = 0
-    server.use(
-      http.get('*/api/job-grades', () => {
-        calls += 1
-        return HttpResponse.json([{ value: 'G7', label: 'G7' }])
-      }),
-    )
+    /*
+     * 🔑 THE WITNESS IS THE CALL, NOT A NETWORK HIT AFTER A SLEEP (RF). This slept a real 50ms and then counted
+     * requests -- so a fetch that started later than that would have passed it. The record's effect calls
+     * `getByBank` SYNCHRONOUSLY, and every step of `openTheRecord` runs inside `act`, which flushes effects: by
+     * the time it returns, a call that was going to happen has happened.
+     */
+    const asked = vi.spyOn(jobGradeService, 'getByBank')
     await openTheRecord()
 
     // The grade is still shown, from the record itself -- so this is "not fetched", not "not rendered".
     expect(panel().getByText('Job Grade').nextElementSibling).toHaveTextContent('G7')
-    // Give the effect a chance to run before asserting that it did not.
-    await new Promise((resolve) => setTimeout(resolve, 50))
-    expect(calls, 'opening a record to READ it fetched its bank’s job grades').toBe(0)
+    expect(asked, 'opening a record to READ it fetched its bank’s job grades').not.toHaveBeenCalled()
   })
 
   it('the must-pass: entering edit mode does fetch them', async () => {
-    let calls = 0
     server.use(
-      http.get('*/api/job-grades', () => {
-        calls += 1
-        return HttpResponse.json([{ value: 'G7', label: 'G7' }, { value: 'G8', label: 'G8' }])
-      }),
+      http.get('*/api/job-grades', () => HttpResponse.json([{ value: 'G7', label: 'G7' }, { value: 'G8', label: 'G8' }])),
     )
+    const asked = vi.spyOn(jobGradeService, 'getByBank')
     const user = await openTheRecord()
 
     await user.click(screen.getByRole('button', { name: /Edit Member/i }))
     await within(await screen.findByLabelText(/^Job Grade/i)).findByRole('option', { name: 'G8' })
-    expect(calls).toBeGreaterThan(0)
+    expect(asked).toHaveBeenCalledWith('ABSA')
   })
 
   it('② an older bank’s answer cannot overwrite a newer one', async () => {
-    let answerAbsa
-    const absaAnswered = new Promise((resolve) => {
-      answerAbsa = resolve
-    })
+    const { promise: absaAnswered, resolve: answerAbsa } = deferred()
+    const asked = vi.spyOn(jobGradeService, 'getByBank')
     server.use(
       http.get('*/api/job-grades', async ({ request }) => {
         if (new URL(request.url).searchParams.get('bankCode') === 'ABSA') {
@@ -113,8 +113,13 @@ describe('the record’s job grades', () => {
     const grade = await screen.findByLabelText(/^Job Grade/i)
     await within(grade).findByRole('option', { name: 'CAPITEC-ONLY' })
 
+    // 🔑 WAIT FOR THE STALE ANSWER ITSELF, NOT FOR A CLOCK (RF). The screen's own `.then` was attached to this
+    // promise first, so by the time awaiting it here resumes, the screen has had the late answer -- and `act`
+    // has rendered whatever it did with it.
+    const absaCall = asked.mock.calls.findIndex(([bank]) => bank === 'ABSA')
+    expect(absaCall, 'the old bank was never asked, so its late answer proves nothing').toBeGreaterThanOrEqual(0)
     answerAbsa()
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await act(async () => { await asked.mock.results[absaCall].value.catch(() => {}) })
     expect(
       within(grade).queryByRole('option', { name: 'ABSA-ONLY' }),
       'the old bank’s late answer replaced the grades of the bank now chosen',

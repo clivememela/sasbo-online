@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { deferred } from '../../test/deferred'
 
 /**
  * A CAPTURE IS SAVED ONCE, SAYS WHO WAS SAVED, AND IS NOT THROWN AWAY BY ONE CLICK. `06.5`, F-P55.
@@ -54,10 +55,7 @@ describe('Capture Member, saving and leaving', () => {
 
   it('① Save is busy while the member is saved, a second press sends nothing, and the message names who was captured', async () => {
     let posts = 0
-    let answer
-    const answered = new Promise((resolve) => {
-      answer = resolve
-    })
+    const { promise: answered, resolve: answer } = deferred()
     server.use(
       ...pageFixtures,
       http.post('*/api/members', async ({ request }) => {

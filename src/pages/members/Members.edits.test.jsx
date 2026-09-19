@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { deferred } from '../../test/deferred'
 
 /**
  * EDITS ARE NEVER LOST SILENTLY. `06.5`, the `06.3` critique, F-P55.
@@ -102,10 +103,7 @@ describe('the member record, mid-edit', () => {
   })
 
   it('⑤ the save confirmation stays open and busy until the save has answered, then closes and says so', async () => {
-    let answer
-    const answered = new Promise((resolve) => {
-      answer = resolve
-    })
+    const { promise: answered, resolve: answer } = deferred()
     server.use(
       http.put('*/api/members/:id', async ({ request }) => {
         const body = await request.json()

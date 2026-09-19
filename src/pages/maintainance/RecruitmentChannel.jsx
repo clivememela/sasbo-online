@@ -108,51 +108,42 @@ export default function RecruitmentChannel() {
             .sort((a, b) => a.name.localeCompare(b.name));
     }, [recruitmentChannels, search]);
 
-    const handleAdd = async () => {
-        const what = 'That recruitment channel';
-        const name = newName.trim();
-        if (!name) return;
+    /**
+     * The three in-row writes, one shape (RF -- each held its own copy of this try/catch/finally): write, re-read
+     * the table (with its loading state -- see `reloadChannels`), then the caller's own step, which runs only on
+     * success, so a failed add keeps what was typed. A failure is the sentence `writeFailure` chooses.
+     */
+    const runWrite = async (what, write, then) => {
         setSaving(true);
         try {
-            await recruitmentChannelService.create(name);
+            await write();
             await reloadChannels();
-            setNewName('');
-            setShowAdd(false);
+            then?.();
         } catch (err) {
             setNotice(writeFailure(err, what));
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleAdd = async () => {
+        const name = newName.trim();
+        if (!name) return;
+        await runWrite('That recruitment channel', () => recruitmentChannelService.create(name), () => {
+            setNewName('');
+            setShowAdd(false);
+        });
     };
 
     const handleEdit = async (r) => {
-        const what = `The new name for ${r.name}`;
         const name = editName.trim();
         if (!name) return;
-        setSaving(true);
-        try {
-            await recruitmentChannelService.update(r.id, { name, enabled: r.enabled });
-            await reloadChannels();
-            setEditingId(null);
-        } catch (err) {
-            setNotice(writeFailure(err, what));
-        } finally {
-            setSaving(false);
-        }
+        await runWrite(`The new name for ${r.name}`, () => recruitmentChannelService.update(r.id, { name, enabled: r.enabled }),
+            () => setEditingId(null));
     };
 
-    const handleToggleEnabled = async (r) => {
-        const what = `The change to ${r.name}`;
-        setSaving(true);
-        try {
-            await recruitmentChannelService.update(r.id, { name: r.name, enabled: !r.enabled });
-            await reloadChannels();
-        } catch (err) {
-            setNotice(writeFailure(err, what));
-        } finally {
-            setSaving(false);
-        }
-    };
+    const handleToggleEnabled = (r) => runWrite(`The change to ${r.name}`,
+        () => recruitmentChannelService.update(r.id, { name: r.name, enabled: !r.enabled }));
 
     // 🔴 `03.4`: was `window.confirm()`. That dialog is unstyleable, says only OK/Cancel
     // rather than naming what will happen, blocks the whole browser thread, and is

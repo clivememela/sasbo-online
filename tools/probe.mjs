@@ -265,11 +265,18 @@ export const themeReadout = `(() => {
  * `Cannot read properties of null (reading 'children')` — the fifth defect the refactor pass
  * turned up, and the clearest possible argument for having stopped swallowing exceptions.
  */
+/**
+ * 🔑 ONE FLOOR FOR "A PAGE": what readiness waits for and what the population canary below complains under (RF, F-P41).
+ * Readiness used to ask for ONE child of `#root` while the canary complained under EIGHT elements, so a row could pass
+ * readiness and be disowned afterwards. Now a page is ready only once it holds as much as the canary asks of it.
+ */
+export const PAGE_FLOOR = 8;
+
 export const pageReady = `(() => (
   document.fonts.status === 'loaded'
   && !document.querySelector('[data-testid="route-pending"]')
   && (document.body?.children.length ?? 0) > 0
-  && (document.getElementById('root')?.children.length ?? 0) > 0
+  && document.querySelectorAll('#root *').length >= ${PAGE_FLOOR}
   && (document.body ? getComputedStyle(document.body).backgroundColor : 'rgba(0, 0, 0, 0)') !== 'rgba(0, 0, 0, 0)'
 ))()`;
 
@@ -298,7 +305,7 @@ const rowWhere = (r) => `${r.route ?? r.name ?? '?'}@${r.width ?? r.requested ??
  * hand-built a row listing eight fields and omitted this one. **The vacuity checker was
  * itself vacuous**, which is the exact species it exists to catch, one level up.
  */
-export function populationComplaints(rows, floor = 8) {
+export function populationComplaints(rows, floor = PAGE_FLOOR) {
   const complaints = [];
 
   const missing = rows.filter((r) => typeof r.elements !== 'number');

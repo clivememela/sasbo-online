@@ -671,7 +671,7 @@ export function Recruiters() {
         ),
     }), []);
 
-    const fullName = (m) => `${m.title ? `${m.title} ` : ''}${m.initials || ''} ${m.surname || ''}`.trim() || '—';
+    const fullName = (m) => formalName(m) || '—';
 
     const repMemberColumns = useMemo(() => [
         memberColumn(setSelectedMember),

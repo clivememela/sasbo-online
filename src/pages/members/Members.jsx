@@ -39,6 +39,7 @@ import { sanitiseField, validateField } from "../../utils/inputRules.js";
 import { branchNamesForBank } from "../../utils/bankBranches.js";
 import { cn } from "../../lib/utils";
 import { formalName, personName } from "../../lib/names.js";
+import { fieldValue } from "../../lib/fieldValue.js";
 
 const PAGE_SIZE = memberService.getPageSize();
 
@@ -689,7 +690,7 @@ export default function Members() {
     };
 
     const handleEditChange = useCallback((field) => (event) => {
-        let rawValue = event && event.target ? event.target.value : event;
+        let rawValue = fieldValue(event);
         if (field === "initials") initialsTyped.current = true;
 
         const hasNonNumericInput =
@@ -961,8 +962,7 @@ export default function Members() {
     const errorSummaryRef = useFocusOn(saveNotice);
 
     const handleInputChange = useCallback((field) => (event) => {
-        const value = event && event.target ? event.target.value : event;
-        setFilters((prev) => ({ ...prev, [field]: value }));
+        setFilters((prev) => ({ ...prev, [field]: fieldValue(event) }));
         setPage(1);
     }, []);
 
@@ -1350,7 +1350,7 @@ export default function Members() {
             {(refs.state === 'partial' || refs.state === 'error') && (
                 <div className="mx-7 mt-4 rounded-lg bg-surface shadow-(--shadow-1) max-lg:mx-4">
                     <DataState
-                        state={refs.state === 'error' ? 'error' : 'partial'}
+                        state={refs.state}
                         layout="row"
                         compact
                         onRetry={refs.retry}
