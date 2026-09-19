@@ -7,7 +7,7 @@
  *
  * Each surface is reached by steps that each report whether they landed, and is then ASSERTED PRESENT by named
  * predicates (T30) before anything is measured. A surface that was not reached is a FAILED row, never a skipped one.
- * At each reached surface, on one settled page (T5):
+ * At each reached surface, on one frame that held still and read the same twice (T5, F-P61):
  *   ① overflow -- `overflowProbe` against the width asked for (T25);
  *   ② contrast on rendered pixels -- `AXE_CONTRAST`; a violation fails, `incomplete` is listed and never passed (T1);
  *   ③ at a phone width, touch targets under REAL touch emulation, reading the `::after` hit area (T6, T22); at a desk
@@ -71,7 +71,7 @@ let cdp;
 
 try {
   cdp = await launch('surfaces');
-  const { send, evaluate, metrics, waitFor, assertBuiltClient, intercept } = cdp;
+  const { send, evaluate, metrics, waitFor, assertBuiltClient, intercept, steady } = cdp;
   console.log('identity OK — entry script', await assertBuiltClient(baseUrl));
   await send('Page.addScriptToEvaluateOnNewDocument', { source: AXE });
 
@@ -257,6 +257,24 @@ try {
   await evaluate(PLANT_TOUCH);
   canaries.push({ name: 'on a mouse, touch-target draws no overlay', ok: await evaluate(`getComputedStyle(document.getElementById('__covered'), '::after').content === 'none' && !matchMedia('(pointer: coarse)').matches`) });
   canaries.push({ name: 'on a mouse, the sweep\'s overlay count reads 0 with the planted touch-target present', ok: await evaluate(`!!document.getElementById('__covered') && (${TOUCH_OVERLAYS_DRAWN}) === 0`) });
+  // ④ a verdict needs a frame that holds still (F-P61): a page that repaints on every frame gets NONE, and the same page,
+  // held still, gets one. Without the second half a `steady` that never answered would pass the first.
+  await evaluate(`(() => {
+    const el = document.createElement('p');
+    el.id = '__unsteady';
+    el.style.cssText = 'position:fixed;top:0;left:0;z-index:99999;font-size:16px;padding:8px;background:#fff;color:#000';
+    document.body.append(el);
+    let n = 0;
+    const tick = () => { if (!el.isConnected) return; el.textContent = 'unsteady canary ' + (n += 1); requestAnimationFrame(tick); };
+    tick();
+    return true;
+  })()`);
+  const unsteady = await steady(() => evaluate(AXE_CONTRAST, { awaitPromise: true }));
+  await evaluate(`(() => { document.getElementById('__unsteady').remove(); return true; })()`);
+  await waitFor(SETTLED, { tries: 120, awaitPromise: true });
+  const heldStill = await steady(() => evaluate(AXE_CONTRAST, { awaitPromise: true }));
+  canaries.push({ name: 'a page that repaints every frame gets no contrast verdict (F-P61)', ok: unsteady === null });
+  canaries.push({ name: 'the same page, held still, gets one', ok: heldStill !== null && heldStill.value.passCount > 0 });
   for (const c of canaries) console.log(`canary: ${c.ok ? 'CAUGHT' : 'MISSED'} — ${c.name}`);
   if (canaries.some((c) => !c.ok)) throw new Error('a probe failed its canary; its results would be worthless (T1)');
 
@@ -290,35 +308,42 @@ try {
           if (row.missed.length) {
             row.diagnosis = await evaluate(PAGE_CENSUS).catch((e) => `the census threw: ${e.message}`);
           } else {
-            // The readout, the probes and the shutter on one settled page.
-            const { paint, probe } = await evaluate(`({ paint: ${themeReadout}, probe: ${overflowProbe(width)} })`);
-            const contrast = await evaluate(AXE_CONTRAST, { awaitPromise: true });
-            const targets = isPhone(width)
-              ? await evaluate(touchTargetProbe())
-              : { overlaysOnMouse: await evaluate(TOUCH_OVERLAYS_DRAWN) };
-            Object.assign(row, {
-              reached: true, elements: probe.elements, theme_dark: paint.dark, theme_bg: paint.bg,
-              overflow: { count: probe.offenderCount, offenders: probe.offenders },
-              contrast,
-              targets,
-            });
-            if (isPhone(width) && !targets.coarse) row.missed.push('asked for touch and the page had a mouse (T6)');
-            const { data } = await send('Page.captureScreenshot', { format: 'png' });
-            row.file = `${name}.png`;
-            writeFileSync(join(outDir, row.file), Buffer.from(data, 'base64'));
-            // Every node axe could not judge, judged on the pixels behind it -- incomplete is never a pass (T1). LAST, because
-            // it scrolls: the touch probe and the shutter above see the settled page, not one scrolled to a node.
-            const judged = contrast.incomplete.length ? await measurePixels(contrast.incomplete.map((n) => n.target)) : [];
-            // 🔴 `pixels` TRAVELS WITH THE ROW. The second sweep built it and dropped it on the way here, so every node axe
-            // could not judge was measured and then thrown away: "measured on pixels: 0" over 86 rows that had them.
-            row.contrast.pixels = {
-              measured: judged.filter((m) => m.ratio).length,
-              occluded: judged.filter((m) => m.occluded).length,
-              skipped: judged.filter((m) => m.skipped).length,
-              unmeasured: judged.filter((m) => m.unmeasured).length,
-              failing: judged.filter((m) => m.ratio && m.ratio < m.needs)
-                .map((m) => ({ text: m.text, ratio: m.ratio, needs: m.needs, ariaHidden: m.ariaHidden, selector: m.selector.slice(-90) })),
-            };
+            // The readout, the probes and the shutter on ONE frame, which held still and read the same twice (F-P61).
+            const held = await steady(async () => ({
+              ...await evaluate(`({ paint: ${themeReadout}, probe: ${overflowProbe(width)} })`),
+              contrast: await evaluate(AXE_CONTRAST, { awaitPromise: true }),
+              targets: isPhone(width)
+                ? await evaluate(touchTargetProbe())
+                : { overlaysOnMouse: await evaluate(TOUCH_OVERLAYS_DRAWN) },
+            }));
+            if (!held) {
+              row.missed.push('its readings never held still on one frame (F-P61)');
+              row.diagnosis = await evaluate(PAGE_CENSUS).catch((e) => `the census threw: ${e.message}`);
+            } else {
+              const { paint, probe, contrast, targets } = held.value;
+              Object.assign(row, {
+                reached: true, elements: probe.elements, theme_dark: paint.dark, theme_bg: paint.bg,
+                overflow: { count: probe.offenderCount, offenders: probe.offenders },
+                contrast,
+                targets,
+              });
+              if (isPhone(width) && !targets.coarse) row.missed.push('asked for touch and the page had a mouse (T6)');
+              row.file = `${name}.png`;
+              writeFileSync(join(outDir, row.file), Buffer.from(held.frame, 'base64'));
+              // Every node axe could not judge, judged on the pixels behind it -- incomplete is never a pass (T1). LAST, because
+              // it scrolls: the touch probe and the shutter above see the settled page, not one scrolled to a node.
+              const judged = contrast.incomplete.length ? await measurePixels(contrast.incomplete.map((n) => n.target)) : [];
+              // 🔴 `pixels` TRAVELS WITH THE ROW. The second sweep built it and dropped it on the way here, so every node axe
+              // could not judge was measured and then thrown away: "measured on pixels: 0" over 86 rows that had them.
+              row.contrast.pixels = {
+                measured: judged.filter((m) => m.ratio).length,
+                occluded: judged.filter((m) => m.occluded).length,
+                skipped: judged.filter((m) => m.skipped).length,
+                unmeasured: judged.filter((m) => m.unmeasured).length,
+                failing: judged.filter((m) => m.ratio && m.ratio < m.needs)
+                  .map((m) => ({ text: m.text, ratio: m.ratio, needs: m.needs, ariaHidden: m.ariaHidden, selector: m.selector.slice(-90) })),
+              };
+            }
           }
         } finally {
           if (networkTouched) {

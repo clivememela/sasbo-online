@@ -323,6 +323,30 @@ export async function launch(tag, { flags = [] } = {}) {
     return String(entry).split('/').pop();
   };
 
+  /**
+   * 🔴 A VERDICT IS TAKEN ON A FRAME THAT HOLDS STILL, AND ONLY WHEN IT REPEATS (F-P61). `SETTLED` answers for one
+   * instant: a list that is still loading can flip its control from disabled to enabled a moment later, and its text
+   * colour fades between the two. The surface sweep read axe in that moment and photographed the page after it, so
+   * three rows failed on screenshots pixel-identical to rows it passed -- 4, 0, 3, 0 and 2 failing rows over five runs
+   * of one build. So `read()` is bracketed by two photographs, and its answer counts only when the frames on both
+   * sides are identical AND a second bracketed reading returns the same answer on the same frame. The frame it
+   * returns is the one the answer was read on. A page that never holds still returns null -- UNMEASURED, never passed.
+   */
+  const steady = async (read, { tries = 8 } = {}) => {
+    const frame = async () => (await send('Page.captureScreenshot', { format: 'png' })).data;
+    let previous = null;
+    for (let i = 0; i < tries; i += 1) {
+      const before = await frame();
+      const value = await read();
+      const after = await frame();
+      const reading = before === after ? { frame: after, key: JSON.stringify(value) } : null;
+      if (reading && previous && reading.frame === previous.frame && reading.key === previous.key) return { value, frame: after };
+      previous = reading;
+      if (!reading) await sleep(150);
+    }
+    return null;
+  };
+
   const close = () => {
     try { ws.close(); } catch { /* already closed */ }
     chrome.kill();
@@ -331,7 +355,7 @@ export async function launch(tag, { flags = [] } = {}) {
     try { rmSync(profileDir, { recursive: true, force: true }); } catch { /* Chrome still has it */ }
   };
 
-  return { send, evaluate, metrics, waitFor, assertBuiltClient, close, port, sleep, on, intercept };
+  return { send, evaluate, metrics, waitFor, assertBuiltClient, close, port, sleep, on, intercept, steady };
 }
 
 export { sleep };
