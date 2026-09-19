@@ -1,0 +1,171 @@
+// @vitest-environment jsdom -- the A.C.B. Runs screen: the list, preparing a run, and its refusals
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { screen, within } from '@testing-library/react'
+import { http, HttpResponse } from 'msw'
+
+import AcbRuns from './AcbRuns'
+import { renderWithProviders } from '../../test/renderWithProviders'
+import { server } from '../../test/msw/server'
+import { setupUser } from '../../test/user'
+import { deferred } from '../../test/deferred'
+import { expectNoA11yViolations } from '../../test/assertions'
+
+/**
+ * `01.5` -- A.C.B. -> Runs.
+ *
+ * The rules under test are the screen's, not the server's: a 202 is followed by polling and never
+ * by a second POST; a write that may have landed says so and re-reads; a refusal names what the
+ * server said, from its `code` and `details`. Every red case has its must-pass beside it.
+ */
+
+const pageOf = (content) => ({ content, page: 0, size: 12, totalElements: content.length, totalPages: content.length ? 1 : 0 })
+
+const SUMMARY = {
+  id: 41, actionMonth: '2026-10', status: 'PREPARED', version: 1, setupDate: '2026-09-18', lineCount: 30,
+  totalAmount: 5220, totalsAgree: true, holidaysKnown: false, failureReason: null,
+}
+
+const runOf = (overrides) => ({
+  ...SUMMARY, creationDate: '2026-10-17', purgeDate: '2026-11-09', firstDueDate: '2026-10-20',
+  lastDueDate: '2026-10-30', rateAmount: 174, rateEffectiveFrom: '2026-01-01', holidaySet: 'weekends-only',
+  createdBy: 'system', approvedBy: null, startedAt: '2026-09-18T10:00+02:00', heartbeatAt: '2026-09-18T10:00+02:00',
+  exclusions: [], ...overrides,
+})
+
+const EMPTY = pageOf([])
+
+beforeEach(() => {
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  server.use(
+    http.get('*/api/acb/runs', () => HttpResponse.json(pageOf([SUMMARY]))),
+    http.get('*/api/acb/runs/:id', ({ params }) => HttpResponse.json(runOf({ id: Number(params.id) }))),
+    http.get('*/api/acb/runs/:id/lines', () => HttpResponse.json(EMPTY)),
+    http.get('*/api/acb/runs/:id/exclusions', () => HttpResponse.json(EMPTY)),
+  )
+})
+
+const openPrepare = async (user) => {
+  await user.click(await screen.findByRole('button', { name: /^Prepare / }))
+  return screen.findByRole('dialog', { name: /^Prepare the .* run\?$/ })
+}
+
+describe('the list', () => {
+  it('shows each run with its state and control total, and opens one', async () => {
+    const user = setupUser()
+    const { container } = renderWithProviders(<AcbRuns />)
+    const open = await screen.findByRole('button', { name: 'Open the October 2026 run' })
+    expect(screen.getByText('Prepared')).toBeInTheDocument()
+    expect(screen.getByText(/5\s?220,00/)).toBeInTheDocument()
+    await expectNoA11yViolations(container)
+
+    await user.click(open)
+    expect(await screen.findByRole('heading', { name: 'October 2026 run' })).toBeInTheDocument()
+  })
+
+  it('an empty list is the first screen, and says what to do -- it is not a failure', async () => {
+    server.use(http.get('*/api/acb/runs', () => HttpResponse.json(EMPTY)))
+    renderWithProviders(<AcbRuns />)
+    expect(await screen.findByText('No runs yet')).toBeInTheDocument()
+    expect(screen.queryByText(/could not load the runs/i)).not.toBeInTheDocument()
+  })
+
+  it('a failed list says so, and its retry goes BACK TO LOADING before the rows arrive', async () => {
+    server.use(http.get('*/api/acb/runs', () => HttpResponse.json({ status: 500, message: 'boom' }, { status: 500 })))
+    const user = setupUser()
+    renderWithProviders(<AcbRuns />)
+    expect(await screen.findByText('We could not load the runs.')).toBeInTheDocument()
+
+    const held = deferred()
+    server.use(http.get('*/api/acb/runs', async () => { await held.promise; return HttpResponse.json(pageOf([SUMMARY])) }))
+    try {
+      await user.click(screen.getByRole('button', { name: /try again/i }))
+      // The retry's own state: without this assertion a retry that never showed loading would pass.
+      expect(await screen.findByText(/Loading runs/)).toBeInTheDocument()
+      expect(screen.queryByText('We could not load the runs.')).not.toBeInTheDocument()
+    } finally {
+      held.resolve()
+    }
+    expect(await screen.findByRole('button', { name: 'Open the October 2026 run' })).toBeInTheDocument()
+  })
+})
+
+describe('preparing a run', () => {
+  it('one POST, then the run is re-read until it settles, and the screen says what it holds', async () => {
+    let posts = 0
+    let reads = 0
+    server.use(
+      http.post('*/api/acb/runs', async ({ request }) => {
+        posts += 1
+        const { actionMonth } = await request.json()
+        return HttpResponse.json(runOf({ id: 42, actionMonth, status: 'PREPARING', lineCount: 0, totalAmount: 0 }), { status: 202 })
+      }),
+      http.get('*/api/acb/runs/42', () => {
+        reads += 1
+        return HttpResponse.json(runOf({ id: 42, status: reads < 3 ? 'PREPARING' : 'PREPARED' }))
+      }),
+    )
+    const user = setupUser()
+    renderWithProviders(<AcbRuns pollDelaysMs={[0, 0, 0, 0, 0, 0]} />)
+    const dialog = await openPrepare(user)
+    await user.click(within(dialog).getByRole('button', { name: 'Prepare' }))
+
+    expect(await screen.findByText(/run is prepared: 30 debits/)).toBeInTheDocument()
+    expect(posts).toBe(1)
+    expect(reads).toBeGreaterThanOrEqual(3)
+  })
+
+  it('must-pass for the ceiling: a run still preparing when the backoff runs out is "still preparing", not a failure', async () => {
+    server.use(
+      http.post('*/api/acb/runs', () => HttpResponse.json(runOf({ id: 42, status: 'PREPARING' }), { status: 202 })),
+      http.get('*/api/acb/runs/42', () => HttpResponse.json(runOf({ id: 42, status: 'PREPARING' }))),
+    )
+    const user = setupUser()
+    renderWithProviders(<AcbRuns pollDelaysMs={[0, 0]} />)
+    await user.click(within(await openPrepare(user)).getByRole('button', { name: 'Prepare' }))
+    expect(await screen.findByText(/is still preparing\. Check back/)).toBeInTheDocument()
+  })
+
+  it('a month already held opens that run and says what to do about it -- from the refusal\'s details', async () => {
+    server.use(http.post('*/api/acb/runs', () => HttpResponse.json({
+      status: 409, message: 'The run for 2026-10 already exists.', code: 'RUN_ALREADY_EXISTS',
+      details: { runId: '41', actionMonth: '2026-10', status: 'PREPARED', version: '1' },
+    }, { status: 409 })))
+    const user = setupUser()
+    renderWithProviders(<AcbRuns />)
+    await user.click(within(await openPrepare(user)).getByRole('button', { name: 'Prepare' }))
+
+    expect(await screen.findByText(/already exists and is prepared\. To prepare the month again, cancel it first\./)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'October 2026 run' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('a write that may have landed is never repeated: it says so, closes, and re-reads the list', async () => {
+    let posts = 0
+    let lists = 0
+    server.use(
+      http.post('*/api/acb/runs', () => { posts += 1; return HttpResponse.json({ status: 503, message: 'down' }, { status: 503 }) }),
+      http.get('*/api/acb/runs', () => { lists += 1; return HttpResponse.json(pageOf([SUMMARY])) }),
+    )
+    const user = setupUser()
+    renderWithProviders(<AcbRuns />)
+    await user.click(within(await openPrepare(user)).getByRole('button', { name: 'Prepare' }))
+
+    expect(await screen.findByText(/could not be confirmed\. It may have been started/)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(posts).toBe(1)
+    expect(lists).toBeGreaterThanOrEqual(2)
+  })
+
+  it('must-pass for that: a 4xx wrote nothing, and says so inside the dialog, which stays open', async () => {
+    server.use(http.post('*/api/acb/runs', () => HttpResponse.json({
+      status: 422, message: 'No subscription rate is in force for 2026-10.', code: 'RATE_NOT_IN_FORCE', details: {},
+    }, { status: 422 })))
+    const user = setupUser()
+    renderWithProviders(<AcbRuns />)
+    const dialog = await openPrepare(user)
+    await user.click(within(dialog).getByRole('button', { name: 'Prepare' }))
+
+    expect(await within(dialog).findByText(/was not prepared\. Nothing was written — No subscription rate/)).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+})

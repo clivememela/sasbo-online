@@ -13,7 +13,7 @@ import {
   MapPinnedIcon,
   LucideDatabase, LucideMails, LucideMenu,
   LucideUserRoundPlus, LucideFile, LucideTags,
-  LucidePiggyBank, LucidePresentation,
+  LucidePiggyBank, LucidePresentation, LucideCalendarRange,
   LucideConstruction, LucideCopyCheck
 } from "lucide-react";
 
@@ -160,6 +160,12 @@ export const navItems = [
             href: "/admin/acb/debits",
             icon: LucidePiggyBank,
           },
+          {
+            title: "Runs",
+            desc: "Debit Order Runs",
+            href: "/admin/acb/runs",
+            icon: LucideCalendarRange,
+          },
           /*{
             title: "Credits",
             desc: "Manage Credits",
@@ -259,6 +265,12 @@ export const navItems = [
         desc: "Manage Re-Debits",
         href: "/admin/acb/debits",
         icon: LucidePiggyBank,
+      },
+      {
+        title: "Runs",
+        desc: "Debit Order Runs",
+        href: "/admin/acb/runs",
+        icon: LucideCalendarRange,
       },
       /*{
         title: "Credits",

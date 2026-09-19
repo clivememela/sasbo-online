@@ -20,7 +20,7 @@ import { readFileSync } from 'node:fs';
  * route". Kept here beside the probe so adding a route is one edit.
  */
 export const ROUTES = [
-  '/login', '/home', '/admin', '/admin/acb', '/admin/acb/debits', '/admin/daily-menu',
+  '/login', '/home', '/admin', '/admin/acb', '/admin/acb/debits', '/admin/acb/runs', '/admin/daily-menu',
   '/admin/monthly-menu', '/admin/maintenance', '/admin/maintenance/recruitment-channel',
   '/admin/maintenance/subscriptions', '/recruiters', '/banks', '/banks/listing',
   '/members', '/members/apply', '/members/capture', '/members/recruiters',

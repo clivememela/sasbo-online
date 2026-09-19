@@ -1,4 +1,5 @@
 import {
+    LucideCalendarRange,
     LucidePiggyBank
 } from 'lucide-react';
 import PageTitle from "../../components/common/PageTitle.jsx";
@@ -11,6 +12,12 @@ const cards = [
         desc: "Manage Debits",
         href: "/admin/acb/debits",
         icon: LucidePiggyBank,
+    },
+    {
+        title: "Runs",
+        desc: "Debit Order Runs",
+        href: "/admin/acb/runs",
+        icon: LucideCalendarRange,
     },
     /*{
         title: "Credits",

@@ -119,8 +119,74 @@ const bankRows = Array.from({ length: 40 }, (_, i) => ({
   provinceCommitteeName: ['Gauteng South', 'Western Cape', 'KwaZulu-Natal'][i % 3],
 }));
 
+
+/**
+ * A.C.B. -> Runs (`01.5`). The list is the `API` table's; one run, its lines, its exclusions, a
+ * prepare and a cancel are answered per shape in `acbRunAnswer` below, because a prefix match would
+ * hand the list's page to every one of them.
+ *
+ * 🔑 THE PREPARE IS STATEFUL, and only that: a POST starts run 9002 `PREPARING`, and its first two
+ * reads answer `PREPARING` before it is `PREPARED` -- the polling flow, measurable (`screens.md` ask 2).
+ * Accounts are last-four only, as the server sends them; every name is the synthetic members'.
+ */
+const acbRun = (id, actionMonth, status, overrides = {}) => ({
+  id, actionMonth, status, version: 1, setupDate: '2026-09-18', creationDate: `${actionMonth}-17`,
+  purgeDate: `${actionMonth}-30`, firstDueDate: `${actionMonth}-20`, lastDueDate: `${actionMonth}-30`,
+  lineCount: 30, totalAmount: 5220, totalsAgree: true, rateAmount: 174, rateEffectiveFrom: '2026-01-01',
+  holidaySet: 'weekends-only', holidaysKnown: false, createdBy: 'system', approvedBy: null,
+  startedAt: '2026-09-18T10:00+02:00', heartbeatAt: '2026-09-18T10:00+02:00', failureReason: null,
+  exclusions: [
+    { reason: 'NOT_DEBIT_ORDER', listed: false, detail: 'Payroll Deduction', memberCount: 48 },
+    { reason: 'STATUS_NOT_ACTIVE', listed: false, detail: 'Suspended', memberCount: 3 },
+    { reason: 'NO_BANK_ON_RECORD', listed: true, detail: null, memberCount: 2 },
+    { reason: 'DAY_OUT_OF_WINDOW', listed: true, detail: null, memberCount: 1 },
+  ],
+  ...overrides,
+});
+const acbRuns = [
+  acbRun(41, '2026-10', 'PREPARED'),
+  acbRun(40, '2026-09', 'SUBMITTED'),
+  acbRun(39, '2026-08', 'CANCELLED', { lineCount: 28, totalAmount: 4872 }),
+];
+const acbPage = (content, size) => ({ content, page: 0, size, totalElements: content.length, totalPages: 1 });
+const acbLines = members.slice(0, 30).map((m, i) => ({
+  id: 1000 + i, memberId: m.id, membershipNumber: m.membershipNumber, surname: m.surname, initials: m.initials,
+  bankName: m.bankName, branchCode: '632005', accountLastFour: String(1000 + i * 37).slice(-4), accountType: null,
+  debitDay: 20 + (i % 12), actionDate: `2026-10-${String(20 + (i % 11)).padStart(2, '0')}`, amount: 174,
+  outcome: 'PENDING', rePresentsLineId: null, fileSequence: null, unpaidCode: null, unpaidReason: null, decision: null,
+}));
+const acbExclusions = members.slice(30, 33).map((m, i) => ({
+  memberId: m.id, membershipNumber: m.membershipNumber, surname: m.surname, initials: m.initials,
+  reason: ['NO_BANK_ON_RECORD', 'NO_BANK_ON_RECORD', 'DAY_OUT_OF_WINDOW'][i], detail: [m.bankName, m.bankName, '5'][i],
+}));
+let acbPreparedReads = 0;
+
+/** The A.C.B. run shapes a prefix match cannot answer; `false` when the path is not one of them. */
+const acbRunAnswer = (req, path) => {
+  const reply = (status, body) => ({ status, body });
+  if (req.method === 'POST' && path === '/api/acb/runs') {
+    acbPreparedReads = 0;
+    return reply(202, acbRun(9002, '2026-10', 'PREPARING', { lineCount: 0, totalAmount: 0, exclusions: [] }));
+  }
+  let m = /^\/api\/acb\/runs\/(\d+)\/cancel$/.exec(path);
+  if (req.method === 'POST' && m) return reply(200, acbRun(Number(m[1]), '2026-10', 'CANCELLED', { version: 2 }));
+  if (req.method !== 'GET') return false;
+  if (/^\/api\/acb\/runs\/\d+\/lines$/.test(path)) return reply(200, acbPage(acbLines, 50));
+  if (/^\/api\/acb\/runs\/\d+\/exclusions$/.test(path)) return reply(200, acbPage(acbExclusions, 50));
+  m = /^\/api\/acb\/runs\/(\d+)$/.exec(path);
+  if (!m) return false;
+  const id = Number(m[1]);
+  if (id === 9002) {
+    acbPreparedReads += 1;
+    return reply(200, acbRun(9002, '2026-10', acbPreparedReads <= 2 ? 'PREPARING' : 'PREPARED'));
+  }
+  return reply(200, acbRuns.find((r) => r.id === id) ?? acbRuns[0]);
+};
+
 const API = {
   '/api/members': members,
+  // The runs list; one run and its sheets are answered per shape by `acbRunAnswer`.
+  '/api/acb/runs': acbPage(acbRuns, 12),
   '/api/banks': bankRows,
   '/api/banks/branches': bankRows,
   // `Locations` searches `/api/branches?...` and hands each result to `LocationListing`,
@@ -290,6 +356,12 @@ const server = createServer((req, res) => {
     if (req.method === 'POST' && /^\/api\/members\/\d+\/send-welcome$/.test(path)) {
       res.writeHead(200);
       res.end();
+      return;
+    }
+    const acb = acbRunAnswer(req, path);
+    if (acb) {
+      res.writeHead(acb.status, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(acb.body));
       return;
     }
     const key = API_KEYS.find((k) => path.startsWith(k));

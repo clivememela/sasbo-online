@@ -114,7 +114,24 @@ const CEILINGS = {
   // over the 641.29 actual -- the same margin the header argues for, and no more, so the
   // next feature still meets a real ceiling. The design arc owns this number: the ACB arc
   // raises it again, by exactly its screen's bytes, when its Runs screen lands.
-  js: 650 * KB,
+  //
+  // 650 -> 666.58 on 2026-09-19, MEASURED, at ACB `01.5` -- by exactly the screen's bytes,
+  // as above. Both builds with the worktree's tracked `.env` (the production URL), so the
+  // pair compares like with like: 67ad286 647.96 -> the Runs screen 664.54 KiB, +16.58
+  // (under the empty-URL measurement env 67ad286 reads 646.13, so expect ~662.7 there).
+  // What spent it, chunk by chunk:
+  //   AcbRuns 0 -> 15,583 B    THE SCREEN: the runs list, preparing and its polling, the
+  //                            run's panel with its debits and exclusions sheets, and the
+  //                            run vocabulary. Lazy, like every route: nothing on the entry.
+  //   SelectInput 0 -> 1,475 B · options 0 -> 912 B   NEW SHARED CHUNKS, not new code: a
+  //                            second lazy route now imports the native select, so Rollup
+  //                            lifts it out of useReferenceData (-1,440) and SearchableSelect
+  //                            (-794) into chunks of their own.
+  //   index +824 · Acb +76     the route and the two A.C.B. menu entries.
+  //   Members +69 · Recruiters +69 · Subscriptions +69 · CaptureMember +74 · BankBranch +30
+  //   · Forms +30              Rollup's import stubs for the new shared chunks.
+  // No headroom added on top: the next feature meets a real ceiling, as the P9 entry argues.
+  js: 666.58 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before

@@ -302,6 +302,27 @@ export const SURFACES = [
       step('load a member', clickByText('main button', '/load banking details for/'), TEXT('Confirm Details')),
       step('Edit Details', clickByText('main button', '/^Edit Details$/'), dialogNamed('/^Update Banking Details$/'))],
     present: { DIALOG: dialogNamed('/^Update Banking Details$/') }, covers: ['pages/acb/AcbDebits.jsx#Modal@update banking'] },
+  // A.C.B. -> Runs (`01.5`). The stub answers the list, a run, its sheets, a prepare and a cancel (`acbRunAnswer`).
+  { name: 'acb-runs', route: '/admin/acb/runs', ready: ROWS,
+    present: { TOTAL: TEXT('Control total'), OCTOBER: TEXT('October 2026') }, covers: [] },
+  { name: 'acb-run-prepare', route: '/admin/acb/runs', ready: ROWS,
+    steps: [step('prepare a month', clickByText('main button', '/^Prepare /'), dialogNamed('/^Prepare the .* run\\?$/'))],
+    present: { DIALOG: dialogNamed('/^Prepare the .* run\\?$/') }, covers: ['pages/acb/AcbRuns.jsx#ConfirmDialog@prepare'] },
+  // The polling pair: the stateful stub answers PREPARING twice, then PREPARED.
+  { name: 'acb-run-preparing', route: '/admin/acb/runs', ready: ROWS,
+    steps: [step('prepare a month', clickByText('main button', '/^Prepare /'), dialogNamed('/^Prepare the .* run\\?$/')),
+      step('confirm', clickByText(IN_DIALOG, '/^Prepare$/'), TEXT('is prepared:'))],
+    present: { PREPARED: TEXT('is prepared:') }, covers: [] },
+  { name: 'acb-run-open', route: '/admin/acb/runs', ready: ROWS,
+    steps: [step('open a run', clickByText('main button', '/^October 2026$/'), TEXT('Left out'))],
+    present: { RUN: TEXT('October 2026 run'), APPROVE_WHY: TEXT('open when administrators sign in') }, covers: [] },
+  { name: 'acb-run-failed', route: '/admin/acb/runs', ready: ROWS, intercept: { url: '*/api/acb/runs/41', mode: 'fail' },
+    steps: [step('open a run that will not load', clickByText('main button', '/^October 2026$/'), STATE('error'))],
+    present: { FAILED: STATE('error') }, covers: ['pages/acb/AcbRunPanel.jsx#DataState@run'] },
+  { name: 'acb-run-cancel', route: '/admin/acb/runs', ready: ROWS,
+    steps: [step('open a run', clickByText('main button', '/^October 2026$/'), TEXT('Cancel this run')),
+      step('cancel it', clickByText('main button', '/^Cancel this run$/'), dialogNamed('/^Cancel the .* run\\?$/'))],
+    present: { DIALOG: dialogNamed('/^Cancel the .* run\\?$/') }, covers: ['pages/acb/AcbRunPanel.jsx#ConfirmDialog@cancel'] },
 
   // ── reports and archives ──────────────────────────────────────────────────────────────────────
   { name: 'organiser-date', route: '/reports/organizer-report', ready: `!!document.querySelector('input[aria-haspopup="dialog"]')`,

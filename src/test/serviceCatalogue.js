@@ -1,3 +1,4 @@
+import { acbRunService } from '../services/acbRunService'
 import { bankService } from '../services/bankService'
 import { debounceService } from '../services/debounceService'
 import { jobGradeService } from '../services/jobGradeService'
@@ -21,6 +22,7 @@ import * as api from '../services/api'
  * a pure string function and is tested adversarially in its own file.
  */
 export const SERVICE_MODULES = [
+  { name: 'acbRunService', module: acbRunService },
   { name: 'bankService', module: bankService },
   { name: 'debounceService', module: debounceService },
   { name: 'jobGradeService', module: jobGradeService },
@@ -31,7 +33,7 @@ export const SERVICE_MODULES = [
   { name: 'subscriptionsService', module: subscriptionsService },
 ]
 
-/** The ninth module. It exports no method that performs a request. */
+/** The one module that exports no method that performs a request. */
 export const PURE_MODULES = [{ name: 'api', module: api }]
 
 /**
@@ -59,6 +61,8 @@ const ARGS = {
   'locationService.getAreas': ['1'],
   'bankService.createBank': [{ bankName: 'Synthetic Bank', branchCode: '000000' }],
   'bankService.updateBank': ['7', { bankName: 'Synthetic Bank' }],
+  'acbRunService.prepare': ['2026-10'],
+  'acbRunService.cancel': ['7', 3, 'Synthetic reason'],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS
