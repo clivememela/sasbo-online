@@ -10,6 +10,7 @@ import Table from '../../components/table/Table.jsx';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import StatusChip from '../../components/common/StatusChip.jsx';
 import reportError from '../../lib/reportError.js';
+import { formalName } from '../../lib/names.js';
 import DialogNotice from '../../components/common/DialogNotice.jsx';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 
@@ -177,7 +178,7 @@ export default function AcbDebits() {
                     type="button"
                     onClick={() => handleSelectMember(m)}
                     aria-pressed={selectedMember?.id === m.id}
-                    aria-label={`${m.membershipNumber || 'This member'} \u2014 load banking details for ${[m.title, m.initials, m.surname].filter(Boolean).join(' ') || 'this member'}`}
+                    aria-label={`${m.membershipNumber || 'This member'} \u2014 load banking details for ${formalName(m) || 'this member'}`}
                     className="touch-target inline-flex items-center gap-2 rounded-sm font-medium text-brand-ink underline-offset-2 hover-hover:hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
                 >
                     {m.membershipNumber}

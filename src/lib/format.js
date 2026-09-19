@@ -36,7 +36,8 @@
  * which is right. The locale is a decision this application makes once.
  */
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** The short month names this app prints -- also the date picker's month grid (RF: it held a copy). */
+export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // 🔑 BUILT ONCE. `toLocaleString(locale, opts)` constructs an `Intl.NumberFormat`
 // internally on every call, and constructing the formatter costs far more than using it.
@@ -198,18 +199,6 @@ export function formatInt(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return EMPTY;
   return COUNT.format(number);
-}
-
-/**
- * The one place "there is nothing here" is rendered.
- *
- * 🔑 It handles the empty ARRAY as well as the empty string, because
- * `[].join(', ')` is `''` and an empty cell reads as a bug rather than as "none".
- */
-export function dash(value) {
-  if (value === '' || value == null) return EMPTY;
-  if (Array.isArray(value)) return value.length === 0 ? EMPTY : value.join(', ');
-  return String(value);
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

@@ -21,7 +21,7 @@ import reportError from '../../lib/reportError.js';
 import { cn } from '../../lib/utils';
 import { formalName } from '../../lib/names.js';
 import { formatDate } from '../../lib/format.js';
-import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
+import { writeFailure } from '../../services/parseApiError.js';
 
 const PAGE_SIZE = 20;
 
@@ -59,20 +59,6 @@ const REFERENCE_LOADERS = {
  * second one. Same rule, same shape, as `Members.jsx`'s `recordDate`.
  */
 const recordDate = (value) => (value ? formatDate(value) : '');
-
-/**
- * 🔴 R3-F2, WIDENED 2026-09-18: "could not be saved" is a claim about the SERVER, and only a refusal supports it.
- *
- * This screen already worded its recruiter REMOVAL honestly ("may be only partly removed ... reload and check"),
- * because that one obviously half-writes. The other three said flatly that nothing happened -- and a create whose
- * answer never arrived, announced as "could not be created", is how a recruiter gets made twice.
- *
- * `writeMayHaveLanded` in `parseApiError.js` is the one place the rule lives; this chooses the sentence and names
- * where to go and look.
- */
-const writeFailure = (err, what, whereToCheck) => (writeMayHaveLanded(err)
-    ? `${what} could not be confirmed. Reload ${whereToCheck} and check before trying again.`
-    : `${what} was not saved. ${messageOf(err)}`.trim());
 
 /**
  * The Add Recruiter dialog's empty form, at module scope so the two places that need it --
@@ -679,7 +665,7 @@ export function Recruiters() {
             <button
                 type="button"
                 onClick={() => onOpen(m)}
-                aria-label={`${m.membershipNumber || 'This member'} — open the record for ${[m.title, m.initials, m.surname].filter(Boolean).join(' ') || 'this member'}`}
+                aria-label={`${m.membershipNumber || 'This member'} — open the record for ${formalName(m) || 'this member'}`}
                 className="touch-target rounded-sm font-medium text-brand-ink underline-offset-2 hover-hover:hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
             >
                 {m.membershipNumber}

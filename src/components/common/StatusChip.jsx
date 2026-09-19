@@ -27,9 +27,6 @@ const STATUS_TOKENS = {
   Retired: { chip: 'bg-status-retired-bg text-status-retired', dot: 'bg-status-retired-dot' },
 };
 
-/** The vocabulary this component knows how to render. */
-export const KNOWN_STATUSES = Object.freeze(Object.keys(STATUS_TOKENS));
-
 /** The statuses card.html strikes through in the register: nothing disappears, it cancels. */
 export const CANCELLED_STATUSES = Object.freeze(['Resigned', 'Retired']);
 

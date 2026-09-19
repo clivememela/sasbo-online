@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, Inbox, Loader2, WifiOff } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
-import { SLOW_NOTICE_MS } from '../../services/parseApiError';
+import { ERROR_KINDS, SLOW_NOTICE_MS } from '../../services/parseApiError';
 import Button from '../form/Button';
 
 /**
@@ -118,7 +118,7 @@ const canRetry = (error) => error?.retryable !== false;
  * that a consumer can branch on it; matching on the sentence is how a copy edit silently
  * turns an offline banner off.
  */
-export const isOffline = (error) => error?.kind === 'network';
+const isOffline = (error) => error?.kind === ERROR_KINDS.NETWORK;
 
 /**
  * @param {{
@@ -239,7 +239,7 @@ export default function DataState({
   // The diagnostic line, and only when there is genuinely something to diagnose. `status: 0`
   // is what a network failure carries and says nothing a reader can use.
   const detail = [
-    error?.kind && error.kind !== 'http' ? error.kind : null,
+    error?.kind && error.kind !== ERROR_KINDS.HTTP ? error.kind : null,
     error?.status ? `HTTP ${error.status}` : null,
   ]
     .filter(Boolean)
