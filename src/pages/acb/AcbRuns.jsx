@@ -56,16 +56,23 @@ export default function AcbRuns({ pollDelaysMs = POLL_DELAYS_MS }) {
   const left = useRef(false);
   useEffect(() => () => { left.current = true; }, []);
 
-  const loadRuns = useCallback((pageNumber) => acbRunService.list(pageNumber - 1, PAGE_SIZE)
-    .then((data) => {
-      if (left.current) return;
-      setRuns(asPage(data));
-      setListState('ready');
-    })
-    .catch((err) => {
-      reportError('AcbRuns.loadRuns', err);
-      if (!left.current) setListState('error');
-    }), []);
+  // Only the newest read may paint (R3-F4): a prepare re-reads the list, and so does the run
+  // settling -- an older answer arriving last must not put the older list back.
+  const ticket = useRef(0);
+  const loadRuns = useCallback((pageNumber) => {
+    const mine = ++ticket.current;
+    const current = () => !left.current && mine === ticket.current;
+    return acbRunService.list(pageNumber - 1, PAGE_SIZE)
+      .then((data) => {
+        if (!current()) return;
+        setRuns(asPage(data));
+        setListState('ready');
+      })
+      .catch((err) => {
+        reportError('AcbRuns.loadRuns', err);
+        if (current()) setListState('error');
+      });
+  }, []);
 
   useEffect(() => {
     loadRuns(page);

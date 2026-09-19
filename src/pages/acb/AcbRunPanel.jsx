@@ -37,18 +37,24 @@ export default function AcbRunPanel({ runId, onChanged, onClose }) {
   const left = useRef(false);
   useEffect(() => () => { left.current = true; }, []);
 
-  const loadRun = useCallback(() => acbRunService.get(runId)
-    .then((data) => {
-      if (left.current) return;
-      setRun(data);
-      setRunState('ready');
-    })
-    .catch((err) => {
-      reportError('AcbRunPanel.loadRun', err);
-      if (left.current) return;
-      setRunError(err);
-      setRunState('error');
-    }), [runId]);
+  // Only the newest read may paint -- a retry can overtake the read it retries.
+  const ticket = useRef(0);
+  const loadRun = useCallback(() => {
+    const mine = ++ticket.current;
+    const current = () => !left.current && mine === ticket.current;
+    return acbRunService.get(runId)
+      .then((data) => {
+        if (!current()) return;
+        setRun(data);
+        setRunState('ready');
+      })
+      .catch((err) => {
+        reportError('AcbRunPanel.loadRun', err);
+        if (!current()) return;
+        setRunError(err);
+        setRunState('error');
+      });
+  }, [runId]);
 
   useEffect(() => {
     loadRun();
@@ -205,16 +211,23 @@ function usePagedRead(read) {
   const left = useRef(false);
   useEffect(() => () => { left.current = true; }, []);
 
-  const load = useCallback((pageNumber) => read(pageNumber - 1, PAGE_SIZE)
-    .then((result) => {
-      if (left.current) return;
-      setData(asPage(result));
-      setState('ready');
-    })
-    .catch((err) => {
-      reportError('AcbRunPanel.read', err);
-      if (!left.current) setState('error');
-    }), [read]);
+  // Only the newest read may paint: a page's answer arriving after the next page's must not
+  // put its rows under the next page's number (R3-F4).
+  const ticket = useRef(0);
+  const load = useCallback((pageNumber) => {
+    const mine = ++ticket.current;
+    const current = () => !left.current && mine === ticket.current;
+    return read(pageNumber - 1, PAGE_SIZE)
+      .then((result) => {
+        if (!current()) return;
+        setData(asPage(result));
+        setState('ready');
+      })
+      .catch((err) => {
+        reportError('AcbRunPanel.read', err);
+        if (current()) setState('error');
+      });
+  }, [read]);
 
   useEffect(() => {
     load(page);

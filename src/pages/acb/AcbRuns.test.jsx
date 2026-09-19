@@ -1,9 +1,10 @@
 // @vitest-environment jsdom -- the A.C.B. Runs screen: the list, preparing a run, and its refusals
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 
 import AcbRuns from './AcbRuns'
+import { acbRunService } from '../../services/acbRunService'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { setupUser } from '../../test/user'
@@ -112,6 +113,36 @@ describe('preparing a run', () => {
     expect(await screen.findByText(/run is prepared: 30 debits/)).toBeInTheDocument()
     expect(posts).toBe(1)
     expect(reads).toBeGreaterThanOrEqual(3)
+  })
+
+  it('an older list answer arriving last does not put the older list back (R3-F4)', async () => {
+    // Read 2 is the prepare's re-read, held; read 3 is the settle's, answered at once with the new run.
+    const NEW = { ...SUMMARY, id: 42, actionMonth: '2027-01' }
+    const held = deferred()
+    let lists = 0
+    server.use(
+      http.get('*/api/acb/runs', async () => {
+        lists += 1
+        if (lists === 2) { await held.promise; return HttpResponse.json(pageOf([SUMMARY])) }
+        return HttpResponse.json(pageOf(lists === 1 ? [SUMMARY] : [NEW, SUMMARY]))
+      }),
+      http.post('*/api/acb/runs', () => HttpResponse.json(runOf({ id: 42, actionMonth: '2027-01', status: 'PREPARING' }), { status: 202 })),
+      http.get('*/api/acb/runs/42', () => HttpResponse.json(runOf({ id: 42, actionMonth: '2027-01' }))),
+    )
+    const list = vi.spyOn(acbRunService, 'list')
+    const user = setupUser()
+    renderWithProviders(<AcbRuns pollDelaysMs={[0]} />)
+    try {
+      await user.click(within(await openPrepare(user)).getByRole('button', { name: 'Prepare' }))
+      expect(await screen.findByRole('button', { name: 'Open the January 2027 run' })).toBeInTheDocument()
+    } finally {
+      held.resolve()
+    }
+    // Wait on the stale read itself, never on a clock: the screen's own `.then` was attached to this
+    // promise first, so it has run by the time this resumes, and `act` flushes whatever it rendered.
+    expect(lists).toBe(3)
+    await act(async () => { await list.mock.results[1].value })
+    expect(screen.getByRole('button', { name: 'Open the January 2027 run' })).toBeInTheDocument()
   })
 
   it('must-pass for the ceiling: a run still preparing when the backoff runs out is "still preparing", not a failure', async () => {

@@ -127,6 +127,10 @@ const bankRows = Array.from({ length: 40 }, (_, i) => ({
  *
  * 🔑 THE PREPARE IS STATEFUL, and only that: a POST starts run 9002 `PREPARING`, and its first two
  * reads answer `PREPARING` before it is `PREPARED` -- the polling flow, measurable (`screens.md` ask 2).
+ * ⏱️ The two reads are the run panel's own, at once, and the screen's first poll at 1 s; its second
+ * poll, at 1 + 2 = 3 s, sees `PREPARED` -- well inside a surface step's wait, so it does not race it
+ * (the design session's review, 2026-09-19). The count resets on EVERY POST, not per process, so
+ * each row of a sweep (widths × themes) exercises the polling afresh.
  * Accounts are last-four only, as the server sends them; every name is the synthetic members'.
  */
 const acbRun = (id, actionMonth, status, overrides = {}) => ({
