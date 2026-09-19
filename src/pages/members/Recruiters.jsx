@@ -15,13 +15,14 @@ import { bankService } from '../../services/bankService.js';
 import { locationService } from '../../services/locationService.js';
 import { validateEmail } from '../../utils/validateSAID.js';
 import DataState from '../../components/common/DataState.jsx';
-import DialogNotice, { NoticeIcon, noticeTone } from '../../components/common/DialogNotice.jsx';
+import DialogNotice, { PageNotice } from '../../components/common/DialogNotice.jsx';
 import useReferenceData from '../../hooks/useReferenceData.js';
 import reportError from '../../lib/reportError.js';
 import { cn } from '../../lib/utils';
 import { formalName } from '../../lib/names.js';
 import { formatDate } from '../../lib/format.js';
 import { writeFailure } from '../../services/parseApiError.js';
+import useFocusOn from '../../hooks/useFocusOn.js';
 
 const PAGE_SIZE = 20;
 
@@ -143,7 +144,6 @@ export function Recruiters() {
      * failure is visible ON the screen.
      */
     const [notice, setNotice] = useState(null);
-    const noticeRef = useRef(null);
     const fail = useCallback((message) => setNotice({ tone: 'error', message }), []);
     // 🔴 `06.5`: AN ACTION THAT WORKED SAID NOTHING. A member added or removed, a recruiter created, its details saved --
     // each changed a list, often one behind the dialog, without a word. The same notice says so, as a status.
@@ -161,10 +161,8 @@ export function Recruiters() {
     // Focus it once it EXISTS -- the same shape as `Auth` and `Members`, and for the same
     // reason: the element is not in the document at the moment the handler sets the state.
     // Also when a dialog closes over an unresolved notice, which is the moment it mounts here.
-    useEffect(() => {
-        // A failure takes focus; a confirmation is announced where it appears and leaves focus where the user is.
-        if (notice?.tone === 'error' && !dialogOpen) noticeRef.current?.focus();
-    }, [notice, dialogOpen]);
+    // A failure takes focus; a confirmation is announced where it appears and leaves focus where the user is.
+    const noticeRef = useFocusOn(notice, notice?.tone === 'error' && !dialogOpen);
 
     /*
      * 🔴 THE LOADING RESET MOVED TO THE RETRY PATH (`10.4`), AND THIS ONE HAD SEVEN CALLERS.
@@ -772,20 +770,7 @@ export function Recruiters() {
                 Dismissible, because unlike a validation summary this describes something
                 that already happened and the member may simply want it out of the way. */}
             {notice && !dialogOpen && (
-                <div
-                    ref={noticeRef}
-                    tabIndex={-1}
-                    {...(notice.tone === 'ok' && { role: 'status' })}
-                    aria-labelledby="recruiters-notice-title"
-                    className={cn(
-                        "mt-4 flex items-start gap-2 rounded-lg border p-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring",
-                        noticeTone(notice.tone),
-                    )}
-                >
-                    <NoticeIcon tone={notice.tone} />
-                    <p id="recruiters-notice-title" className="flex-1">{notice.message}</p>
-                    <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dismiss</Button>
-                </div>
+                <PageNotice ref={noticeRef} id="recruiters-notice-title" tone={notice.tone} onDismiss={() => setNotice(null)}>{notice.message}</PageNotice>
             )}
 
             {/* ✅ THE FOURTH STATE, ON THE SCREEN THAT NEEDED IT MOST (EH-D9).

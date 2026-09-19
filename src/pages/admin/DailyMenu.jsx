@@ -3,8 +3,8 @@ import {
     LucidePresentation,
 } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
-import NavigationCard from '../../components/common/NavigationCard.jsx';
-import Sheet, { Page } from '../../components/common/Sheet.jsx';
+import { NavigationList } from '../../components/common/NavigationCard.jsx';
+import { Page } from '../../components/common/Sheet.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
 
 const cards = [
@@ -76,18 +76,13 @@ const { setSelectedCardHref, setSideBarOpen } = useOutletContext() || {};
 return (
     <Page>
         <PageTitle title="Daily Menu" subtitle="Select options below" />
-        <Sheet className="mt-6 max-w-4xl divide-y divide-line">
-            {cards.map((card) => (
-                <NavigationCard
-                    key={`${card.href}-${card.title}`}
-                    {...card}
-                    onSelect={() => {
-                        setSelectedCardHref?.('/admin/daily-menu');
-                        setSideBarOpen?.(true);
-                    }}
-                />
-            ))}
-        </Sheet>
+        <NavigationList
+            cards={cards}
+            onSelect={() => {
+                setSelectedCardHref?.('/admin/daily-menu');
+                setSideBarOpen?.(true);
+            }}
+        />
     </Page>
 );
 }

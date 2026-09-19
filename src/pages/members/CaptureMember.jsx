@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo } from "react";
+import { useRef, useState, useMemo } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import WelcomeLetter from "../../components/members/WelcomeLetter";
 import { memberService } from "@/services/memberService.js";
@@ -8,6 +8,7 @@ import { locationService } from "@/services/locationService.js";
 import { jobGradeService } from "@/services/jobGradeService.js";
 import { bankService } from "@/services/bankService.js";
 import PageTitle from "../../components/common/PageTitle";
+import { Page } from "../../components/common/Sheet.jsx";
 import {
     Button, DateField, SearchableSelect, SelectInput, TextInput,
 } from "../../components/form";
@@ -21,7 +22,7 @@ import {
 import { toWireDate, today } from "@/lib/format.js";
 import { sanitiseField, validateField } from "@/utils/inputRules.js";
 import { subscriptionsService } from "@/services/subscriptionsService.js";
-import { ERROR_KINDS, messageOf, validationErrorsOf, writeMayHaveLanded } from "@/services/parseApiError.js";
+import { messageOf, validationErrorsOf, writeMayHaveLanded } from "@/services/parseApiError.js";
 import { findSubscriptionForBank, formatSubscriptionAmount, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
 import { branchCodeOf, branchNamesForBank, findBranchRecord, formatBranchAddress } from "@/utils/bankBranches.js";
 import { DERIVATION, derivationNote, derivationStateOf } from "@/utils/derivation.js";
@@ -34,6 +35,8 @@ import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderF
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState";
 import useReferenceData from "../../hooks/useReferenceData.js";
+import useAsyncOptions from "../../hooks/useAsyncOptions.js";
+import useFocusOn from "../../hooks/useFocusOn.js";
 import { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
 
 const FIELD_TO_TAB_MAP = {
@@ -388,11 +391,7 @@ export default function CaptureMember() {
     };
 
     const [saveNotice, setSaveNotice] = useState(null);
-    const saveNoticeRef = useRef(null);
-
-    useEffect(() => {
-        if (saveNotice) saveNoticeRef.current?.focus();
-    }, [saveNotice]);
+    const saveNoticeRef = useFocusOn(saveNotice);
 
     const handleSave = () => {
         if (saving) return;
@@ -464,10 +463,27 @@ export default function CaptureMember() {
     const frequencyOptions = FREQUENCY_OPTIONS;
     const identityTypeOptions = IDENTITY_TYPE_OPTIONS;
     const genderOptions = GENDER_OPTIONS;
-    const [jobGradeOptions, setJobGradeOptions] = useState([]);
-    const [jobGradeLoading, setJobGradeLoading] = useState(false);
-    const [jobGradeError, setJobGradeError] = useState(null);
-    const [jobGradeAttempt, setJobGradeAttempt] = useState(0);
+    /*
+     * 🔑 THE GRADES FOLLOW THE BANK, THROUGH `useAsyncOptions` (RF). This was a hand-rolled copy of that hook -- a
+     * `cancelled` flag for its ticket, an attempt counter for its `refetch` -- and it set loading SYNCHRONOUSLY inside
+     * its effect, through an async function the `set-state-in-effect` rule cannot see into (F-P60's blind spot, live).
+     * The hook answers exactly as the copy did: no bank, no grades and no request; a new bank keeps the last list on
+     * offer until its own answer lands; a failure empties it and says so; a superseded answer is dropped.
+     *
+     * 🔴 R3-F3: the grade is NOT cleared here. This re-runs when a reference list is retried (the listing gets a new
+     * identity), and clearing here wiped a chosen grade under a notice promising "anything you have already typed is
+     * kept". A grade belongs to a bank, so it is cleared where the BANK changes: handleChange.
+     */
+    const jobGrades = useAsyncOptions(() => {
+        const normalized = nameKey(form.bankName);
+        const found = bankListing.find((b) => {
+            const bn = nameKey(b.bankName || b.name);
+            return bn === normalized || bn.includes(normalized) || normalized.includes(bn);
+        });
+        const bankIdentifier = (found && (found.universalBranchCode || found.universal_branch_code)) || form.bankName;
+        return jobGradeService.getByBank(bankIdentifier);
+    }, [form.bankName, bankListing], { enabled: !!form.bankName });
+    const jobGradeOptions = jobGrades.options;
 
     /**
      * 🔑 THE NEAR MISS IS A QUESTION, NEVER A SUBSTITUTION (rule 4, "smartly allow free text").
@@ -487,46 +503,6 @@ export default function CaptureMember() {
     }, [form.jobGrade, jobGradeOptions]);
 
 
-    useEffect(() => {
-        let cancelled = false;
-        // 🔴 R3-F3: the grade is NOT cleared here. This effect also re-runs when a reference list is retried (the
-        // listing gets a new identity), and clearing here wiped a chosen grade under a notice promising "anything you
-        // have already typed is kept". A grade belongs to a bank, so it is cleared where the BANK changes: handleChange.
-
-        const fetchGrades = async () => {
-            if (!form.bankName) {
-                setJobGradeOptions([]);
-                setJobGradeError(null);
-                setJobGradeLoading(false);
-                return;
-            }
-
-            setJobGradeLoading(true);
-            setJobGradeError(null);
-
-            const normalized = nameKey(form.bankName);
-            const found = bankListing.find((b) => {
-                const bn = nameKey(b.bankName || b.name);
-                return bn === normalized || bn.includes(normalized) || normalized.includes(bn);
-            });
-            const bankIdentifier = (found && (found.universalBranchCode || found.universal_branch_code)) || form.bankName;
-
-            try {
-                const grades = await jobGradeService.getByBank(bankIdentifier);
-                if (!cancelled) setJobGradeOptions(Array.isArray(grades) ? grades : []);
-            } catch (error) {
-                if (!cancelled && error?.kind !== ERROR_KINDS.ABORT) {
-                    setJobGradeOptions([]);
-                    setJobGradeError(error);
-                }
-            } finally {
-                if (!cancelled) setJobGradeLoading(false);
-            }
-        };
-        fetchGrades();
-        return () => { cancelled = true; };
-    }, [form.bankName, bankListing, jobGradeAttempt]);
-
     return (
         <>
         <WelcomeLetter
@@ -534,7 +510,7 @@ export default function CaptureMember() {
             onClose={() => setWelcomeMember(null)}
             member={welcomeMember}
         />
-        <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
+        <Page>
             <PageTitle
                 title="Capture Member"
                 subtitle="Capture a new Sasbo member. Every required personal, employment and banking detail is checked before the record is saved."
@@ -680,7 +656,7 @@ export default function CaptureMember() {
                                     it: `jobGradeMatching` in `api-vocabulary.json` publishes the normalisation
                                     and `MemberDto.jobGradeOutcome` reports MATCHED / CAPTURED / CLEARED.
                                     `allowCustom` is the design arc's prop, on their instruction and their shape. */}
-                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} emptyLabel="No job grades available" loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} searchable allowCustom note={jobGradeNote} />
+                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGrades.loading} emptyLabel="No job grades available" loadError={jobGrades.error} onRetryLoad={jobGrades.refetch} searchable allowCustom note={jobGradeNote} />
                                 <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={branchOptionsFor(form.bankName)} error={fieldErrors.branch} required={form.paymentType === PAYMENT_TYPE_DEBIT_ORDER} searchable disabled={!form.bankName} note={form.bankName ? null : "Choose the bank first."} />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
 
@@ -761,7 +737,7 @@ export default function CaptureMember() {
                     }}
                 />
             </div>
-        </div>
+        </Page>
         </>
     );
 }

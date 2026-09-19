@@ -3,8 +3,8 @@
 // hits and concluded it was live, while eslint (which reads code, not comments) called all ten
 // dead. eslint was right. Anyone restoring one of those cards restores its icon import with it.
 import { Landmark, LucideCopyCheck, LucideMails } from "lucide-react";
-import NavigationCard from '../../components/common/NavigationCard.jsx';
-import Sheet, { Page } from '../../components/common/Sheet.jsx';
+import { NavigationList } from '../../components/common/NavigationCard.jsx';
+import { Page } from '../../components/common/Sheet.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
 import {useOutletContext} from "react-router-dom";
 
@@ -101,18 +101,13 @@ export default function Maintenance() {
 
         <Page>
             <PageTitle title="Maintenance" subtitle="Select a function to maintain" />
-            <Sheet className="mt-6 max-w-4xl divide-y divide-line">
-                {maintenance_cards.map((card) => (
-                    <NavigationCard
-                        key={`${card.href}-${card.title}`}
-                        {...card}
-                        onSelect={() => {
-                            setSelectedCardHref?.('');
-                            setSideBarOpen?.(true);
-                        }}
-                    />
-                ))}
-            </Sheet>
+            <NavigationList
+                cards={maintenance_cards}
+                onSelect={() => {
+                    setSelectedCardHref?.('');
+                    setSideBarOpen?.(true);
+                }}
+            />
         </Page>
     );
 }

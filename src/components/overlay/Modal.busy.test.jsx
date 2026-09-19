@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
 
-import Modal, { ConfirmDialog } from './Modal'
+import Modal, { ConfirmDialog, ModalClose } from './Modal'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { setupUser } from '../../test/user'
 
@@ -90,5 +90,43 @@ describe('ConfirmDialog, while its confirm is running (R2-F3)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+})
+
+/**
+ * `ModalClose` (RF): a footer's own Cancel/Close, which reads `busy` from the dialog it sits in. Before it, each screen
+ * disabled that button by hand, and the welcome letter shipped without doing so. It closes through Radix, so the close
+ * is the X's path, through `Modal`'s own guard.
+ */
+function Footer({ busy }) {
+  const [open, setOpen] = useState(true)
+  return (
+    <>
+      <p>{open ? 'still open' : 'closed'}</p>
+      <Modal open={open} onOpenChange={setOpen} title="Welcome Letter Preview" busy={busy} footer={<ModalClose variant="ghost">Keep it</ModalClose>}>
+        <p>Body</p>
+      </Modal>
+    </>
+  )
+}
+
+describe('ModalClose -- a footer close that cannot be forgotten (RF)', () => {
+  it('while the write runs it is disabled, and the dialog stays', () => {
+    renderWithProviders(<Footer busy />)
+    const dialog = screen.getByRole('dialog', { name: 'Welcome Letter Preview' })
+    const close = within(dialog).getByRole('button', { name: 'Keep it' })
+
+    expect(close).toBeDisabled()
+    fireEvent.click(close)
+    expect(screen.getByText('still open')).toBeInTheDocument()
+  })
+
+  it('the must-pass: not busy, it closes the dialog through onOpenChange', async () => {
+    const user = setupUser()
+    renderWithProviders(<Footer busy={false} />)
+
+    await user.click(screen.getByRole('button', { name: 'Keep it' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByText('closed')).toBeInTheDocument()
   })
 })

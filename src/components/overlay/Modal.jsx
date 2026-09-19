@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { useEffect, useRef } from 'react';
+import { createContext, useContext, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 import { cn, pick } from '../../lib/utils';
@@ -60,6 +60,29 @@ import Button from '../form/Button';
 export const closeOn = (close) => (next) => {
   if (!next) close();
 };
+
+/** Whether a write started from the enclosing dialog is running -- `Modal`'s `busy`, for the controls inside it. */
+const BusyContext = createContext(false);
+
+/**
+ * A footer control that CLOSES the dialog, and is disabled while its write runs (RF; R2-F3's other half).
+ *
+ * 🔴 `busy` SHUT EVERY WAY OUT BUT THE ONES A CALLER DREW. Escape, a press outside and the X are the primitive's, and
+ * it closed them; a footer's own Cancel/Close called its screen's setter directly, so each caller had to disable it by
+ * hand -- `ConfirmDialog` did, the ACB banking editor did, and the welcome letter shipped without it until P10's
+ * inventory found it. This reads `busy` from the dialog it sits in and closes through Radix, so the close takes the
+ * same path as the X -- through `Modal`'s own guard -- and no caller can forget.
+ *
+ * Everything else is `Button`'s: the variant is the caller's, so a footer keeps exactly the button it drew.
+ */
+export function ModalClose({ disabled = false, children, ...props }) {
+  const busy = useContext(BusyContext);
+  return (
+    <Dialog.Close asChild>
+      <Button disabled={busy || disabled} {...props}>{children}</Button>
+    </Dialog.Close>
+  );
+}
 
 const SIZES = {
   sm: 'max-w-sm',
@@ -164,6 +187,7 @@ export default function Modal({
   };
 
   return (
+    <BusyContext.Provider value={busy}>
     <Dialog.Root open={open} onOpenChange={changeOpen}>
       <Dialog.Portal>
         {/* Portalled to the body, so no page's `overflow` or stacking context can clip it —
@@ -276,6 +300,7 @@ export default function Modal({
         </div>
       </Dialog.Portal>
     </Dialog.Root>
+    </BusyContext.Provider>
   );
 }
 
@@ -323,9 +348,7 @@ export function ConfirmDialog({
       busy={loading}
       footer={
         <>
-          <Dialog.Close asChild>
-            <Button variant="ghost" disabled={loading}>{cancelLabel}</Button>
-          </Dialog.Close>
+          <ModalClose variant="ghost">{cancelLabel}</ModalClose>
           <Button variant={destructive ? 'danger' : 'primary'} loading={loading} onClick={onConfirm}>
             {confirmLabel}
           </Button>

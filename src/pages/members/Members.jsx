@@ -29,10 +29,11 @@ import MemberPanel from "../../components/members/MemberPanel.jsx";
 import Criteria, { CRITERION } from "../../components/common/Criteria.jsx";
 import Pager from "../../components/common/Pager.jsx";
 import KeyHints from "../../components/common/KeyHints.jsx";
-import Sheet from "../../components/common/Sheet.jsx";
+import Sheet, { PAGE_GUTTER } from "../../components/common/Sheet.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
 import { ERROR_KINDS, writeMayHaveLanded } from "../../services/parseApiError.js";
+import useFocusOn from "../../hooks/useFocusOn.js";
 import { formatDate, parseDate, sameDate, today } from "../../lib/format.js";
 import { sanitiseField, validateField } from "../../utils/inputRules.js";
 import { branchNamesForBank } from "../../utils/bankBranches.js";
@@ -803,7 +804,6 @@ export default function Members() {
      * exactly as it had, with nothing on screen saying what was wrong.
      */
     const [saveNotice, setSaveNotice] = useState(null);
-    const errorSummaryRef = useRef(null);
 
     const handleSaveChanges = async () => {
         const clientSideErrors = validateEditForm();
@@ -957,13 +957,8 @@ export default function Members() {
         else closeRecord();
     };
 
-    // Same shape as `Auth`'s, and for the same reason: the summary does not exist yet when
-    // the handler that sets it runs, so focusing it there is a silent no-op. `saveNotice`
-    // is replaced by a fresh object on every attempt, so a second failed save moves focus
-    // again rather than looking ignored.
-    useEffect(() => {
-        if (saveNotice) errorSummaryRef.current?.focus();
-    }, [saveNotice]);
+    // The save summary takes focus once it exists, and again on every fresh notice -- `useFocusOn` says why.
+    const errorSummaryRef = useFocusOn(saveNotice);
 
     const handleInputChange = useCallback((field) => (event) => {
         const value = event && event.target ? event.target.value : event;
@@ -1226,7 +1221,7 @@ export default function Members() {
            is the SHELL's third column -- `MemberPanel` portals into it -- so nothing here has
            to make room for it, and below `xl` it is a drawer over this. */
         <div className="flex min-h-0 flex-1 flex-col text-ink">
-            <div className="px-7 pt-[26px] max-lg:px-4">
+            <div className={cn(PAGE_GUTTER, "pt-[26px]")}>
                 <PageTitle
                     title="Members"
                     subtitle="The membership register across every bank. Select a member to open their card."
@@ -1257,7 +1252,7 @@ export default function Members() {
                 the page, "More criteria" beside them, Clear at the end. This page had FIFTEEN
                 in a grid, which is a search form rather than a register's criteria. The other
                 twelve are all still here, one disclosure away -- nothing was removed. */}
-            <div className="no-print px-7 pt-4 max-lg:px-4">
+            <div className={cn("no-print", PAGE_GUTTER, "pt-4")}>
                 <Criteria>
                     <SearchableSelect
                         className={CRITERION}
@@ -1378,7 +1373,8 @@ export default function Members() {
             <section
                 aria-label="Member register"
                 className={cn(
-                    "register flex flex-1 flex-col px-7 pb-7 pt-4 max-lg:px-4",
+                    "register flex flex-1 flex-col pb-7 pt-4",
+                    PAGE_GUTTER,
                     printScope === "register" && "print-area",
                 )}
             >
@@ -1836,7 +1832,7 @@ export default function Members() {
 
             <ConfirmDialog
                 open={Boolean(pendingSave)}
-                onOpenChange={closeOn(() => { if (!savingRecord) setPendingSave(null); })}
+                onOpenChange={closeOn(() => setPendingSave(null))}
                 title="Save these changes?"
                 confirmLabel="Save changes"
                 cancelLabel="Keep editing"

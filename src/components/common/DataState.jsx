@@ -278,13 +278,18 @@ export default function DataState({
     </Button>
   );
 
+  // What a reader and a test know the frame by, identical in both shapes -- spelled once (RF).
+  const frame = {
+    role,
+    ...(role === 'status' && { 'aria-live': 'polite' }),
+    'data-testid': testId,
+    'data-state': shown,
+  };
+
   if (row) {
     return (
       <div
-        role={role}
-        {...(role === 'status' && { 'aria-live': 'polite' })}
-        data-testid={testId}
-        data-state={shown}
+        {...frame}
         className={cn(
           'grid items-center gap-4 text-left',
           compact ? 'px-4 py-3' : 'px-6 py-7',
@@ -312,10 +317,7 @@ export default function DataState({
 
   return (
     <div
-      role={role}
-      {...(role === 'status' && { 'aria-live': 'polite' })}
-      data-testid={testId}
-      data-state={shown}
+      {...frame}
       className={cn(
         'flex flex-col items-center text-center',
         compact ? 'gap-1.5 py-2' : 'gap-3 py-6',

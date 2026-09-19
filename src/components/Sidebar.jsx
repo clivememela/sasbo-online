@@ -51,6 +51,20 @@ const BELOW_DESK = "(max-width: 1023px)";
  * phone treatment (R-RESP) rather than the mock's 68px icon rail; the mock only ever
  * specified a desk.
  */
+/**
+ * `expanded` with every section in `hrefs` open -- the same object when they already were, so a render-phase update
+ * that changes nothing does not ask for another render. The card and the route each opened a chain of sections by
+ * hand (RF); both open it here.
+ */
+const withOpened = (expanded, hrefs) => {
+  let changed = false;
+  const next = { ...expanded };
+  hrefs.forEach((href) => {
+    if (!next[href]) { next[href] = true; changed = true; }
+  });
+  return changed ? next : expanded;
+};
+
 function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
   const location = useLocation();
   const [expandedItems, setExpandedItems] = useState({});
@@ -60,11 +74,7 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
     setPrevSelectedCardHref(selectedCardHref);
     if (selectedCardHref) {
       const ancestors = findAncestors(navItems, selectedCardHref) || [selectedCardHref];
-      setExpandedItems(prev => {
-        const next = { ...prev };
-        ancestors.forEach(href => { next[href] = true; });
-        return next;
-      });
+      setExpandedItems(prev => withOpened(prev, ancestors));
     }
   }
 
@@ -83,18 +93,9 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
   if (location.pathname !== prevPathname) {
     setPrevPathname(location.pathname);
     const ancestors = findAncestors(navItems, location.pathname);
-    if (ancestors) {
-      setExpandedItems(prev => {
-        const next = { ...prev };
-        let changed = false;
-        // The whole chain, the current section included: Members open shows Capture Member
-        // and Labels under it, which is how the mock draws the rail on the register.
-        ancestors.forEach(href => {
-          if (!next[href]) { next[href] = true; changed = true; }
-        });
-        return changed ? next : prev;
-      });
-    }
+    // The whole chain, the current section included: Members open shows Capture Member
+    // and Labels under it, which is how the mock draws the rail on the register.
+    if (ancestors) setExpandedItems(prev => withOpened(prev, ancestors));
   }
 
   const toggleExpand = (href) => {

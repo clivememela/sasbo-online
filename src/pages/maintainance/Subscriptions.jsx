@@ -10,6 +10,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import StatusChip from "../../components/common/StatusChip.jsx";
 import TableScroller from "../../components/table/TableScroller.jsx";
+import { HEAD_CELL } from "../../components/table/Table.jsx";
 import DataState from "../../components/common/DataState.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
@@ -22,8 +23,8 @@ import reportError from "../../lib/reportError.js";
 // `touch-size`: an in-row input is a replaced element, so it GROWS to 44px on a coarse pointer (`07.2`; index.css).
 const inputCls = 'w-full px-2 py-1 rounded border border-line-strong bg-surface-2 text-ink field-text touch-size';
 
-/** A head cell of this hand-built table -- the same classes as `RecruitmentChannel.jsx`'s `HEAD_CELL`. */
-const HEAD_CELL = 'whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5';
+/** A body cell of this hand-built table: card.css `.table td`'s padding, the first column at 20px. */
+const BODY_CELL = 'px-3.5 py-[11px] first:pl-5';
 
 /**
  * The bank list behind this screen's filter. `06.1b`, EH-D9.
@@ -253,20 +254,20 @@ export default function Subscriptions() {
                                 >
                                     {editingId === sub.id ? (
                                         <>
-                                            <td className="px-3.5 py-[11px] first:pl-5 text-ink">{editData.bankName}</td>
-                                            <td className="px-3.5 py-[11px] first:pl-5">
+                                            <td className={`${BODY_CELL} text-ink`}>{editData.bankName}</td>
+                                            <td className={BODY_CELL}>
                                                 <input type="number" aria-label={`ACB debit day for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.acbDebitDay ?? ''} onChange={(e) => handleField('acbDebitDay', parseInt(e.target.value))} onClick={e => e.stopPropagation()} />
                                             </td>
-                                            <td className="px-3.5 py-[11px] first:pl-5">
+                                            <td className={BODY_CELL}>
                                                 <input type="number" step="0.01" aria-label={`Subscription amount for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.subscriptionAmount ?? ''} onChange={(e) => handleField('subscriptionAmount', parseFloat(e.target.value))} onClick={e => e.stopPropagation()} />
                                             </td>
-                                            <td className="px-3.5 py-[11px] first:pl-5">
+                                            <td className={BODY_CELL}>
                                                 <select aria-label={`Core banking for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.isCoreBanking === true ? 'true' : 'false'} onChange={(e) => handleField('isCoreBanking', e.target.value === 'true')} onClick={e => e.stopPropagation()}>
                                                     <option value="true">Yes</option>
                                                     <option value="false">No</option>
                                                 </select>
                                             </td>
-                                            <td className="px-3.5 py-[11px] first:pl-5">
+                                            <td className={BODY_CELL}>
                                                 <select aria-label={`Status for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.status || ''} onChange={(e) => handleField('status', e.target.value)} onClick={e => e.stopPropagation()}>
                                                     <option value="ACTIVE">ACTIVE</option>
                                                     <option value="PENDING">PENDING</option>
@@ -274,7 +275,7 @@ export default function Subscriptions() {
                                                     <option value="INACTIVE">INACTIVE</option>
                                                 </select>
                                             </td>
-                                            <td className="px-3.5 py-[11px] first:pl-5 text-ink-muted">{formatDateLong(sub.registrationDate)}</td>
+                                            <td className={`${BODY_CELL} text-ink-muted`}>{formatDateLong(sub.registrationDate)}</td>
                                             {/* ♻️ The two hand-rolled buttons are the primitive's now: one
                                                 focus ring, one hit area, one hover rule, and the primary
                                                 LAST, as every other surface in this world orders them. */}
@@ -294,7 +295,7 @@ export default function Subscriptions() {
                                             <td className="px-3.5 py-[11px] tabular-nums first:pl-5">{sub.acbDebitDay ?? '—'}</td>
                                             <td className="px-3.5 py-[11px] tabular-nums first:pl-5">{formatZar(sub.subscriptionAmount)}</td>
                                             <td className="px-3.5 py-[11px] text-ink-muted first:pl-5">{sub.isCoreBanking ? 'Yes' : 'No'}</td>
-                                            <td className="px-3.5 py-[11px] first:pl-5">
+                                            <td className={BODY_CELL}>
                                                 {/* ♻️ THE FOURTH COPY OF THE STATUS CHIP, and the one
                                                     that was wrong in the most damaging direction: it knew
                                                     ACTIVE and PENDING and painted EVERYTHING ELSE with the
