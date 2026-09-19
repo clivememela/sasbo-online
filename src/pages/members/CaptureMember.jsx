@@ -16,7 +16,7 @@ import {
     FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, MEMBER_TABS,
     BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS, IDENTITY_TYPE_PASSPORT,
-    DEBIT_DAY_EARLIEST, DEBIT_DAY_LATEST, isDebitDayInRange, IDENTITY_TYPE_ID,
+    DEBIT_DAY_EARLIEST, DEBIT_DAY_LATEST, isDebitDayInRange,
     PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL
 } from "@/config/memberConstants.js";
 import { toWireDate, today } from "@/lib/format.js";
@@ -112,7 +112,7 @@ export default function CaptureMember() {
         branch: "",
         employmentType: "",
         ibtNo: "",
-        paymentType: PAYMENT_TYPE_DEBIT_ORDER,
+        paymentType: "Debit Order",
         debitDay: "20",
         bankAddress: "",
         // The three the stakeholder asked for, under the names MemberDto declares.
@@ -268,7 +268,7 @@ export default function CaptureMember() {
         if (field === "ibtNo") setIbtNoTyped(true);
 
         const hasNonNumericInput =
-            field === "identityNumber" && form.identityType === IDENTITY_TYPE_ID &&
+            field === "identityNumber" && form.identityType === "I.D. Number" &&
             /\D/.test(rawValue);
         // What each field accepts at all, as it is typed -- one rule for both member screens (utils/inputRules.js).
         const value = sanitiseField(field, rawValue, { identityType: form.identityType });
@@ -320,7 +320,7 @@ export default function CaptureMember() {
                 delete newErrors.identityNumber;
                 delete newErrors.dateOfBirth;
             }
-            if (field === "paymentType" && value !== PAYMENT_TYPE_DEBIT_ORDER) {
+            if (field === "paymentType" && value !== "Debit Order") {
                 delete newErrors.bankAccountNumber;
                 delete newErrors.bankName;
                 delete newErrors.branch;
@@ -328,7 +328,7 @@ export default function CaptureMember() {
             return newErrors;
         });
 
-        if (field === "identityNumber" && form.identityType === IDENTITY_TYPE_ID) {
+        if (field === "identityNumber" && form.identityType === "I.D. Number") {
             const error = hasNonNumericInput
                 ? "Only numbers are allowed for I.D. Number"
                 : validateSAID(value);
@@ -360,7 +360,7 @@ export default function CaptureMember() {
         if (!form.identityType) errors.identityType = "Identity Type selection is required";
         if (!form.identityNumber.trim()) {
             errors.identityNumber = "Identity Number field is required";
-        } else if (form.identityType === IDENTITY_TYPE_ID && form.identityNumber.trim().length !== 13) {
+        } else if (form.identityType === "I.D. Number" && form.identityNumber.trim().length !== 13) {
             errors.identityNumber = "Identity Number must be exactly 13 digits when I.D. Number is selected";
         }
 
@@ -368,7 +368,7 @@ export default function CaptureMember() {
             errors.dateOfBirth = "Date of Birth is strictly required when Passport is selected";
         }
 
-        if (form.paymentType === PAYMENT_TYPE_DEBIT_ORDER) {
+        if (form.paymentType === "Debit Order") {
             if (!form.bankAccountNumber.trim()) errors.bankAccountNumber = "Bank Account Number is required for Debit Orders";
             if (!form.bankName.trim()) errors.bankName = "Bank Employer alignment name is required for Debit Orders";
             if (!form.branch.trim()) errors.branch = "Bank Branch selection is required for Debit Orders";
@@ -383,7 +383,7 @@ export default function CaptureMember() {
         // Shape checks, on what is FILLED IN (requiredness is above). Bank Account Number only while it is on screen:
         // under Payroll it is hidden, and a stale value there must not block a save nobody can see the reason for.
         const shapeChecked = ["initials", "phone", "workTel", "homeTel", "ibtNo", "personalEmail", "workEmail", "dateOfBirth"];
-        if (form.paymentType === PAYMENT_TYPE_DEBIT_ORDER) shapeChecked.push("bankAccountNumber");
+        if (form.paymentType === "Debit Order") shapeChecked.push("bankAccountNumber");
         for (const key of shapeChecked) {
             if (errors[key]) continue;
             const message = validateField(key, form[key], { identityType: form.identityType });
@@ -617,10 +617,10 @@ export default function CaptureMember() {
                                 />
                                 <Field
                                     label="Date of Birth"
-                                    value={form.identityType === IDENTITY_TYPE_ID ? formatDate(form.dateOfBirth) : form.dateOfBirth}
+                                    value={form.identityType === "I.D. Number" ? formatDate(form.dateOfBirth) : form.dateOfBirth}
                                     onChange={handleChange("dateOfBirth")}
-                                    type={form.identityType === IDENTITY_TYPE_ID ? "text" : "date"}
-                                    disabled={form.identityType === IDENTITY_TYPE_ID}
+                                    type={form.identityType === "I.D. Number" ? "text" : "date"}
+                                    disabled={form.identityType === "I.D. Number"}
                                     error={fieldErrors.dateOfBirth}
                                     required={form.identityType === IDENTITY_TYPE_PASSPORT}
                                 />
@@ -628,8 +628,8 @@ export default function CaptureMember() {
                                     label="Gender"
                                     value={form.gender}
                                     onChange={handleChange("gender")}
-                                    options={form.identityType === IDENTITY_TYPE_ID ? null : genderOptions}
-                                    disabled={form.identityType === IDENTITY_TYPE_ID}
+                                    options={form.identityType === "I.D. Number" ? null : genderOptions}
+                                    disabled={form.identityType === "I.D. Number"}
                                 />
                                 <Field label="Race" value={form.race} onChange={handleChange("race")} options={raceOptions} />
                                 <EmailFields form={form} setForm={setForm} handleChange={handleChange} fieldErrors={fieldErrors} />
@@ -650,7 +650,7 @@ export default function CaptureMember() {
                         )}
                         {activeTab === "employment" && (
                             <>
-                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} {...refs.field('banks')} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === PAYMENT_TYPE_DEBIT_ORDER} searchable />
+                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} {...refs.field('banks')} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
                                 <Field label="Employee Number" kind="reference" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
                                 {/* 🔑 02.5 / CM-37 -- LIST FIRST, TYPING ALLOWED. The seeded list is per-bank and
@@ -660,10 +660,10 @@ export default function CaptureMember() {
                                     and `MemberDto.jobGradeOutcome` reports MATCHED / CAPTURED / CLEARED.
                                     `allowCustom` is the design arc's prop, on their instruction and their shape. */}
                                 <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGrades.loading} emptyLabel="No job grades available" loadError={jobGrades.error} onRetryLoad={jobGrades.refetch} searchable allowCustom note={jobGradeNote} />
-                                <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={branchOptionsFor(form.bankName)} error={fieldErrors.branch} required={form.paymentType === PAYMENT_TYPE_DEBIT_ORDER} searchable disabled={!form.bankName} note={form.bankName ? null : "Choose the bank first."} />
+                                <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={branchOptionsFor(form.bankName)} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable disabled={!form.bankName} note={form.bankName ? null : "Choose the bank first."} />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
 
-                                {form.paymentType === PAYMENT_TYPE_DEBIT_ORDER && (
+                                {form.paymentType === "Debit Order" && (
                                     <>
                                         <Field label="Bank Account Number" kind="identifier" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} error={fieldErrors.bankAccountNumber} required />
                                         <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={DEBIT_DAY_OPTIONS} note={debitDateHint} />

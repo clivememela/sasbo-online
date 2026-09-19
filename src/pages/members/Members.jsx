@@ -16,7 +16,7 @@ import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, IDENTITY_TYPE_PASSPORT,
-    DEBIT_DAY_OPTIONS, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY, IDENTITY_TYPE_ID, PAYMENT_TYPE_DEBIT_ORDER,
+    DEBIT_DAY_OPTIONS, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
 } from "../../config/memberConstants.js";
 import {
     validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID
@@ -694,7 +694,7 @@ export default function Members() {
         if (field === "initials") initialsTyped.current = true;
 
         const hasNonNumericInput =
-            field === "identityNumber" && editForm.identityType === IDENTITY_TYPE_ID &&
+            field === "identityNumber" && editForm.identityType === "I.D. Number" &&
             /\D/.test(rawValue);
         // One typing rule for both member screens (utils/inputRules.js).
         const value = sanitiseField(field, rawValue, { identityType: editForm.identityType });
@@ -718,7 +718,7 @@ export default function Members() {
                     .map(name => name.charAt(0).toUpperCase())
                     .join("");
             }
-            if (field === "identityNumber" && value.length === 13 && prev.identityType === IDENTITY_TYPE_ID) {
+            if (field === "identityNumber" && value.length === 13 && prev.identityType === "I.D. Number") {
                 next.dateOfBirth = extractDateOfBirthFromSAID(value) || next.dateOfBirth;
                 next.gender = extractGenderFromSAID(value) || next.gender;
             }
@@ -737,12 +737,12 @@ export default function Members() {
                 delete newErrors.identityNumber;
                 delete newErrors.dateOfBirth;
             }
-            if (field === "paymentType" && value !== PAYMENT_TYPE_DEBIT_ORDER) {
+            if (field === "paymentType" && value !== "Debit Order") {
                 delete newErrors.bankAccountNumber;
                 delete newErrors.bankName;
                 delete newErrors.branch;
             }
-            if (field === "identityNumber" && editForm.identityType === IDENTITY_TYPE_ID) {
+            if (field === "identityNumber" && editForm.identityType === "I.D. Number") {
                 const error = hasNonNumericInput ? "Only numbers are allowed for I.D. Number" : validateSAID(value);
                 if (error) newErrors[field] = error;
             }
@@ -762,7 +762,7 @@ export default function Members() {
 
         if (!editForm.identityNumber?.trim()) {
             errors.identityNumber = "Identity Number field is required";
-        } else if (editForm.identityType === IDENTITY_TYPE_ID && editForm.identityNumber.trim().length !== 13) {
+        } else if (editForm.identityType === "I.D. Number" && editForm.identityNumber.trim().length !== 13) {
             errors.identityNumber = "Identity Number must be exactly 13 digits when I.D. Number is selected";
         }
 
@@ -770,7 +770,7 @@ export default function Members() {
             errors.dateOfBirth = "Date of Birth is strictly required when Passport is selected";
         }
 
-        if (editForm.paymentType === PAYMENT_TYPE_DEBIT_ORDER) {
+        if (editForm.paymentType === "Debit Order") {
             if (!editForm.bankAccountNumber?.trim()) errors.bankAccountNumber = "Bank Account Number is required for Debit Orders";
             if (!editForm.bankName?.trim()) errors.bankName = "Bank Employer alignment name is required for Debit Orders";
             if (!editForm.branch?.trim()) errors.branch = "Bank Branch selection is required for Debit Orders";
@@ -782,7 +782,7 @@ export default function Members() {
         // Payroll, so neither can block a save the administrator has no way to fix.
         const original = editBaseline ? JSON.parse(editBaseline) : {};
         const shapeChecked = ["initials", "phone", "workTel", "homeTel", "ibtNo", "dateOfBirth"];
-        if (editForm.paymentType === PAYMENT_TYPE_DEBIT_ORDER) shapeChecked.push("bankAccountNumber");
+        if (editForm.paymentType === "Debit Order") shapeChecked.push("bankAccountNumber");
         for (const key of shapeChecked) {
             if (errors[key] || String(editForm[key] ?? "") === String(original[key] ?? "")) continue;
             const message = validateField(key, editForm[key], { identityType: editForm.identityType });
@@ -1654,7 +1654,7 @@ export default function Members() {
                                         could not close, because BR-10 owned this file until
                                         now. The I.D.-derived case stays read-only text: it is
                                         computed from the identity number, not typed. */}
-                                    {editForm.identityType === IDENTITY_TYPE_ID ? (
+                                    {editForm.identityType === "I.D. Number" ? (
                                         <Detail label="Date of Birth" value={recordDate(editForm.dateOfBirth)} isEditing={isEditing} disabled onChange={handleEditChange("dateOfBirth")} />
                                     ) : isEditing ? (
                                         <DateField
@@ -1668,7 +1668,7 @@ export default function Members() {
                                     ) : (
                                         <Detail label="Date of Birth" value={recordDate(editForm.dateOfBirth)} isEditing={false} />
                                     )}
-                                    <Detail label="Gender" value={editForm.gender} isEditing={isEditing} options={editForm.identityType === IDENTITY_TYPE_ID ? null : genderOptions} onChange={handleEditChange("gender")} disabled={editForm.identityType === IDENTITY_TYPE_ID} />
+                                    <Detail label="Gender" value={editForm.gender} isEditing={isEditing} options={editForm.identityType === "I.D. Number" ? null : genderOptions} onChange={handleEditChange("gender")} disabled={editForm.identityType === "I.D. Number"} />
                                     <Detail label="Race" value={editForm.race} isEditing={isEditing} options={raceOptions} onChange={handleEditChange("race")} />
                                     <Detail label="Cellphone Number" value={editForm.phone} isEditing={isEditing} onChange={handleEditChange("phone")} kind="tel" error={fieldErrors.phone} />
                                     <Detail label="Work Tel" value={editForm.workTel} isEditing={isEditing} onChange={handleEditChange("workTel")} kind="tel" error={fieldErrors.workTel} />
@@ -1686,13 +1686,13 @@ export default function Members() {
                             {activeTab === "employment" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
                                     <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="reference" />
-                                    <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} {...refs.field('banks')} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === PAYMENT_TYPE_DEBIT_ORDER} onChange={handleEditChange("bankName")} />
+                                    <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} {...refs.field('banks')} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
                                     <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
                                     <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGrade} onChange={handleEditChange("jobGrade")} disabled={!editForm.bankName} loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
-                                    <Detail label="Bank Branch" value={editForm.branch} isEditing={isEditing} options={branchOptions} error={fieldErrors.branch} required={editForm.paymentType === PAYMENT_TYPE_DEBIT_ORDER} onChange={handleEditChange("branch")} />
+                                    <Detail label="Bank Branch" value={editForm.branch} isEditing={isEditing} options={branchOptions} error={fieldErrors.branch} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("branch")} />
                                     <Detail label="Payment Type" value={editForm.paymentType} isEditing={isEditing} options={paymentTypeOptions} onChange={handleEditChange("paymentType")} />
 
-                                    {editForm.paymentType === PAYMENT_TYPE_DEBIT_ORDER && (
+                                    {editForm.paymentType === "Debit Order" && (
                                         <>
                                             <Detail label="Bank Account Number" value={editForm.bankAccountNumber} isEditing={isEditing} error={fieldErrors.bankAccountNumber} required onChange={handleEditChange("bankAccountNumber")} kind="identifier" />
                                             <Detail
