@@ -8,17 +8,23 @@
  * the only sentence this form can tell an administrator that they did not already
  * know, and the rule behind it exists nowhere in either repository.
  *
- * <h2>The rule (A57, as the signed specification states it)</h2>
- * A debit day that lands on a non-business day moves <b>BACKWARD</b> to the most recent business day in the same
- * month -- the 18 August session ("it must move backward to the most recent business day within the same month")
- * and the A.7 glossary. <b>Only when backward would fall below the 20th</b> does it move forward instead: the
- * session's own example (a Sunday 20th is processed on Monday the 21st) and SASBO's re-debit letter, which only
- * ever debits on the 20th. So the date never falls below the 20th and never leaves its month.
+ * <h2>The rule (A57, as SASBO answered question 33 on 2026-09-21)</h2>
+ * A debit day that lands on a non-business day moves <b>FORWARD</b> to the next business day in the same month
+ * -- "If a debit date is on the 25th and it is a Saturday it will move to the following business day which is
+ * the 27". <b>Only when forward would leave the month</b> does it move backward instead -- "We never go into the
+ * next month. If the debit date is on the 30 or 31st and that fall on a weekend it moved back to the available
+ * business day." So the date never falls below the 20th and never leaves its month. Their July 2026 bureau file
+ * did exactly this: nobody on Friday the 24th, 365 members on Monday the 27th. The server's DebitWindow runs the
+ * same rule, and each is held to one generated fixture, `src/test/debit-window.json` -- never to the other.
  *
- * 🔴 History, because it went wrong twice. The first rule moved backward ALWAYS, which put a Saturday 20th on
- * Friday the 19th, outside the window. The first correction over-reached and moved EVERY weekend forward, which
- * matched all three of the spec's examples and disagreed with its rule on 56 of 288 cells in 2026-2027 (day 25
- * in July 2026: Friday the 24th, not Monday the 27th). Found by the ACB arc; the test pins a mid-window weekend.
+ * 🔴 History, because it went wrong three times. The first rule moved backward ALWAYS, which put a Saturday 20th
+ * on Friday the 19th, outside the window. The first correction moved every weekend forward, backward only at
+ * month end -- the rule above. It was then turned round to the signed specification's reading (18 August session
+ * and A.7 glossary: backward first, forward only below the 20th), and SASBO overruled their own specification
+ * with the answer quoted above. The two readings agree on all three of the spec's examples and differ on 56 of
+ * 288 cells in 2026-2027 (day 25 in July 2026: Monday the 27th, not Friday the 24th); the tests pin a mid-window
+ * weekend. 🟡 One seam is SASBO's to settle (question 47): a Sunday 30th with Monday the 31st free goes forward
+ * here, and back if their sentence is read literally -- first live on 30 May 2027.
  *
  * <h2>🔴 IT MUST ITERATE, NOT STEP ONCE</h2>
  * Under the Public Holidays Act 36 of 1994, a public holiday falling on a Sunday
@@ -98,12 +104,11 @@ export const actualDebitDate = (day, reference = new Date(), holidays = new Set(
   const clampedDay = Math.min(requested, monthEnd)
 
   const target = new Date(year, month, clampedDay)
-  // Backward, as the spec says; forward only where backward would leave the window (below the 20th, or the
-  // month). A57 -- see the rule above.
-  const backward = lastBusinessDayOnOrBefore(target, holidays)
-  const actual = backward.getMonth() === month && backward.getDate() >= 20
-    ? backward
-    : nextBusinessDayOnOrAfter(target, holidays)
+  // Forward, as SASBO answered; backward only where forward would leave the month. A57 / Q33 -- see the rule above.
+  const forward = nextBusinessDayOnOrAfter(target, holidays)
+  const actual = forward.getMonth() === month
+    ? forward
+    : lastBusinessDayOnOrBefore(target, holidays)
 
   return {
     iso: isoOf(actual),

@@ -13,10 +13,10 @@ import { actualDebitDate, lastBusinessDayOnOrBefore, nextBusinessDayOnOrAfter } 
  * run the server prepares. Two implementations of one rule, compared against ONE artefact, never
  * against each other.
  *
- * The rule's direction is contested (question 33: SASBO's July file moved a Saturday forward; the
- * specification both repositories run moves it back). The fixture names the rule it encodes, and
- * the first test pins that name — so the day the server's rule flips, this file goes red and says
- * which half has not moved.
+ * The rule's direction was contested until SASBO answered question 33 on 2026-09-21: forward, back
+ * only where forward would leave the month — and both repositories flipped in one sitting. The
+ * fixture names the rule it encodes, and the first test pins that name, so a one-sided change to
+ * either half goes red here and says which half has not moved.
  */
 
 const { rule, window: range, holidaySets, months } = fixture
@@ -49,8 +49,8 @@ const clientRule = (day, reference, holidays) => {
 const toMonth = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 
 describe('debitDate.js against the server-generated window fixture', () => {
-  it('the fixture encodes the rule this file implements -- backward in the month, forward only below the 20th', () => {
-    expect(rule).toBe('backward-in-month-forward-below-20th')
+  it('the fixture encodes the rule this file implements -- forward in the month, backward only at its end', () => {
+    expect(rule).toBe('forward-in-month-backward-at-end')
     expect(range).toEqual({ firstDay: 20, lastDay: 31 })
   })
 
@@ -66,19 +66,25 @@ describe('debitDate.js against the server-generated window fixture', () => {
     expect(disagreements(clientRule)).toEqual([])
   })
 
-  it('canary: a forward-first rule disagrees with the fixture -- the comparison can fail', () => {
-    // The reading SASBO's July file suggests (question 33). If it matched every cell, the test
-    // above would prove nothing about which reading is implemented.
-    const forwardFirst = (day, reference, holidays) => {
+  it('canary: a backward-first rule disagrees with the fixture -- the comparison can fail', () => {
+    // The reading SASBO overruled (question 33): the signed specification's, backward first and
+    // forward only below the 20th, which this file ran until 2026-09-21. If it matched every cell,
+    // the test above would prove nothing about which reading is implemented.
+    const backwardFirst = (day, reference, holidays) => {
       const month = reference.getMonth()
       const end = new Date(reference.getFullYear(), month + 1, 0).getDate()
       const target = new Date(reference.getFullYear(), month, Math.min(day, end))
-      const forward = nextBusinessDayOnOrAfter(target, holidays)
-      return (forward.getMonth() === month ? forward : lastBusinessDayOnOrBefore(target, holidays)).getDate()
+      const backward = lastBusinessDayOnOrBefore(target, holidays)
+      return (backward.getMonth() === month && backward.getDate() >= 20
+        ? backward
+        : nextBusinessDayOnOrAfter(target, holidays)).getDate()
     }
-    const found = disagreements(forwardFirst)
-    expect(found.length).toBeGreaterThan(0)
-    // Witness W6: Saturday 25 July 2026 -- backward to Friday the 24th, forward to Monday the 27th.
-    expect(found).toContain('2026-07 weekends-only day 25: fixture 24, got 27')
+    const found = disagreements(backwardFirst)
+    // The whole measured gap, not merely "some": 56 cells on weekends only and 64 with the
+    // statutory holidays -- the figures the planning pack's facts.py measured against main.
+    expect(found.filter((cell) => cell.includes(' weekends-only '))).toHaveLength(56)
+    expect(found.filter((cell) => cell.includes(' za-statutory '))).toHaveLength(64)
+    // Witness W6: Saturday 25 July 2026 -- forward to Monday the 27th, backward to Friday the 24th.
+    expect(found).toContain('2026-07 weekends-only day 25: fixture 27, got 24')
   })
 })

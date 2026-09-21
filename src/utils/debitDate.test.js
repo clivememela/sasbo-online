@@ -19,10 +19,11 @@ describe('lastBusinessDayOnOrBefore', () => {
     expect(lastBusinessDayOnOrBefore(new Date(2026, 7, 21)).getDate()).toBe(21)
   })
 
-  it('moves BACKWARDS off a weekend, never forwards', () => {
-    // Sunday 23 August 2026 -> Friday the 21st. Forwards would be Monday the 24th,
-    // which for a month-end debit day would push the collection into the next month
-    // and change which month the member has paid for.
+  it('moves BACKWARDS off a weekend, never forwards -- the month-end fallback it serves', () => {
+    // Sunday 23 August 2026 -> Friday the 21st. The rule only asks this helper when
+    // going forward would leave the month, so it must never step forwards itself: at a
+    // month end that would push the collection into the next month and change which
+    // month the member has paid for.
     expect(lastBusinessDayOnOrBefore(new Date(2026, 7, 23)).getDate()).toBe(21)
     // Saturday the 22nd, same answer.
     expect(lastBusinessDayOnOrBefore(new Date(2026, 7, 22)).getDate()).toBe(21)
@@ -85,23 +86,26 @@ describe('actualDebitDate', () => {
   })
 })
 
-describe('🔴 A57 -- a non-business day moves BACKWARD, and forward only where backward would fall below the 20th', () => {
-  // The source of the rule: a SASBO "Not Provided For" re-debit letter (printed
-  // 11/09/26, planning/branches/acb/legacy/) tells the member that debits run on the
-  // 20th and that a Saturday, Sunday or public holiday moves the date FORWARD to the
-  // next weekday; the specification's 18 August worked example says the same. The
-  // rule here used to move backwards only, which put a Saturday 20th on Friday the
-  // 19th -- below the 20-31 window the debit day exists to respect.
+describe('🔴 A57 / Q33 -- a non-business day moves FORWARD, and backward only where forward would leave the month', () => {
+  // The source of the rule: SASBO's answer to question 33 (2026-09-21) -- "If a debit
+  // date is on the 25th and it is a Saturday it will move to the following business day
+  // which is the 27 ... we never go into the next month" -- and their July 2026 bureau
+  // file, which moved Saturday the 25th to Monday the 27th. It overrules the signed
+  // specification's backward-first reading, which this file ran until that answer.
 
-  it('🔴 a weekend INSIDE the window moves BACKWARD -- the 18 August rule: day 25, Saturday 25 July 2026, is Friday 24 July', () => {
-    // Spec, 18 Aug session (SASBO Membership System.txt:1862): "it must move backward to the most recent business day
-    // within the same month"; A.7 glossary (:3668) says the same. Forward is only the bottom-of-window exception.
-    // Found by the ACB arc (sasbo-online-8a): an always-forward rule differs from the spec on 56 of 288 cells in
-    // 2026-2027, and none of the spec's three examples tells the two apart.
-    expect(actualDebitDate(25, new Date(2026, 6, 1))).toMatchObject({ iso: '2026-07-24', day: 24, adjusted: true })
-    // 26 and 27 September 2026 are a weekend: both are Friday the 25th, not Monday the 28th.
-    expect(actualDebitDate(26, new Date(2026, 8, 1)).iso).toBe('2026-09-25')
-    expect(actualDebitDate(27, new Date(2026, 8, 1)).iso).toBe('2026-09-25')
+  it('🔴 a weekend INSIDE the window moves FORWARD -- SASBO\'s own example: day 25, Saturday 25 July 2026, is Monday 27 July', () => {
+    // The case that separates the two readings (W6). A backward-first rule says Friday the 24th, and agrees with this
+    // one on all three of the specification's examples -- they differ on 56 of 288 cells in 2026-2027.
+    expect(actualDebitDate(25, new Date(2026, 6, 1))).toMatchObject({ iso: '2026-07-27', day: 27, adjusted: true })
+    // 26 and 27 September 2026 are a weekend: both are Monday the 28th, not Friday the 25th.
+    expect(actualDebitDate(26, new Date(2026, 8, 1)).iso).toBe('2026-09-28')
+    expect(actualDebitDate(27, new Date(2026, 8, 1)).iso).toBe('2026-09-28')
+  })
+
+  it('🟡 the seam, provisional until SASBO\'s August 2026 file answers question 47: a Sunday 30th with Monday 31st free goes forward', () => {
+    // 30 August 2026 is a Sunday and the 31st a Monday: forward stays in the month, so the rule goes forward (W17).
+    // SASBO's sentence read literally ("the 30 or 31st ... moved back") would say Friday the 28th.
+    expect(actualDebitDate(30, new Date(2026, 7, 1)).iso).toBe('2026-08-31')
   })
 
   it('a Saturday 20th is debited on Monday the 22nd, never Friday the 19th', () => {

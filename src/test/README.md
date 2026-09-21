@@ -132,12 +132,13 @@ asserts they are present — which is the only reason it was noticed.
 
 ## Part 7 — The API contract guards, and how to refresh them
 
-Two files in this directory are **copies of artifacts the server generates**:
+Three files in this directory are **copies of artifacts the server generates**:
 
 | File | What it carries |
 | :-- | :-- |
 | `api-surface.txt` | every route the server actually serves, `METHOD /path`, sorted |
 | `api-vocabulary.json` | the payment-type vocabulary *with its `requiresBankAccount` rule*, and the error envelope's key set |
+| `debit-window.json` | the A.C.B. run-window rule as data: the day each debit day 20–31 becomes in every month of 2026–2027, in two holiday sets — `src/utils/debitDate.js` must reproduce every cell |
 
 They are what lets a static, sub-30ms test prove this browser cannot call an
 endpoint the server does not have — with **no browser, no database and no
@@ -148,16 +149,17 @@ running server**.
 In the **server** repository:
 
 ```
-./gradlew generateApiSurface     # regenerates both from the live routing table
-git add api-surface.txt api-vocabulary.json
+./gradlew generateApiSurface     # regenerates all three from the live code
+git add api-surface.txt api-vocabulary.json debit-window.json
 ```
 
 Commit there **first** — the guard here is useless without the artifact it
-reads. Then copy both files into this repository:
+reads. Then copy all three into this repository:
 
 ```
 cp <server>/api-surface.txt      src/test/api-surface.txt
 cp <server>/api-vocabulary.json  src/test/api-vocabulary.json
+cp <server>/debit-window.json    src/test/debit-window.json
 npm test
 ```
 
