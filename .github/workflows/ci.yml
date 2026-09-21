@@ -18,6 +18,11 @@ on:
 permissions:
   contents: read
 
+# The clock is STATED, never inherited: a hosted runner is UTC, and these tests have only ever run in South
+# African time. Neither suite pins a zone of its own.
+env:
+  TZ: Africa/Johannesburg
+
 concurrency:
   group: ci-${{ github.ref }}
   # A fixup pushed to a PR cancels the superseded run. A running `main` run is NEVER cancelled: cancelling it
@@ -28,7 +33,7 @@ concurrency:
 jobs:
   gate:
     name: gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15 # the suite is ~40 s at 4 workers locally; 15 min here means something hung
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -75,6 +80,8 @@ jobs:
           name: junit-client-${{ github.sha }}
           path: reports/junit.xml
           retention-days: 7
+          # A name is unique per RUN, not per attempt: without this, a re-run dies here on a name conflict.
+          overwrite: true
           if-no-files-found: warn
 
   # ------------------------------------------------------------------------------------------------
@@ -86,7 +93,7 @@ jobs:
   # ------------------------------------------------------------------------------------------------
   changes:
     name: changes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       deploy: ${{ steps.decide.outputs.deploy }}
@@ -109,6 +116,8 @@ jobs:
           decide() {
             echo "deploy=$1" >> "$GITHUB_OUTPUT"
             echo "reason=$2" >> "$GITHUB_OUTPUT"
+            # The backticks are literal: Markdown for the job summary, inside deliberate single quotes.
+            # shellcheck disable=SC2016
             printf '### Deploy decision\n\n- deploy: `%s`\n- reason: %s\n' "$1" "$2" >> "$GITHUB_STEP_SUMMARY"
             echo "deploy=$1 — $2"
             exit 0
