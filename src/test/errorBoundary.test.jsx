@@ -36,6 +36,10 @@ import { smokeHandlers } from './msw/smokeLayer'
  * which is how people learn to ignore red stack traces.
  */
 
+/** The boundary element, OPENED -- with or without props. A `key` is props, and the first spelling of this
+ *  predicate did not know that. Its canary is the last test in this file. */
+const BOUNDARY_TAG = /<ErrorBoundary(\s[^>]*)?>/
+
 /** A component that fails the way a real one does: while rendering. */
 const Exploding = () => {
   throw new Error('a component failed while rendering')
@@ -284,9 +288,23 @@ describe('the application declares a boundary, and it is reachable from every ro
 
     for (const [path, src] of entries) {
       expect(src, `${path} renders an <Outlet> with no <ErrorBoundary> around it`)
-        .toMatch(/<ErrorBoundary>/)
+        .toMatch(BOUNDARY_TAG)
       expect(src, `${path} renders an <Outlet> with no <Suspense> around it`)
         .toMatch(/<Suspense/)
     }
+  })
+
+  /*
+   * 🔴 THE GUARD ABOVE IS A SOURCE SCAN, AND A SOURCE SCAN BREAKS ON SPELLING -- BLIND AND LOUD. It read
+   * `/<ErrorBoundary>/`, so the moment R1-F1 gave the boundary a `key` the layouts had one and the guard said they
+   * did not. The predicate is aimed at the FACT now -- the element is opened, with or without props -- and these two
+   * cases are its canary: the shape it must catch, and the shape it must not accept.
+   */
+  it('the guard above matches a boundary WITH props, and still refuses a layout that has none', () => {
+    expect('<ErrorBoundary key={pathname}>').toMatch(BOUNDARY_TAG)
+    expect('<ErrorBoundary>').toMatch(BOUNDARY_TAG)
+    expect('<Suspense><Outlet /></Suspense>').not.toMatch(BOUNDARY_TAG)
+    // A mention in an import or a comment is not a boundary AROUND anything.
+    expect("import ErrorBoundary from './common/ErrorBoundary'").not.toMatch(BOUNDARY_TAG)
   })
 })

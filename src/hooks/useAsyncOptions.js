@@ -2,6 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ERROR_KINDS } from '../services/parseApiError.js';
 
+/** No options: one stable array, so a disabled or unanswered field is not handed a new one each render. */
+const NO_OPTIONS = [];
+
+/** The answer before any request has settled. `request: -1` matches no request, so the first one is loading. */
+const NO_ANSWER = { request: -1, options: NO_OPTIONS, error: null };
+
+/** Same inputs as last render, compared element by element with `Object.is` -- exactly as React compares deps. */
+const sameInputs = (a, b) => a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
+
 /**
  * OPTIONS THAT ARRIVE OUT OF ORDER MUST NOT OVERWRITE NEWER ONES. `03.2b`, R-ROB-G.
  *
@@ -16,11 +25,12 @@ import { ERROR_KINDS } from '../services/parseApiError.js';
  * not one of them sequences. This is the fix as a hook rather than as a rule, because a
  * rule is something 27 rebuilt routes each have to remember (contract ⑮).
  *
- * 🔑 **A SEQUENCE NUMBER, NOT A CANCELLATION.** `AbortController` cancels the *request*,
- * which is worth doing and is not sufficient: an already-resolved promise still runs its
- * `.then`. So each call takes a ticket, and a result is applied only if its ticket is
- * still the newest. Both are used — abort to stop the network, the ticket to stop the
- * write.
+ * 🔑 **SUPERSEDED, NOT ONLY CANCELLED.** `AbortController` cancels the *request*, which is
+ * worth doing and is not sufficient: an already-resolved promise still runs its `.then`. So
+ * each request's effect owns a `superseded` flag that its cleanup sets -- new inputs, a
+ * refetch, or unmount -- and an answer is applied only while its request is still current.
+ * Both are used: abort to stop the network, the flag to stop the write. *(Until `10.4` this
+ * was a ref-held ticket number; the effect's own lifetime now does the same job.)*
  *
  * ⚠️ **AN ABORT IS NOT A FAILURE.** A superseded request is dropped silently and the state
  * is left exactly as it was — no error, no empty list, no spinner stuck on. That is the
@@ -37,9 +47,6 @@ import { ERROR_KINDS } from '../services/parseApiError.js';
  * @param options   `{ enabled }` — skip entirely while false (a dependent field with no parent yet).
  */
 export default function useAsyncOptions(fetcher, deps = [], { enabled = true } = {}) {
-  const [state, setState] = useState({ options: [], loading: enabled, error: null });
-
-  const ticketRef = useRef(0);
   const fetcherRef = useRef(fetcher);
 
   // The fetcher is almost always an inline arrow, so it is a new function every render.
@@ -56,38 +63,56 @@ export default function useAsyncOptions(fetcher, deps = [], { enabled = true } =
     fetcherRef.current = fetcher;
   });
 
-  const run = useCallback(() => {
-    if (!enabled) {
-      setState({ options: [], loading: false, error: null });
-      return undefined;
-    }
+  /*
+   * 🔴 ONE ANSWER PER REQUEST, AND `loading` IS DERIVED FROM WHETHER THE CURRENT REQUEST HAS ONE (`10.4`).
+   *
+   * This hook used to store `{ options, loading, error }` and flip it on the way INTO the fetch effect --
+   * `setState({ loading: true, error: null })` before the request, and the disabled state likewise -- which
+   * `react-hooks/set-state-in-effect` makes an error this phase. So nothing is flipped any more:
+   *
+   *   `request`  counts requests. It moves when the inputs change (`enabled` or any of `deps`), noticed during
+   *              render against the inputs last seen, and when `refetch` is pressed.
+   *   `answer`   is the last settled result, stamped with the request it answers.
+   *   loading    = enabled, and the answer is not for the current request. Nobody sets it; it cannot stick.
+   *
+   * 🔑 THE TICKET IS STILL HERE, IT IS JUST THE EFFECT'S OWN LIFETIME NOW. A request is superseded when the
+   * effect for it is cleaned up -- new inputs, a refetch, or unmount -- which sets `superseded` and aborts the
+   * network, so a stale answer is dropped exactly as before. Unlike the old ref ticket it also covers unmount,
+   * and a refetch now aborts the request it replaces rather than only ignoring its answer.
+   *
+   * ⚠️ WHAT HAD TO BE PRESERVED, and is: a reload KEEPS the options it already had while it waits (the old
+   * `{ ...current, loading: true }`); disabling EMPTIES them, so re-enabling never flashes a list from before;
+   * and an abort leaves everything as it was. `useAsyncOptions.test.jsx` is the contract.
+   */
+  const inputs = [enabled, ...deps];
+  const [seenInputs, setSeenInputs] = useState(inputs);
+  const [request, setRequest] = useState(0);
+  const [answer, setAnswer] = useState(NO_ANSWER);
+  if (!sameInputs(inputs, seenInputs)) {
+    setSeenInputs(inputs);
+    setRequest((n) => n + 1);
+    if (!enabled) setAnswer(NO_ANSWER);
+  }
 
-    const ticket = (ticketRef.current += 1);
+  useEffect(() => {
+    if (!enabled) return undefined;
+
+    let superseded = false;
     const controller = typeof AbortController === 'undefined' ? null : new AbortController();
 
-    setState((current) => ({ ...current, loading: true, error: null }));
-
-    // 🔑 CALLED SYNCHRONOUSLY, not from a microtask. Deferring it by even one tick delays
-    // every request by a render, and — worse for a test — makes "was it called?" depend on
-    // when you look. The try/catch is what a `Promise.resolve().then(fetch)` was buying:
-    // a fetcher that throws before it returns a promise becomes the error state rather
-    // than an unhandled exception inside an effect.
-    let pending;
-    try {
-      pending = Promise.resolve(fetcherRef.current(controller?.signal));
-    } catch (error) {
-      setState({ options: [], loading: false, error });
-      return () => controller?.abort();
-    }
-
-    pending
+    // 🔑 CALLED SYNCHRONOUSLY, not from a microtask: a Promise EXECUTOR runs at once. Deferring the call by even
+    // one tick delays every request by a render, and makes "was it called?" depend on when a test looks. The
+    // executor is also what the old try/catch was for -- a fetcher that throws before it returns a promise
+    // becomes a rejection, and so the error state, rather than an exception inside an effect. And it means no
+    // state is set synchronously here at all, which is the point of the phase.
+    new Promise((resolve) => resolve(fetcherRef.current(controller?.signal)))
       .then((result) => {
         // 🔑 THE ONE LINE THE HOOK EXISTS FOR. A stale answer is discarded, not applied.
-        if (ticket !== ticketRef.current) return;
-        setState({ options: Array.isArray(result) ? result : [], loading: false, error: null });
+        if (superseded) return;
+        setAnswer({ request, options: Array.isArray(result) ? result : [], error: null });
       })
       .catch((error) => {
-        if (ticket !== ticketRef.current) return;
+        if (superseded) return;
         /*
          * An abort is the caller's own doing. Reporting it as a failure would put an
          * error under a field the user is still happily typing into.
@@ -111,30 +136,30 @@ export default function useAsyncOptions(fetcher, deps = [], { enabled = true } =
          * field the user was still typing into, and then cleared the options.
          */
         if (error?.kind === ERROR_KINDS.ABORT) return;
-        setState({ options: [], loading: false, error });
+        setAnswer({ request, options: [], error });
       });
 
-    return () => controller?.abort();
-  }, [enabled]);
-
-  useEffect(() => {
-    const cancel = run();
-    return cancel;
-    // `run` is intentionally absent: it closes over nothing but `enabled`, and the
-    // caller's `deps` are the real inputs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, ...deps]);
+    return () => {
+      superseded = true;
+      controller?.abort();
+    };
+  }, [enabled, request]);
 
   const refetch = useCallback(() => {
-    run();
-  }, [run]);
+    setRequest((n) => n + 1);
+  }, []);
+
+  const current = answer.request === request;
+  const loading = enabled && !current;
+  const options = enabled ? answer.options : NO_OPTIONS;
+  const error = enabled && current ? answer.error : null;
 
   return {
-    options: state.options,
-    loading: state.loading,
-    error: state.error,
+    options,
+    loading,
+    error,
     /** The fourth state, named rather than inferred at each call site. */
-    isEmpty: !state.loading && !state.error && state.options.length === 0,
+    isEmpty: !loading && !error && options.length === 0,
     refetch,
   };
 }

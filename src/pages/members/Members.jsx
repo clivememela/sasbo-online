@@ -5,9 +5,9 @@ import {
     LucideUserRoundPlus, AlertCircle, CircleCheck, Printer, SlidersHorizontal,
     Pencil, Check,
 } from "lucide-react";
-import { memberService } from "../../services/memberService.js";
-import { jobGradeService } from "../../services/jobGradeService.js";
-import { bankService } from "../../services/bankService.js";
+import { memberService } from "@/services/memberService.js";
+import { jobGradeService } from "@/services/jobGradeService.js";
+import { bankService } from "@/services/bankService.js";
 import { TextInput, SearchableSelect, SelectInput, Button, DateField } from "../../components/form";
 import StatusChip, { CANCELLED_STATUSES } from "../../components/common/StatusChip.jsx";
 import Table from "../../components/table/Table.jsx";
@@ -17,10 +17,10 @@ import {
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, IDENTITY_TYPE_PASSPORT,
     DEBIT_DAY_OPTIONS, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
-} from "../../config/memberConstants.js";
+} from "@/config/memberConstants.js";
 import {
-    validateSAID, validateEmail, formatDate, extractDateOfBirthFromSAID, extractGenderFromSAID
-} from "../../utils/validateSAID.js";
+    validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID
+} from "@/utils/validateSAID.js";
 import PageTitle from "../../components/common/PageTitle.jsx";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState.jsx";
@@ -29,16 +29,26 @@ import MemberPanel from "../../components/members/MemberPanel.jsx";
 import Criteria, { CRITERION } from "../../components/common/Criteria.jsx";
 import Pager from "../../components/common/Pager.jsx";
 import KeyHints from "../../components/common/KeyHints.jsx";
-import Sheet from "../../components/common/Sheet.jsx";
+import Sheet, { PAGE_GUTTER } from "../../components/common/Sheet.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
-import { parseDate, sameDate, today } from "../../lib/format.js";
-import { sanitiseField, validateField } from "../../utils/inputRules.js";
-import { branchNamesForBank } from "../../utils/bankBranches.js";
-import { cn } from "../../lib/utils";
-import { personName } from "../../lib/names.js";
+import { ERROR_KINDS, writeMayHaveLanded } from "@/services/parseApiError.js";
+import useFocusOn from "../../hooks/useFocusOn.js";
+import { formatDate, parseDate, sameDate, today } from "@/lib/format.js";
+import { sanitiseField, validateField } from "@/utils/inputRules.js";
+import { branchNamesForBank } from "@/utils/bankBranches.js";
+import { cn } from "@/lib/utils.js";
+import { formalName, personName } from "@/lib/names.js";
+import { fieldValue } from "@/lib/fieldValue.js";
+
 
 const PAGE_SIZE = memberService.getPageSize();
+
+/** The job-grade list when there is no current answer: stable, so the select is not handed a new array each render. */
+const NO_JOB_GRADES = [];
+
+/** The members out of `getMembers`' answer, whichever of its shapes arrived -- the load and the refresh after a save. */
+const memberRows = (res) => (Array.isArray(res) ? res : (res.data || res.members || []));
 
 /*
  * 🔴 HOW LONG THE RECORD OUTLIVES THE CLICK THAT CLOSED IT. This is `--duration-panel` in
@@ -48,7 +58,7 @@ const PAGE_SIZE = memberService.getPageSize();
  */
 const PANEL_MS = 380;
 
-/** The fields the topbar's search reads -- card.js `visible()`, plus the wire's own names. */
+/** The fields in the topbar's search reads -- card.js `visible()`, plus the wire's own names. */
 const SEARCH_FIELDS = [
     "membershipNumber", "employeeNumber", "surname", "firstNames", "initials", "bankName",
     "branch", "status", "identityNumber", "workEmail", "personalEmail", "email", "phone",
@@ -124,14 +134,10 @@ const notOnFile = (value) => (value === null || value === undefined || String(va
  *    both rows and centres in them -- *"right in the center, relative to all the other panel
  *    tabs."*
  * ④ And the strip is SYMMETRICAL about its own centre line: the left column reads from the
- *    left edge, the right column to the right edge, and the middle one is centred. Aligning
- *    all three from the left is what left "Membership" and "Structures" ending in different
- *    places and the whole block leaning.
+ *    left edge, the right column to the right edge, and the middle one is centred.
  *
- * It is a list rather than three conditionals because it is one composition, and a
- * composition is easier to check when you can see it. It applies only at five sections --
- * a sixth would fill a 3x2 grid with nothing left to balance, so any other count falls back
- * to the plain left-aligned flow.
+ * It applies only at five sections -- a sixth would fill a 3x2 grid with nothing left to
+ * balance, so any other count falls back to the plain left-aligned flow.
  */
 const TAB_PLACE = TABS.length === 5
   ? [
@@ -275,7 +281,7 @@ const RECORD_FIELD_LABELS = {
 };
 
 /** Never listed: identifiers, and a name the form derives from a field that is listed (the committee's id). */
-const UNLISTED_KEYS = ["id", "membershipNumber", "memberId", "becCommitteeName"];
+const UNLISTED_KEYS = new Set(["id", "membershipNumber", "memberId", "becCommitteeName"]);
 
 /**
  * A stored yes/no as a person reads it. `null` is its own answer on the read side -- Shop Steward
@@ -295,12 +301,27 @@ const comparable = (key, value) => {
     return value;
 };
 
+/**
+ * A record date as the panel shows it (R3-F1), and the one rule the deleted `formatBackendDate` used to carry:
+ * EMPTY stays empty. `formatDate` answers the em dash for a missing value and `Detail` prints its own for an empty
+ * one, so calling it unguarded put a literal "—" inside a disabled edit FIELD -- which a capture caught and no test
+ * did. Written once because it was written three times.
+ */
+const recordDate = (value) => (value ? formatDate(value) : "");
+
+/** The record's date fields, by name. conventions §15 gives them all one shape: `yyyy/mm/dd`. */
+const DATE_KEYS = new Set(["dateOfBirth", "joinDate", "electionDate"]);
+
 /** A value as a person reads it. */
 const readable = (key, value) => {
     const shown = comparable(key, value);
     if (typeof shown === "boolean") return shown ? "Yes" : "No";
     if (key === "becCommitteeId") return SASBO_BEC_BRANCHES.find((branch) => branch.id === shown)?.name ?? (shown || "—");
     if (key === "becStructures" || key === "cosatuPositions") return shown ? String(shown).split(",").join(", ") : "none";
+    // R3-F1: a LocalDate arrives as [y, m, d], and `comparable` joins an array with commas -- so an untouched date
+    // read "1988,6,15", and a changed one "1988,6,15 → 1988-06-15". Dates are NAMED, never sniffed: a value that
+    // merely looks like one is not one, and the record holds exactly these three.
+    if (DATE_KEYS.has(key)) return formatDate(value);
     return shown === "" ? "—" : String(shown);
 };
 
@@ -308,7 +329,7 @@ const fieldLabel = (key) =>
     RECORD_FIELD_LABELS[key] || MEMBER_FIELD_LABEL_MAP[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 
 const getChangedFields = (draft, original) => Object.keys(draft)
-    .filter((key) => !UNLISTED_KEYS.includes(key))
+    .filter((key) => !UNLISTED_KEYS.has(key))
     .filter((key) => comparable(key, draft[key]) !== comparable(key, original[key]))
     .map((key) => `${fieldLabel(key)}: ${readable(key, original[key])} → ${readable(key, draft[key])}`);
 
@@ -330,11 +351,23 @@ const REFERENCE_LOADERS = {
     'bank branches': () => bankService.getBankListing(),
 };
 
+/**
+ * The record's save notice, by kind. `unconfirmed` and `stale` are R3-F2's: a save whose answer never arrived is not
+ * "not saved", and a save that landed before the register failed to refresh is saved.
+ */
+const SAVE_NOTICE_TITLES = {
+    invalid: "Fix these before saving",
+    unchanged: "Nothing to save",
+    failed: "The changes were not saved",
+    unconfirmed: "The save could not be confirmed",
+    stale: "The changes were saved",
+};
+
 export default function Members() {
     const navigate = useNavigate();
     const location = useLocation();
     const [filters, setFilters] = useState(() => getInitialFilters(location.state));
-    const [page, setPage] = useState(1);
+    const [requestedPage, setPage] = useState(1);
     const [selectedMember, setSelectedMember] = useState(null);
 
     /*
@@ -382,7 +415,6 @@ export default function Members() {
     const [activeTab, setActiveTab] = useState("personal");
     const [showSavedNotification, setShowSavedNotification] = useState(false);
     const [fieldErrors, setFieldErrors] = useState({});
-    const prevMemberIdRef = useRef(null);
     const [membersList, setMembersList] = useState([]);
 
     /*
@@ -455,11 +487,16 @@ export default function Members() {
         setPrintScope(null);
     }, []);
 
+    /*
+     * 🔴 THE LOADING RESET IS ON THE RETRY PATH NOW (`10.4`), not inside the fetch the effect
+     * calls. `react-hooks/set-state-in-effect` is an error as of this phase and it was right.
+     *
+     * 🔑 A NO-OP ON MOUNT: `listState` already initialises to "loading". The line only ever did
+     * work when a human pressed Try again after a failure, and that is `retryMembers`.
+     */
     const loadMembers = useCallback(() => {
-        setListState("loading");
         return memberService.getMembers().then(res => {
-            const list = Array.isArray(res) ? res : (res.data || res.members || []);
-            setMembersList(list);
+            setMembersList(memberRows(res));
             setListState("ready");
         }).catch(err => {
             // Still logged — the log is what a developer reads. What changed is that the
@@ -468,6 +505,11 @@ export default function Members() {
             setListState("error");
         });
     }, []);
+
+    const retryMembers = useCallback(() => {
+        setListState("loading");
+        loadMembers();
+    }, [loadMembers]);
 
     // The two reference lists are `useReferenceData`'s now; this owns the register alone.
     useEffect(() => {
@@ -498,16 +540,38 @@ export default function Members() {
     );
     const branchOptions = branchOptionsFor(editForm.bankName);
     const genderOptions = GENDER_OPTIONS;
-    const [jobGradeOptions, setJobGradeOptions] = useState([]);
     /*
      * ✅ A25's SECOND CLAUSE, `06.1b` -- the other of the two callers. Same reasoning as the
      * one written out at `CaptureMember.jsx`: `getByBank` no longer swallows a failure into
      * the (empty) static list, so this panel renders the failure with a retry instead of
      * telling an administrator that the member's bank has no job grades on file.
      */
-    const [jobGradeError, setJobGradeError] = useState(null);
     const [jobGradeAttempt, setJobGradeAttempt] = useState(0);
-    const jobGrade = jobGradeOptions;
+    /*
+     * 🔴 ONE RESULT, KEYED BY THE QUESTION IT ANSWERS, AND SHOWN ONLY WHILE IT IS THE CURRENT ONE (`10.4`).
+     *
+     * The grades and their failure used to be two pieces of state that the fetch effect RESET on the way in
+     * (`setJobGradeOptions([])`, `setJobGradeError(null)`) -- which `react-hooks/set-state-in-effect` makes an
+     * error this phase. Keying the result by `[bank, attempt]` removes every one of those resets, because a
+     * result for another bank or another attempt is simply not current, so it is not shown. Nothing has to be
+     * cleared for it to disappear.
+     *
+     * 🔑 AND IT CLOSES A GAP R3-F4 LEFT OPEN. The resets only ran when the NEXT answer landed, so switching
+     * ABSA -> Capitec while editing left ABSA's grades on offer under "Capitec" for as long as Capitec took to
+     * answer -- one click from saving a grade against the wrong bank, which is the very thing R3-F4's ticket
+     * was added to prevent, reached by waiting rather than by racing. Here the old bank's list stops being
+     * current the instant the bank changes. `Members.jobGradeSequencing.test.jsx` ③ was red on that before
+     * this change.
+     *
+     * Not editing, or no bank: no key, no grades -- grades are per bank, so an empty list is the honest answer.
+     */
+    const [jobGradeResult, setJobGradeResult] = useState(null);
+    const jobGradeKey = isEditing && editForm.bankName
+        ? JSON.stringify([editForm.bankName, jobGradeAttempt])
+        : null;
+    const currentJobGrades = jobGradeResult?.key === jobGradeKey ? jobGradeResult : null;
+    const jobGrade = currentJobGrades?.options ?? NO_JOB_GRADES;
+    const jobGradeError = currentJobGrades?.error ?? null;
 
     useEffect(() => {
         const onKeyDown = (e) => {
@@ -517,12 +581,8 @@ export default function Members() {
             // guard, Escape in the calendar of the edit form threw the member away.
             if (e.defaultPrevented || e.target?.closest?.('[role="dialog"], [role="listbox"]')) return;
             // `06.5`: through the same guard as every other way out -- an edit with changes asks first.
-            if (leaveRef.current) {
-                leaveRef.current();
-                return;
-            }
-            closeRecord();
-            setIsEditing(false);
+            // `leaveRef` is assigned on every commit, before any key can be pressed, so there is no second path.
+            leaveRef.current?.();
         };
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);
@@ -530,30 +590,49 @@ export default function Members() {
 
     /**
      * 🔴 R4-F1, the edit twin of Capture Member's: Initials are derived from First Name(s) until the administrator
-     * types them. Reset whenever a record is loaded or an edit begins, so one member's typed initials do not stop the
+     * types them. Reset whenever an edit BEGINS (`handleEditToggle`), so one member's typed initials do not stop the
      * next member's from deriving.
+     *
+     * ♻️ IT USED TO BE RESET ON RECORD LOAD AS WELL, AND THAT RESET HAD NO CONSEQUENCE. The flag is read only while
+     * editing, every way into editing passes through `handleEditToggle`, and no path opens a different member in the
+     * middle of an edit -- opening one ends the edit first, and a save ends it itself. A deletion proof in `10.4`
+     * confirmed it (removed, `Members.recordSeed.test.jsx` ③ stayed green), and P10's refactor pass removed it.
      */
     const initialsTyped = useRef(false);
 
-    useEffect(() => {
-        initialsTyped.current = false;
+    /*
+     * 🔴 THE RECORD RESEEDS DURING RENDER NOW, AND THE REF THAT REMEMBERED THE LAST MEMBER IS STATE (`10.4`).
+     *
+     * This was one effect keyed on `selectedMember` -- an error under `react-hooks/set-state-in-effect` this
+     * phase -- and it could not simply be lifted into render, because it also WROTE two refs, and a ref written
+     * during render is its own violation. So it splits:
+     *
+     *   - the state it seeds (form, section, errors, edit mode) moves into a render-phase update guarded by
+     *     the last member seen, React's documented form, which also means a newly opened record never paints
+     *     one frame with the previous member's form;
+     *   - `prevMemberIdRef` is not moved but REPLACED: the last member seen is exactly what it held;
+     *   - the `initialsTyped` reset that was also here turned out to be dead weight -- see `initialsTyped`.
+     *
+     * ⚠️ THE SECTION RESETS BY MEMBERSHIP NUMBER, NOT BY OBJECT, and that has to survive: a save replaces the
+     * record with a new object carrying the same number, and comparing identities would throw the user back to
+     * Personal after every save. `Members.recordSeed.test.jsx` ② is the must-pass that says so.
+     */
+    const [seenMember, setSeenMember] = useState(null);
+    if (selectedMember !== seenMember) {
+        const previousNumber = seenMember?.membershipNumber ?? null;
+        setSeenMember(selectedMember);
         if (selectedMember) {
             // List fields arrive as lists: memberService.normalizeMember unfolds the server's
             // "PEC,CEC" once, for every consumer (A37 / A38).
-            const normalized = { ...selectedMember, paymentType: normalizePaymentType(selectedMember.paymentType) };
-            setEditForm(normalized);
-            if (prevMemberIdRef.current !== selectedMember.membershipNumber) {
-                setActiveTab("personal");
-            }
-            prevMemberIdRef.current = selectedMember.membershipNumber;
+            setEditForm({ ...selectedMember, paymentType: normalizePaymentType(selectedMember.paymentType) });
+            if (previousNumber !== selectedMember.membershipNumber) setActiveTab("personal");
             setFieldErrors({});
         } else {
             setIsEditing(false);
             setEditForm({});
-            prevMemberIdRef.current = null;
             setFieldErrors({});
         }
-    }, [selectedMember]);
+    }
 
     useEffect(() => {
         /*
@@ -565,23 +644,31 @@ export default function Members() {
          * own change, which only a person can cause. Proved by `Members.jobGrade.test.jsx`:
          * ① reddened on the merged code, and ③ holds that a real change of bank still clears it.
          */
-        if (!editForm.bankName) {
-            // No bank, no grades: grades are per bank, so an empty list is the honest answer.
-            setJobGradeOptions([]);
-            setJobGradeError(null);
-            return;
-        }
+        /*
+         * 🔴 R3-F4: ONLY WHILE EDITING, AND ONLY THE LATEST ANSWER COUNTS.
+         *
+         * The list is offered by the edit form alone -- the read view prints `editForm.jobGrade` directly and never
+         * touches these options -- so fetching on every OPEN spent two requests per member looked at, on the screen
+         * used most, for something nobody could see. And the fetch had no ticket: switching bank A → B with A's
+         * answer arriving last put A's grades under bank B, where one of them could then be saved.
+         */
+        if (jobGradeKey === null) return undefined;
 
-        setJobGradeError(null);
+        let superseded = false;
         jobGradeService.getByBank(editForm.bankName)
-            .then((grades) => setJobGradeOptions(Array.isArray(grades) ? grades : []))
+            .then((grades) => {
+                if (superseded) return;
+                setJobGradeResult({ key: jobGradeKey, options: Array.isArray(grades) ? grades : [], error: null });
+            })
             .catch((error) => {
                 // An abort is the caller superseding itself, not a failure (§16, EH-D3).
-                if (error?.kind === 'abort') return;
-                setJobGradeOptions([]);
-                setJobGradeError(error);
+                if (superseded || error?.kind === ERROR_KINDS.ABORT) return;
+                setJobGradeResult({ key: jobGradeKey, options: [], error });
             });
-    }, [editForm.bankName, jobGradeAttempt]);
+        return () => {
+            superseded = true;
+        };
+    }, [jobGradeKey, editForm.bankName]);
 
 
     const handleEditToggle = () => {
@@ -600,7 +687,7 @@ export default function Members() {
     };
 
     const handleEditChange = useCallback((field) => (event) => {
-        let rawValue = event && event.target ? event.target.value : event;
+        let rawValue = fieldValue(event);
         if (field === "initials") initialsTyped.current = true;
 
         const hasNonNumericInput =
@@ -715,7 +802,6 @@ export default function Members() {
      * exactly as it had, with nothing on screen saying what was wrong.
      */
     const [saveNotice, setSaveNotice] = useState(null);
-    const errorSummaryRef = useRef(null);
 
     const handleSaveChanges = async () => {
         const clientSideErrors = validateEditForm();
@@ -759,28 +845,50 @@ export default function Members() {
     const commitSave = async () => {
         if (savingRecord) return;
         setSavingRecord(true);
+        // ONE exit, whatever happens below: the write's own `catch` returns early, and the refresh that follows
+        // has a `try` of its own, so a third path added later would otherwise leave the record busy for ever.
         try {
-            await memberService.updateMember(editForm);
-            const refreshed = await memberService.getMembers();
-            const list = Array.isArray(refreshed) ? refreshed : (refreshed.data || refreshed.members || []);
+            try {
+                await memberService.updateMember(editForm);
+            } catch (error) {
+                reportError("Members.save", error);
+                // 06.1 owns the shared error CONTRACT; what this wave owes the screen is that
+                // a failed save is visible on the screen the member is looking at, rather than
+                // in a dialog they dismiss and a console they never open.
+                // 🔴 R3-F2: "Nothing was written" only after a refusal. A timeout, a lost connection or a 5xx may have saved
+                // the change, and a clerk told otherwise redoes it.
+                setPendingSave(null);
+                setSaveNotice(writeMayHaveLanded(error)
+                    ? {
+                        kind: "unconfirmed",
+                        messages: ["We did not get an answer about these changes, so they may have been saved. Reload the register and check this member before trying again."],
+                    }
+                    : {
+                        kind: "failed",
+                        messages: ["We could not save these changes. Nothing was written — please try again."],
+                    });
+                return;
+            }
+
+            // The save landed. What follows is the register catching up, and its failure is not the save's (R3-F2): it
+            // shared the write's `try`, so a good save followed by a failed refresh was reported as not written.
             setPendingSave(null);
-            setMembersList(list);
             setSelectedMember({ ...editForm });
             setEditBaseline(null);
             setIsEditing(false);
-            setSavedName([editForm.firstNames, editForm.surname].filter(Boolean).join(" "));
+            setSavedName(personName(editForm));
             setShowSavedNotification(true);
             window.setTimeout(() => setShowSavedNotification(false), 2600);
-        } catch (error) {
-            reportError("Members.save", error);
-            // 06.1 owns the shared error CONTRACT; what this wave owes the screen is that
-            // a failed save is visible on the screen the member is looking at, rather than
-            // in a dialog they dismiss and a console they never open.
-            setPendingSave(null);
-            setSaveNotice({
-                kind: "failed",
-                messages: ["We could not save these changes. Nothing was written — please try again."],
-            });
+            try {
+                const refreshed = await memberService.getMembers();
+                setMembersList(memberRows(refreshed));
+            } catch (error) {
+                reportError("Members.refreshAfterSave", error);
+                setSaveNotice({
+                    kind: "stale",
+                    messages: ["The changes were saved, but the register could not be refreshed, so its rows may show the old values until the page is reloaded."],
+                });
+            }
         } finally {
             setSavingRecord(false);
         }
@@ -847,17 +955,11 @@ export default function Members() {
         else closeRecord();
     };
 
-    // Same shape as `Auth`'s, and for the same reason: the summary does not exist yet when
-    // the handler that sets it runs, so focusing it there is a silent no-op. `saveNotice`
-    // is replaced by a fresh object on every attempt, so a second failed save moves focus
-    // again rather than looking ignored.
-    useEffect(() => {
-        if (saveNotice) errorSummaryRef.current?.focus();
-    }, [saveNotice]);
+    // The save summary takes focus once it exists, and again on every fresh notice -- `useFocusOn` says why.
+    const errorSummaryRef = useFocusOn(saveNotice);
 
     const handleInputChange = useCallback((field) => (event) => {
-        const value = event && event.target ? event.target.value : event;
-        setFilters((prev) => ({ ...prev, [field]: value }));
+        setFilters((prev) => ({ ...prev, [field]: fieldValue(event) }));
         setPage(1);
     }, []);
 
@@ -886,6 +988,35 @@ export default function Members() {
             (!query || SEARCH_FIELDS.some((field) => String(member[field] ?? "").toLowerCase().includes(query)))
         );
     }, [deferredFilters, membersList, query]);
+
+    /*
+     * 🔴 THE PAGE IS DERIVED, NOT CLAMPED AFTER THE FACT (`10.4`) -- AND THE CLAMP WAS A LIE FOR ONE FRAME.
+     *
+     * It used to be an effect: `setPage(p => Math.min(p, totalPages))`. `react-hooks/set-state-in-effect`
+     * flagged it, and the warning was describing a real frame. Search from page 3 for a surname five members
+     * share, and React rendered once with `page` still 3 and one page in total -- an EMPTY slice -- COMMITTED
+     * it, and drew **No member matches "..."** over members it was about to show. Only then did the effect
+     * bring the page down. A false statement about the union's own register, for one frame, on every search
+     * made from a later page.
+     *
+     * Criteria never showed it (they reset to page 1 themselves); only the TOPBAR search shrinks the list
+     * without doing so, which is why that is the one path that needed a clamp at all. And no test could see
+     * it, because every test mounts this page without the shell that supplies the search.
+     * `Members.pageClamp.test.jsx` mounts it under one, and watches the empty title for the whole transition.
+     *
+     * Derived during render, there is no frame in which the page can be out of range.
+     *
+     * ⚠️ AND DERIVING ALONE WOULD HAVE BROKEN SOMETHING ELSE, WHICH IS WHY THE SECOND LINE EXISTS. The effect
+     * clamped PERMANENTLY: search from page 3, land on page 1, clear the search, and you stay on page 1. A bare
+     * `Math.min` leaves what was asked for at 3, so clearing the search would have thrown the user back to
+     * page 3 of the full register -- a page they never chose for that list. So what was asked for follows
+     * what can be shown, during render. That is React's documented adjustment ("storing information from
+     * previous renders"): the re-render happens before anything commits, so the stale frame is never drawn,
+     * and the guard is what makes it terminate. The test file's third case holds this half.
+     */
+    const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE)), [filteredMembers]);
+    const page = Math.min(requestedPage, totalPages);
+    if (requestedPage !== page) setPage(page);
 
     /* The rows re-enter when the question changes: a new query, a new criterion, a new page. */
     const enterKey = useMemo(
@@ -944,11 +1075,6 @@ export default function Members() {
         };
     }, [membersList]);
 
-    const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE)), [filteredMembers]);
-    useEffect(() => {
-        setPage((currentPage) => Math.min(currentPage, totalPages));
-    }, [totalPages]);
-
     const startIndex = (page - 1) * PAGE_SIZE;
     const endIndex = Math.min(startIndex + PAGE_SIZE, filteredMembers.length);
     const visibleMembers = useMemo(() => filteredMembers.slice(startIndex, endIndex), [filteredMembers, startIndex, endIndex]);
@@ -959,16 +1085,6 @@ export default function Members() {
         setPage(1);
     };
 
-    const formatBackendDate = (dateVal) => {
-        // Empty, not "-": `Detail` prints the record's own "—" for a value that is not there,
-        // and a hyphen beside it read as a different mark for the same absence (`06.3`).
-        if (!dateVal) return "";
-        if (Array.isArray(dateVal)) {
-            const [year, month, day] = dateVal;
-            return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-        }
-        return String(dateVal).split("T")[0];
-    };
     /**
      * The register's columns. R-RESP-K: every column declares what it is worth, so a phone
      * shows three real columns and puts the rest in the row's detail panel instead of
@@ -990,7 +1106,7 @@ export default function Members() {
             priority: "essential",
             cell: (member) => {
                 const number = member.membershipNumber || "—";
-                const who = [member.title, member.initials, member.surname].filter(Boolean).join(" ");
+                const who = formalName(member);
                 const cancelled = CANCELLED_STATUSES.some((s) => s.toLowerCase() === String(member.status ?? "").toLowerCase());
                 return (
                     <button
@@ -1045,7 +1161,7 @@ export default function Members() {
             cell: (m) => (
                 <span className="block max-w-[13rem]">
                     <span className="block truncate text-base font-semibold leading-tight text-ink">
-                        {[m.title, m.initials, m.surname].filter(Boolean).join(" ") || "—"}
+                        {formalName(m) || "—"}
                     </span>
                     {m.firstNames && <span className="block truncate text-xs text-ink-muted">{m.firstNames}</span>}
                 </span>
@@ -1102,7 +1218,7 @@ export default function Members() {
            is the SHELL's third column -- `MemberPanel` portals into it -- so nothing here has
            to make room for it, and below `xl` it is a drawer over this. */
         <div className="flex min-h-0 flex-1 flex-col text-ink">
-            <div className="px-7 pt-[26px] max-lg:px-4">
+            <div className={cn(PAGE_GUTTER, "pt-[26px]")}>
                 <PageTitle
                     title="Members"
                     subtitle="The membership register across every bank. Select a member to open their card."
@@ -1133,7 +1249,7 @@ export default function Members() {
                 the page, "More criteria" beside them, Clear at the end. This page had FIFTEEN
                 in a grid, which is a search form rather than a register's criteria. The other
                 twelve are all still here, one disclosure away -- nothing was removed. */}
-            <div className="no-print px-7 pt-4 max-lg:px-4">
+            <div className={cn("no-print", PAGE_GUTTER, "pt-4")}>
                 <Criteria>
                     <SearchableSelect
                         className={CRITERION}
@@ -1231,7 +1347,7 @@ export default function Members() {
             {(refs.state === 'partial' || refs.state === 'error') && (
                 <div className="mx-7 mt-4 rounded-lg bg-surface shadow-(--shadow-1) max-lg:mx-4">
                     <DataState
-                        state={refs.state === 'error' ? 'error' : 'partial'}
+                        state={refs.state}
                         layout="row"
                         compact
                         onRetry={refs.retry}
@@ -1254,7 +1370,8 @@ export default function Members() {
             <section
                 aria-label="Member register"
                 className={cn(
-                    "register flex flex-1 flex-col px-7 pb-7 pt-4 max-lg:px-4",
+                    "register flex flex-1 flex-col pb-7 pt-4",
+                    PAGE_GUTTER,
                     printScope === "register" && "print-area",
                 )}
             >
@@ -1270,7 +1387,7 @@ export default function Members() {
                         loading={listState === "loading"}
                         error={listState === "error" ? "The register could not be reached" : null}
                         errorMessage="The server did not answer, so this is not an empty result. Nothing you typed has been lost."
-                        onRetry={loadMembers}
+                        onRetry={retryMembers}
                         emptyTitle={query ? `No member matches “${deferredSearch.trim()}”` : "No members match these criteria"}
                         emptyMessage={
                             query
@@ -1317,14 +1434,17 @@ export default function Members() {
             </section>
 
             {/* card.css `.toast`: the save's confirmation, low and centred, gone in 2.6s. */}
+            {/* card.css `.toast`: the save's confirmation, low and centred, gone in 2.6s.
+                `<output>` NOT `<div role="status">`: its implicit role IS `status`, so the
+                live region is native semantics rather than a generic box wearing an ARIA hat --
+                consistent across every device and screen reader. */}
             {showSavedNotification && (
-                <div
-                    role="status"
+                <output
                     className="kind-in fixed bottom-[84px] left-1/2 z-50 flex -translate-x-1/2 items-center gap-2.5 rounded-[10px] bg-ink px-3.5 py-2.5 text-[13.5px] font-medium text-bg shadow-(--shadow-2)"
                 >
                     <CircleCheck size={16} strokeWidth={2} aria-hidden="true" className="text-brand" />
                     <span>{savedName ? `${savedName}’s record saved` : "Changes saved"}</span>
-                </div>
+                </output>
             )}
 
             {/* ✅ THE RECORD IS A DOCKED PANEL, NOT A MODAL.
@@ -1354,12 +1474,6 @@ export default function Members() {
                         </>
                     ) : (
                         <>
-                            {/* 🗣️ PRINT IS LIVE (the owner, 2026-09-09) and the member record is
-                                the first thing to get a real print layout: index.css hides the
-                                shell and every control, drops the record to a single column, and
-                                forces the light theme so a dark-mode user does not print a black
-                                page. The mock's foot has Edit alone; print earns the one quiet
-                                control beside it. */}
                             <Button size="icon" onClick={() => printWith("record")} aria-label="Print this member's record">
                                 <Printer size={16} strokeWidth={1.75} aria-hidden="true" />
                             </Button>
@@ -1389,18 +1503,14 @@ export default function Members() {
                                 tabIndex={-1}
                                 aria-labelledby="member-save-notice-title"
                                 className={`mt-4 rounded-lg border p-3 text-sm no-print focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring ${
-                                    saveNotice.kind === "unchanged"
+                                    saveNotice.kind === "unchanged" || saveNotice.kind === "stale"
                                         ? "border-line-strong bg-surface-2 text-ink-muted"
                                         : "border-status-suspended-dot bg-status-suspended-bg text-status-suspended"
                                 }`}
                             >
                                 <p id="member-save-notice-title" className="flex items-center gap-2 font-medium">
                                     <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.5} />
-                                    {saveNotice.kind === "invalid"
-                                        ? "Fix these before saving"
-                                        : saveNotice.kind === "unchanged"
-                                            ? "Nothing to save"
-                                            : "The changes were not saved"}
+                                    {SAVE_NOTICE_TITLES[saveNotice.kind]}
                                 </p>
                                 <ul className="mt-1 list-disc pl-6">
                                     {saveNotice.messages.map((message) => <li key={message}>{message}</li>)}
@@ -1424,66 +1534,27 @@ export default function Members() {
                             ⏳ The full pattern needs roving focus, and a shared
                             `useRovingFocus` is already on RF's list precisely because this
                             application has three places that want it. */}
-                        {/* 🔴 FIVE TABS WRAPPED TO THREE ROWS IN THE PANEL. Docked, the record
-                            is a `clamp(360px, 32vw, 448px)` column, and "Personal Information",
-                            "Employment & Bank", "Membership & Subscriptions", "Recruitment
-                            Channel" and "Sasbo Structures" do not fit across it — so the strip
-                            broke into three stacked lines with the rule under only the last of
-                            them, and the record's own heading took 90px before a single field.
-                            The mock's tab strip is ONE line with a rule under it, and one line
-                            is what it stays: the row scrolls sideways instead of wrapping.
-                            The scrollbar itself is hidden: `scroll-quiet` draws a THIN one,
-                            which laid a second horizontal line directly on top of the strip's
-                            own rule. The tabs are their own affordance — the cut-off edge of
-                            the next label is what says there is more. */}
-                        <div className="no-print mt-4 border-b border-line">
                         {/* 🔑 IT WRAPS. IT DOES NOT SCROLL — AND THE MOCK SETTLED THAT.
-                            `card.css:357` is `.tabs { display: flex; flex-wrap: wrap; }` at
-                            13px: every section is on screen, always, and nothing is reached by
-                            swiping. This build had it scrolling for one round, and the owner
-                            put it plainly — *"I didn't even know they were there until I opened
-                            up the console. There mustn't be any trickyness to it."* A tab you
-                            cannot see is a tab that does not exist, and a fading edge is a hint,
-                            not a control.
-
-                            What made wrapping look wrong before was not the wrap. It was FIVE
-                            LONG LABELS breaking into three ragged rows, with the rule under only
-                            the last of them. Short labels at the mock's own 13px fit two, and the
-                            rule sits on the wrapper so it runs under the whole block the way
-                            `.tabs`'s `border-bottom` does.
-
-                            📐 THREE COLUMNS, NOT `flex-wrap` — AND THE DIFFERENCE IS THAT THIS
-                            ONE IS THE SAME EVERY TIME. Left to wrap, the strip broke 4+1 on a
-                            448px panel and 3+2 on the owner's own window, because the split was
-                            whatever the labels happened to measure at that width. A grid gives
-                            the five sections three fixed columns, so they line up under each
-                            other in both rows and the arrangement does not change with the
-                            window. `justify-self-start` keeps each button its own width, so the
-                            active underline stays under the LABEL and not under the column.
-
-                            🗣️ The last tab is placed in the third column rather than the second,
-                            at the owner's instruction: *"Make structures aligned under Membership
-                            so that there's a gap in the middle between Recruitment and
-                            Structures."* The gap is the point -- it reads as a deliberate
-                            arrangement rather than as a row that ran out. */}
-                        <div className="grid grid-cols-3 gap-x-0.5">
-                            {TABS.map((tab, index) => (
-                                <button
-                                    key={tab.id}
-                                    type="button"
-                                    aria-current={activeTab === tab.id ? "true" : undefined}
-                                    onClick={() => changeTab(tab.id)}
-                                    className={cn(
-                                        // card.css:358 -- 13px, not 14: the strip is a quiet index of the record, not a
-                                        // second row of headings, and the extra pixel is what pushed it to three rows.
-                                        "touch-target inline-flex items-center justify-self-start gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-[13px] font-medium",
-                                        // Where this one sits in the composition -- see `TAB_PLACE`.
-                                        TAB_PLACE[index],
-                                        "transition-[color,box-shadow] duration-(--duration-instant) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
-                                        activeTab === tab.id
-                                            ? "font-semibold text-brand-ink shadow-[inset_0_-2px_0_var(--color-brand)]"
-                                            : "text-ink-muted shadow-[inset_0_-2px_0_transparent] hover-hover:hover:text-ink",
-                                    )}
+                            Short labels at the mock's own 13px fit a three-column composition
+                            in the docked `clamp(424px, 32vw, 448px)` panel. The rule sits on
+                            the wrapper so it runs under the whole block. */}
+                        <div className="no-print mt-4 border-b border-line">
+                            <div className="grid grid-cols-3 gap-x-0.5">
+                                {TABS.map((tab, index) => (
+                                    <button
+                                        key={tab.id}
+                                        type="button"
+                                        aria-current={activeTab === tab.id ? "true" : undefined}
+                                        onClick={() => changeTab(tab.id)}
+                                        className={cn(
+                                            // card.css:358 -- 13px, not 14: a quiet index of the record, not a second row of headings.
+                                            "touch-target inline-flex items-center gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-[13px] font-medium",
+                                            TAB_PLACE[index],
+                                            "transition-[color,box-shadow] duration-(--duration-instant) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
+                                            activeTab === tab.id
+                                                ? "font-semibold text-brand-ink shadow-[inset_0_-2px_0_var(--color-brand)]"
+                                                : "text-ink-muted shadow-[inset_0_-2px_0_transparent] hover-hover:hover:text-ink",
+                                        )}
                                 >
                                     {/* Shown short, named in full -- see `RECORD_TABS`. Not `aria-label`: that would
                                         also silence the "has errors" text a screen reader gets below. */}
@@ -1539,7 +1610,7 @@ export default function Members() {
                                         now. The I.D.-derived case stays read-only text: it is
                                         computed from the identity number, not typed. */}
                                     {editForm.identityType === "I.D. Number" ? (
-                                        <Detail label="Date of Birth" value={editForm.dateOfBirth ? formatDate(editForm.dateOfBirth) : ""} isEditing={isEditing} disabled onChange={handleEditChange("dateOfBirth")} />
+                                        <Detail label="Date of Birth" value={recordDate(editForm.dateOfBirth)} isEditing={isEditing} disabled onChange={handleEditChange("dateOfBirth")} />
                                     ) : isEditing ? (
                                         <DateField
                                             label="Date of Birth"
@@ -1550,7 +1621,7 @@ export default function Members() {
                                             onChange={(e) => setEditForm(prev => ({ ...prev, dateOfBirth: e.target.value }))}
                                         />
                                     ) : (
-                                        <Detail label="Date of Birth" value={editForm.dateOfBirth} isEditing={false} />
+                                        <Detail label="Date of Birth" value={recordDate(editForm.dateOfBirth)} isEditing={false} />
                                     )}
                                     <Detail label="Gender" value={editForm.gender} isEditing={isEditing} options={editForm.identityType === "I.D. Number" ? null : genderOptions} onChange={handleEditChange("gender")} disabled={editForm.identityType === "I.D. Number"} />
                                     <Detail label="Race" value={editForm.race} isEditing={isEditing} options={raceOptions} onChange={handleEditChange("race")} />
@@ -1602,7 +1673,7 @@ export default function Members() {
 
                             {activeTab === "membership" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
-                                    <Detail label="Date Joined Sasbo" value={formatBackendDate(selectedMember.joinDate)} isEditing={false} />
+                                    <Detail label="Date Joined Sasbo" value={recordDate(selectedMember.joinDate)} isEditing={false} />
                                     <Detail label="Account Membership Status" value={editForm.status} isEditing={isEditing} options={statusOptions} onChange={handleEditChange("status")} />
                                     <h4 className="col-span-full mt-1.5 border-t border-line pt-[18px] text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Sasbo Subscription Fee Details</h4>
                                     {/* 🔴 A MEMBER WITH NO SUBSCRIPTION ON FILE WAS SHOWN R182.77, MONTHLY (`06.4`) -- two invented
@@ -1716,7 +1787,7 @@ export default function Members() {
 
             <ConfirmDialog
                 open={Boolean(pendingSave)}
-                onOpenChange={closeOn(() => { if (!savingRecord) setPendingSave(null); })}
+                onOpenChange={closeOn(() => setPendingSave(null))}
                 title="Save these changes?"
                 confirmLabel="Save changes"
                 cancelLabel="Keep editing"

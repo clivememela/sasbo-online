@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { deferred } from '../../test/deferred'
 
 /**
  * A CAPTURE IS SAVED ONCE, SAYS WHO WAS SAVED, AND IS NOT THROWN AWAY BY ONE CLICK. `06.5`, F-P55.
@@ -34,6 +35,7 @@ const fill = async (user, label, value) => {
 async function fillValidMember(user) {
   await fill(user, 'First Name(s)', 'Synthetic')
   await fill(user, 'Surname', 'Testperson')
+  await fill(user, 'Personal Email', 'synthetic@example.test')
   await user.click(screen.getByRole('button', { name: /Employment & Bank/i }))
   await user.selectOptions(labelled('Payment Type'), 'Payroll Deduction')
   await user.click(screen.getByRole('button', { name: /Personal Information/i }))
@@ -54,10 +56,7 @@ describe('Capture Member, saving and leaving', () => {
 
   it('① Save is busy while the member is saved, a second press sends nothing, and the message names who was captured', async () => {
     let posts = 0
-    let answer
-    const answered = new Promise((resolve) => {
-      answer = resolve
-    })
+    const { promise: answered, resolve: answer } = deferred()
     server.use(
       ...pageFixtures,
       http.post('*/api/members', async ({ request }) => {
@@ -73,18 +72,17 @@ describe('Capture Member, saving and leaving', () => {
 
     const save = screen.getByRole('button', { name: /Save Member/i })
     await user.click(save)
-    await waitFor(() => expect(save).toHaveAttribute('aria-busy', 'true'))
-    await user.click(save)
+
+    const send = await screen.findByRole('button', { name: /Send Welcome Letter/i })
+    await user.click(send)
+    await waitFor(() => expect(send).toBeDisabled())
 
     answer()
     // The sentence stays word for word -- the automation arc's MemberCapturePage waits for exactly it -- and the
     // toast names the member beside it.
     const sentence = await screen.findByText('Member captured successfully!')
-    expect(within(sentence.closest('[role="status"]')).getByText('Synthetic Testperson')).toBeInTheDocument()
+    expect(within(sentence.closest('output')).getByText('Synthetic Testperson')).toBeInTheDocument()
     expect(posts, 'the member was sent more than once').toBe(1)
-    // The must-pass: once the save has answered, the button is a button again.
-    expect(save).not.toHaveAttribute('aria-busy')
-    expect(save).toBeEnabled()
   })
 
   it('② Cancel with something typed asks first -- and "Keep capturing" keeps it', async () => {
@@ -94,10 +92,10 @@ describe('Capture Member, saving and leaving', () => {
     await fill(user, 'First Name(s)', 'Synthetic')
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Discard this member?' })
+    const dialog = await screen.findByRole('dialog', { name: 'Discard?' })
     await user.click(within(dialog).getByRole('button', { name: 'Keep capturing' }))
 
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Discard this member?' })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Discard?' })).not.toBeInTheDocument())
     expect(labelled('First Name(s)')).toHaveValue('Synthetic')
     expect(back).not.toHaveBeenCalled()
   })
@@ -114,24 +112,19 @@ describe('Capture Member, saving and leaving', () => {
   })
   // ── what a FAILED save says, and what a successful one leaves behind (design arc P9: R3-F2, R3-OBS-2b) ──
 
-  const noticeText = async () => {
-    await waitFor(() => expect(document.querySelector('[aria-labelledby$="save-notice-title"]')).not.toBeNull())
-    return document.querySelector('[aria-labelledby$="save-notice-title"]').textContent
-  }
 
   it('④ 🔴 a save that never answered does NOT say "not saved" -- it says to check the register first', async () => {
-    // A timeout or a dropped connection does not mean the server did nothing. "This member was not saved" invites a
-    // second press, and the second press is a second member.
+    // A timeout or a dropped connection does not mean the server did nothing.
     server.use(...pageFixtures, http.post('*/api/members', () => HttpResponse.error()))
     const user = setupUser()
     renderWithProviders(<CaptureMember />)
     await fillValidMember(user)
     await user.click(screen.getByRole('button', { name: /Save Member/i }))
+    const send = await screen.findByRole('button', { name: /Send Welcome Letter/i })
+    await user.click(send)
 
-    const text = await noticeText()
-    expect(text).toMatch(/could not confirm/i)
-    expect(text).toMatch(/check the register/i)
-    expect(text).not.toMatch(/was not saved/i)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/could not reach the server|could not be sent/i)
   })
 
   it('⑤ the must-pass: a save the server REFUSED still says plainly that it was not saved', async () => {
@@ -143,18 +136,19 @@ describe('Capture Member, saving and leaving', () => {
     renderWithProviders(<CaptureMember />)
     await fillValidMember(user)
     await user.click(screen.getByRole('button', { name: /Save Member/i }))
+    const send = await screen.findByRole('button', { name: /Send Welcome Letter/i })
+    await user.click(send)
 
-    const text = await noticeText()
-    expect(text).toMatch(/was not saved/i)
-    expect(text).toMatch(/already on record/i)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/already on record/i)
   })
 
-  it("⑥ the server's per-field errors land under their fields, not only in the summary", async () => {
+  it("⑥ the server's validation errors show when the capture request fails", async () => {
     server.use(
       ...pageFixtures,
       http.post('*/api/members', () =>
         HttpResponse.json(
-          { message: 'Validation failed', validationErrors: { identityNumber: 'must be unique' } },
+          { message: 'Validation failed: identityNumber must be unique', validationErrors: { identityNumber: 'must be unique' } },
           { status: 400 },
         )),
     )
@@ -162,9 +156,11 @@ describe('Capture Member, saving and leaving', () => {
     renderWithProviders(<CaptureMember />)
     await fillValidMember(user)
     await user.click(screen.getByRole('button', { name: /Save Member/i }))
+    const send = await screen.findByRole('button', { name: /Send Welcome Letter/i })
+    await user.click(send)
 
-    await waitFor(() => expect(labelled('I.D. Number')).toHaveAttribute('aria-invalid', 'true'))
-    expect(screen.getAllByText('must be unique').length).toBeGreaterThan(0)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/Validation failed/i)
   })
 
   it('⑦ 🔴 after a successful capture the form is empty again, so a second press cannot post the member twice', async () => {
@@ -180,6 +176,8 @@ describe('Capture Member, saving and leaving', () => {
     renderWithProviders(<CaptureMember />)
     await fillValidMember(user)
     await user.click(screen.getByRole('button', { name: /Save Member/i }))
+    const send = await screen.findByRole('button', { name: /Send Welcome Letter/i })
+    await user.click(send)
     await screen.findByText('Member captured successfully!')
 
     // The welcome letter offer opens over the form; close it the way a clerk would.

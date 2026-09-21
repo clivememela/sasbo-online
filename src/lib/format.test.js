@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import {
   EMPTY,
-  dash,
   formatDate,
   formatDateLong,
   formatInt,
@@ -120,19 +119,6 @@ describe('format — money and numbers name their locale', () => {
     expect(formatInt(1234).replace(/[^\d]/g, '')).toBe('1234')
     expect(formatInt(null)).toBe(EMPTY)
     expect(formatInt('abc')).toBe(EMPTY)
-  })
-})
-
-describe('format — dash is the one place "nothing" is rendered', () => {
-  it('treats an EMPTY ARRAY as nothing, which join() does not', () => {
-    // `[].join(', ')` is `''`, so a member with no COSATU positions renders a blank cell
-    // that reads as a bug. This is the case the helper exists for.
-    expect(dash([])).toBe(EMPTY)
-    expect(dash(['PEC', 'CEC'])).toBe('PEC, CEC')
-    expect(dash('')).toBe(EMPTY)
-    expect(dash(null)).toBe(EMPTY)
-    expect(dash(0)).toBe('0')
-    expect(dash(false)).toBe('false')
   })
 })
 

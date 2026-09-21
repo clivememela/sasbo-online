@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { useEffect, useRef } from 'react';
+import { createContext, useContext, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 import { cn, pick } from '../../lib/utils';
@@ -61,6 +61,29 @@ export const closeOn = (close) => (next) => {
   if (!next) close();
 };
 
+/** Whether a write started from the enclosing dialog is running -- `Modal`'s `busy`, for the controls inside it. */
+const BusyContext = createContext(false);
+
+/**
+ * A footer control that CLOSES the dialog, and is disabled while its write runs (RF; R2-F3's other half).
+ *
+ * 🔴 `busy` SHUT EVERY WAY OUT BUT THE ONES A CALLER DREW. Escape, a press outside and the X are the primitive's, and
+ * it closed them; a footer's own Cancel/Close called its screen's setter directly, so each caller had to disable it by
+ * hand -- `ConfirmDialog` did, the ACB banking editor did, and the welcome letter shipped without it until P10's
+ * inventory found it. This reads `busy` from the dialog it sits in and closes through Radix, so the close takes the
+ * same path as the X -- through `Modal`'s own guard -- and no caller can forget.
+ *
+ * Everything else is `Button`'s: the variant is the caller's, so a footer keeps exactly the button it drew.
+ */
+export function ModalClose({ disabled = false, children, ...props }) {
+  const busy = useContext(BusyContext);
+  return (
+    <Dialog.Close asChild>
+      <Button disabled={busy || disabled} {...props}>{children}</Button>
+    </Dialog.Close>
+  );
+}
+
 const SIZES = {
   sm: 'max-w-sm',
   md: 'max-w-lg',
@@ -79,6 +102,25 @@ export default function Modal({
   children,
   /** Escape and a click outside are ON by default. Off only for a step you must answer. */
   dismissible = true,
+  /**
+   * 🔴 A WRITE STARTED FROM THIS DIALOG IS RUNNING (R2-F3). Every way out is shut until it answers -- Escape, a press
+   * outside, the X, and any `onOpenChange(false)` Radix would send -- so the result or the failure lands on the
+   * surface the user is still looking at, and a second attempt cannot overlap the first. Nothing moves: the X stays
+   * where it is, disabled, and only while the write is in flight.
+   */
+  busy = false,
+  /**
+   * 🔴 WHICH CONTROL GETS THE CARET WHEN THIS DIALOG OPENS (`10.4`). Pass a ref and that element is focused;
+   * omit it and Radix's default stands, which focuses the first tabbable thing in the content -- the header's
+   * Close button, because the header renders before `{children}`.
+   *
+   * ⚠️ IT REPLACES `autoFocus`, WHICH IS NOT THE SAME THING WRITTEN DIFFERENTLY. `autoFocus` worked here only by
+   * a timing accident: React focuses in the COMMIT phase and Radix's focus scope runs in a PASSIVE effect
+   * afterwards, finds focus already placed inside the content, and leaves it. That is invisible, version-
+   * dependent, and `jsx-a11y/no-autofocus` is an error as of this phase. This says the same thing out loud,
+   * through the mechanism Radix provides for it.
+   */
+  initialFocusRef,
 }) {
   if (import.meta.env?.DEV && !title) {
     throw new Error(
@@ -90,7 +132,11 @@ export default function Modal({
   }
 
   // One blocker, passed three times, rather than the same arrow written three times.
-  const block = dismissible ? undefined : (event) => event.preventDefault();
+  const block = dismissible && !busy ? undefined : (event) => event.preventDefault();
+  const changeOpen = (next) => {
+    if (busy && !next) return;
+    onOpenChange?.(next);
+  };
 
   /**
    * 🔴 ESCAPE BELONGS TO A POPUP OPEN INSIDE THE DIALOG FIRST (R2-F1, R2-F2). Radix takes Escape on the document in the
@@ -141,7 +187,8 @@ export default function Modal({
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <BusyContext.Provider value={busy}>
+    <Dialog.Root open={open} onOpenChange={changeOpen}>
       <Dialog.Portal>
         {/* Portalled to the body, so no page's `overflow` or stacking context can clip it —
             which is the single thing all eight hand-rolled overlays got wrong. */}
@@ -178,6 +225,20 @@ export default function Modal({
           onEscapeKeyDown={onEscapeKeyDown}
           onPointerDownOutside={block}
           onInteractOutside={block}
+          // 🔑 A TERNARY IS SAFE HERE, unlike the `aria-describedby` spread above, and the
+          // difference is worth stating because the two sit ten lines apart. That one is an
+          // ARIA attribute, where a present key holding `undefined` REMOVES Radix's own
+          // wiring; this is an event handler, where an absent handler and an `undefined` one
+          // are the same thing, so the default behaviour is genuinely untouched when no ref
+          // is passed. The must-pass in `Modal.initialFocus.test.jsx` is what proves it.
+          onOpenAutoFocus={
+            initialFocusRef
+              ? (event) => {
+                  event.preventDefault()
+                  initialFocusRef.current?.focus()
+                }
+              : undefined
+          }
           onCloseAutoFocus={returnFocus}
           className={cn(
             'relative z-50 w-[calc(100%-2rem)]',
@@ -211,6 +272,7 @@ export default function Modal({
                 <button
                   type="button"
                   aria-label="Close"
+                  disabled={busy}
                   className={cn(
                     'touch-target -mr-1 shrink-0 rounded-md p-1.5 text-ink-faint',
                     'hover-hover:hover:bg-surface-2 hover-hover:hover:text-ink',
@@ -238,6 +300,7 @@ export default function Modal({
         </div>
       </Dialog.Portal>
     </Dialog.Root>
+    </BusyContext.Provider>
   );
 }
 
@@ -281,11 +344,11 @@ export function ConfirmDialog({
       title={title}
       description={description}
       size="sm"
+      // The confirm's own write is the dialog's: while it runs, nothing closes it (R2-F3).
+      busy={loading}
       footer={
         <>
-          <Dialog.Close asChild>
-            <Button variant="ghost">{cancelLabel}</Button>
-          </Dialog.Close>
+          <ModalClose variant="ghost">{cancelLabel}</ModalClose>
           <Button variant={destructive ? 'danger' : 'primary'} loading={loading} onClick={onConfirm}>
             {confirmLabel}
           </Button>

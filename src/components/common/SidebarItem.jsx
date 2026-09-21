@@ -31,10 +31,6 @@ export default function SidebarItem({ item, isActive, expandedItems, onToggle, o
   const hasSubItems = item.subItems && item.subItems.length > 0;
   const isExpanded = expandedItems?.[item.href];
   const isCardSelected = selectedCardHref === item.href;
-  const isSubItemActive = (subItem) => {
-    if (location.pathname === subItem.href) return true;
-    return (subItem.subItems || []).some(isSubItemActive);
-  };
   const highlighted = isActive || isCardSelected;
 
   // A menu entry with no route yet (Maintenance > Bank/Branch) is a label, not a link.
@@ -138,7 +134,6 @@ export default function SidebarItem({ item, isActive, expandedItems, onToggle, o
               item={subItem}
               depth={depth + 1}
               isActive={location.pathname === subItem.href}
-              hasActiveSubItem={isSubItemActive(subItem)}
               expandedItems={expandedItems}
               onToggle={onToggle}
               onClick={onClick}

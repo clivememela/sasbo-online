@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 
 import useReferenceData from './useReferenceData'
 import { apiErrorFrom, networkError } from '../services/parseApiError'
+import { deferred } from '../test/deferred'
 
 /**
  * THE FOURTH STATE. `06.1b`, EH-D9, and the DoD's first box.
@@ -220,6 +221,34 @@ describe('useReferenceData', () => {
     // would not have proven it works.
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('ready'))
     expect(screen.getByTestId('banks')).toHaveTextContent('Absa')
+  })
+
+  it('retry goes back to LOADING while the loaders run again -- the half the recovery test cannot see', async () => {
+    /*
+     * 🔴 `10.4` MOVED THIS. `run` set `loading` synchronously on the way into the mount effect -- the exact shape
+     * `react-hooks/set-state-in-effect` flags, which this file passed only because an unrelated early `return`
+     * blinds the rule (F-P60). The reset now lives on the retry alone. The recovery test above cannot witness it:
+     * it asserts the screen ends `ready`, which is true whether or not it ever went back to loading. So the
+     * retry's answer is HELD here, and the state is read while it is.
+     */
+    const user = userEvent.setup()
+    const held = deferred()
+    const banks = vi
+      .fn()
+      .mockRejectedValueOnce(await http500())
+      .mockImplementationOnce(() => held.promise)
+    const loaders = { banks, roles: vi.fn().mockResolvedValue(['Organiser']) }
+
+    render(<Probe loaders={loaders} />)
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('partial'))
+
+    try {
+      await user.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(screen.getByTestId('state')).toHaveTextContent('loading')
+    } finally {
+      held.resolve(['Absa'])
+    }
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('ready'))
   })
 
   it('does not re-fetch on every render', async () => {

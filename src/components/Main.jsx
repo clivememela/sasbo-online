@@ -1,10 +1,12 @@
-import { Suspense, useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Suspense, useSyncExternalStore } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 import Header from "./Header";
 import ErrorBoundary from "./common/ErrorBoundary";
 import RoutePending from "./common/RoutePending";
 import { MAIN_CONTENT_ID } from "./shellIds";
 import OfflineBanner from "./common/OfflineBanner";
+import { PAGE_GUTTER } from "./common/Sheet.jsx";
+import { cn } from "../lib/utils";
 import { getLastNetworkFailureAt, onNetworkFailure } from "../lib/reportError";
 
 export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref, search, setSearch }) {
@@ -20,9 +22,10 @@ export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref,
    * panel that failed because the connection went look alike for a moment and are not the
    * same situation; hiding the first to tidy the second would lose a real failure.
    */
-  const [lastNetworkFailureAt, setLastNetworkFailureAt] = useState(getLastNetworkFailureAt);
-
-  useEffect(() => onNetworkFailure(setLastNetworkFailureAt), []);
+  // An external store read as one (RF): `reportError` already has the subscribe shape, and a state copy plus an
+  // effect left a gap between the first render and the subscription.
+  const lastNetworkFailureAt = useSyncExternalStore(onNetworkFailure, getLastNetworkFailureAt);
+  const { pathname } = useLocation();
 
   return (
     /* 🔴 THE LANDMARKS WERE NESTED WRONG, AND THE COST WAS THAT THERE WERE NONE.
@@ -47,7 +50,7 @@ export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref,
       <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex w-full flex-1 flex-col">
         {/* Above the boundary, so it survives a screen that threw -- an offline banner that
             disappears with the screen it was explaining is the one moment it was for. */}
-        <div className="px-7 pt-5 empty:hidden max-lg:px-4">
+        <div className={cn(PAGE_GUTTER, "pt-5 empty:hidden")}>
           <OfflineBanner
             lastNetworkFailureAt={lastNetworkFailureAt}
             // 🔴 A RELOAD, AND SAYING WHY IT IS NOT A CHEAT MATTERS. Every panel already
@@ -67,7 +70,11 @@ export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref,
             Suspense sits inside it for the same reason: `03.1` made every route lazy, so
             the outlet is where a chunk arrives -- and where a chunk that fails to arrive
             throws. A boundary above the Suspense would never see it. */}
-        <ErrorBoundary>
+        {/* 🔴 KEYED BY ROUTE (R1-F1). A boundary holds its error in state and renders the fallback whatever its
+            children become, so one page that threw left "This page could not be displayed." on every route the rail
+            could reach -- and the fallback's own sentence, "you can carry on somewhere else", was false. A key change
+            remounts it, which clears the error for the page you have moved to and keeps it for the one that threw. */}
+        <ErrorBoundary key={pathname}>
           <Suspense fallback={<RoutePending />}>
             <Outlet context={{ setSelectedCardHref, setSideBarOpen, search, setSearch }} />
           </Suspense>

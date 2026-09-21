@@ -10,6 +10,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import StatusChip from "../../components/common/StatusChip.jsx";
 import TableScroller from "../../components/table/TableScroller.jsx";
+import { HEAD_CELL } from "../../components/table/Table.jsx";
 import DataState from "../../components/common/DataState.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
@@ -22,8 +23,8 @@ import reportError from "../../lib/reportError.js";
 // `touch-size`: an in-row input is a replaced element, so it GROWS to 44px on a coarse pointer (`07.2`; index.css).
 const inputCls = 'w-full px-2 py-1 rounded border border-line-strong bg-surface-2 text-ink field-text touch-size';
 
-/** A head cell of this hand-built table -- the same classes as `RecruitmentChannel.jsx`'s `HEAD_CELL`. */
-const HEAD_CELL = 'whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5';
+/** A body cell of this hand-built table: card.css `.table td`'s padding, the first column at 20px. */
+const BODY_CELL = 'px-3.5 py-[11px] first:pl-5';
 
 /**
  * The bank list behind this screen's filter. `06.1b`, EH-D9.
@@ -65,12 +66,21 @@ export default function Subscriptions() {
        neither of them the design's. `formatDateLong` is the one every other surface reads,
        and it already knows the API's `[y, m, d]`. */
 
+    /*
+     * 🔴 THE TWO RESETS MOVED TO THE RETRY CONTROL (`10.4`), which is the only thing that can
+     * bump `attempt`. `react-hooks/set-state-in-effect` is an error as of this phase.
+     *
+     * 🔑 NOTHING MOVES ON SCREEN, and the reason is worth stating rather than trusting: on mount
+     * both were no-ops (`loading` initialises to `true`, `error` to `null`), and on a retry they
+     * now run in the SAME RENDER as the `attempt` bump that re-triggers this effect -- so the
+     * committed frames are identical either way. The effect that follows sets state only from
+     * its own promise, which is what the rule is asking for.
+     *
+     * ⚠️ `setError(null)` IS STILL LOAD-BEARING and must stay on that path: nothing else ever
+     * unsets `error`, so a SUCCESSFUL retry without it would leave the failure banner sitting
+     * above the list it had just loaded.
+     */
     useEffect(() => {
-        setLoading(true);
-        // ⚠️ CLEARED ON EVERY ATTEMPT, and its absence would have made the retry look broken:
-        // nothing else ever unsets `error`, so a SUCCESSFUL retry would have left the failure
-        // banner sitting above the list it had just loaded.
-        setError(null);
         subscriptionsService.getAll()
             .then(data => setAllSubscriptions(data))
             // 🔴 IT WAS `setError(String(err))`, WHICH RENDERS "Error: Error: ..." ON SCREEN.
@@ -126,6 +136,9 @@ export default function Subscriptions() {
 
     const handleField = (field, value) => setEditData(prev => ({ ...prev, [field]: value }));
 
+    /** The row being edited, by name, for its controls' labels -- spelled five times before (RF). */
+    const editName = editData.bankName || 'this subscription';
+
     return (
         <Page>
             <PageTitle title="Subscriptions" subtitle="Each bank's subscription: the debit day, the amount, and whether it runs through core banking." />
@@ -160,7 +173,7 @@ export default function Subscriptions() {
                         <DataState
                             state="error"
                             error={error}
-                            onRetry={() => setAttempt((n) => n + 1)}
+                            onRetry={() => { setLoading(true); setError(null); setAttempt((n) => n + 1); }}
                             title="We could not load the subscriptions."
                         />
                     </div>
@@ -230,13 +243,13 @@ export default function Subscriptions() {
                                 narrow, and the second sentence is the one that invites them
                                 to widen the filter and try again forever. conventions §8: the
                                 empty copy renders ONLY when data genuinely resolved empty. */}
-                            {!loading && !error && subscriptions.length === 0 ? (
+                            {error ? null : !loading && subscriptions.length === 0 ? (
                                 <tr>
                                     <td colSpan={7} className="px-4 py-6 text-center text-sm text-ink-muted">
                                         No subscriptions match your search.
                                     </td>
                                 </tr>
-                            ) : error ? null : subscriptions.map((sub) => (
+                            ) : subscriptions.map((sub) => (
                                 <tr
                                     key={sub.id}
                                     onClick={() => handleRowClick(sub)}
@@ -244,35 +257,35 @@ export default function Subscriptions() {
                                 >
                                     {editingId === sub.id ? (
                                         <>
-                                            <td className="px-3.5 py-[11px] first:pl-5 text-ink">{editData.bankName}</td>
-                                            <td className="px-3.5 py-[11px] first:pl-5">
-                                                <input type="number" aria-label={`ACB debit day for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.acbDebitDay ?? ''} onChange={(e) => handleField('acbDebitDay', parseInt(e.target.value))} onClick={e => e.stopPropagation()} />
+                                            <td className={`${BODY_CELL} text-ink`}>{editData.bankName}</td>
+                                            <td className={BODY_CELL}>
+                                                <input type="number" aria-label={`ACB debit day for ${editName}`} className={inputCls} value={editData.acbDebitDay ?? ''} onChange={(e) => handleField('acbDebitDay', parseInt(e.target.value))} onClick={e => e.stopPropagation()} />
                                             </td>
-                                            <td className="px-3.5 py-[11px] first:pl-5">
-                                                <input type="number" step="0.01" aria-label={`Subscription amount for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.subscriptionAmount ?? ''} onChange={(e) => handleField('subscriptionAmount', parseFloat(e.target.value))} onClick={e => e.stopPropagation()} />
+                                            <td className={BODY_CELL}>
+                                                <input type="number" step="0.01" aria-label={`Subscription amount for ${editName}`} className={inputCls} value={editData.subscriptionAmount ?? ''} onChange={(e) => handleField('subscriptionAmount', parseFloat(e.target.value))} onClick={e => e.stopPropagation()} />
                                             </td>
-                                            <td className="px-3.5 py-[11px] first:pl-5">
-                                                <select aria-label={`Core banking for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.isCoreBanking === true ? 'true' : 'false'} onChange={(e) => handleField('isCoreBanking', e.target.value === 'true')} onClick={e => e.stopPropagation()}>
+                                            <td className={BODY_CELL}>
+                                                <select aria-label={`Core banking for ${editName}`} className={inputCls} value={editData.isCoreBanking === true ? 'true' : 'false'} onChange={(e) => handleField('isCoreBanking', e.target.value === 'true')} onClick={e => e.stopPropagation()}>
                                                     <option value="true">Yes</option>
                                                     <option value="false">No</option>
                                                 </select>
                                             </td>
-                                            <td className="px-3.5 py-[11px] first:pl-5">
-                                                <select aria-label={`Status for ${editData.bankName || 'this subscription'}`} className={inputCls} value={editData.status || ''} onChange={(e) => handleField('status', e.target.value)} onClick={e => e.stopPropagation()}>
+                                            <td className={BODY_CELL}>
+                                                <select aria-label={`Status for ${editName}`} className={inputCls} value={editData.status || ''} onChange={(e) => handleField('status', e.target.value)} onClick={e => e.stopPropagation()}>
                                                     <option value="ACTIVE">ACTIVE</option>
                                                     <option value="PENDING">PENDING</option>
                                                     <option value="CANCELLED">CANCELLED</option>
                                                     <option value="INACTIVE">INACTIVE</option>
                                                 </select>
                                             </td>
-                                            <td className="px-3.5 py-[11px] first:pl-5 text-ink-muted">{formatDateLong(sub.registrationDate)}</td>
+                                            <td className={`${BODY_CELL} text-ink-muted`}>{formatDateLong(sub.registrationDate)}</td>
                                             {/* ♻️ The two hand-rolled buttons are the primitive's now: one
                                                 focus ring, one hit area, one hover rule, and the primary
                                                 LAST, as every other surface in this world orders them. */}
                                             <td className="whitespace-nowrap px-3.5 py-[11px] text-right first:pl-5">
                                                 <span className="inline-flex gap-2">
                                                     <Button size="sm" onClick={handleCancel} aria-label="Discard these changes">Cancel</Button>
-                                                    <Button size="sm" variant="primary" onClick={handleSave} aria-label={`Save changes to ${editData.bankName || 'this subscription'}`}>Save</Button>
+                                                    <Button size="sm" variant="primary" onClick={handleSave} aria-label={`Save changes to ${editName}`}>Save</Button>
                                                 </span>
                                             </td>
                                         </>
@@ -282,10 +295,10 @@ export default function Subscriptions() {
                                                 seeing: an em dash says "no bank on this row", a blank
                                                 cell says nothing and reads as a rendering fault. */}
                                             <td className="px-3.5 py-[11px] font-medium text-ink first:pl-5">{sub.bankName || '—'}</td>
-                                            <td className="px-3.5 py-[11px] tabular-nums first:pl-5">{sub.acbDebitDay ?? '—'}</td>
-                                            <td className="px-3.5 py-[11px] tabular-nums first:pl-5">{formatZar(sub.subscriptionAmount)}</td>
-                                            <td className="px-3.5 py-[11px] text-ink-muted first:pl-5">{sub.isCoreBanking ? 'Yes' : 'No'}</td>
-                                            <td className="px-3.5 py-[11px] first:pl-5">
+                                            <td className={`${BODY_CELL} tabular-nums`}>{sub.acbDebitDay ?? '—'}</td>
+                                            <td className={`${BODY_CELL} tabular-nums`}>{formatZar(sub.subscriptionAmount)}</td>
+                                            <td className={`${BODY_CELL} text-ink-muted`}>{sub.isCoreBanking ? 'Yes' : 'No'}</td>
+                                            <td className={BODY_CELL}>
                                                 {/* ♻️ THE FOURTH COPY OF THE STATUS CHIP, and the one
                                                     that was wrong in the most damaging direction: it knew
                                                     ACTIVE and PENDING and painted EVERYTHING ELSE with the
@@ -300,7 +313,7 @@ export default function Subscriptions() {
                                                     is on the wire, not ours to change here. */}
                                                 <StatusChip status={sub.status} />
                                             </td>
-                                            <td className="px-3.5 py-[11px] text-ink-muted first:pl-5">{formatDateLong(sub.registrationDate)}</td>
+                                            <td className={`${BODY_CELL} text-ink-muted`}>{formatDateLong(sub.registrationDate)}</td>
                                             {/* 🔴 IT SAID "click to edit" -- a hint where a control belongs,
                                                 and the only way in was a mouse on the row. The row still
                                                 opens on a click as a pointer convenience; this is the

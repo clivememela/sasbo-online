@@ -520,8 +520,85 @@
    ========================================================================== */
 @media print {
   /* Force the light palette. A print stylesheet that inherits the dark theme
-     produces a page that is blank to the eye and expensive to the toner. */
+     produces a page that is blank to the eye and expensive to the toner.
+
+     🔴 R5-F1 (P9's independent review): THIS USED TO RESET THE GROUNDS, THE INKS AND THE LINES, AND STOP.
+     F-P37 fixed what it could see, and everything else the `.dark` rule sets came through onto paper:
+     `--color-brand-ink` (the register's membership numbers), every `--color-status-*` text (every StatusChip),
+     `--color-accent-ink` (the gold section labels), `--color-head-ink` and `--color-nav-icon` (table heads).
+     Paper drops backgrounds, so all of it printed near-white on white: a register printed from the dark theme
+     came out with its numbers and statuses invisible, and print is LIVE by the owner's ruling of 2026-09-09.
+
+     The list below is not hand-picked. It is EVERY custom property the dark theme sets, put back to the value
+     `@theme` gives it, and `src/test/printTokens.structural.test.js` reddens if a token is added to `.dark`
+     and forgotten here. `color-scheme: light` goes with it, so the browser draws form controls and scrollbars
+     for paper rather than for a dark screen. */
   :root, :root.dark {
+    color-scheme: light;
+    --color-bg: oklch(94.4% 0.007 248);
+    --color-bg-raised: oklch(91.3% 0.012 252);
+    --color-surface: oklch(100.0% 0.000 90);
+    --color-surface-2: oklch(95.7% 0.006 255);
+    --color-ink: oklch(17.9% 0.020 252);
+    --color-ink-muted: oklch(40.0% 0.025 251);
+    --color-ink-faint: oklch(52.6% 0.028 252);
+    --color-nav-ink: oklch(33.2% 0.027 253);
+    --color-line: oklch(87.9% 0.013 252);
+    --color-line-strong: oklch(77.8% 0.022 253);
+    --color-brand: oklch(51.3% 0.086 210);
+    --color-brand-hover: oklch(44.6% 0.075 210);
+    --color-brand-ink: oklch(41.9% 0.069 207);
+    --color-brand-soft: oklch(93.2% 0.023 207);
+    --color-brand-ring: rgba(11, 116, 130, 0.3);
+    --color-accent: oklch(68.0% 0.110 84);
+    --color-accent-ink: oklch(45.8% 0.083 87);
+    --color-accent-soft: oklch(94.8% 0.029 88);
+    --color-status-active: oklch(41.9% 0.069 207);
+    --color-status-active-bg: oklch(92.5% 0.024 207);
+    --color-status-active-dot: oklch(51.3% 0.086 210);
+    --color-status-pending: oklch(47.7% 0.100 72);
+    --color-status-pending-bg: oklch(93.1% 0.051 87);
+    --color-status-pending-dot: oklch(66.8% 0.141 72);
+    --color-status-suspended: oklch(43.6% 0.152 26);
+    --color-status-suspended-bg: oklch(91.3% 0.033 18);
+    --color-status-suspended-dot: oklch(56.3% 0.179 25);
+    --color-status-resigned: oklch(42.9% 0.030 260);
+    --color-status-resigned-bg: oklch(93.2% 0.010 253);
+    --color-status-resigned-dot: oklch(63.0% 0.026 256);
+    --color-status-retired: oklch(42.9% 0.030 260);
+    --color-status-retired-bg: oklch(93.2% 0.010 253);
+    --color-status-retired-dot: oklch(63.0% 0.026 256);
+    --card-metal-a: oklch(32.6% 0.052 215);
+    --card-metal-b: oklch(40.7% 0.067 211);
+    --card-metal-c: oklch(37.7% 0.061 211);
+    --card-engrave: oklch(97.9% 0.008 197);
+    --card-engrave-gold: oklch(88.8% 0.102 93);
+    --card-chip-ink: oklch(88.8% 0.102 93);
+    --card-chip-ring: rgba(241, 217, 138, 0.5);
+    --card-gloss: rgba(255, 255, 255, 0.08);
+    --card-shade: rgba(0, 0, 0, 0.22);
+    --card-edge-top: rgba(255, 255, 255, 0.2);
+    --card-edge-bottom: rgba(0, 0, 0, 0.3);
+    --card-text-2: rgba(242, 250, 250, 0.9);
+    --card-chip-bg: rgba(255, 255, 255, 0.04);
+    --card-chip-suspended: #FFC4C4;
+    --card-chip-pending: #F5E2A8;
+    --card-chip-muted: rgba(242, 250, 250, 0.75);
+    --engrave-shadow: 0 1px 0 rgba(255, 255, 255, 0.12), 0 -1px 1px rgba(0, 0, 0, 0.5);
+    --card-foil: linear-gradient(135deg, #8E7230 0%, #D4B86A 42%, #F3E4AE 50%, #C9A85A 58%, #7F6528 100%);
+    --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.08), 0 2px 6px rgba(16, 24, 40, 0.08);
+    --shadow-2: 0 4px 12px rgba(16, 24, 40, 0.10), 0 12px 32px rgba(16, 24, 40, 0.12);
+    --shadow-card: 0 2px 4px rgba(11, 59, 69, 0.22), 0 18px 40px rgba(11, 59, 69, 0.26), 0 40px 80px rgba(11, 59, 69, 0.16);
+    --color-on-brand: oklch(100.0% 0.000 90);
+    --color-accent-line: oklch(68.0% 0.110 84);
+    --color-head-ink: oklch(17.9% 0.020 252);
+    --color-nav-hover: rgba(14, 22, 32, 0.05);
+    --color-nav-icon: oklch(33.2% 0.027 253);
+
+    /* 🖨️ AND THESE NINE ARE PAPER'S, NOT THE LIGHT THEME'S. F-P37 chose pure white grounds and near-black
+       ink deliberately: the light theme's page ground is a tinted oklch(94.4%), which a printer lays down as
+       a grey wash over every sheet, and its lines are lighter than a laser resolves. They are declared after
+       the generated list above, so they win. */
     --color-bg: #ffffff;
     --color-bg-raised: #ffffff;
     --color-surface: #ffffff;

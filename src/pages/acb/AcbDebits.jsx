@@ -1,15 +1,19 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { AlertCircle, CheckCircle2, Search } from "lucide-react";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { CheckCircle2, Search } from "lucide-react";
 import PageTitle from "../../components/common/PageTitle.jsx";
 import Criteria, { CRITERION, CRITERION_WIDE } from "../../components/common/Criteria.jsx";
 import { TextInput, Button } from "../../components/form";
-import Modal from "../../components/overlay/Modal.jsx";
+import Modal, { ModalClose } from "../../components/overlay/Modal.jsx";
 import { memberService } from "../../services/memberService.js";
 import { validateSAID } from "../../utils/validateSAID.js";
 import Table from '../../components/table/Table.jsx';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import StatusChip from '../../components/common/StatusChip.jsx';
 import reportError from '../../lib/reportError.js';
+import { formalName } from '../../lib/names.js';
+import useFocusOn from '../../hooks/useFocusOn.js';
+import DialogNotice, { PageNotice } from '../../components/common/DialogNotice.jsx';
+import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 
 export default function AcbDebits() {
     const [membersList, setMembersList] = useState([]);
@@ -19,16 +23,15 @@ export default function AcbDebits() {
     const [selectedMember, setSelectedMember] = useState(null);
     const [loadingId, setLoadingId] = useState(null);
     const [notice, setNotice] = useState(null);
-    const noticeRef = useRef(null);
-    useEffect(() => {
-        if (notice) noticeRef.current?.focus();
-    }, [notice]);
+    const noticeRef = useFocusOn(notice);
     const [confirmed, setConfirmed] = useState(false);
 
     // Edit modal state
     const [editing, setEditing] = useState(false);
     const [bankForm, setBankForm] = useState({});
     const [saving, setSaving] = useState(false);
+    // A failed update is said in the dialog, which stays open on a failure (R4-F1): the page notice renders under its scrim.
+    const [bankingNotice, setBankingNotice] = useState(null);
 
     /**
      * 🔴 SAME SHAPE, SAME MISSING `.catch`. And it matters more here than on a listing:
@@ -41,12 +44,27 @@ export default function AcbDebits() {
      */
     const [listState, setListState] = useState('loading');
 
-    const loadMembers = useCallback(() => {
-        setListState('loading');
-        return memberService.getMembers()
-            .then((data) => { setMembersList(data ?? []); setListState('ready'); })
-            .catch((err) => { reportError('AcbDebits.loadMembers', err); setListState('error'); });
-    }, []);
+    /*
+     * 🔴 THE LOADING RESET LIVES ON THE RETRY PATH, NOT INSIDE THE FETCH (`10.4`).
+     *
+     * `react-hooks/set-state-in-effect` is an error as of this phase, and it was right: the effect
+     * below called a function whose FIRST statement set state synchronously, so every mount paid a
+     * cascading render for a transition that had already happened.
+     *
+     * 🔑 IT WAS A NO-OP ON MOUNT ANYWAY, which is what makes this behaviour-preserving rather than a
+     * judgement call: `listState` already INITIALISES to 'loading', so setting it to 'loading' again
+     * on the way in changed nothing anybody could see. What the line genuinely does is on the RETRY
+     * path -- press Try again after a failure and the screen must go back to loading rather than sit
+     * on the error until the answer lands. That is exactly where it now is.
+     *
+     * So the fetch owns its own outcome (ready or error) and the caller owns the intent to reload.
+     * `retryMembers` is the retry; the effect calls the plain fetch and sets nothing.
+     */
+    const loadMembers = useCallback(() => memberService.getMembers()
+        .then((data) => { setMembersList(data ?? []); setListState('ready'); })
+        .catch((err) => { reportError('AcbDebits.loadMembers', err); setListState('error'); }), []);
+
+    const retryMembers = useCallback(() => { setListState('loading'); loadMembers(); }, [loadMembers]);
 
     useEffect(() => { loadMembers(); }, [loadMembers]);
 
@@ -62,6 +80,7 @@ export default function AcbDebits() {
             paymentType: selectedMember.paymentType || "",
             debitDay: selectedMember.debitDay || "",
         });
+        setBankingNotice(null);
         setEditing(true);
     };
 
@@ -70,6 +89,7 @@ export default function AcbDebits() {
     const saveBanking = async () => {
         if (!selectedMember) return;
         setSaving(true);
+        setBankingNotice(null);
         try {
             const updated = await memberService.updateBanking(selectedMember.id, bankForm);
             setSelectedMember(updated);
@@ -80,7 +100,13 @@ export default function AcbDebits() {
             // This screen writes a member's debit-order details; "Failed to update banking
             // details" arriving as a native modal, and leaving no trace once dismissed, is
             // the worst place in the application for that pattern.
-            setNotice('Those banking details were not saved. Nothing was written \u2014 check the values and try again.');
+            // R3-F2: and "Nothing was written" is true only of a refusal. After a timeout, a lost connection or a 5xx
+            // the change may have landed, and re-submitting a debit-order change whose outcome is unknown is the harm.
+            setBankingNotice({
+                message: writeMayHaveLanded(err)
+                    ? 'This banking change could not be confirmed. It may have been saved \u2014 reload the member and check their details before trying again.'
+                    : `Those banking details were not saved. Nothing was written \u2014 ${messageOf(err)}`,
+            });
         } finally {
             setSaving(false);
         }
@@ -150,7 +176,7 @@ export default function AcbDebits() {
                     type="button"
                     onClick={() => handleSelectMember(m)}
                     aria-pressed={selectedMember?.id === m.id}
-                    aria-label={`${m.membershipNumber || 'This member'} \u2014 load banking details for ${[m.title, m.initials, m.surname].filter(Boolean).join(' ') || 'this member'}`}
+                    aria-label={`${m.membershipNumber || 'This member'} \u2014 load banking details for ${formalName(m) || 'this member'}`}
                     className="touch-target inline-flex items-center gap-2 rounded-sm font-medium text-brand-ink underline-offset-2 hover-hover:hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
                 >
                     {m.membershipNumber}
@@ -169,7 +195,7 @@ export default function AcbDebits() {
             header: 'Name',
             priority: 'essential',
             truncate: true,
-            cell: (m) => `${m.title ? `${m.title} ` : ''}${m.initials || ''} ${m.surname || ''}`.trim() || '\u2014',
+            cell: (m) => formalName(m) || '\u2014',
         },
         { key: 'identityNumber', header: 'ID Number', priority: 'secondary', truncate: true, cell: (m) => m.identityNumber || '\u2014' },
         { key: 'bankName', header: 'Bank', priority: 'secondary', truncate: true, cell: (m) => m.bankName || '\u2014' },
@@ -184,16 +210,7 @@ export default function AcbDebits() {
                 form primitives already give inline messages that role, and stacking a
                 page-level live region on top is two announcements for one failure. */}
             {notice && (
-                <div
-                    ref={noticeRef}
-                    tabIndex={-1}
-                    aria-labelledby="acb-notice-title"
-                    className="mt-4 flex items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
-                >
-                    <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
-                    <p id="acb-notice-title" className="flex-1">{notice}</p>
-                    <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dismiss</Button>
-                </div>
+                <PageNotice ref={noticeRef} id="acb-notice-title" onDismiss={() => setNotice(null)}>{notice}</PageNotice>
             )}
 
             <div className="mt-5 max-w-4xl">
@@ -233,7 +250,7 @@ export default function AcbDebits() {
                             rowKey="id"
                             loading={listState === 'loading'}
                             error={listState === 'error' ? 'We could not load the member list.' : null}
-                            onRetry={loadMembers}
+                            onRetry={retryMembers}
                             emptyTitle="No members match your search."
                             emptyMessage="Try a different membership or identity number."
                             dense
@@ -305,13 +322,15 @@ export default function AcbDebits() {
                             onOpenChange={setEditing}
                             title="Update Banking Details"
                             size="lg"
+                            busy={saving}
                             footer={
                                 <>
-                                    <Button onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
+                                    <ModalClose>Cancel</ModalClose>
                                     <Button variant="primary" onClick={saveBanking} loading={saving}>Update</Button>
                                 </>
                             }
                         >
+                            <DialogNotice notice={bankingNotice} onDismiss={() => setBankingNotice(null)} />
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <TextInput label="Bank" value={bankForm.bankName} onChange={handleBankChange('bankName')} />
                                         <TextInput label="Branch" value={bankForm.branch} onChange={handleBankChange('branch')} />

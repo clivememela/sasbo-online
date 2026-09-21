@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "preview": "vite preview",
     "test": "node scripts/suite-floor.mjs && node scripts/contract-witness.mjs",
     "test:raw": "vitest run",

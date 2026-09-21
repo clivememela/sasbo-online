@@ -51,6 +51,26 @@ const answerYes = (legend) => `(() => {
   return true;
 })()`;
 
+/**
+ * Press the first element whose visible TEXT matches, with a real pointer sequence.
+ *
+ * `clickByText` sends `el.click()` alone, and a `SearchableSelect` option commits on POINTERDOWN -- deliberately,
+ * so a choice lands before the outside-dismiss can close the list. `mouseDownOn` sends the right gesture but finds
+ * its target by LABEL, which an option has none of. This is the missing pair: find by text, press like a pointer.
+ */
+const ROSTER_INPUT = `!!document.querySelector('[aria-label="Name of non-member 1"]')`;
+
+const pointerDownOnText = (selector, pattern) => `(() => {
+  const re = ${pattern};
+  const el = [...document.querySelectorAll(${JSON.stringify(selector)})]
+    .find((n) => re.test((n.textContent || '').trim()));
+  if (!el || el.disabled) return false;
+  for (const type of ['pointerdown', 'mousedown', 'mouseup', 'click']) {
+    el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+  }
+  return true;
+})()`;
+
 /** Choose a value in the native select whose label matches, inside a scope, the way React hears it. */
 const chooseOption = (scope, labelPattern, value) => `(() => {
   const re = ${labelPattern};
@@ -140,6 +160,14 @@ export const SURFACES = [
   { name: 'record-structures', route: '/members', ready: ROWS,
     steps: [OPEN_FIRST_MEMBER, step('open Structures', clickByText(`${PANEL} button`, '/Structures/i'), TEXT('SASBO structures'))],
     present: { TAB: TEXT('SASBO structures') } },
+  /*
+   * 🔴 THE MEMBERSHIP TAB HAD NO SURFACE, AND IT IS WHERE THE RECORD'S ONLY VISIBLE DATE LIVES. R3-F1 changed how
+   * Date Joined prints, and nothing photographed it: `record-open` is the Personal tab and `record-structures` is
+   * Structures. A change with no capture is a change nobody can prove did what it says.
+   */
+  { name: 'record-membership', route: '/members', ready: ROWS,
+    steps: [OPEN_FIRST_MEMBER, step('open Membership & Subscriptions', clickByText(`${PANEL} button`, '/Membership/i'), TEXT('Date Joined Sasbo'))],
+    present: { TAB: TEXT('Date Joined Sasbo') } },
   { name: 'record-edit', route: '/members', ready: ROWS, steps: [OPEN_FIRST_MEMBER, EDIT_RECORD], present: { EDITING: TEXT('Save changes') } },
   { name: 'record-save-confirm', route: '/members', ready: ROWS,
     steps: [OPEN_EDITABLE_MEMBER, EDIT_RECORD, CHANGE_PHONE,
@@ -173,7 +201,11 @@ export const SURFACES = [
       step('send the welcome letter', clickByText('[role="dialog"] button', '/^Send Welcome Letter$/'), WELCOME_SENT)],
     present: { DIALOG: dialogNamed('/^Welcome Letter Preview$/'), SENT: WELCOME_SENT },
     covers: ['components/members/WelcomeLetter.jsx#Modal@welcome'] },
-  { name: 'capture-refs-error', route: '/members/capture', intercept: { url: ['*/api/banks*', '*/api/job-grades*', '*/api/provinces*', '*/api/recruitment-channels*', '*/api/representatives*', '*/api/members/userRoles*', '*/api/members/structures/tree*', '*/api/branches*', '*/api/districts*', '*/api/areas*'], mode: 'fail' },
+  // 🔴 EVERY LIST CAPTURE LOADS, OR THE PAGE IS HONESTLY 'partial' AND THIS ROW CAN NEVER BE REACHED (RF). PR #7 gave
+  // Capture two more reference lists (`/api/recruiters`, `/api/subscriptions`) and this intercept never learnt them, so
+  // from P10's close on the four rows failed "never ready" with the census reading `states: ["partial"]` -- recorded
+  // then as the browser timing out. The census was right and the catalogue was stale.
+  { name: 'capture-refs-error', route: '/members/capture', intercept: { url: ['*/api/banks*', '*/api/job-grades*', '*/api/provinces*', '*/api/recruitment-channels*', '*/api/representatives*', '*/api/members/userRoles*', '*/api/members/structures/tree*', '*/api/branches*', '*/api/districts*', '*/api/areas*', '*/api/recruiters*', '*/api/subscriptions*'], mode: 'fail' },
     ready: STATE('error'), present: { ERROR: STATE('error') },
     covers: ['pages/members/CaptureMember.jsx#DataState@refs', 'components/form/LoadFailureFrame.jsx#DataState@loadError'] },
   { name: 'capture-listbox', route: '/members/capture', ready: TEXT('Save Member'),
@@ -314,6 +346,17 @@ export const SURFACES = [
     steps: [step('open the first bank', clickNth('main button[aria-expanded="false"]', 0), EXPANDED('main')),
       step('open its first category', clickNth('main [aria-expanded="true"] ~ * button[aria-expanded="false"], main li button[aria-expanded="false"]', 0), `document.querySelectorAll('main [aria-expanded="true"]').length > 1`)],
     present: { NESTED: `document.querySelectorAll('main [aria-expanded="true"]').length > 1` }, covers: ['pages/archives/FinanceHouses.jsx#aria-expanded@category'] },
+  /*
+   * 🔴 R4-F2 PUT THIS ENTRY HERE. General Form renders only after choosing it on `/reports/forms`, so no route
+   * sweep, matrix or contrast pass had ever reached its 120 roster inputs -- and their placeholders were drawn in
+   * `ink-faint` (3.65:1 in dark) for the whole arc, on the one surface nothing measured. L2, exactly.
+   */
+  { name: 'general-form', route: '/reports/forms', ready: HEADING,
+    // Form Type is a `SearchableSelect`, not a native select: it opens on MOUSEDOWN (T30) and its options commit on
+    // pointerdown. `chooseOption` drives a <select> and found nothing here -- the first spelling of this entry.
+    steps: [step('open Form Type', mouseDownOn('main [role="combobox"]', '/^Form Type/'), `!!document.querySelector('[role="listbox"]')`),
+      step('choose General Form', pointerDownOnText('[role="option"]', '/^General Form$/'), ROSTER_INPUT)],
+    present: { ROSTER: ROSTER_INPUT } },
   { name: 'forms-empty', route: '/reports/forms', ready: HEADING,
     steps: [step('filter to nothing', typeIntoLabelled('main', '/^Random access number/', '000000000'), STATE('empty'))],
     present: { EMPTY: STATE('empty') }, covers: ['pages/forms/Forms.jsx#DataState@empty'] },

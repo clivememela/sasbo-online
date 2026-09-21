@@ -30,7 +30,8 @@ src/test/
   assertNonVacuousScan.js  the non-vacuity canary, and every floor it guards
   knownDefects.js          the defect register: every row, its reason, disabled() and pin()
   serviceCatalogue.js      every service module and method, DISCOVERED not listed
-  user.js                  setupUser() — the one userEvent configuration
+  user.js                  setupUser() — the one userEvent configuration (options pass through)
+  deferred.js              a promise the TEST settles — how "slow" is written without a clock
   msw/server.js            unhandled request => ERROR, never a warning
   msw/handlers.js          deliberately empty; tests declare their own
   msw/pageFixtures.js      the mount-time calls a page test must answer

@@ -54,6 +54,29 @@ export default function AddressAutocomplete({
 
   const placesLib = useMapsLibrary('places');
 
+  /*
+   * 🔴 BELOW THREE CHARACTERS THE SUGGESTIONS ARE CLEARED -- DURING RENDER, NOT AFTER IT (`10.4`).
+   *
+   * They used to be cleared by the debounce effect (`setPredictions([])`), which
+   * `react-hooks/set-state-in-effect` makes an error this phase. Two replacements were weighed and one
+   * was wrong:
+   *
+   *   HIDE the list while the query is short (derive it) -- rejected. That clears nothing; it only
+   *   stops SHOWING the old list. Back out of "12 Synthetic" to "12", type " S", and the suggestions
+   *   for the abandoned query reappear under the new one until the new lookup answers.
+   *
+   *   CLEAR it during render, guarded -- this. Same semantics as before, exactly: short query, no
+   *   suggestions, and they are gone rather than hidden. React re-renders before anything commits, so
+   *   the one frame the effect used to leave (a short query still showing its old list) is never drawn.
+   *   The guard is what makes it terminate. It also clears a LATE answer for a longer query that lands
+   *   after the user has backed out, which the effect -- keyed on `query` -- never saw.
+   *
+   * `AddressAutocomplete.suggestions.test.jsx` holds the backed-out case, with the second lookup held
+   * so that a slow box cannot let a fresh answer hide the stale one.
+   */
+  const searchable = query.trim().length >= 3;
+  if (!searchable && predictions.length > 0) setPredictions([]);
+
   // Declared here, above the effects that read it: `const` is not hoisted, and the
   // outside-dismiss effect below runs before the render body reaches the JSX.
   const listOpen = isOpen && predictions.length > 0;
@@ -63,12 +86,29 @@ export default function AddressAutocomplete({
     sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
   }, [placesLib]);
 
-  // Sync external value changes (e.g. a form reset) into the local query.
-  useEffect(() => {
+  /*
+   * 🔴 A VALUE THE FORM CHANGES REACHES THE FIELD -- DURING RENDER, WITH A PREVIOUS-VALUE GUARD (`10.4`).
+   *
+   * A reset, or a record loaded into the form, changes `value` from outside; the field keeps its own
+   * `query` so it can be typed into, and has to adopt the new value when that happens. This was an effect
+   * keyed on `[value]` that also needed an `eslint-disable-next-line react-hooks/exhaustive-deps` to stop
+   * it re-running on every keystroke -- and `react-hooks/set-state-in-effect` makes the effect an error
+   * this phase.
+   *
+   * The render-phase form is React's own answer ("storing information from previous renders"): remember
+   * the last `value` seen, and adopt a new one when it differs. Same trigger as the effect had, so the
+   * suppression goes with it -- one fewer disable comment in the tree -- and the frame in which a reset
+   * form still showed the old text is never committed. `value !== query` is still the guard that stops
+   * the parent's echo of each keystroke from fighting the keyboard.
+   *
+   * `AddressAutocomplete.test.jsx` holds both directions now; before this phase only the outbound one had
+   * a witness.
+   */
+  const [seenValue, setSeenValue] = useState(value);
+  if (value !== seenValue) {
+    setSeenValue(value);
     if (value !== undefined && value !== query) setQuery(value || '');
-    // Only when `value` changes externally -- not on every keystroke.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
+  }
 
   const fetchPredictions = useCallback(
     async (input) => {
@@ -115,13 +155,10 @@ export default function AddressAutocomplete({
 
   // Debounce the predictions fetch.
   useEffect(() => {
-    if (!query || query.trim().length < 3) {
-      setPredictions([]);
-      return undefined;
-    }
+    if (!searchable) return undefined;
     const timer = setTimeout(() => fetchPredictions(query), 300);
     return () => clearTimeout(timer);
-  }, [query, fetchPredictions]);
+  }, [query, searchable, fetchPredictions]);
 
   // 🔑 `pointerdown`, and ONLY WHILE OPEN -- matching `SearchableSelect`, which documents
   // why: `mousedown` alone misses touch on iOS. This file shipped the `mousedown` version in

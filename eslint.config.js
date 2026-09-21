@@ -127,7 +127,12 @@ export default defineConfig([
        * second disable comment anywhere is a visible decision rather than a habit.
        */
       'no-console': 'error',
-      // ── jsx-a11y, at `warn` and DELIBERATELY NOT `error` (design arc, 00.5) ───────────
+      // ── jsx-a11y, AT `error` SINCE `10.4` (design arc) — it was `warn` from `00.5` until then ──
+      //
+      // 🔒 FLIPPED 2026-09-18, AT A MEASURED ZERO. `eslint .` reported 0 errors and 0 warnings on the
+      // commit before this one, so the flip could not turn anything red by itself; from here, a new
+      // violation fails the gate. The history below is why it waited that long, and it is kept because
+      // the reason is the lesson.
       //
       // 🔴 THE LEVEL IS THE WHOLE POINT. MobiZone turned this on at `error` mid-arc, could
       // not land anything until the backlog was cleared, and turned it back off -- so the
@@ -163,22 +168,74 @@ export default defineConfig([
       ...Object.fromEntries(
         Object.entries(jsxA11y.flatConfigs.recommended.rules).map(([rule, config]) => {
           const [severity, ...options] = Array.isArray(config) ? config : [config]
-          return [rule, severity === 'off' ? 'off' : ['warn', ...options]]
+          return [rule, severity === 'off' ? 'off' : ['error', ...options]]
         })
       ),
-      // ── R-ROB-I: the five React Compiler rules come back, at `warn` (design arc, 00.5) ──
+      // ── R-ROB-I: the five React Compiler rules, AT `error` SINCE `10.4` — `warn` from `00.5` ──
+      //
+      // 🔒 FLIPPED AT A MEASURED ZERO, AFTER NINE BATCHES AND NOT ONE SUPPRESSION. Twenty-three sites
+      // were fixed at the cause (F-P60): no `eslint-disable` was added for any of them, and two that were
+      // already in the tree went. Two things were learned that belong beside the level:
+      //
+      //   ⚠️ THE RULE HAS A BLIND SPOT, SO ZERO IS NOT A POPULATION CLAIM. An unrelated early `return`
+      //   before a synchronous `setState` hides it from `set-state-in-effect`, and so does wrapping the
+      //   body in an `async` function inside the effect. `useReferenceData.js` passed this way by
+      //   accident and was fixed anyway. The count says what the rule can SEE.
+      //   ⚠️ SO DO NOT "FIX" A NEW ONE WITH A DECOY `return`. That is a suppression wearing a guard's
+      //   clothes: the gate goes green and the code does not change. Move the state to where it belongs
+      //   -- derive it, set it in the handler that caused it, or let the promise set it.
+      //
       //
       // These were switched OFF because the code violates them today. That is the reason to
       // SEE them, not the reason to hide them -- they are the React Compiler's own rules, and
       // an app that breaks them is an app the compiler cannot optimise. Same schedule and same
       // level as jsx-a11y above: visible and counted now, mapped to owning phases, flipped to
       // `error` by `10.4` once the worklist is clear. `00.5` is the unit that owes this.
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/set-state-in-render': 'warn',
-      'react-hooks/purity': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-hooks/static-components': 'warn',
+      'react-hooks/set-state-in-effect': 'error',
+      'react-hooks/set-state-in-render': 'error',
+      'react-hooks/purity': 'error',
+      'react-hooks/immutability': 'error',
+      'react-hooks/static-components': 'error',
       'react-refresh/only-export-components': 'off',
+      /*
+       * 🔴 NO NATIVE BROWSER DIALOGS, AND NO NATIVE DATE INPUT -- AS LINT RULES, NOT SOURCE SCANS (P10's refactor pass).
+       *
+       * They began life in `10.4` as two vitest source-scans (regex over comment-blanked source). Lint had just gone
+       * hard (`--max-warnings 0`), and the review of that phase showed the scans missing what the AST cannot miss:
+       * `type={cond ? 'date' : 'text'}`, and any `<` inside an attribute value before `type` (the scan's window closed
+       * there) -- and, the other way, convicting the word "confirm (" inside a string literal. An AST rule sees a CALL
+       * to a GLOBAL, and a `type` attribute ON an `<input>`, and nothing else. It also fails in the editor, at
+       * authoring time, not only when the suite runs. The canary pair lives in `src/test/eslintJsxUsage.test.js`,
+       * which already lints fixtures through this exact config.
+       *
+       *   why no `alert`/`confirm`/`prompt`: unstyleable, unthemeable, thread-blocking, OK/Cancel only -- and passed an
+       *     `Error` they print "[object Error]". 22 when the arc opened; `ConfirmDialog` and in-dialog notices replaced
+       *     every one.
+       *   why no native date input: the owner's ruling is that the date field is CHOOSE-ONLY. `DateField` is the one
+       *     control and `<Field type="date">` routes to it -- which is why the rule looks at the `<input>` ELEMENT,
+       *     not at the string `type="date"`.
+       */
+      'no-restricted-globals': ['error', ...['alert', 'confirm', 'prompt'].map((name) => ({
+        name,
+        message: `Native ${name}() is not used here: ConfirmDialog for a question, a notice inside the dialog for an outcome (SCREEN-CONTRACT.md §5).`,
+      }))],
+      'no-restricted-properties': ['error', ...['window', 'globalThis', 'self'].flatMap((object) =>
+        ['alert', 'confirm', 'prompt'].map((property) => ({
+          object,
+          property,
+          message: `Native ${property}() is not used here: ConfirmDialog for a question, a notice inside the dialog for an outcome (SCREEN-CONTRACT.md §5).`,
+        })),
+      )],
+      'no-restricted-syntax': ['error',
+        {
+          selector: "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'] Literal[value=/^(date|datetime-local|month|week)$/]",
+          message: 'No native date input: the date field is choose-only. Use DateField, or <Field type="date">, which routes to it (SCREEN-CONTRACT.md §4).',
+        },
+        {
+          selector: "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'] TemplateElement[value.cooked=/^(date|datetime-local|month|week)$/]",
+          message: 'No native date input: the date field is choose-only. Use DateField, or <Field type="date">, which routes to it (SCREEN-CONTRACT.md §4).',
+        },
+      ],
     },
   },
   {
@@ -209,6 +266,12 @@ export default defineConfig([
       'tools/**',
       'scripts/**',
     ],
-    rules: { 'no-console': 'off' },
+    rules: {
+      'no-console': 'off',
+      // A test may stub or assert on a native dialog; these rules are about what ships.
+      'no-restricted-globals': 'off',
+      'no-restricted-properties': 'off',
+      'no-restricted-syntax': 'off',
+    },
   },
 ])

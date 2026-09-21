@@ -149,6 +149,10 @@ const API = {
     phone: '0110000000', memberId: i + 1, roleId: 1, isElectedRep: i % 2 === 0,
     electionDate: '2024-06-01', recruiterTypeId: 1, structureIds: [],
   })),
+  // `recruiterService.getRecruiters()` -- the Capture Member re-port's own endpoint (main `bb1052b`), which reached
+  // this branch in P10's merge. The drift guard below refused to serve until it had a stub (P10, 2026-09-18): a
+  // Recruiter drop-down answered by nothing is a capture screen measured with an empty control.
+  '/api/recruiters': Array.from({ length: 8 }, (_, i) => ({ id: i + 1, name: `Synthetic Recruiter ${i + 1}` })),
   // `recruiterService.getRoles()` and `.getStructures()`. These were `/api/roles` and
   // `/api/structures`, which nothing calls, so both lists were being answered by `/api/members`
   // -- see `stubDrift` below.

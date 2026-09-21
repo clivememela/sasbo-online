@@ -33,7 +33,7 @@ import useMediaQuery from "../hooks/useMediaQuery";
  */
 
 /** What the search recognised: the register's own identifiers, named as the user types them. */
-export function searchKind(query) {
+function searchKind(query) {
   const q = String(query ?? "").trim();
   if (!q) return "";
   if (/^m-?\d{3,}$/i.test(q)) return "Membership number";

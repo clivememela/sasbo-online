@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import reportError from '../lib/reportError';
 import { ERROR_KINDS } from '../services/parseApiError.js';
@@ -60,10 +60,11 @@ export default function useReferenceData(loaders) {
   const names = Object.keys(loaders);
 
   const [data, setData] = useState(() => Object.fromEntries(names.map((n) => [n, []])));
-  const [failed, setFailed] = useState([]);
   // The rejection itself, per failed list -- so a field can say whether retrying could work
-  // (`DataState` reads `retryable` off it) rather than always offering a button.
+  // (`DataState` reads `retryable` off it) rather than always offering a button. The failed
+  // NAMES are its keys: one fact, one state (RF -- a second `failed` array was set beside it).
   const [reasons, setReasons] = useState({});
+  const failed = useMemo(() => Object.keys(reasons), [reasons]);
   const [loading, setLoading] = useState(names.length > 0);
 
   // Same pattern, and the same reason, as `useAsyncOptions`: a result that arrives after a
@@ -78,23 +79,35 @@ export default function useReferenceData(loaders) {
     loadersRef.current = loaders;
   });
 
-  const run = useCallback(() => {
+  /*
+   * 🔴 THE LOADING FLAG IS SET BY THE RETRY, NOT ON THE WAY INTO THE MOUNT EFFECT (`10.4`) -- AND THIS FILE
+   * PASSED THE RULE BY ACCIDENT, WHICH IS WHY IT IS HERE AT ALL.
+   *
+   * `run` set `loading` synchronously before its first await, which is the exact shape of the eight loaders
+   * `react-hooks/set-state-in-effect` flagged this phase -- and the rule reported this one CLEAN. Bisected
+   * through `eslint --stdin`: an early `if (entries.length === 0) { setLoading(false); return }` that stood
+   * above the reset (since removed) defeated the analysis. Remove that unrelated guard and the file was flagged;
+   * put it back and it was not. So a "0 warnings" count was hiding one live instance of the class the phase was eliminating.
+   * It is fixed the same way as the others rather than left standing on the linter's blind spot -- and the
+   * blind spot is recorded ([F-P60]) so the count is never quoted as coverage.
+   *
+   * ⚠️ AND IT IS A TRAP FOR THE FIX AS WELL AS FOR THE COUNT: every other loader could have been "fixed" by
+   * inserting a decoy early return. That is a suppression wearing a guard's clothes. Nothing here does that.
+   *
+   * Both resets were no-ops on mount -- `loading` initialises to whether there is anything to load -- so the
+   * mount path simply loses them, and `retry` keeps the one that matters.
+   */
+  const load = useCallback(() => {
     const ticket = (ticketRef.current += 1);
     const current = loadersRef.current;
     const entries = Object.entries(current);
 
-    if (entries.length === 0) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
+    if (entries.length === 0) return;
 
     Promise.allSettled(entries.map(([, load]) => load())).then((results) => {
       if (ticket !== ticketRef.current) return;
 
       const nextData = {};
-      const nextFailed = [];
       const nextReasons = {};
 
       results.forEach((result, index) => {
@@ -112,7 +125,6 @@ export default function useReferenceData(loaders) {
         if (result.reason?.kind === ERROR_KINDS.ABORT) return;
 
         nextData[name] = [];
-        nextFailed.push(name);
         nextReasons[name] = result.reason;
         // 🔑 ONE SINK, AND THE CONTEXT IS A NAME. `reportError` emits `kind`, `status`,
         // `retryable` and the refused FIELD NAMES -- never the message, never the envelope.
@@ -120,15 +132,20 @@ export default function useReferenceData(loaders) {
       });
 
       setData((previous) => ({ ...previous, ...nextData }));
-      setFailed(nextFailed);
       setReasons(nextReasons);
       setLoading(false);
     });
   }, []);
 
+  const run = useCallback(() => {
+    if (Object.keys(loadersRef.current).length === 0) return;
+    setLoading(true);
+    load();
+  }, [load]);
+
   useEffect(() => {
-    run();
-  }, [run]);
+    load();
+  }, [load]);
 
   /*
    * 🔑 THE STATE IS DERIVED, NOT STORED, so the illegal combinations cannot be reached.

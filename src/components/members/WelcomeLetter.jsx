@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Send, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import Modal, { closeOn } from '../overlay/Modal';
+import Modal, { ModalClose, closeOn } from '../overlay/Modal';
 import Button from '../form/Button';
 import { memberService } from '@/services/memberService.js';
 import { formatDate } from '@/utils/validateSAID.js';
@@ -18,7 +18,7 @@ import { formatDate } from '@/utils/validateSAID.js';
  * the application's type -- in both themes. The words are the template's, including its sign-off, so the preview
  * says what the member will receive.
  */
-export default function WelcomeLetter({ open, onClose, member }) {
+export default function WelcomeLetter({ open, onClose, member, onSuccess }) {
     const [sendState, setSendState] = useState('idle'); // idle | sending | sent | error
     const [errorMessage, setErrorMessage] = useState('');
 
@@ -28,7 +28,7 @@ export default function WelcomeLetter({ open, onClose, member }) {
      * Send button. Reset when the member changes, during render (React's pattern for state derived from a prop),
      * never on a re-render of the same member.
      */
-    const memberKey = member?.id ?? null;
+    const memberKey = member?.id ?? (member ? (member.identityNumber || member.surname || 'new') : null);
     const [stateFor, setStateFor] = useState(memberKey);
     if (stateFor !== memberKey) {
         setStateFor(memberKey);
@@ -69,17 +69,19 @@ export default function WelcomeLetter({ open, onClose, member }) {
     const hasAddress = Boolean(member.personalEmail || member.workEmail);
 
     const handleSend = () => {
-        if (!member.id) {
-            setErrorMessage('Member ID is missing — cannot send email.');
-            setSendState('error');
-            return;
-        }
         setSendState('sending');
         setErrorMessage('');
-        memberService.sendWelcomeLetter(member.id)
-            .then(() => setSendState('sent'))
+        const sendPromise = member.id
+            ? memberService.sendWelcomeLetter(member.id)
+            : memberService.createMember(member, { sendWelcome: true });
+
+        sendPromise
+            .then((savedMember) => {
+                setSendState('sent');
+                onSuccess?.(savedMember || member);
+            })
             .catch((err) => {
-                setErrorMessage(err?.message || 'The email could not be sent. Please try again.');
+                setErrorMessage(err?.message || 'The email could not be sent and member was not saved. Please try again.');
                 setSendState('error');
             });
     };
@@ -88,11 +90,14 @@ export default function WelcomeLetter({ open, onClose, member }) {
         <Modal
             open={open}
             onOpenChange={closeOn(onClose)}
+            // 🔴 R2-F3, THE ONE WRITE-BEARING DIALOG IT MISSED (found by P10's component inventory). While the letter
+            // is sending, every way out is shut, so the result lands on the dialog the user is still looking at.
+            busy={sendState === 'sending'}
             title="Welcome Letter Preview"
             size="xl"
             footer={
                 <>
-                    <Button variant="ghost" onClick={onClose}>Close</Button>
+                    <ModalClose variant="ghost">Close</ModalClose>
                     {sendState === 'sent' ? (
                         <span role="status" className="flex items-center gap-2 text-sm font-medium text-status-active">
                             <CheckCircle2 className="size-4" aria-hidden="true" />

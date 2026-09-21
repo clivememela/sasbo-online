@@ -30,7 +30,7 @@ import { PANEL_SLOT_ID } from '../shellIds';
  *
  * 📐 **THREE CONTAINERS, ONE SET OF FIELDS** *(R-RESP-M)*:
  *
- *   `xl` and up  a real third column, `clamp(360px, 32vw, 448px)`, full height, own scroll.
+ *   `xl` and up  a real third column, `clamp(424px, 32vw, 448px)` (`DOCKED_WIDTH`), full height, own scroll.
  *   below `xl`   a drawer from the right, `min(448px, 100vw)`, with a scrim; hidden at rest.
  *
  * ⚠️ **THE DOCKING EDGE IS `xl` (1280px), NOT THE MOCK'S ORIGINAL 1361** — R-RESP-D, a
@@ -48,6 +48,24 @@ import { PANEL_SLOT_ID } from '../shellIds';
  */
 
 const ARRIVAL_MS = 900;
+
+/**
+ * 📐 **THE DOCKED WIDTH -- ONE RULE FOR BOTH ITS USERS.** The column and the body it clips are held at the same width,
+ * which is what makes the collapse a slide rather than a reflow (see the body below); two copies of it drift the day
+ * one is edited.
+ *
+ * 🗣️ **THE FLOOR IS 424px, NOT 360** -- the owner, 2026-09-21: the panel *"may be a little too thin -- maybe we can
+ * widen it a bit"*. On his own screen, a 1280x661 CSS viewport, it was 410px: 32vw, because a 360px floor never binds
+ * at `xl`. 424px is the widest it can be there and cost the register NOTHING. The register shares the row and reflows
+ * off its own width (the `register` container, index.css), and at 1280 with a record open it turns into the phone's
+ * stacked rows past a 429px panel -- measured in Chromium with this app's thin scrollbar reserved (10px in Chrome).
+ * Nothing else moves: 32vw passes 424px at 1325px, and the ceiling stays 448px because at 1440 the register keeps its
+ * Bank column only up to a 449px panel.
+ *
+ * ⚠️ A panel much wider than this on a laptop is a trade, not a number -- the register stacking while a record is open,
+ * or the 256px rail giving some of itself back. Both are the owner's to choose.
+ */
+const DOCKED_WIDTH = 'xl:w-[clamp(424px,32vw,448px)]';
 
 /**
  * @param {{
@@ -179,7 +197,7 @@ export default function MemberPanel({ member, open, onClose, children, footer })
           // ── docked: a real third column, and no column at all when it is empty ──
           'xl:sticky xl:top-0 xl:h-dvh xl:shrink-0 xl:overflow-hidden xl:shadow-none',
           'xl:transition-[width] xl:duration-(--duration-panel) xl:ease-(--ease-out)',
-          open ? 'xl:w-[clamp(360px,32vw,448px)] xl:border-l' : 'xl:w-0 xl:border-l-0',
+          open ? `${DOCKED_WIDTH} xl:border-l` : 'xl:w-0 xl:border-l-0',
           // ── drawer: everything below xl. It SLIDES now rather than being switched off:
           //    `hidden` cut the drawer out of the layout on the same frame the record was
           //    cleared, so the phone's close was the one movement in the application with no
@@ -204,7 +222,8 @@ export default function MemberPanel({ member, open, onClose, children, footer })
         {member && (
           <div
             className={cn(
-              'flex h-full min-h-0 flex-col max-xl:w-full xl:w-[clamp(360px,32vw,448px)]',
+              'flex h-full min-h-0 flex-col max-xl:w-full',
+              DOCKED_WIDTH,
               'transition-opacity duration-(--duration-panel) ease-(--ease-out) motion-reduce:transition-none',
               open ? 'opacity-100' : 'opacity-0',
             )}

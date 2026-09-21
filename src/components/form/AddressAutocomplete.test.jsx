@@ -1,5 +1,6 @@
 // @vitest-environment jsdom -- two instances on one page is the whole point
 import { describe, expect, it } from 'vitest'
+import { useState } from 'react'
 import { screen } from '@testing-library/react'
 
 import AddressAutocomplete from './AddressAutocomplete'
@@ -118,5 +119,63 @@ describe('AddressAutocomplete — accessibility and the 16px rule', () => {
     const combobox = screen.getByRole('combobox', { name: 'Bank Address' })
     expect(combobox.className).toMatch(/\bfield-text\b/)
     expect(combobox.className).not.toMatch(/\btext-(xs|sm|2xs)\b/)
+  })
+})
+
+describe('AddressAutocomplete — a value the PARENT changes reaches the field', () => {
+  /*
+   * 🔴 THE INBOUND HALF, NAKED UNTIL `10.4`. The outbound half has a test above ("the value flows
+   * out on every keystroke"); nothing asserted the other direction -- that when the FORM changes
+   * the value (a reset, a record loaded into it), the field shows it. It is done by a sync from
+   * `value` into the component's own `query`, which was an effect carrying an
+   * `eslint-disable-next-line react-hooks/exhaustive-deps` and which `set-state-in-effect` makes
+   * an error this phase. These three hold the behaviour so it can be moved; the deletion proof is
+   * that removing the sync outright turns the first two red.
+   */
+  function Controlled({ external }) {
+    const [value, setValue] = useState('')
+    return (
+      <div>
+        <AddressAutocomplete label="Residential Address" value={value} onChange={(event) => setValue(event.target.value)} />
+        <button type="button" onClick={() => setValue(external)}>
+          Load from elsewhere
+        </button>
+      </div>
+    )
+  }
+
+  it('a reset from the form empties what was typed', async () => {
+    const user = setupUser()
+    renderWithProviders(<Controlled external="" />)
+    const field = screen.getByRole('combobox', { name: 'Residential Address' })
+
+    await user.type(field, '12 Main')
+    await user.click(screen.getByRole('button', { name: 'Load from elsewhere' }))
+
+    expect(field).toHaveValue('')
+  })
+
+  it('a value loaded from elsewhere replaces what was typed', async () => {
+    const user = setupUser()
+    renderWithProviders(<Controlled external="7 Imported Road, Durban" />)
+    const field = screen.getByRole('combobox', { name: 'Residential Address' })
+
+    await user.type(field, '12 Main')
+    await user.click(screen.getByRole('button', { name: 'Load from elsewhere' }))
+
+    expect(field).toHaveValue('7 Imported Road, Durban')
+  })
+
+  it('the must-pass: the sync never fights the keyboard -- typing arrives whole', async () => {
+    // 🔑 THE FAILURE MODE OF A CARELESS SYNC. The parent echoes every keystroke back as `value`,
+    // so a sync that re-applied `value` without checking it against what is already typed would
+    // race the keyboard and drop or reorder characters. Every character must survive.
+    const user = setupUser()
+    renderWithProviders(<Controlled external="" />)
+    const field = screen.getByRole('combobox', { name: 'Residential Address' })
+
+    await user.type(field, '14 Synthetic Avenue')
+
+    expect(field).toHaveValue('14 Synthetic Avenue')
   })
 })

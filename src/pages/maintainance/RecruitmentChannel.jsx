@@ -1,14 +1,19 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { AlertCircle, Pencil, Trash2, UserPlus, Check, X } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Pencil, Trash2, UserPlus, Check, X } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import Criteria, { CRITERION_WIDE } from '../../components/common/Criteria.jsx';
 import TableScroller from '../../components/table/TableScroller.jsx';
+import { HEAD_CELL } from '../../components/table/Table.jsx';
 import { Button, TextInput } from '../../components/form';
 import { ConfirmDialog, closeOn } from '../../components/overlay/Modal.jsx';
 import { recruitmentChannelService } from '../../services/recruitmentChannelService.js';
 import DataState from '../../components/common/DataState.jsx';
 import reportError from '../../lib/reportError.js';
+import DialogNotice, { PageNotice } from '../../components/common/DialogNotice.jsx';
+import { focusOnMount } from '../../lib/focusOnMount.js';
+import useFocusOn from '../../hooks/useFocusOn.js';
+import { messageOf, writeFailure, writeMayHaveLanded } from '../../services/parseApiError.js';
 
 /*
  * 📐 THE CHROME OF AN IN-ROW EDITOR -- one constant, with the same classes as `Subscriptions.jsx`'s
@@ -20,15 +25,9 @@ import reportError from '../../lib/reportError.js';
 // `touch-size`: an in-row input is a replaced element, so it GROWS to 44px on a coarse pointer (`07.2`; index.css).
 const CELL_INPUT = 'w-full rounded border border-line-strong bg-surface-2 px-2 py-1 field-text text-ink touch-size';
 
-const HEAD_CELL = 'whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5';
-
 export default function RecruitmentChannel() {
     const [notice, setNotice] = useState(null);
-    const noticeRef = useRef(null);
-
-    useEffect(() => {
-        if (notice) noticeRef.current?.focus();
-    }, [notice]);
+    const noticeRef = useFocusOn(notice);
 
     const [recruitmentChannels, setRecruipmentChannels] = useState([]);
     const [search, setSearch] = useState('');
@@ -37,6 +36,11 @@ export default function RecruitmentChannel() {
     const [editName, setEditName] = useState('');
     const [showAdd, setShowAdd] = useState(false);
     const [newName, setNewName] = useState('');
+
+    // 🔴 THE CARET FOLLOWS THE REVEAL (`10.4`): both inline inputs below take `ref={focusOnMount}`. They mount exactly
+    // when the user asks for them, so focusing on mount is the whole rule -- see `lib/focusOnMount.js` for why this
+    // replaced `autoFocus`, and then the ref-and-effect pair that was here first. `RecruitmentChannel.focus.test.jsx`
+    // holds it: the caret arrives on each reveal, on the row that was pressed, and never before.
 
     /*
      * 🔴 A LIVE A27 THE REGISTER NEVER NAMED, AND IT WAS THE WORST SHAPE OF IT: this
@@ -61,8 +65,6 @@ export default function RecruitmentChannel() {
     // effect's dependency, and a fresh identity each render is a re-fetch each render --
     // which on screen is indistinguishable from a slow backend.
     const refresh = useCallback(() => {
-        setListState('loading');
-        setLoadError(null);
         return recruitmentChannelService.getAll()
             .then((data) => {
                 setRecruipmentChannels(Array.isArray(data) ? data : []);
@@ -75,6 +77,28 @@ export default function RecruitmentChannel() {
             });
     }, []);
 
+    /*
+     * 🔴 THE RESET IS ON EVERY PATH EXCEPT THE MOUNT (`10.4`), AND THAT DISTINCTION IS THE WHOLE CARE HERE.
+     *
+     * `react-hooks/set-state-in-effect` flagged the effect below, because `refresh` set state synchronously
+     * before its fetch. On MOUNT that was a no-op -- `listState` already initialises to 'loading' and
+     * `loadError` to null -- so hoisting it out of the effect costs nothing there.
+     *
+     * ⚠️ BUT THIS SCREEN IS NOT THE OTHER FOUR LOADERS: `refresh` HAS FIVE NON-EFFECT CALLERS, not one.
+     * Besides Try again, the four write handlers (add, rename, enable/disable, delete) reload the table
+     * afterwards, and TODAY THAT SHOWS THE LOADING STATE while the reloaded rows are fetched. Hoisting the
+     * reset onto the retry path alone would have silently deleted that -- after a rename the table would sit
+     * on the stale rows with no sign anything was happening, which is a real behaviour change smuggled in as
+     * a lint fix. So `reloadChannels` is what all five call, and the effect alone calls the bare fetch.
+     *
+     * `RecruitmentChannel.reload.test.jsx` holds it: nothing asserted that flash before this phase.
+     */
+    const reloadChannels = useCallback(() => {
+        setListState('loading');
+        setLoadError(null);
+        return refresh();
+    }, [refresh]);
+
     useEffect(() => { refresh(); }, [refresh]);
 
     const filtered = useMemo(() => {
@@ -84,65 +108,69 @@ export default function RecruitmentChannel() {
             .sort((a, b) => a.name.localeCompare(b.name));
     }, [recruitmentChannels, search]);
 
-    const handleAdd = async () => {
-        const name = newName.trim();
-        if (!name) return;
+    /**
+     * The three in-row writes, one shape (RF -- each held its own copy of this try/catch/finally): write, re-read
+     * the table (with its loading state -- see `reloadChannels`), then the caller's own step, which runs only on
+     * success, so a failed add keeps what was typed. A failure is the sentence `writeFailure` chooses.
+     */
+    const runWrite = async (what, write, then) => {
         setSaving(true);
         try {
-            await recruitmentChannelService.create(name);
-            await refresh();
-            setNewName('');
-            setShowAdd(false);
+            await write();
+            await reloadChannels();
+            then?.();
         } catch (err) {
-            setNotice(`That change could not be saved. ${err?.message || ''}`.trim());
+            setNotice(writeFailure(err, what));
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleAdd = async () => {
+        const name = newName.trim();
+        if (!name) return;
+        await runWrite('That recruitment channel', () => recruitmentChannelService.create(name), () => {
+            setNewName('');
+            setShowAdd(false);
+        });
     };
 
     const handleEdit = async (r) => {
         const name = editName.trim();
         if (!name) return;
-        setSaving(true);
-        try {
-            await recruitmentChannelService.update(r.id, { name, enabled: r.enabled });
-            await refresh();
-            setEditingId(null);
-        } catch (err) {
-            setNotice(`That change could not be saved. ${err?.message || ''}`.trim());
-        } finally {
-            setSaving(false);
-        }
+        await runWrite(`The new name for ${r.name}`, () => recruitmentChannelService.update(r.id, { name, enabled: r.enabled }),
+            () => setEditingId(null));
     };
 
-    const handleToggleEnabled = async (r) => {
-        setSaving(true);
-        try {
-            await recruitmentChannelService.update(r.id, { name: r.name, enabled: !r.enabled });
-            await refresh();
-        } catch (err) {
-            setNotice(`That change could not be saved. ${err?.message || ''}`.trim());
-        } finally {
-            setSaving(false);
-        }
-    };
+    const handleToggleEnabled = (r) => runWrite(`The change to ${r.name}`,
+        () => recruitmentChannelService.update(r.id, { name: r.name, enabled: !r.enabled }));
 
     // 🔴 `03.4`: was `window.confirm()`. That dialog is unstyleable, says only OK/Cancel
     // rather than naming what will happen, blocks the whole browser thread, and is
     // SUPPRESSIBLE -- a user who ticks "don't show me these again" silently loses every
     // confirmation in the application.
     const [pendingDelete, setPendingDelete] = useState(null);
+    // A failed delete is said in the dialog that is still open (R4-F1): the page notice renders under its scrim.
+    const [deleteNotice, setDeleteNotice] = useState(null);
+    const askToDelete = (r) => { setDeleteNotice(null); setPendingDelete(r); };
 
     const handleDelete = async () => {
         const r = pendingDelete;
         if (!r) return;
         setSaving(true);
+        setDeleteNotice(null);
         try {
             await recruitmentChannelService.remove(r.id);
             setPendingDelete(null);
-            await refresh();
+            await reloadChannels();
         } catch (err) {
-            setNotice(`That change could not be saved. ${err?.message || ''}`.trim());
+            reportError('RecruitmentChannel.remove', err);
+            // R3-F2: only a refusal proves nothing was deleted; a lost answer may have deleted it.
+            setDeleteNotice({
+                message: writeMayHaveLanded(err)
+                    ? `The delete of ${r.name} could not be confirmed. Reload the list and check before trying again.`
+                    : `${r.name} was not deleted. ${messageOf(err)}`,
+            });
         } finally {
             setSaving(false);
         }
@@ -159,16 +187,7 @@ export default function RecruitmentChannel() {
                 prints "[object Error]" in some browsers -- so the member was shown a dialog
                 that told them nothing, and told them it modally. */}
             {notice && (
-                <div
-                    ref={noticeRef}
-                    tabIndex={-1}
-                    aria-labelledby="channel-notice-title"
-                    className="mt-4 flex max-w-4xl items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
-                >
-                    <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
-                    <p id="channel-notice-title" className="flex-1">{notice}</p>
-                    <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dismiss</Button>
-                </div>
+                <PageNotice ref={noticeRef} id="channel-notice-title" className="max-w-4xl" onDismiss={() => setNotice(null)}>{notice}</PageNotice>
             )}
 
             {/* 🔴 THE SEARCH WAS A RAW <input> WITH NO VISIBLE LABEL, held together by an
@@ -192,7 +211,7 @@ export default function RecruitmentChannel() {
                 {showAdd && (
                     <div className="flex items-center gap-2 border-b border-line bg-brand-soft p-3">
                         <input
-                            autoFocus
+                            ref={focusOnMount}
                             value={newName}
                             onChange={e => setNewName(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleAdd()}
@@ -259,7 +278,7 @@ export default function RecruitmentChannel() {
                                             <DataState
                                                 state="error"
                                                 error={loadError}
-                                                onRetry={refresh}
+                                                onRetry={reloadChannels}
                                                 title="We could not load the recruiter types."
                                             />
                                         )}
@@ -280,7 +299,7 @@ export default function RecruitmentChannel() {
                                     <td className="px-3.5 py-[11px] text-ink first:pl-5">
                                         {editingId === r.id ? (
                                             <input
-                                                autoFocus
+                                                ref={focusOnMount}
                                                 value={editName}
                                                 onChange={e => setEditName(e.target.value)}
                                                 aria-label={`Rename ${r.name}`}
@@ -345,7 +364,7 @@ export default function RecruitmentChannel() {
                                     <td className="px-3.5 py-[11px] pr-5">
                                         <button
                                             type="button"
-                                            onClick={() => setPendingDelete(r)}
+                                            onClick={() => askToDelete(r)}
                                             disabled={saving}
                                             aria-label={`Delete ${r.name}`}
                                             className="touch-size rounded-md p-1.5 text-status-suspended transition hover-hover:hover:bg-status-suspended-bg disabled:opacity-40">
@@ -378,7 +397,9 @@ export default function RecruitmentChannel() {
                 confirmLabel="Delete recruiter type"
                 loading={saving}
                 onConfirm={handleDelete}
-            />
+            >
+                <DialogNotice notice={deleteNotice} onDismiss={() => setDeleteNotice(null)} />
+            </ConfirmDialog>
         </Page>
     );
 }
