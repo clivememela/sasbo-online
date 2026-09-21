@@ -163,9 +163,11 @@ const CEILINGS = {
   //                            capital letter) · Members +109 · Recruiters +104 · Acb +76
   //                            · Subscriptions +64 · Auth +40 · AcbDebits +35 · RecruitmentChannel +35
   //                            · Forms, BankBranch +30 each · AddressAutocomplete +5 · DialogNotice +2.
-  // The ceiling comes DOWN, to exactly the measurement: carrying e70b675's 676.60 would have left
-  // 6 KiB of slack nobody earned. Still no headroom on top.
-  js: 687.33 * KB,
+  // The ceiling comes DOWN, to the measurement: carrying e70b675's 676.60 would have left 6 KiB of
+  // slack nobody earned. It is 687.34, not 687.33, because the measurement is 703,827 B -- 687.331
+  // KiB -- and a ceiling written to the hundredth must round UP or it refuses the build it was
+  // measured from (it did, by one byte). Still no headroom on top.
+  js: 687.34 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
