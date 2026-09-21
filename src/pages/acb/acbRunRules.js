@@ -1,3 +1,5 @@
+import { formatDateLong } from '../../lib/format.js';
+
 /**
  * The A.C.B. run's vocabulary and the Runs screen's small rules, named once.
  *
@@ -48,6 +50,23 @@ export const REFUSAL = Object.freeze({
   RUN_VERSION_CONFLICT: 'RUN_VERSION_CONFLICT',
   RUN_NOT_IN_STATE: 'RUN_NOT_IN_STATE',
 });
+
+/**
+ * What the Runs screen says about the holiday calendar (D30), or `null` when there is nothing to say.
+ *
+ * With no calendar on record nothing can be prepared, and the screen says so before anyone tries.
+ * From sixty days before the date the calendar is known until -- the server decides when, and says
+ * `endingSoon` -- the screen names that date, so a month past it is never first refused inside
+ * December's three-day window (SD3-G). Anything that is not a calendar -- the route smoke answers
+ * every read with `[]` -- says nothing rather than something wrong.
+ */
+export const calendarNotice = (calendar) => {
+  if (!calendar || typeof calendar !== 'object' || Array.isArray(calendar)) return null;
+  if (!calendar.knownUntil) return 'No holiday calendar is on record, so no month can be prepared yet.';
+  if (!calendar.endingSoon) return null;
+  return `The holiday calendar is known until ${formatDateLong(calendar.knownUntil)}. `
+    + 'A month after that cannot be prepared until the calendar is extended.';
+};
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
   'September', 'October', 'November', 'December'];

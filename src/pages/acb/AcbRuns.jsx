@@ -14,7 +14,8 @@ import { acbRefusalOf, acbRunService } from '../../services/acbRunService.js';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import AcbRunPanel from './AcbRunPanel.jsx';
 import {
-  CANCELLABLE, POLL_DELAYS_MS, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, monthLabel, pollRun, preparableMonths,
+  CANCELLABLE, POLL_DELAYS_MS, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, calendarNotice, monthLabel, pollRun,
+  preparableMonths,
 } from './acbRunRules.js';
 
 /** Twelve runs to a page: a year of months. */
@@ -51,6 +52,7 @@ export default function AcbRuns({ pollDelaysMs = POLL_DELAYS_MS }) {
   const [confirming, setConfirming] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [prepareNotice, setPrepareNotice] = useState(null);
+  const [calendar, setCalendar] = useState(null);
 
   // The screen was left: every poll and every late answer stops touching its state.
   const left = useRef(false);
@@ -77,6 +79,16 @@ export default function AcbRuns({ pollDelaysMs = POLL_DELAYS_MS }) {
   useEffect(() => {
     loadRuns(page);
   }, [loadRuns, page]);
+
+  // The holiday calendar, once: what it says is a note beside preparing, never a condition of the
+  // list -- a calendar that cannot be read leaves the screen as it was, and preparing still refuses
+  // a month the calendar does not reach (HOLIDAYS_NOT_KNOWN, in the dialog).
+  useEffect(() => {
+    acbRunService.holidayCalendar()
+      .then((data) => { if (!left.current) setCalendar(data); })
+      .catch((err) => reportError('AcbRuns.loadCalendar', err));
+  }, []);
+  const calendarSays = calendarNotice(calendar);
 
   /** Back to loading, then read again -- the retry, a page change and every write come here. */
   const reloadRuns = useCallback((pageNumber = page) => {
@@ -205,6 +217,7 @@ export default function AcbRuns({ pollDelaysMs = POLL_DELAYS_MS }) {
           Prepare {monthLabel(month)}
         </Button>
       </Criteria>
+      {calendarSays && <p className="mt-2 text-sm text-ink-muted">{calendarSays}</p>}
 
       <Sheet className="mt-4">
         <Table

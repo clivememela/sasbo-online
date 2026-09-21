@@ -155,6 +155,11 @@ export default function AcbRunPanel({ runId, onChanged, onClose }) {
           The totals stored when this run was prepared no longer match its lines. Do not approve it — prepare the month again.
         </p>
       )}
+      {run.calendarAgrees === false && (
+        <p className="mt-3 text-sm text-status-suspended">
+          A public holiday was added in this month after the run was prepared, so a debit may now fall on it — and the bank declines a file with a holiday in it. Do not approve it — cancel it and prepare the month again.
+        </p>
+      )}
       {!run.holidaysKnown && (
         <p className="mt-3 text-sm text-ink-muted">
           Action dates move off weekends only. Public holidays are not yet taken into account.

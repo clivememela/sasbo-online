@@ -46,6 +46,17 @@ export const acbRunService = {
             signal,
         })),
 
+    /**
+     * The holiday calendar -- its name, the date it is known until, and whether that date is near --
+     * and one year of it: this year's unless `year` is given (D30). Public, and read-only here: the
+     * server refuses its writes to every caller until the API knows who is calling (B1).
+     */
+    holidayCalendar: (year) =>
+        requestJson((signal) => fetch(apiUrl(`/api/acb/holidays${year == null ? '' : `?${new URLSearchParams({ year: String(year) })}`}`), {
+            credentials: 'include',
+            signal,
+        })),
+
     /** Withdraws a prepared or approved run. `version` is the one the screen was showing. */
     cancel: (id, version, reason) =>
         requestJsonWrite((signal) => fetch(apiUrl(`/api/acb/runs/${id}/cancel`), {

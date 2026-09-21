@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { committedVocabulary } from '../../test/apiContractScan'
 import {
-  CANCELLABLE, EXCLUSION_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, maskedAccount, monthLabel, pollRun,
-  preparableMonths,
+  CANCELLABLE, EXCLUSION_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, calendarNotice, maskedAccount, monthLabel,
+  pollRun, preparableMonths,
 } from './acbRunRules'
 
 /**
@@ -45,6 +45,30 @@ describe('monthLabel and preparableMonths', () => {
     expect(preparableMonths(new Date(2026, 8, 19)).map((m) => m.value)).toEqual(['2026-09', '2026-10'])
     expect(preparableMonths(new Date(2026, 11, 31)).map((m) => m.value)).toEqual(['2026-12', '2027-01'])
     expect(preparableMonths(new Date(2026, 11, 31))[1].label).toBe('January 2027')
+  })
+})
+
+describe('calendarNotice (D30, SD3-G)', () => {
+  const CALENDAR = { name: 'za-statutory', knownUntil: '2027-12-31', endingSoon: false, year: 2027, holidays: [] }
+
+  it('names the date the calendar ends on once the server says it is near', () => {
+    expect(calendarNotice({ ...CALENDAR, endingSoon: true })).toBe(
+      'The holiday calendar is known until 31 Dec 2027. A month after that cannot be prepared until the calendar is extended.')
+  })
+
+  it('the must-pass twin: a calendar far from its end says nothing', () => {
+    expect(calendarNotice(CALENDAR)).toBeNull()
+  })
+
+  it('no calendar on record says that nothing can be prepared -- before anyone tries', () => {
+    expect(calendarNotice({ ...CALENDAR, name: 'none', knownUntil: null, endingSoon: true }))
+      .toBe('No holiday calendar is on record, so no month can be prepared yet.')
+  })
+
+  it('anything that is not a calendar -- the route smoke\'s [] among them -- says nothing', () => {
+    expect(calendarNotice([])).toBeNull()
+    expect(calendarNotice(null)).toBeNull()
+    expect(calendarNotice('za-statutory')).toBeNull()
   })
 })
 

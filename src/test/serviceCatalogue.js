@@ -63,6 +63,7 @@ const ARGS = {
   'bankService.updateBank': ['7', { bankName: 'Synthetic Bank' }],
   'acbRunService.prepare': ['2026-10'],
   'acbRunService.cancel': ['7', 3, 'Synthetic reason'],
+  'acbRunService.holidayCalendar': [2026],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS

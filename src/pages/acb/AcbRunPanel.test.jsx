@@ -57,6 +57,20 @@ describe('the run', () => {
     expect(screen.getByText(/Public holidays are not yet taken into account/)).toBeInTheDocument()
   })
 
+  it('a run whose month gained a holiday after it was prepared says to prepare it again (SD3-F)', async () => {
+    server.use(http.get('*/api/acb/runs/41', () => HttpResponse.json({ ...RUN, calendarAgrees: false })))
+    renderPanel()
+    expect(await screen.findByText(/A public holiday was added in this month after the run was prepared/)).toBeInTheDocument()
+    expect(screen.getByText(/cancel it and prepare the month again/)).toBeInTheDocument()
+  })
+
+  it('the must-pass twin: a run whose calendar agrees says nothing about it', async () => {
+    server.use(http.get('*/api/acb/runs/41', () => HttpResponse.json({ ...RUN, calendarAgrees: true })))
+    renderPanel()
+    expect(await screen.findByRole('heading', { name: 'October 2026 run' })).toBeInTheDocument()
+    expect(screen.queryByText(/A public holiday was added/)).not.toBeInTheDocument()
+  })
+
   it('approve is shown, refused, and says why -- the API does not yet know who is asking', async () => {
     renderPanel()
     const approve = await screen.findByRole('button', { name: 'Approve' })

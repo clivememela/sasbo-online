@@ -1,3 +1,7 @@
+POST /api/acb/calendar/known-until
+GET /api/acb/holidays
+POST /api/acb/holidays
+DELETE /api/acb/holidays/{date}
 GET /api/acb/runs
 POST /api/acb/runs
 GET /api/acb/runs/{id}
@@ -35,6 +39,7 @@ PUT /api/members/{id}
 PATCH /api/members/{id}/banking
 POST /api/members/{id}/send-welcome
 PATCH /api/members/{id}/subscription
+GET /api/members/{id}/welcome-letter-preview
 GET /api/provinces
 GET /api/recruiters
 GET /api/recruitment-channels

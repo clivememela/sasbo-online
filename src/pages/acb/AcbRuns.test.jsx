@@ -35,6 +35,8 @@ const runOf = (overrides) => ({
 
 const EMPTY = pageOf([])
 
+const CALENDAR = { name: 'za-statutory', knownUntil: '2027-12-31', endingSoon: false, year: 2026, holidays: [] }
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   server.use(
@@ -42,6 +44,7 @@ beforeEach(() => {
     http.get('*/api/acb/runs/:id', ({ params }) => HttpResponse.json(runOf({ id: Number(params.id) }))),
     http.get('*/api/acb/runs/:id/lines', () => HttpResponse.json(EMPTY)),
     http.get('*/api/acb/runs/:id/exclusions', () => HttpResponse.json(EMPTY)),
+    http.get('*/api/acb/holidays', () => HttpResponse.json(CALENDAR)),
   )
 })
 
@@ -49,6 +52,27 @@ const openPrepare = async (user) => {
   await user.click(await screen.findByRole('button', { name: /^Prepare / }))
   return screen.findByRole('dialog', { name: /^Prepare the .* run\?$/ })
 }
+
+describe('the holiday calendar (D30)', () => {
+  it('from sixty days before its end, the screen names the date it is known until (SD3-G)', async () => {
+    server.use(http.get('*/api/acb/holidays', () => HttpResponse.json({ ...CALENDAR, endingSoon: true })))
+    renderWithProviders(<AcbRuns />)
+    expect(await screen.findByText(/The holiday calendar is known until 31 Dec 2027\./)).toBeInTheDocument()
+  })
+
+  it('the must-pass twin: a calendar far from its end adds nothing to the screen', async () => {
+    renderWithProviders(<AcbRuns />)
+    expect(await screen.findByRole('button', { name: 'Open the October 2026 run' })).toBeInTheDocument()
+    expect(screen.queryByText(/holiday calendar/i)).not.toBeInTheDocument()
+  })
+
+  it('a calendar that cannot be read leaves the list as it was -- preparing still refuses a month it does not reach', async () => {
+    server.use(http.get('*/api/acb/holidays', () => HttpResponse.json({ status: 500, message: 'boom' }, { status: 500 })))
+    renderWithProviders(<AcbRuns />)
+    expect(await screen.findByRole('button', { name: 'Open the October 2026 run' })).toBeInTheDocument()
+    expect(screen.queryByText(/could not load the runs/i)).not.toBeInTheDocument()
+  })
+})
 
 describe('the list', () => {
   it('shows each run with its state and control total, and opens one', async () => {
