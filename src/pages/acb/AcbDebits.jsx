@@ -16,6 +16,7 @@ import { formalName } from '../../lib/names.js';
 import useFocusOn from '../../hooks/useFocusOn.js';
 import DialogNotice, { PageNotice } from '../../components/common/DialogNotice.jsx';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
+import { formatZar } from '../../lib/format.js';
 import AcbUnpaids from './AcbUnpaids.jsx';
 import AcbHeldOver from './AcbHeldOver.jsx';
 import AcbHeldLetters from './AcbHeldLetters.jsx';
@@ -296,7 +297,7 @@ export default function AcbDebits() {
                                 ["IBT No.", selectedMember.ibtNo],
                                 ["Payment Type", selectedMember.paymentType],
                                 ["Debit Day", selectedMember.debitDay ? ordinal(selectedMember.debitDay) : null],
-                                ["Monthly Subscription", selectedMember.monthlySubscription ? `R ${selectedMember.monthlySubscription}` : null],
+                                ["Monthly Subscription", selectedMember.monthlySubscription == null ? null : formatZar(selectedMember.monthlySubscription)],
                                 ["Subscription Frequency", selectedMember.subscriptionFrequency],
                                 ["Deduct via ACB", selectedMember.deductACB],
                             ].map(([label, val]) => (

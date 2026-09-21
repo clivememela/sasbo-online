@@ -73,21 +73,3 @@ export const sasboSubscriptionAmount = (subscriptions) => {
   return amounts.size === 1 ? [...amounts][0] : null
 }
 
-/**
- * The monthly subscription amount, formatted as the form shows it.
- *
- * The server stores a `BigDecimal` and sends it as a JSON number, so `120.0`
- * arrives as `120`. Rands and cents is what an administrator expects to read on a
- * subscription, and `R120` beside `R99.99` reads as two different kinds of thing.
- */
-export const formatSubscriptionAmount = (amount) => {
-  // 🔴 `Number(null)`, `Number('')` and `Number([])` are all 0, so the obvious
-  // `Number.isFinite(Number(amount))` renders a MISSING subscription as "0.00" —
-  // a member with no subscription row shown as one who pays nothing. Those are
-  // different facts and the second is the kind that reaches a finance report.
-  // Only an actual number, or a string that is one, is an amount.
-  if (typeof amount === 'number') return Number.isFinite(amount) ? amount.toFixed(2) : ''
-  if (typeof amount !== 'string' || amount.trim() === '') return ''
-  const value = Number(amount)
-  return Number.isFinite(value) ? value.toFixed(2) : ''
-}

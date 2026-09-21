@@ -18,10 +18,10 @@ import {
     DEBIT_DAY_EARLIEST, DEBIT_DAY_LATEST, isDebitDayInRange,
     PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL
 } from "@/config/memberConstants.js";
-import { toWireDate, today } from "@/lib/format.js";
+import { formatZar, toWireDate, today } from "@/lib/format.js";
 import { sanitiseField, validateField } from "@/utils/inputRules.js";
 import { subscriptionsService } from "@/services/subscriptionsService.js";
-import { findSubscriptionForBank, formatSubscriptionAmount, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
+import { findSubscriptionForBank, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
 import { branchCodeOf, branchNamesForBank, findBranchRecord, formatBranchAddress } from "@/utils/bankBranches.js";
 import { DERIVATION, derivationNote, derivationStateOf } from "@/utils/derivation.js";
 import { debitDateSentence } from "@/utils/debitDate.js";
@@ -625,7 +625,7 @@ export default function CaptureMember() {
                                 <Field label="Date Joined" value={form.joinDate} onChange={handleChange("joinDate")} type="date" disabled />
                                 <Field label="Status" value={form.status} onChange={handleChange("status")} options={statusOptions} disabled />
                                 <SectionTitle title="Sasbo Subscription" />
-                                <Field label="Monthly Subscription" value={formatSubscriptionAmount(subscriptionAmount)} onChange={handleChange("monthlySubscription")} disabled note="*reviewed annually through business discussions *" />
+                                <Field label="Monthly Subscription" value={subscriptionAmount == null ? '' : formatZar(subscriptionAmount)} onChange={handleChange("monthlySubscription")} disabled note="*reviewed annually through business discussions *" />
                                 <Field label="Frequency" value={form.subscriptionFrequency} onChange={handleChange("subscriptionFrequency")} options={frequencyOptions} disabled />
                             </>
                         )}
