@@ -19,7 +19,7 @@ import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, IDENTITY_TYPE_PASSPORT,
-    DEBIT_DAY_OPTIONS, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
+    DEBIT_DAY_OPTIONS, PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
 } from "@/config/memberConstants.js";
 import {
     validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID
@@ -37,7 +37,7 @@ import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
 import { ERROR_KINDS, writeMayHaveLanded } from "@/services/parseApiError.js";
 import useFocusOn from "../../hooks/useFocusOn.js";
-import { formatDate, parseDate, sameDate, today } from "@/lib/format.js";
+import { formatDate, parseDate, sameDate, sameMonth, today } from "@/lib/format.js";
 import { finishField, sanitiseField, validateField } from "@/utils/inputRules.js";
 import { branchNamesForBank } from "@/utils/bankBranches.js";
 import { cn } from "@/lib/utils.js";
@@ -1105,11 +1105,18 @@ export default function Members() {
     const registerFigures = useMemo(() => {
         const by = (status) => membersList.filter((m) => m?.status === status).length;
         const now = today();
+        // 🗣️ SASBO, 18 Sep 2026: the month's new members, and how many of them pay by debit order. "New" is the
+        // member's own Date Joined -- the day they were captured, which capture fills in and does not let anyone
+        // change -- in this calendar month; the payment type is read through the same fold the record uses, so a
+        // legacy spelling counts as what it is.
+        const joinedThisMonth = membersList.filter((m) => sameMonth(parseDate(m?.joinDate), now));
         return {
             total: membersList.length,
             active: by("Active"),
             pending: by("Pending"),
             suspended: by("Suspended"),
+            newThisMonth: joinedThisMonth.length,
+            newDebitOrders: joinedThisMonth.filter((m) => normalizePaymentType(m?.paymentType) === PAYMENT_TYPE_DEBIT_ORDER).length,
             // card.html's fifth, quiet figure. `dateLastChanged` is the wire's name for the
             // record's last edit; a register that carries none simply reads 0.
             updatedToday: membersList.filter((m) =>
