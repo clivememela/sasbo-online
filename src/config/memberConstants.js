@@ -75,12 +75,19 @@ export const REP_OPTIONS = [
  * on the member's RECORD -- so the two lists are meant to differ, and one shared list would
  * have taken the Structures tab off every member's record. See `RECORD_TABS` in
  * `Members.jsx`.
+ *
+ * 🗣️ RECRUITMENT CHANNEL COMES BEFORE MEMBERSHIP & SUBSCRIPTIONS -- SASBO, 18 Sep 2026, asked twice
+ * in the meeting and written into their notes ("Recruitment Channel -> membership & subs needs to
+ * change"): who recruited the member is captured straight after where they work, and the
+ * subscription, which the capturer cannot change anyway, comes last. An ORDER change only: no label
+ * moved, so the suite (which opens each tab by name) is untouched. The record's own strip is NOT
+ * reordered -- its arrangement is the owner's, settled over three rounds on 2026-09-10.
  */
 export const MEMBER_TABS = [
   { id: 'personal', label: 'Personal Information' },
   { id: 'employment', label: 'Employment & Bank' },
-  { id: 'membership', label: 'Membership & Subscriptions' },
   { id: 'representatives', label: 'Recruitment Channel' },
+  { id: 'membership', label: 'Membership & Subscriptions' },
   // { id: 'history', label: 'History & Remarks' },
 ];
 
