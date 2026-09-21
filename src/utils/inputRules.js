@@ -1,10 +1,13 @@
 /**
- * WHAT MAY BE TYPED, AND WHAT MAY BE SAVED — one rule, one place.
+ * WHAT MAY BE TYPED, WHAT A FIELD BECOMES WHEN YOU LEAVE IT, AND WHAT MAY BE SAVED — one rule, one place.
  *
- * Two different questions, deliberately kept apart:
+ * Three different questions, deliberately kept apart:
  *
  *   `sanitiseField`  runs on EVERY KEYSTROKE and decides what a field will accept at
  *                    all. A letter typed into Work Tel never appears.
+ *   `finishField`    runs on BLUR and tidies what was typed, where you can see it happen:
+ *                    "smith" becomes "Smith" as you move on. Never on a keystroke, which
+ *                    would move the caret under the person typing.
  *   `validateField`  runs on SUBMIT and decides whether what is there is usable. It
  *                    can say "too short", which a keystroke filter cannot.
  *
@@ -97,6 +100,61 @@ export function sanitiseField(field, value, context = {}) {
             return raw;
     }
 }
+
+/**
+ * The surname particles that stay as typed when they are not the first word -- "Janse van Rensburg", "Van der Merwe",
+ * "Maria de Lourdes". Afrikaans, Dutch, French and Portuguese, the ones South African names actually carry.
+ */
+const NAME_PARTICLES = new Set(['van', 'der', 'den', 'de', 'du', 'le', 'la', 'von', 'ter', 'ten', 'te', 'da', 'das', 'dos', 'di', 'del']);
+
+/**
+ * 🗣️ A NAME STARTS WITH A CAPITAL -- SASBO, 18 Sep 2026 ("rules for capital letter on first letter"): a list printed
+ * from the register must read consistently, and "smith" beside "Nkosi" does not.
+ *
+ * 🔑 IT ONLY EVER RAISES A LETTER, AND ONLY THE FIRST LETTER OF A WORD. Nothing is lowered and nothing inside a word
+ * moves, because both would change a real name somebody typed on purpose (register A62 is about exactly that):
+ *
+ *   smith → Smith · zola thabo → Zola Thabo · van der merwe → Van der Merwe · janse van rensburg → Janse van Rensburg
+ *   McDonald, DeVilliers, Smit-Nel, O'Brien, N'wamitwa → unchanged -- the capital inside is theirs, and so is its absence
+ *
+ * A particle keeps its case unless it opens the name, so "van der merwe" becomes "Van der Merwe" and not "Van Der
+ * Merwe". And a word is split on WHITESPACE only: after a hyphen or apostrophe nothing changes, which is also what keeps
+ * the automation suite's `ZZ-AT-member-…` surnames byte-for-byte (its read-back and its cleanup both match them exactly).
+ */
+export function capitaliseName(value) {
+    let opened = false;
+    return String(value ?? '')
+        .split(/(\s+)/)
+        .map((part) => {
+            if (part.trim() === '') return part;
+            // The first WORD, not the first part: "  van der merwe" opens with whitespace and still means "Van".
+            const opensTheName = !opened;
+            opened = true;
+            if (!opensTheName && NAME_PARTICLES.has(part)) return part;
+            return part.replace(/^\p{Ll}/u, (letter) => letter.toUpperCase());
+        })
+        .join('');
+}
+
+/**
+ * Tidy a value as its field is LEFT (blur). The value to store; unchanged for any field with no finishing rule.
+ *
+ * Initials are letters that stand for names, so they are capitals whichever way they were typed ("zt" → "ZT").
+ */
+export function finishField(field, value) {
+    switch (field) {
+        case 'firstNames':
+        case 'surname':
+            return capitaliseName(value);
+        case 'initials':
+            return String(value ?? '').toUpperCase();
+        default:
+            return value;
+    }
+}
+
+/** Every field `finishField` tidies — used by the screens' tests. */
+export const FINISHED_FIELDS = Object.freeze(['firstNames', 'surname', 'initials']);
 
 /**
  * Whether a filled-in value is usable. Returns a message, or `null` when it is fine.

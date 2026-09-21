@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sanitiseField, validateField, digitCount, SANITISED_FIELDS } from './inputRules'
+import { sanitiseField, validateField, digitCount, SANITISED_FIELDS, capitaliseName, finishField, FINISHED_FIELDS } from './inputRules'
 
 /**
  * The typing rules, and the one way they could do real harm.
@@ -90,6 +90,58 @@ describe('sanitiseField — what may be typed', () => {
         // an unlisted field is never silently filtered.
         expect(sanitiseField('bankAddress', '135 Rivonia Rd, Sandton #4')).toBe('135 Rivonia Rd, Sandton #4')
         expect(SANITISED_FIELDS).not.toContain('bankAddress')
+    })
+})
+
+/**
+ * 🗣️ SASBO, 18 Sep 2026: "rules for capital letter on first letter". The rule RAISES first letters and does nothing
+ * else, and the half of this block that matters is the second: what it must never touch. A rule that also lowered the
+ * rest would pass every "smith → Smith" case and then rewrite McDonald, and ZZ-AT-member-… -- the automation suite's
+ * surnames, which it reads back and cleans up by exact match.
+ */
+describe('finishField — what a field becomes when you leave it', () => {
+    it.each([
+        ['smith', 'Smith'],
+        ['zola thabo', 'Zola Thabo'],
+        ['van der merwe', 'Van der Merwe'],
+        ['janse van rensburg', 'Janse van Rensburg'],
+        ['maria de lourdes', 'Maria de Lourdes'],
+        ['naudé', 'Naudé'],
+        ['élise', 'Élise'],
+        // Whitespace first: the first WORD still opens the name, so its particle is raised.
+        ['  van zyl', '  Van Zyl'],
+    ])('raises the first letter of each word: %s → %s', (typed, finished) => {
+        expect(capitaliseName(typed)).toBe(finished)
+    })
+
+    it.each([
+        'McDonald', 'DeVilliers', 'Smit-Nel', "O'Brien", "N'wamitwa", 'Anderson-Bekker',
+        'ZZ-AT-member-abqkdemhijkl', 'Zola', 'Van der Merwe', 'VAN ZYL',
+    ])('🔑 leaves an already-capitalised name exactly as typed: %s', (typed) => {
+        expect(capitaliseName(typed)).toBe(typed)
+    })
+
+    it('🔴 never lowers a letter and never touches one after a hyphen or apostrophe', () => {
+        expect(capitaliseName('smit-nel')).toBe('Smit-nel')
+        expect(capitaliseName("o'brien")).toBe("O'brien")
+        expect(capitaliseName('ZZ-AT-member-abq')).toBe('ZZ-AT-member-abq')
+        expect(capitaliseName('mcDONALD')).toBe('McDONALD')
+    })
+
+    it('initials are capitals whichever way they were typed', () => {
+        expect(finishField('initials', 'zt')).toBe('ZT')
+        expect(finishField('initials', 'Z.T.')).toBe('Z.T.')
+    })
+
+    it('only the name fields are finished; every other field comes back as it went in', () => {
+        expect(FINISHED_FIELDS).toEqual(['firstNames', 'surname', 'initials'])
+        expect(finishField('firstNames', 'zola')).toBe('Zola')
+        expect(finishField('surname', 'nkosi')).toBe('Nkosi')
+        // The must-pass: a field with no finishing rule is untouched, or "smith → Smith" could be a global lower-case
+        // fold that happens to agree on names.
+        expect(finishField('personalEmail', 'Some.Body@Example.test')).toBe('Some.Body@Example.test')
+        expect(finishField('employeeNumber', 'emp-10001')).toBe('emp-10001')
+        expect(finishField('surname', undefined)).toBe('')
     })
 })
 

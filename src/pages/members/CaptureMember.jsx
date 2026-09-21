@@ -18,7 +18,7 @@ import {
     PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL
 } from "@/config/memberConstants.js";
 import { toWireDate, today } from "@/lib/format.js";
-import { sanitiseField, validateField } from "@/utils/inputRules.js";
+import { finishField, sanitiseField, validateField } from "@/utils/inputRules.js";
 import { subscriptionsService } from "@/services/subscriptionsService.js";
 import { findSubscriptionForBank, formatSubscriptionAmount, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
 import { branchCodeOf, branchNamesForBank, findBranchRecord, formatBranchAddress } from "@/utils/bankBranches.js";
@@ -374,6 +374,17 @@ export default function CaptureMember() {
         }
     };
 
+    /**
+     * 🗣️ A NAME STARTS WITH A CAPITAL (SASBO, 18 Sep 2026) -- tidied as the field is LEFT, where the change can be seen,
+     * by the rule both member screens share (`finishField`, utils/inputRules.js). Only first letters are ever raised.
+     */
+    const handleBlur = (field) => () => {
+        setForm((prev) => {
+            const finished = finishField(field, prev[field]);
+            return finished === prev[field] ? prev : { ...prev, [field]: finished };
+        });
+    };
+
     const validateFormBeforeSave = () => {
         const errors = {};
 
@@ -608,9 +619,9 @@ export default function CaptureMember() {
                         {activeTab === "personal" && (
                             <>
                                 <Field label="Title" value={form.title} onChange={handleChange("title")} options={titleOptions} />
-                                <Field label="Initials" value={form.initials} onChange={handleChange("initials")} error={fieldErrors.initials} />
-                                <Field label="First Name(s)" value={form.firstNames} onChange={handleChange("firstNames")} error={fieldErrors.firstNames} required />
-                                <Field label="Surname" value={form.surname} onChange={handleChange("surname")} error={fieldErrors.surname} required />
+                                <Field label="Initials" value={form.initials} onChange={handleChange("initials")} onBlur={handleBlur("initials")} error={fieldErrors.initials} />
+                                <Field label="First Name(s)" value={form.firstNames} onChange={handleChange("firstNames")} onBlur={handleBlur("firstNames")} error={fieldErrors.firstNames} required />
+                                <Field label="Surname" value={form.surname} onChange={handleChange("surname")} onBlur={handleBlur("surname")} error={fieldErrors.surname} required />
                                 <Field label="Identity Type" value={form.identityType} onChange={handleChange("identityType")} options={identityTypeOptions} error={fieldErrors.identityType} required />
                                 <Field
                                     kind={form.identityType === IDENTITY_TYPE_PASSPORT ? "reference" : "identifier"}
@@ -834,7 +845,7 @@ function EmailFields({ form, setForm, handleChange, fieldErrors }) {
     );
 }
 
-function Field({ label, value, onChange, className = "", options = null, type = "text",
+function Field({ label, value, onChange, onBlur, className = "", options = null, type = "text",
                    error = null, disabled = false, searchable = false, note = null, kind, required = false,
                    loading = false, emptyLabel, loadError = null, onRetryLoad, allowCustom = false }) {
 
@@ -889,5 +900,6 @@ function Field({ label, value, onChange, className = "", options = null, type = 
         );
     }
 
-    return <TextInput {...shared} kind={kind || "text"} />;
+    // `onBlur` on the typed branch only: the pickers above own their blur (it is how a searchable one commits).
+    return <TextInput {...shared} kind={kind || "text"} onBlur={onBlur} />;
 }

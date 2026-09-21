@@ -38,7 +38,7 @@ import reportError from "../../lib/reportError.js";
 import { ERROR_KINDS, writeMayHaveLanded } from "@/services/parseApiError.js";
 import useFocusOn from "../../hooks/useFocusOn.js";
 import { formatDate, parseDate, sameDate, today } from "@/lib/format.js";
-import { sanitiseField, validateField } from "@/utils/inputRules.js";
+import { finishField, sanitiseField, validateField } from "@/utils/inputRules.js";
 import { branchNamesForBank } from "@/utils/bankBranches.js";
 import { cn } from "@/lib/utils.js";
 import { formalName, personName } from "@/lib/names.js";
@@ -716,6 +716,18 @@ export default function Members() {
         setFieldErrors({});
         setIsEditing(true);
     };
+
+    /**
+     * 🗣️ A NAME STARTS WITH A CAPITAL (SASBO, 18 Sep 2026) -- tidied as the field is LEFT, where the change can be seen,
+     * by the rule both member screens share (`finishField`, utils/inputRules.js). Only first letters are ever raised.
+     * No new object when nothing changed, so leaving an untouched field does not count as an edit.
+     */
+    const handleEditBlur = useCallback((field) => () => {
+        setEditForm((prev) => {
+            const finished = finishField(field, prev[field]);
+            return finished === prev[field] ? prev : { ...prev, [field]: finished };
+        });
+    }, []);
 
     const handleEditChange = useCallback((field) => (event) => {
         let rawValue = fieldValue(event);
@@ -1621,9 +1633,9 @@ export default function Members() {
                             {activeTab === "personal" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
                                     <Detail label="Title" value={editForm.title} isEditing={isEditing} options={titleOptions} onChange={handleEditChange("title")} />
-                                    <Detail label="Initials" value={editForm.initials} isEditing={isEditing} onChange={handleEditChange("initials")} error={fieldErrors.initials} />
-                                    <Detail label="First Name(s)" value={editForm.firstNames} isEditing={isEditing} onChange={handleEditChange("firstNames")} error={fieldErrors.firstNames} required kind="name" />
-                                    <Detail label="Surname" value={editForm.surname} isEditing={isEditing} onChange={handleEditChange("surname")} error={fieldErrors.surname} required kind="name" />
+                                    <Detail label="Initials" value={editForm.initials} isEditing={isEditing} onChange={handleEditChange("initials")} onBlur={handleEditBlur("initials")} error={fieldErrors.initials} />
+                                    <Detail label="First Name(s)" value={editForm.firstNames} isEditing={isEditing} onChange={handleEditChange("firstNames")} onBlur={handleEditBlur("firstNames")} error={fieldErrors.firstNames} required kind="name" />
+                                    <Detail label="Surname" value={editForm.surname} isEditing={isEditing} onChange={handleEditChange("surname")} onBlur={handleEditBlur("surname")} error={fieldErrors.surname} required kind="name" />
                                     <Detail label="Identity Type" value={editForm.identityType} isEditing={isEditing} options={idTypeOptions} onChange={handleEditChange("identityType")} error={fieldErrors.identityType} required />
                                     <Detail
                                         label={editForm.identityType || "Identity Number"}
@@ -1875,7 +1887,7 @@ function recordIsDirty({ isEditing, baseline, editForm }) {
     return isEditing && baseline !== null && JSON.stringify(editForm) !== baseline;
 }
 
-function Detail({ label, value, isEditing, onChange, className = "", options = null, kind = "text", error = null, disabled = false, required = false, loadError = null, onRetryLoad, note = null }) {
+function Detail({ label, value, isEditing, onChange, onBlur, className = "", options = null, kind = "text", error = null, disabled = false, required = false, loadError = null, onRetryLoad, note = null }) {
     if (!isEditing) {
         /* card.css `.field`: the label in small capitals, the value in ink, no box around
            either -- a record reads as a record, not as a form with its inputs disabled.
@@ -1919,6 +1931,7 @@ function Detail({ label, value, isEditing, onChange, className = "", options = n
             label={label}
             value={value}
             onChange={onChange}
+            onBlur={onBlur}
             kind={kind}
             error={error || undefined}
             disabled={disabled}
