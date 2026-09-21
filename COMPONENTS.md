@@ -1492,7 +1492,7 @@ never reads — see *Surprises*.
 
 | State | How |
 | --- | --- |
-| **open (docked, ≥ `xl`)** | a real third column at `clamp(360px, 32vw, 448px)`, full height, own scroll, `xl:border-l` |
+| **open (docked, ≥ `xl`)** | a real third column at `clamp(424px, 32vw, 448px)`, full height, own scroll, `xl:border-l` |
 | **closed (docked)** | 🔴 **the column closes rather than showing an empty slot** — the owner, 2026-09-10: *"Is it not better to rather close that right hand bar instead of showing an empty card slot?"* It **collapses** (`xl:w-0`) rather than unmounting, so the width animates over `--duration-panel`; an instant 448px reflow of the register is a jump this design does not make. It also gives the register that width back: the register's columns come from a container query, so at 1440 it was reading ~680px and dropping to its narrow ladder. |
 | **open (drawer, < `xl`)** | `max-xl:translate-x-0` over a `bg-ink/25` scrim, `min(448px,100vw)`, `shadow-2` |
 | **closed (drawer)** | `translate-x-full`, and `max-xl:hidden` once there is no member at all — it **slides** now; `hidden` used to cut it out of the layout on the same frame the record was cleared, so the phone's close was the one movement in the application with no motion |
