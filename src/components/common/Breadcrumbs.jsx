@@ -27,7 +27,7 @@ export default function Breadcrumbs() {
 
     if (lastSegment.toLowerCase() === "banks") return "Bank / Branch";
     if (lastSegment.toLowerCase() === "apply") return "Member Application";
-    if (lastSegment.toLowerCase() === "organizer-report") return "Organizer's Report";
+    if (lastSegment.toLowerCase() === "organizer-report") return "Location Visit";
     if (lastSegment.toLowerCase() === "daily-menu") return "Daily Menu";
     if (lastSegment.toLowerCase() === "miscellaneous") return "Admin Menu";
 
