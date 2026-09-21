@@ -1,7 +1,6 @@
 import { useRef, useState, useEffect, useMemo } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import WelcomeLetter from "../../components/members/WelcomeLetter";
-import { memberService } from "@/services/memberService.js";
 import { recruiterService } from "@/services/recruiterService.js";
 import { recruitmentChannelService } from "@/services/recruitmentChannelService.js";
 import { locationService } from "@/services/locationService.js";
@@ -21,7 +20,6 @@ import {
 import { toWireDate, today } from "@/lib/format.js";
 import { sanitiseField, validateField } from "@/utils/inputRules.js";
 import { subscriptionsService } from "@/services/subscriptionsService.js";
-import { ERROR_KINDS, messageOf, validationErrorsOf } from "@/services/parseApiError.js";
 import { findSubscriptionForBank, formatSubscriptionAmount, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
 import { branchCodeOf, branchNamesForBank, findBranchRecord, formatBranchAddress } from "@/utils/bankBranches.js";
 import { DERIVATION, derivationNote, derivationStateOf } from "@/utils/derivation.js";
@@ -62,7 +60,7 @@ const FIELD_TO_TAB_MAP = {
 const nameList = (rows) => (Array.isArray(rows) ? rows : []).map((row) => row?.name).filter(Boolean);
 
 const REFERENCE_LOADERS = {
-    // 🔴 S6/R5/03.10: the CAPTURE screen's recruiter list is `/api/recruiters`, not the representatives
+    // 🔴 S6/R5/03.10: the CAPTURE screen's recruiter list is `/api/recruiters`, not the representatives'
     // endpoint. Two lists, two jobs -- see `recruiterService.getRecruiters`.
     recruiters: () => recruiterService.getRecruiters(),
     // 03.8 -- HOW the member was recruited. A reference table that was seeded, served and administered
@@ -135,13 +133,12 @@ export default function CaptureMember() {
          * ⚖️ Cleared with the automation arc before landing (2026-09-17): none of the sixteen is among the
          * 21 fields its live round-trip scenario types and reads back, and `captureCatalogue.spec.js`'s
          * closed list of removed-tab labels does not move. `capturePayload.test.jsx` holds the payload as a
-         * CLOSED SET, so a key creeping back reddens whether or not anyone remembers to look for it. */
+         * CLOSED SET, so a key creeping back reddens whether anyone remembers to look for it. */
     });
 
     const [fieldErrors, setFieldErrors] = useState({});
     const [showSavedNotification, setShowSavedNotification] = useState(false);
     const [welcomeMember, setWelcomeMember] = useState(null);
-    const [saving, setSaving] = useState(false);
     const [savedName, setSavedName] = useState("");
     const [pristineForm] = useState(() => JSON.stringify(form));
     const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -187,7 +184,7 @@ export default function CaptureMember() {
     const initialsTyped = useRef(false);
 
     /**
-     * 🔑 S4, FOR THE TWO BRANCH-DERIVED FIELDS (E4, E6). Same rule as the initials above and the same defect
+     * 🔑 S4, FOR THE TWO BRANCH-DERIVED FIELDS (E4, E6). The same rule as the initials above and the same defect
      * behind it: a derivation must never win an argument with a value somebody typed. State rather than a ref,
      * unlike `initialsTyped`, because the NOTE under each field renders from it -- a ref would leave the field
      * saying "filled in from the branch" under a value the administrator had just corrected.
@@ -229,9 +226,9 @@ export default function CaptureMember() {
      * The sentence under a branch-derived field.
      *
      * The two states that need their own words are the ones whose general wording would be WRONG here:
-     *   NOT_APPLICABLE  means "no branch chosen yet", not "this member has no IBT number", and saying the
+     *   NOT_APPLICABLE means "no branch chosen yet", not "this member has no IBT number", and saying the
      *                   latter would tell the administrator to stop looking for a value that is coming.
-     *   NO_MATCH        names the branch, because the fourteen dev branch names are offered for every bank
+     *   NO_MATCH names the branch, because the fourteen dev branch names are offered for every bank
      *                   and belong to none of them -- "nothing found" without the name reads as a fault.
      */
     const branchDerivationNote = (state, source) => derivationNote(state, {
@@ -244,8 +241,8 @@ export default function CaptureMember() {
     /**
      * 04.3 -- the one thing this screen can say that no other screen can: the DATE, not the day.
      *
-     * The rule is the signed spec's and A57 corrected it: back to the last business day, forward only where
-     * back would fall out of the 20th-to-31st window. The sentence carries its own caveat, because no
+     * The rule is the signed spec's, and A57 corrected it: back to the last business day, forward only where
+     * back would fall out of the 20th-to-31st window. The sentence carries its own issue, because no
      * maintained public-holiday source is wired to this application and presenting the date as certain would
      * overstate it.
      */
@@ -262,7 +259,7 @@ export default function CaptureMember() {
         const hasNonNumericInput =
             field === "identityNumber" && form.identityType === "I.D. Number" &&
             /\D/.test(rawValue);
-        // What each field accepts at all, as it is typed -- one rule for both member screens (utils/inputRules.js).
+        // What each field accepts all, as it is typed -- one rule for both member screens (utils/inputRules.js).
         const value = sanitiseField(field, rawValue, { identityType: form.identityType });
 
         setForm((prev) => {
@@ -365,11 +362,19 @@ export default function CaptureMember() {
             if (!form.bankName.trim()) errors.bankName = "Bank Employer alignment name is required for Debit Orders";
             if (!form.branch.trim()) errors.branch = "Bank Branch selection is required for Debit Orders";
 
-            // A RANGE, not a list of three. The server's DebitDay takes the 20th to the 31st and
+            // A RANGE, not a list of three. The server's DebitDay takes the 20th to the 31st, and
             // most banks' own ACB days live between them (E9a/E9b, A32).
             if (!isDebitDayInRange(form.debitDay)) {
                 errors.debitDay = `Debit day must be between ${DEBIT_DAY_EARLIEST} and ${DEBIT_DAY_LATEST} when payment type is 'Debit Order'`;
             }
+        }
+
+        // Welcome letter email validation: ensure selected preferred recipients have email populated
+        const hasPersonal = Boolean(form.personalEmail?.trim());
+        const hasWork = Boolean(form.workEmail?.trim());
+        if (form.preferredEmail === "both") {
+            if (!hasPersonal) errors.personalEmail = "Personal Email is required when both is selected";
+            if (!hasWork) errors.workEmail = "Work Email is required when both is selected";
         }
 
         // Shape checks, on what is FILLED IN (requiredness is above). Bank Account Number only while it is on screen:
@@ -393,7 +398,6 @@ export default function CaptureMember() {
     }, [saveNotice]);
 
     const handleSave = () => {
-        if (saving) return;
         const clientSideErrors = validateFormBeforeSave();
         const mergedErrors = { ...fieldErrors, ...clientSideErrors };
 
@@ -410,41 +414,19 @@ export default function CaptureMember() {
         }
 
         setSaveNotice(null);
-        setSaving(true);
-        memberService.createMember({ ...form, monthlySubscription: subscriptionAmount ?? form.monthlySubscription })
-            .then((saved) => {
-                setSavedName([form.firstNames, form.surname].filter(Boolean).join(" "));
-                setShowSavedNotification(true);
-                setTimeout(() => setShowSavedNotification(false), 3000);
-                
-                // Inject the persisted ID from the Java backend into the payload structure
-                // This triggers the WelcomeLetter evaluation overlay window to perform inspection
-                setWelcomeMember({ ...form, id: saved?.id || saved?.memberId });
+        // Open confirmation modal to preview welcome letter PDF and confirm capture + dispatch
+        setWelcomeMember({ ...form, monthlySubscription: subscriptionAmount ?? form.monthlySubscription });
+    };
 
-                // 🔴 R3-OBS-2b: the form stayed filled and Save re-enabled, so a second press posted the same member
-                // again. The welcome letter has taken its own copy above, so the form can be emptied now.
-                initialsTyped.current = false;
-                setForm(JSON.parse(pristineForm));
-                setFieldErrors({});
-            })
-            .catch((err) => {
-                // The server's per-field messages go under their fields, not only into the summary.
-                const serverFieldErrors = validationErrorsOf(err);
-                if (Object.keys(serverFieldErrors).length > 0) {
-                    setFieldErrors((prev) => ({ ...prev, ...serverFieldErrors }));
-                }
-                // 🔴 R3-F2: only a 4xx is the server saying no. A timeout, a dropped connection or a 5xx does NOT mean
-                // nothing was written -- "not saved" there invites a second press, and the second press is a second
-                // member. Worded as Recruiters.jsx already words it.
-                const refused = err?.kind === ERROR_KINDS.HTTP && err.status >= 400 && err.status < 500;
-                setSaveNotice({
-                    kind: refused ? "failed" : "unconfirmed",
-                    messages: [refused
-                        ? `This member was not saved. ${messageOf(err)}`
-                        : `We could not confirm whether this member was saved. ${messageOf(err)} Check the register for this member before trying again, or they may be captured twice.`],
-                });
-            })
-            .finally(() => setSaving(false));
+    const handleCaptureSuccess = (saved) => {
+        setSavedName([saved?.firstNames || form.firstNames, saved?.surname || form.surname].filter(Boolean).join(" "));
+        setShowSavedNotification(true);
+        setTimeout(() => setShowSavedNotification(false), 3000);
+
+        // Reset form to pristine after successful confirmation & email dispatch
+        initialsTyped.current = false;
+        setForm(JSON.parse(pristineForm));
+        setFieldErrors({});
     };
 
     const handleCancel = () => {
@@ -531,6 +513,7 @@ export default function CaptureMember() {
             open={!!welcomeMember}
             onClose={() => setWelcomeMember(null)}
             member={welcomeMember}
+            onSuccess={handleCaptureSuccess}
         />
         <div className="flex min-h-0 flex-1 flex-col px-7 pb-7 pt-[26px] text-ink max-lg:px-4">
             <PageTitle
@@ -560,20 +543,19 @@ export default function CaptureMember() {
             )}
 
             <div className="relative mt-2 rounded-lg bg-surface shadow-(--shadow-1)">
-                {/* 🔴 IT SAID "Member captured successfully!" AT THE TOP OF A LONG FORM, WHERE NOBODY PRESSING SAVE AT THE
+                {/* 🔴 IT SAID, "Member captured successfully!" AT THE TOP OF A LONG FORM, WHERE NOBODY PRESSING SAVE AT THE
                     BOTTOM COULD SEE IT (`06.5`). It is the world's toast now, fixed above the action bar as the record's
                     own is, and it names who was captured.
                     ⚠️ THE SENTENCE IS KEPT WORD FOR WORD, IN ITS OWN ELEMENT: the automation arc's `MemberCapturePage`
                     waits for `getByText('Member captured successfully!')`. The name is a second element beside it. */}
                 {showSavedNotification && (
-                    <div
-                        role="status"
+                    <output
                         className="kind-in fixed bottom-[84px] left-1/2 z-50 flex -translate-x-1/2 items-center gap-2.5 rounded-[10px] bg-ink px-3.5 py-2.5 text-[13.5px] font-medium text-bg shadow-(--shadow-2)"
                     >
                         <CheckCircle2 size={16} strokeWidth={1.75} aria-hidden="true" className="text-brand" />
                         <span>Member captured successfully!</span>
                         {savedName && <span className="font-normal opacity-80">{savedName}</span>}
-                    </div>
+                    </output>
                 )}
 
                 {saveNotice && (
@@ -675,7 +657,7 @@ export default function CaptureMember() {
                                 {/* 🔑 02.5 / CM-37 -- LIST FIRST, TYPING ALLOWED. The seeded list is per-bank and
                                     incomplete (SASBO's own data carries grades no bank row has), so a list-only
                                     field means a member who cannot be captured at all. The server is built for
-                                    it: `jobGradeMatching` in `api-vocabulary.json` publishes the normalisation
+                                    it: `jobGradeMatching` in `api-vocabulary.json` publishes the normalization
                                     and `MemberDto.jobGradeOutcome` reports MATCHED / CAPTURED / CLEARED.
                                     `allowCustom` is the design arc's prop, on their instruction and their shape. */}
                                 <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGradeLoading} emptyLabel="No job grades available" loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} searchable allowCustom note={jobGradeNote} />
@@ -709,14 +691,14 @@ export default function CaptureMember() {
                                     🗣️ S6, SETTLED BY THE OWNER the same day. The older spec asks for a tab called
                                     "Recruiter Type"; the stakeholder calls the tab "Recruitment Channel", twice, on
                                     both screens. Both are right about different things -- "Recruiter Type" was never
-                                    the TAB, it names the KIND of recruitment, which is what the first field holds. So
+                                    the TAB; it names the KIND of recruitment, which is what the first field holds. So
                                     the tab keeps the stakeholder's name and the FIELD takes the spec's. Nothing was
                                     renamed to satisfy a checker: the reconciliation was put to the owner. */}
                                 <Field label="Recruiter Type" value={form.recruitedHow} onChange={handleChange("recruitedHow")} {...refs.field('recruitment channels')} options={nameList(channels)} searchable />
 
                                 {/* 🔑 R2 / RE-3 -- A CHANGE OF MEANING, NOT A RENAME. This was "Area's Recruiter", fed
                                     from the list of recruiter PEOPLE, so it captured a person under an area-shaped
-                                    name. Three documents ask for an AREA (28 Aug, §11, RE-3). Relabelling alone would
+                                    name. Three documents ask for an AREA (28 Aug, §11, RE-3). Relabeling alone would
                                     have left the screen collecting the wrong KIND of thing behind a corrected word --
                                     worse than obviously wrong, because nothing about it would ever look wrong again.
 
@@ -742,16 +724,16 @@ export default function CaptureMember() {
                 </div>
 
                 <div className="sticky bottom-0 z-10 flex flex-row-reverse justify-start gap-3 border-t border-line bg-surface px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                    <Button variant="primary" onClick={handleSave} loading={saving}>Save Member</Button>
+                    <Button variant="primary" onClick={handleSave} >Save Member</Button>
                     <Button onClick={handleCancel}>Cancel</Button>
                 </div>
 
                 <ConfirmDialog
                     open={confirmDiscard}
                     onOpenChange={closeOn(() => setConfirmDiscard(false))}
-                    title="Discard this member?"
+                    title="Discard?"
                     description="Nothing on this form has been saved."
-                    confirmLabel="Discard member"
+                    confirmLabel="Discard capturing member"
                     cancelLabel="Keep capturing"
                     onConfirm={() => {
                         setConfirmDiscard(false);

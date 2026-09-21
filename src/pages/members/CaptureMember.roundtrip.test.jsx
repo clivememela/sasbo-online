@@ -85,6 +85,8 @@ const fill = async (user, label, value) => {
 
 const save = async (user) => {
   await user.click(screen.getByRole('button', { name: /save member/i }))
+  const send = screen.queryByRole('button', { name: /send welcome letter/i })
+  if (send) await user.click(send)
 }
 
 /**
@@ -127,6 +129,7 @@ describe('CaptureMember round-trips its fields', () => {
 
     await fill(user, 'First Name(s)', 'Synthetic')
     await fill(user, 'Surname', 'Testperson')
+    await fill(user, 'Personal Email', 'synthetic@example.test')
     await choosePayroll(user)
 
     // Identity type is a select, and its own value gates the identity-number
