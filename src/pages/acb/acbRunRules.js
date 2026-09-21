@@ -1,4 +1,4 @@
-import { formatDateLong } from '../../lib/format.js';
+import { formatDateLong, formatZar } from '../../lib/format.js';
 
 /**
  * The A.C.B. run's vocabulary and the Runs screen's small rules, named once.
@@ -89,6 +89,23 @@ export const calendarNotice = (calendar) => {
   if (!calendar.endingSoon) return null;
   return `The holiday calendar is known until ${formatDateLong(calendar.knownUntil)}. `
     + 'A month after that cannot be prepared until the calendar is extended.';
+};
+
+/**
+ * What a month will charge, and the next dated rate after it if there is one (Q43): the rate in
+ * force for a month is the latest row dated on or before its first day. `null` when the answer is
+ * not a list of rates -- the route smoke answers every read with `[]` -- or no rate reaches the month.
+ */
+export const rateNote = (ratesAnswer, month) => {
+  const rates = Array.isArray(ratesAnswer?.rates) ? ratesAnswer.rates : null;
+  if (!rates || !/^\d{4}-\d{2}$/.test(month ?? '')) return null;
+  const first = `${month}-01`;
+  const inForce = rates.filter((r) => r.effectiveFrom <= first).at(-1);
+  if (!inForce) return null;
+  const next = rates.find((r) => r.effectiveFrom > first);
+  return `${monthLabel(month)} charges ${formatZar(inForce.amount)} a member — the rate since `
+    + `${monthLabel(inForce.effectiveFrom.slice(0, 7))}.`
+    + (next ? ` From ${monthLabel(next.effectiveFrom.slice(0, 7))}: ${formatZar(next.amount)}.` : '');
 };
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',

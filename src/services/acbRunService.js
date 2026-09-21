@@ -57,6 +57,13 @@ export const acbRunService = {
             signal,
         })),
 
+    /** Every dated flat rate, oldest first, and -- from December -- the January notice (Q43). Read-only here. */
+    rates: () =>
+        requestJson((signal) => fetch(apiUrl('/api/acb/rates'), {
+            credentials: 'include',
+            signal,
+        })),
+
     /** Withdraws a prepared or approved run. `version` is the one the screen was showing. */
     cancel: (id, version, reason) =>
         requestJsonWrite((signal) => fetch(apiUrl(`/api/acb/runs/${id}/cancel`), {

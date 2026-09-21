@@ -15,7 +15,7 @@ import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import AcbRunPanel from './AcbRunPanel.jsx';
 import {
   CANCELLABLE, POLL_DELAYS_MS, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, calendarNotice, declinedMonthWarning,
-  monthLabel, pollRun, preparableMonths,
+  monthLabel, pollRun, preparableMonths, rateNote,
 } from './acbRunRules.js';
 
 /** Twelve runs to a page: a year of months. */
@@ -53,6 +53,7 @@ export default function AcbRuns({ pollDelaysMs = POLL_DELAYS_MS }) {
   const [preparing, setPreparing] = useState(false);
   const [prepareNotice, setPrepareNotice] = useState(null);
   const [calendar, setCalendar] = useState(null);
+  const [rates, setRates] = useState(null);
 
   // The screen was left: every poll and every late answer stops touching its state.
   const left = useRef(false);
@@ -89,6 +90,14 @@ export default function AcbRuns({ pollDelaysMs = POLL_DELAYS_MS }) {
       .catch((err) => reportError('AcbRuns.loadCalendar', err));
   }, []);
   const calendarSays = calendarNotice(calendar);
+
+  // The dated rates, once (Q43): what the chosen month will charge sits beside Prepare -- a note, never a
+  // condition; the server still refuses a month no rate reaches (RATE_NOT_IN_FORCE, in the dialog).
+  useEffect(() => {
+    acbRunService.rates()
+      .then((data) => { if (!left.current) setRates(data); })
+      .catch((err) => reportError('AcbRuns.loadRates', err));
+  }, []);
 
   /** Back to loading, then read again -- the retry, a page change and every write come here. */
   const reloadRuns = useCallback((pageNumber = page) => {
@@ -219,6 +228,8 @@ export default function AcbRuns({ pollDelaysMs = POLL_DELAYS_MS }) {
           Prepare {monthLabel(month)}
         </Button>
       </Criteria>
+      {rateNote(rates, month) && <p className="mt-2 text-sm text-ink-muted">{rateNote(rates, month)}</p>}
+      {rates?.januaryNotice && <p className="mt-2 text-sm text-status-suspended">{rates.januaryNotice}</p>}
       {calendarSays && <p className="mt-2 text-sm text-ink-muted">{calendarSays}</p>}
 
       <Sheet className="mt-4">

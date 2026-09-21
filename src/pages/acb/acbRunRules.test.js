@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { committedVocabulary } from '../../test/apiContractScan'
 import {
   CANCELLABLE, DECLINE_REASON_LABEL, EXCLUSION_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, calendarNotice,
-  declinedMonthWarning, maskedAccount, monthLabel, pollRun, preparableMonths,
+  declinedMonthWarning, maskedAccount, monthLabel, pollRun, preparableMonths, rateNote,
 } from './acbRunRules'
 
 /**
@@ -92,6 +92,30 @@ describe('declinedMonthWarning (SD3-H)', () => {
     expect(declinedMonthWarning([{ ...DECLINED, declinedReason: 'LAYOUT' }], '2026-10')).toBeNull()
     expect(declinedMonthWarning([{ ...DECLINED, status: 'CANCELLED' }], '2026-10')).toBeNull()
     expect(declinedMonthWarning(undefined, '2026-10')).toBeNull()
+  })
+})
+
+describe('rateNote (Q43)', () => {
+  const RATES = {
+    rates: [
+      { effectiveFrom: '2026-01-01', amount: 174, source: 'From January' },
+      { effectiveFrom: '2027-01-01', amount: 185, source: 'AGM' },
+    ],
+    januaryNotice: null,
+  }
+
+  it('names what the month charges, since when, and the next dated rate', () => {
+    expect(rateNote(RATES, '2026-10')).toMatch(/^October 2026 charges R\s?174,00 a member — the rate since January 2026\. From January 2027: R\s?185,00\.$/)
+  })
+
+  it('a month on the new rate names it, and nothing after it', () => {
+    expect(rateNote(RATES, '2027-01')).toMatch(/^January 2027 charges R\s?185,00 a member — the rate since January 2027\.$/)
+  })
+
+  it('the must-pass twins: no rate reaching the month, or no list at all, says nothing', () => {
+    expect(rateNote(RATES, '2025-12')).toBeNull()
+    expect(rateNote([], '2026-10')).toBeNull()
+    expect(rateNote(null, '2026-10')).toBeNull()
   })
 })
 

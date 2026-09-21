@@ -37,6 +37,8 @@ const EMPTY = pageOf([])
 
 const CALENDAR = { name: 'za-statutory', knownUntil: '2027-12-31', endingSoon: false, year: 2026, holidays: [] }
 
+const RATES = { rates: [{ effectiveFrom: '2026-01-01', amount: 174, source: 'From January' }], januaryNotice: null }
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   server.use(
@@ -45,6 +47,7 @@ beforeEach(() => {
     http.get('*/api/acb/runs/:id/lines', () => HttpResponse.json(EMPTY)),
     http.get('*/api/acb/runs/:id/exclusions', () => HttpResponse.json(EMPTY)),
     http.get('*/api/acb/holidays', () => HttpResponse.json(CALENDAR)),
+    http.get('*/api/acb/rates', () => HttpResponse.json(RATES)),
   )
 })
 
@@ -52,6 +55,22 @@ const openPrepare = async (user) => {
   await user.click(await screen.findByRole('button', { name: /^Prepare / }))
   return screen.findByRole('dialog', { name: /^Prepare the .* run\?$/ })
 }
+
+describe('the rate (Q43)', () => {
+  it('says beside Prepare what the chosen month will charge, and since when', async () => {
+    const user = setupUser()
+    renderWithProviders(<AcbRuns />)
+    await screen.findByRole('button', { name: 'Open the October 2026 run' })
+    await user.selectOptions(screen.getByLabelText('Action month'), '2026-10')
+    expect(await screen.findByText(/^October 2026 charges R\s?174,00 a member — the rate since January 2026\.$/)).toBeInTheDocument()
+  })
+
+  it('shows the January notice when the server gives one -- a notice, never a refusal', async () => {
+    server.use(http.get('*/api/acb/rates', () => HttpResponse.json({ ...RATES, januaryNotice: '2027-01 will charge R 174.00, the rate since 2026-01.' })))
+    renderWithProviders(<AcbRuns />)
+    expect(await screen.findByText('2027-01 will charge R 174.00, the rate since 2026-01.')).toBeInTheDocument()
+  })
+})
 
 describe('a month the bank declined (D29, SD3-H)', () => {
   it('the prepare dialog warns when the month\'s last file was declined for a wrong date -- a warning, never a refusal', async () => {

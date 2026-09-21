@@ -192,6 +192,11 @@ const API = {
   '/api/members': members,
   // The runs list; one run and its sheets are answered per shape by `acbRunAnswer`.
   '/api/acb/runs': acbPage(acbRuns, 12),
+  // The dated rates the Runs screen reads (Q43): V41's one row, and no January notice in September.
+  '/api/acb/rates': {
+    rates: [{ effectiveFrom: '2026-01-01', amount: 174, source: 'From January -- confirmed by SASBO 2026-09-21 (Q43)' }],
+    januaryNotice: null,
+  },
   // The holiday calendar the Runs screen reads (D30): V47's, far from its end, so no notice.
   '/api/acb/holidays': {
     name: 'za-statutory', knownUntil: '2027-12-31', endingSoon: false, year: 2026,
