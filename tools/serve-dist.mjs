@@ -134,10 +134,11 @@ const bankRows = Array.from({ length: 40 }, (_, i) => ({
  * Accounts are last-four only, as the server sends them; every name is the synthetic members'.
  */
 const acbRun = (id, actionMonth, status, overrides = {}) => ({
-  id, actionMonth, status, version: 1, setupDate: '2026-09-18', creationDate: `${actionMonth}-17`,
+  id, actionMonth, status, version: 1, setupDate: '2026-09-18', creationDate: null,
+  makeBy: `${actionMonth}-17`, makeByPassed: false,
   purgeDate: `${actionMonth}-30`, firstDueDate: `${actionMonth}-20`, lastDueDate: `${actionMonth}-30`,
-  lineCount: 30, totalAmount: 5220, totalsAgree: true, rateAmount: 174, rateEffectiveFrom: '2026-01-01',
-  holidaySet: 'weekends-only', holidaysKnown: false, createdBy: 'system', approvedBy: null,
+  lineCount: 30, totalAmount: 5220, totalsAgree: true, calendarAgrees: true, rateAmount: 174,
+  rateEffectiveFrom: '2026-01-01', holidaySet: 'za-statutory', holidaysKnown: true, createdBy: 'system', approvedBy: null,
   startedAt: '2026-09-18T10:00+02:00', heartbeatAt: '2026-09-18T10:00+02:00', failureReason: null,
   exclusions: [
     { reason: 'NOT_DEBIT_ORDER', listed: false, detail: 'Payroll Deduction', memberCount: 48 },
@@ -191,6 +192,15 @@ const API = {
   '/api/members': members,
   // The runs list; one run and its sheets are answered per shape by `acbRunAnswer`.
   '/api/acb/runs': acbPage(acbRuns, 12),
+  // The holiday calendar the Runs screen reads (D30): V47's, far from its end, so no notice.
+  '/api/acb/holidays': {
+    name: 'za-statutory', knownUntil: '2027-12-31', endingSoon: false, year: 2026,
+    holidays: [
+      { date: '2026-09-24', name: 'Heritage Day', source: 'STATUTORY' },
+      { date: '2026-12-16', name: 'Day of Reconciliation', source: 'STATUTORY' },
+      { date: '2026-12-25', name: 'Christmas Day', source: 'STATUTORY' },
+    ],
+  },
   '/api/banks': bankRows,
   '/api/banks/branches': bankRows,
   // `Locations` searches `/api/branches?...` and hands each result to `LocationListing`,

@@ -27,7 +27,7 @@ const SUMMARY = {
 }
 
 const runOf = (overrides) => ({
-  ...SUMMARY, creationDate: '2026-10-17', purgeDate: '2026-11-09', firstDueDate: '2026-10-20',
+  ...SUMMARY, creationDate: null, makeBy: '2026-10-17', makeByPassed: false, purgeDate: '2026-11-09', firstDueDate: '2026-10-20',
   lastDueDate: '2026-10-30', rateAmount: 174, rateEffectiveFrom: '2026-01-01', holidaySet: 'weekends-only',
   createdBy: 'system', approvedBy: null, startedAt: '2026-09-18T10:00+02:00', heartbeatAt: '2026-09-18T10:00+02:00',
   exclusions: [], ...overrides,

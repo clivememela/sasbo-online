@@ -12,8 +12,8 @@ import { deferred } from '../../test/deferred'
 const pageOf = (content) => ({ content, page: 0, size: 50, totalElements: content.length, totalPages: content.length ? 1 : 0 })
 
 const RUN = {
-  id: 41, actionMonth: '2026-10', status: 'PREPARED', version: 1, setupDate: '2026-09-18', creationDate: '2026-10-17',
-  purgeDate: '2026-11-09', firstDueDate: '2026-10-20', lastDueDate: '2026-10-30', lineCount: 1, totalAmount: 174,
+  id: 41, actionMonth: '2026-10', status: 'PREPARED', version: 1, setupDate: '2026-09-18', creationDate: null,
+  makeBy: '2026-10-17', makeByPassed: false, purgeDate: '2026-11-09', firstDueDate: '2026-10-20', lastDueDate: '2026-10-30', lineCount: 1, totalAmount: 174,
   totalsAgree: true, rateAmount: 174, rateEffectiveFrom: '2026-01-01', holidaySet: 'weekends-only', holidaysKnown: false,
   createdBy: 'system', approvedBy: null, startedAt: '2026-09-18T10:00+02:00', heartbeatAt: '2026-09-18T10:00+02:00',
   failureReason: null,
@@ -55,6 +55,29 @@ describe('the run', () => {
     expect(await screen.findByText('Debit day outside the 20th to the 31st')).toBeInTheDocument()
     expect(screen.getByText(/counted rather than listed: Payroll Deduction 48/)).toBeInTheDocument()
     expect(screen.getByText(/Public holidays are not yet taken into account/)).toBeInTheDocument()
+  })
+
+  it('before its file is made, the run says the day to make it by (D31)', async () => {
+    renderPanel()
+    expect(await screen.findByText('Make the file by')).toBeInTheDocument()
+    expect(screen.getByText('2026/10/17')).toBeInTheDocument()
+    expect(screen.queryByText('File made on')).not.toBeInTheDocument()
+    expect(screen.queryByText(/has passed/)).not.toBeInTheDocument()
+  })
+
+  it('once made, it says the day the file was made -- the header\'s creation date, stamped then', async () => {
+    server.use(http.get('*/api/acb/runs/41', () => HttpResponse.json({ ...RUN, status: 'APPROVED', creationDate: '2026-10-16' })))
+    renderPanel()
+    expect(await screen.findByText('File made on')).toBeInTheDocument()
+    expect(screen.getByText('2026/10/16')).toBeInTheDocument()
+    expect(screen.queryByText('Make the file by')).not.toBeInTheDocument()
+  })
+
+  it('a day to make it by that has passed is flagged, never refused -- the bank judges a late file (Q29)', async () => {
+    server.use(http.get('*/api/acb/runs/41', () => HttpResponse.json({ ...RUN, makeByPassed: true })))
+    renderPanel()
+    expect(await screen.findByText(/The day to make this run's file by, 2026\/10\/17, has passed/)).toBeInTheDocument()
+    expect(screen.getByText(/the bank decides whether it accepts a late file/)).toBeInTheDocument()
   })
 
   it('a run whose month gained a holiday after it was prepared says to prepare it again (SD3-F)', async () => {

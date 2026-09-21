@@ -146,13 +146,20 @@ export default function AcbRunPanel({ runId, onChanged, onClose }) {
         <Fact term="Prepared" value={formatDate(run.setupDate)} />
         <Fact term="First action date" value={formatDate(run.firstDueDate)} />
         <Fact term="Last action date" value={formatDate(run.lastDueDate)} />
-        <Fact term="File created" value={formatDate(run.creationDate)} />
+        {run.creationDate
+          ? <Fact term="File made on" value={formatDate(run.creationDate)} />
+          : <Fact term="Make the file by" value={formatDate(run.makeBy)} />}
         <Fact term="Purge date" value={formatDate(run.purgeDate)} />
       </dl>
 
       {run.totalsAgree === false && (
         <p className="mt-3 text-sm text-status-suspended">
           The totals stored when this run was prepared no longer match its lines. Do not approve it — prepare the month again.
+        </p>
+      )}
+      {run.makeByPassed && (
+        <p className="mt-3 text-sm text-status-suspended">
+          The day to make this run's file by, {formatDate(run.makeBy)}, has passed. It can still be made — the bank decides whether it accepts a late file.
         </p>
       )}
       {run.calendarAgrees === false && (
