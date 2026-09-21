@@ -192,7 +192,37 @@ const CEILINGS = {
   //                  own once Capture imports it) · CaptureMember +487 (the calendar read, the caveat on
   //                  every unknown date) · index +44 · AcbDebits, AcbRuns +41 each.
   // 725,706 B is 708.697 KiB, so 708.70. Still no headroom on top.
-  js: 708.70 * KB,
+  //
+  // 650 -> 680 on 2026-09-21, MEASURED, at the design arc's close (670.22 KiB on the lockfile's own
+  // packages). The SAME code measured 641.31 on React 19.2.6: `8c6b675` (Clive, 2026-09-21) regenerated the lockfile --
+  // `package.json` untouched, 86 packages refreshed within their ranges -- and React came with it, 19.2.6 -> 19.3.0.
+  // What spent it, chunk by chunk (the lockfile's packages against 19.2.6's):
+  //   index         298.45 -> 327.13  +28.68  the entry chunk, where react-dom lives: its production client is
+  //                                           523.5 KiB at 19.2.6 and 610.5 at 19.3.0
+  //   index.modern   34.96 ->  35.74   +0.78
+  //   Modal          40.85 ->  40.31   -0.54
+  //   every other chunk within 200 B, 69 chunks both sides.
+  // Over the wire: +8.5 KiB gzipped (+7.2 brotli) on the first load, cached after. The suite and the E2E pass on 19.3,
+  // and 19.2.6 against 19.3.0 rendered 350/350 pixel-identical. Kept on the owner's word (2026-09-21): the cost is
+  // small, and rolling React back alone would fight a refresh of 86 packages. Checked before raising, as the header
+  // asks: nothing from src/test/ is imported by the product, and no test library is in the built bundle. 1.4% of
+  // headroom, as the last raise had; the ACB arc still raises it by exactly its own bytes.
+  //
+  // 680 -> 718.43 on 2026-09-21, MEASURED, at the merge of client main f96e723 (design/12) into the ACB branch:
+  // main's own ceiling raised by exactly ACB's bytes, as the paragraph above asks, so main keeps its 1.4% and
+  // ACB brings none of its own. On the gate's runner, the method of 708.70's paragraph (run 35667059993):
+  //   main f96e723 ON ITS OWN   686,361 B (670.274 KiB -- the 670.27 measured locally at 3a3cc3c, to the
+  //                            hundredth: design/12 changed a test and this script, not the product)
+  //   the ACB tree              725,706 B -- accdfd1's product, byte for byte, for the same reason
+  //   ACB's own bytes           +39,345 B = 38.423 KiB, chunk by chunk: AcbDebits 8,303 -> 22,710 · AcbRuns
+  //                            0 -> 14,161 · acbPaging 0 -> 5,772 · acbRunService 0 -> 2,671 · SelectInput
+  //                            0 -> 1,475 · options 0 -> 912 · index +969 · CaptureMember +459 · Acb +289
+  //                            · circle-alert 0 -> 251 · Members +172 · Subscriptions +64 · format +43
+  //                            · Auth +40 · RecruitmentChannel +35 · BankBranch, Forms +30 each
+  //                            · AddressAutocomplete, DataState +5 each · DialogNotice +2 · Recruiters +1
+  //                            · SearchableSelect -794 · useReferenceData -1,440 · useFocusOn -214.
+  // 680 + 38.423 = 718.423, so 718.43 (rounded UP, as 687.34's paragraph explains).
+  js: 718.43 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
