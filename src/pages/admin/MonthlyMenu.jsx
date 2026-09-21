@@ -5,9 +5,9 @@ import {
     LucideUserRound
 } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
-import NavigationCard from '../../components/common/NavigationCard.jsx';
+import { NavigationList } from '../../components/common/NavigationCard.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
-import Sheet, { Page } from '../../components/common/Sheet.jsx';
+import { Page } from '../../components/common/Sheet.jsx';
 
 /*
  * 🔴 NINE ROWS, NINE DEAD ENDS -- the worst state a landing surface can be in, and the last
@@ -44,18 +44,13 @@ export default function MonthlyMenu() {
                 This one was a `grid md:grid-cols-2 xl:grid-cols-3` of same-size cards, which
                 is the scaffold `NavigationCard`'s own note refuses by name and the direction
                 contract lists first under page scaffolds. */}
-            <Sheet className="mt-6 max-w-4xl divide-y divide-line">
-                {cards.map((card) => (
-                    <NavigationCard
-                        key={card.title}
-                        {...card}
-                        onSelect={() => {
-                            setSelectedCardHref?.('/admin/monthly-menu');
-                            setSideBarOpen?.(true);
-                        }}
-                    />
-                ))}
-            </Sheet>
+            <NavigationList
+                cards={cards}
+                onSelect={() => {
+                    setSelectedCardHref?.('/admin/monthly-menu');
+                    setSideBarOpen?.(true);
+                }}
+            />
         </Page>
     );
 }

@@ -1,9 +1,10 @@
-import { Download, FileText, ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useMemo } from "react";
 import PageTitle from '../../components/common/PageTitle';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import ArchiveEmpty from '../../components/archives/ArchiveEmpty.jsx';
-import { Button, TextInput } from '../../components/form';
+import { ArchiveFile, ArchiveSearchBar } from '../../components/archives/ArchiveParts.jsx';
+import { countArchive, filterArchive } from '../../components/archives/archiveTree.js';
 
 export default function FinanceHouses() {
   const [expandedFolders, setExpandedFolders] = useState({});
@@ -400,49 +401,9 @@ export default function FinanceHouses() {
     }));
   };
 
-  const toggleSubFolder = (key) => {
-    setExpandedFolders(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
+  const totalFiles = countArchive(fileStructure);
 
-  const totalFiles = Object.values(fileStructure).reduce((sum, bank) => {
-    if (Array.isArray(bank)) return sum + bank.length;
-    return sum + Object.values(bank).reduce((s, files) => s + files.length, 0);
-  }, 0);
-
-  const filteredStructure = useMemo(() => {
-    if (!searchQuery.trim()) return fileStructure;
-
-    const query = searchQuery.toLowerCase();
-    const filtered = {};
-
-    Object.entries(fileStructure).forEach(([bank, categories]) => {
-      const bankMatches = bank.toLowerCase().includes(query);
-      let matchedCategories = {};
-
-      if (Array.isArray(categories)) {
-        const matchedFiles = categories.filter(file => file.toLowerCase().includes(query));
-        if (bankMatches || matchedFiles.length > 0) {
-          filtered[bank] = bankMatches ? categories : matchedFiles;
-        }
-      } else {
-        Object.entries(categories).forEach(([category, files]) => {
-          const categoryMatches = category.toLowerCase().includes(query);
-          const matchedFiles = files.filter(file => file.toLowerCase().includes(query));
-          if (categoryMatches || matchedFiles.length > 0) {
-            matchedCategories[category] = categoryMatches ? files : matchedFiles;
-          }
-        });
-        if (bankMatches || Object.keys(matchedCategories).length > 0) {
-          filtered[bank] = bankMatches ? categories : matchedCategories;
-        }
-      }
-    });
-
-    return filtered;
-  }, [fileStructure, searchQuery]);
+  const filteredStructure = useMemo(() => filterArchive(fileStructure, searchQuery), [fileStructure, searchQuery]);
 
   return (
     <Page>
@@ -454,29 +415,12 @@ export default function FinanceHouses() {
         {totalFiles} documents across {Object.keys(fileStructure).length} financial institutions
       </p>
 
-      <div className="mb-6 max-w-xl">
-        {/* 🔴 THE CLEAR BUTTON HAD NO ACCESSIBLE NAME -- an `<X>` icon and
-            nothing else. `TextInput kind="search"` also brings the search
-            keyboard and the "Search" return key on a phone, and the 16px rule. */}
-        <div className="flex items-end gap-2">
-          <TextInput
-            label="Search"
-            kind="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search documents and folders..."
-            className="flex-1"
-          />
-          {searchQuery && (
-            <Button variant="ghost" onClick={() => setSearchQuery("")}>Clear</Button>
-          )}
-        </div>
-        {searchQuery && Object.keys(filteredStructure).length > 0 && (
-          <p className="text-sm text-ink-muted mt-2">
-            Found {Object.keys(filteredStructure).length} institutions with matching documents
-          </p>
-        )}
-      </div>
+      <ArchiveSearchBar
+        query={searchQuery}
+        onChange={setSearchQuery}
+        found={Object.keys(filteredStructure).length > 0 &&
+          `Found ${Object.keys(filteredStructure).length} institutions with matching documents`}
+      />
 
       <div className="max-w-4xl">
         {/* A search that matched nothing says so, with the way out -- `ArchiveEmpty`, shared by the three archives. */}
@@ -504,25 +448,14 @@ export default function FinanceHouses() {
               <div className="border-t border-line bg-surface-2/60 py-1.5 pl-[38px] pr-3 sm:pl-[46px]">
                 {Array.isArray(categories) ? (
                   categories.map((file, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between rounded-md px-3 py-1.5 transition-colors hover-hover:hover:bg-surface"
-                    >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <FileText size={16} className="text-brand-ink flex-shrink-0" />
-                        <span className="text-sm truncate">{file}</span>
-                      </div>
-                      <Button size="icon" variant="ghost" aria-label={`Download ${file}`} className="ml-2 shrink-0">
-                        <Download size={16} aria-hidden="true" className="text-brand-ink" />
-                      </Button>
-                    </div>
+                    <ArchiveFile key={idx} name={file} />
                   ))
                 ) : (
                   Object.entries(categories).map(([category, files]) => (
                     <div key={category}>
                       <button
                         type="button"
-                        onClick={() => toggleSubFolder(`${bank}-${category}`)}
+                        onClick={() => toggleFolder(`${bank}-${category}`)}
                         aria-expanded={Boolean(expandedFolders[`${bank}-${category}`])}
                         className="touch-size w-full flex items-center gap-2 rounded-md px-3 py-1.5 transition-colors hover-hover:hover:bg-surface text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
                       >
@@ -538,18 +471,7 @@ export default function FinanceHouses() {
                       {expandedFolders[`${bank}-${category}`] && (
                         <div className="ml-3 border-l border-line pl-3 sm:ml-4 sm:pl-4">
                           {files.map((file, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-between rounded-md px-3 py-1.5 transition-colors hover-hover:hover:bg-surface"
-                            >
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <FileText size={14} className="text-brand-ink flex-shrink-0" />
-                                <span className="text-xs truncate">{file}</span>
-                              </div>
-                              <Button size="icon" variant="ghost" aria-label={`Download ${file}`} className="ml-2 shrink-0">
-                                <Download size={14} aria-hidden="true" className="text-brand-ink" />
-                              </Button>
-                            </div>
+                            <ArchiveFile key={idx} name={file} nested />
                           ))}
                         </div>
                       )}

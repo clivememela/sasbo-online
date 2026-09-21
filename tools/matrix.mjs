@@ -56,23 +56,6 @@ const FREEZE = `(() => {
   return true;
 })()`;
 
-/**
- * 🔑 THE RASTERISER, MADE REPEATABLE. With motion frozen, two captures still differed on 10 of 350 screenshots -- by one
- * or two channel levels in scattered pixels, and along the antialiased edge of a control at a fractional x ("Add
- * Recruiter" at x=850.84, 1024 wide). Software raster splits the frame into tiles on several threads. One raster
- * thread, no partial raster, every compositor stage run before the frame is drawn, no LCD subpixel text, an sRGB
- * profile and no font hinting take the variance out at the source: three subset captures, 70 of 70 identical where
- * the data arrived. Still mode only.
- */
-const STILL_FLAGS = [
-  '--num-raster-threads=1',
-  '--disable-partial-raster',
-  '--run-all-compositor-stages-before-draw',
-  '--disable-lcd-text',
-  '--force-color-profile=srgb',
-  '--font-render-hinting=none',
-];
-
 /** No loading state on screen: no skeleton, no DataState that is still loading, nothing busy. */
 const NOTHING_LOADING = `!document.querySelector('.skeleton, [data-state="loading"], [data-state="slow"], [aria-busy="true"]')`;
 
@@ -99,13 +82,13 @@ try {
   // The browser, the socket, the strict `evaluate`, the viewport rule and T23's identity
   // check all live in `cdp.mjs` — see its header for the four defects six hand-copies of this
   // block had already drifted into.
-  cdp = await launch('matrix', { flags: still ? STILL_FLAGS : [] });
+  // Still mode's repeatable rasteriser and motion off both come from `launch` -- one owner, so no tool can forget one.
+  cdp = await launch('matrix', { still });
   const { send, evaluate, metrics, waitFor, assertBuiltClient, on } = cdp;
 
   console.log('identity OK — entry script', await assertBuiltClient(baseUrl));
 
   if (shotsDir) mkdirSync(shotsDir, { recursive: true });
-  if (still) await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
 
   /*
    * 🔴 A PAGE WHOSE REQUESTS DID NOT ALL ARRIVE IS NOT THE PAGE. The stub answers every path, every time, so a request

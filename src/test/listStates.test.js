@@ -61,6 +61,24 @@ const FETCHES = /\b\w+Service\s*\.\s*\w+\s*\(/
 const HANDLES_FAILURE = /\.catch\s*\(|\bcatch\s*\(|\.then\s*\([^)]*,\s*(?:\(|function)/
 
 /**
+ * 🔄 OR THE PAGE DELEGATES BOTH HALVES, AND BOTH HALVES ARE CHECKED (main `8c6b675`).
+ *
+ * `CaptureMember` stopped carrying a `.catch` of its own when main moved its save into the welcome-letter
+ * dialog: its remaining requests are the reference lists, which `useReferenceData` catches for it, and it
+ * renders that failure with `DataState`. That is handling, in the two places this guard cares about --
+ * somebody catches, and the user is told -- so it is recognised rather than exempted.
+ *
+ * 🔴 BOTH, NEVER EITHER. A page that calls the hook and never renders its error is exactly the shape this
+ * guard exists to catch (`A27`: a fact about the SERVER stated as a fact about the DATA), and the canary
+ * below is a page that does precisely that. The hooks are named, not pattern-matched: a new hook that
+ * handles failure has to be added here deliberately, which is a decision somebody makes once.
+ */
+const DELEGATES_FAILURE = /useReferenceData\s*\(|useAsyncOptions\s*\(/
+const SHOWS_FAILURE = /<DataState\b|<LoadFailureFrame\b/
+const handlesFailure = (code) =>
+  HANDLES_FAILURE.test(code) || (DELEGATES_FAILURE.test(code) && SHOWS_FAILURE.test(code))
+
+/**
  * Pages that fetch nothing of their own, or fetch through a component that does.
  *
  * Each is here with a reason, and the reason is checked: a page on this list that DOES
@@ -74,6 +92,16 @@ function pages() {
 }
 
 describe('every page that fetches can say the fetch failed', () => {
+  it('the predicate itself: delegation counts only when the failure is also SHOWN', () => {
+    // 🔑 A page that fetches through the hook and renders its error is handled...
+    expect(handlesFailure("const refs = useReferenceData(LOADERS)\n<DataState state={refs.state} />")).toBe(true)
+    // ...and the same page with nothing on screen for it is NOT, which is the whole point of the pair.
+    expect(handlesFailure('const refs = useReferenceData(LOADERS)')).toBe(false)
+    expect(handlesFailure('<DataState state="error" />')).toBe(false)
+    // The original shape still passes on its own.
+    expect(handlesFailure('service.get().catch(() => setError(true))')).toBe(true)
+  })
+
   it('finds no page whose only outcome is data', () => {
     const sources = pages()
 
@@ -93,7 +121,7 @@ describe('every page that fetches can say the fetch failed', () => {
     ).toBeGreaterThan(5)
 
     const silent = fetching
-      .filter((source) => !HANDLES_FAILURE.test(source.code))
+      .filter((source) => !handlesFailure(source.code))
       .map((source) => source.path)
 
     expect(

@@ -57,7 +57,26 @@ describe('the error boundary, after a route has thrown', () => {
     const rail = within(screen.getByRole('navigation', { name: 'Main' }))
     await user.click(rail.getByRole('link', { name: /^Home/ }))
 
-    expect(await screen.findByRole('heading', { level: 1, name: /welcome to sasbo online/i })).toBeInTheDocument()
+    /*
+     * 🔴 THE BUDGET IS THE SUITE'S, NOT TESTING LIBRARY'S DEFAULT — and the MERGED GATE is what found that (RF).
+     *
+     * The import above removes the wall-clock dependence that can be removed: Home's module is in the registry, so
+     * `lazy` resolves on a microtask. What is left is the cost of rendering the shell and the page, and that is a
+     * property of the BOX, not of this assertion. Measured here: **657ms at rest, 772ms under six CPU hogs** —
+     * against `findBy*`'s own implicit 1,000ms, a budget nothing in this repository ever chose. This test passed the
+     * arc's gate at two workers and a full suite at four on a quiet box, and went RED in the merged gate, where four
+     * workers ran beside Docker's resident VM. A correct assertion must not fail because a render took 1.1s.
+     *
+     * 5,000ms is the figure this suite already uses at its two slowest sites (`App.routes.test.jsx`,
+     * `headingContract.test.jsx`): ~7x the observed cost, still far under `testTimeout` (20,000ms), so a page that
+     * never arrives still fails — as the commit's deletion proof shows, with `Main.jsx`'s `key={pathname}` removed.
+     *
+     * ⚠️ NOT A THRESHOLD RAISED TO HIDE A FLAKE. The threshold that was hiding one was the 1,000ms nobody picked.
+     * Anything slower than five seconds here is a defect, and this still says so.
+     */
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /welcome to sasbo online/i }, { timeout: 5000 }),
+    ).toBeInTheDocument()
     expect(screen.queryByText('This page could not be displayed.')).not.toBeInTheDocument()
   })
 

@@ -1,10 +1,11 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Info, LogIn, UserPlus } from 'lucide-react';
 
 import Button from '../../components/form/Button';
 import Logo from '../../components/common/Logo';
 import TextInput from '../../components/form/TextInput';
+import useFocusOn from '../../hooks/useFocusOn.js';
 
 /**
  * The sign-in screen. `04.1`.
@@ -66,31 +67,15 @@ export default function Auth() {
   // writers are the submit handler and the mode switch (which clears it). Three sources
   // of truth for one fact is three chances for two of them to disagree.
   const [errors, setErrors] = useState({});
-  const summaryRef = useRef(null);
   const summaryId = useId();
   const navigate = useNavigate();
 
   const showErrors = Object.keys(errors).length > 0;
 
-  /**
-   * Move focus to the summary once it EXISTS.
-   *
-   * 🔴 THE FIRST DRAFT FOCUSED IT INSIDE THE SUBMIT HANDLER AND SILENTLY DID NOTHING.
-   * The summary only renders after `setErrors` re-renders the component, so at the
-   * moment the handler ran `summaryRef.current` was still `null` -- and optional
-   * chaining meant the failure was a no-op rather than a throw. Focus stayed on the
-   * submit button, which is exactly the "form does not react" experience this replaced
-   * `alert()` to avoid. `Auth.test.jsx` caught it; reading the code did not.
-   *
-   * ⚠️ KEYED ON `errors`, WHICH IS AN OBJECT, AND THAT IS DELIBERATE. `validate()`
-   * returns a FRESH object on every submit, so the identity changes even when the same
-   * form is submitted twice with the same mistakes -- and the member gets focus moved
-   * again, rather than a form that looks like it ignored them. A boolean
-   * `hasErrors` dependency would fire once and then never again.
-   */
-  useEffect(() => {
-    if (Object.keys(errors).length > 0) summaryRef.current?.focus();
-  }, [errors]);
+  // The summary takes focus once it EXISTS, and again on every submit: `validate()` returns a fresh `errors`
+  // object each time, so the same mistakes twice still move focus. `useFocusOn` holds the reasons; `Auth.test.jsx`
+  // caught the first draft, which focused from the submit handler and silently did nothing.
+  const summaryRef = useFocusOn(errors, showErrors);
 
   const switchMode = (toLogin) => {
     setIsLogin(toLogin);
