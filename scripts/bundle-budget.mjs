@@ -180,7 +180,19 @@ const CEILINGS = {
   //                                  (the paging hook and pager, moved out of the Runs panel to be
   //                                  shared) · index +52.
   // 725,224 B is 708.227 KiB, so 708.23. Still no headroom on top.
-  js: 708.23 * KB,
+  //
+  // 708.23 -> 708.70 on 2026-09-21, MEASURED ON THE GATE'S RUNNER: the box had 574 MB free (commit
+  // 42.5 of 46.5 GB), no room for a vite build beside the other sessions' work. A throwaway commit printed
+  // every chunk's bytes from the CI build, runs 35666314519 and 35666314630. The method checked first:
+  //   3e86cba (00.2) 725,059 B, 165 under the 04.1 tree, and its 69 unchanged chunks byte-identical to the
+  //                  local build above; the five that moved are exactly 00.2's files: CaptureMember -159
+  //                  · Recruiters -103 · Members +63 · format +43 · AcbDebits -9.
+  //   accdfd1 (Capture's holiday sentence) 725,706 B, +647 over 3e86cba, chunk by chunk:
+  //                  acbRunService 0 -> 2,671 and acbPaging -2,637 (Rollup gives the service a chunk of its
+  //                  own once Capture imports it) · CaptureMember +487 (the calendar read, the caveat on
+  //                  every unknown date) · index +44 · AcbDebits, AcbRuns +41 each.
+  // 725,706 B is 708.697 KiB, so 708.70. Still no headroom on top.
+  js: 708.70 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
