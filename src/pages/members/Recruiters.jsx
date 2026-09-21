@@ -20,7 +20,7 @@ import useReferenceData from '../../hooks/useReferenceData.js';
 import reportError from '../../lib/reportError.js';
 import { cn } from '../../lib/utils';
 import { formalName } from '../../lib/names.js';
-import { formatDate } from '../../lib/format.js';
+import { formatDate, formatZar } from '../../lib/format.js';
 import { writeFailure } from '../../services/parseApiError.js';
 import useFocusOn from '../../hooks/useFocusOn.js';
 
@@ -439,7 +439,6 @@ export function Recruiters() {
             workBankAddress: member.workBankAddress || '',
             joinDate: member.joinDate || '',
             status: member.status || 'Active',
-            monthlySubscription: member.monthlySubscription || 0,
             /*
              * 🔴 ONE LINE IS DELIBERATELY ABSENT HERE, AND TWO ARE DELIBERATELY STILL PRESENT.
              *
@@ -492,8 +491,10 @@ export function Recruiters() {
             // become removable when the server this client is pointed at carries 0cf00e1,
             // not because the decision exists. Delete them on the strength of the decision
             // alone and every recruiter action erases both balances again.
-            currentBalance: member.currentBalance || 0,
-            arrearsBalance: member.arrearsBalance || 0,
+            // ✅ 2026-09-21 (ACB 00.2): `monthlySubscription`, `currentBalance` and `arrearsBalance` are GONE from
+            // this builder, as the note above said they would be. Server `0cf00e1` -- `updateFromMember` with
+            // `NullValuePropertyMappingStrategy.IGNORE` -- is on `origin/main`, measured with `git merge-base`: an
+            // omitted key now KEEPS the stored value, where `|| 0` wrote a member with nothing on file back as R 0,00.
             electedRep: member.electedRep || '',
             repElectionDay: member.repElectionDay || '',
             repElectionMonth: member.repElectionMonth || '',
@@ -1316,7 +1317,7 @@ export function Recruiters() {
                                     <DRow label="Membership No." value={selectedMember.membershipNumber} />
                                     <DRow label="Date Joined" value={recordDate(selectedMember.joinDate)} />
                                     <DRow label="Status" value={selectedMember.status} />
-                                    <DRow label="Monthly Subs" value={selectedMember.monthlySubscription} />
+                                    <DRow label="Monthly Subs" value={formatZar(selectedMember.monthlySubscription)} />
                                     <DRow label="Current Balance" value={selectedMember.currentBalance} />
                                     <DRow label="Arrears Balance" value={selectedMember.arrearsBalance} />
                                 </Section>

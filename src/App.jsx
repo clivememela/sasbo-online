@@ -44,6 +44,7 @@ const AuthPage = lazy(() => import('./pages/auth/Auth.jsx'));
 const Admin = lazy(() => import('./pages/admin/Admin.jsx'));
 const Acb = lazy(() => import('./pages/admin/Acb.jsx'));
 const AcbDebits = lazy(() => import('./pages/acb/AcbDebits.jsx'));
+const AcbRuns = lazy(() => import('./pages/acb/AcbRuns.jsx'));
 const DailyMenu = lazy(() => import('./pages/admin/DailyMenu.jsx'));
 const MonthlyMenu = lazy(() => import('./pages/admin/MonthlyMenu.jsx'));
 const CaptureMember = lazy(() => import('./pages/members/CaptureMember.jsx'));
@@ -78,6 +79,7 @@ function App() {
         <Route path="admin" element={<Admin />} />
         <Route path="admin/acb" element={<Acb />} />
         <Route path="admin/acb/debits" element={<AcbDebits />} />
+        <Route path="admin/acb/runs" element={<AcbRuns />} />
         <Route path="admin/daily-menu" element={<DailyMenu />} />
         <Route path="admin/monthly-menu" element={<MonthlyMenu />} />
         <Route path="recruiters" element={<Recruiters />} />

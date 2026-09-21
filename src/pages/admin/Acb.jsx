@@ -1,66 +1,44 @@
 import {
+    LucideCalendarRange,
+    LucideHandCoins,
+    LucideMails,
     LucidePiggyBank
 } from 'lucide-react';
 import PageTitle from "../../components/common/PageTitle.jsx";
 import { NavigationList } from "../../components/common/NavigationCard.jsx";
 import { Page } from '../../components/common/Sheet.jsx';
 
+/**
+ * The A.C.B. menu (`04.2`): Runs, Debits, Letters and Credits.
+ *
+ * Rows without a route stay HONEST -- `NavigationCard` renders them as "Not yet available", never as a
+ * link to nowhere. Credits is kept as an option because SASBO asked to keep it, though they no longer
+ * run credits (Q10, 2026-09-18). The fund-list rows -- benevolent, death benefit, endowment, Criticare,
+ * accounts, subscriptions -- are GONE, not commented out: SASBO does not keep those lists here (Q12).
+ */
 const cards = [
+    {
+        title: "Runs",
+        desc: "Debit Order Runs",
+        href: "/admin/acb/runs",
+        icon: LucideCalendarRange,
+    },
     {
         title: "Debits",
         desc: "Manage Debits",
         href: "/admin/acb/debits",
         icon: LucidePiggyBank,
     },
-    /*{
-        title: "Credits",
-        desc: "Manage Credits",
-        //href: "/admin/membership/roles",
-        icon: LucidePiggyBank,
-        color: 'text-red-600 dark:text-red-400'
-    },
     {
-        title: "Subscriptions",
-        desc: "Manage Subscriptions",
-        //href: "/admin/membership/permissions",
+        title: "Letters",
+        desc: "The union's letters to members, on its letterhead once SASBO has agreed it",
         icon: LucideMails,
-        color: 'text-red-600 dark:text-red-400'
     },
     {
-        title: "Benevolent Funds",
-        desc: "Manage Benevolent Funds",
-        //href: "/admin/membership/users",
-        icon: LucideCalendar,
-        color: 'text-red-600 dark:text-red-400'
+        title: "Credits",
+        desc: "No longer run by SASBO — kept as an option, as they asked",
+        icon: LucideHandCoins,
     },
-    {
-        title: "Death Benefit Funds",
-        desc: "Manage Death Benefit Funds",
-        //href: "/admin/membership/roles",
-        icon: LucideCalendar,
-        color: 'text-red-600 dark:text-red-400'
-    },
-    {
-        title: "Endowment Funds",
-        desc: "Manage Endowment Funds",
-        //href: "/admin/membership/permissions",
-        icon: LucideCalendar,
-        color: 'text-red-600 dark:text-red-400'
-    },
-    {
-        title: "Criticare",
-        desc: "Manage Criticare",
-        //href: "/admin/membership/permissions",
-        icon: LucideCross,
-        color: 'text-red-600 dark:text-red-400'
-    },
-    {
-        title: "Accounts",
-        desc: "Manage Accounts",
-        //href: "/admin/membership/permissions",
-        icon: LucideBuilding,
-        color: 'text-red-600 dark:text-red-400'
-    },*/
 ];
 
 // 🔴 `console.log("Rendering Acb")` WAS HERE, AT MODULE SCOPE -- so it fired once per

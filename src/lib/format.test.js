@@ -115,6 +115,16 @@ describe('format — money and numbers name their locale', () => {
     expect(formatZar(0)).not.toBe(EMPTY)
   })
 
+  it('🔴 only a number, or a string that is one, is an amount -- never R 0,00 for nothing (00.2)', () => {
+    // Number('  '), Number([]) and Number(false) are all 0: each would read as a member who pays nothing.
+    for (const missing of ['   ', {}, [], true, false, NaN, Infinity, -Infinity]) {
+      expect(formatZar(missing), String(missing)).toBe(EMPTY)
+    }
+    // The must-pass: a BigDecimal can arrive as a number or as a numeric string, and both are amounts.
+    expect(formatZar('120').replace(/[^\d,.]/g, '')).toBe('120,00')
+    expect(formatZar(99.99).replace(/[^\d,.]/g, '')).toBe('99,99')
+  })
+
   it('formats counts and refuses nonsense', () => {
     expect(formatInt(1234).replace(/[^\d]/g, '')).toBe('1234')
     expect(formatInt(null)).toBe(EMPTY)
