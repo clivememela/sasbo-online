@@ -8,6 +8,9 @@ import {
 import { memberService } from "@/services/memberService.js";
 import { jobGradeService } from "@/services/jobGradeService.js";
 import { bankService } from "@/services/bankService.js";
+import { recruiterService } from "@/services/recruiterService.js";
+import { recruitedArea } from "@/utils/recruitment.js";
+import useAsyncOptions from "../../hooks/useAsyncOptions.js";
 import { TextInput, SearchableSelect, SelectInput, Button, DateField } from "../../components/form";
 import StatusChip, { CANCELLED_STATUSES } from "../../components/common/StatusChip.jsx";
 import Table from "../../components/table/Table.jsx";
@@ -427,6 +430,34 @@ export default function Members() {
      */
     const refs = useReferenceData(REFERENCE_LOADERS);
     const bankNames = refs.data.banks;
+
+    /*
+     * 🗣️ THE AREA THE MEMBER WAS RECRUITED IN, AS THE CAPTURE SCREEN NOW SHOWS IT (SASBO, 18 Sep 2026): read off the
+     * recruiter -- their demarcation letter -- rather than chosen (`utils/recruitment.js`).
+     *
+     * 🔑 A STORED AREA WINS. It is a historical fact recorded at capture (V24) and is shown exactly as held. Only a
+     * record with none -- every member captured from now on, and the 160 the seed carries -- has it read off their
+     * recruiter, with a note saying so.
+     *
+     * ⚠️ FETCHED ONLY WHILE THE RECRUITMENT TAB IS OPEN, and only when it is needed. Not in `REFERENCE_LOADERS`:
+     * that set's failure is the whole page's `partial` notice, and a recruiter list that failed is a fact about one
+     * read-only line on one tab -- which is where it is said.
+     */
+    const recordStoredArea = String(editForm.areaRecruited ?? "").trim();
+    const recordRecruiterName = String(editForm.recruitmentRepresentativeName ?? "").trim();
+    const recordRecruiters = useAsyncOptions(
+        () => recruiterService.getRecruiters(),
+        [],
+        { enabled: activeTab === "representatives" && !recordStoredArea && Boolean(recordRecruiterName) },
+    );
+    const recordArea = recordStoredArea
+        ? { text: recordStoredArea, note: undefined }
+        : recruitedArea({
+            channel: editForm.recruitedHow,
+            recruiterName: recordRecruiterName,
+            recruiters: recordRecruiters.options,
+            listState: recordRecruiters.loading ? "loading" : recordRecruiters.error ? "failed" : "ready",
+        });
 
     /**
      * A27 — THE THREE STATES, AT LAST, AND THE DEFECT WAS THAT THERE WAS ONLY ONE.
@@ -1699,7 +1730,10 @@ export default function Members() {
                                         Read-only here, editable on capture: a recruiter is assigned where the member
                                         is captured, and these three are a historical fact about that moment. */}
                                     <Detail label="Recruiter Type" value={editForm.recruitedHow} isEditing={false} />
-                                    <Detail label="Area Recruited" value={editForm.areaRecruited} isEditing={false} />
+                                    {/* 🗣️ SASBO, 18 Sep 2026: the area follows the recruiter. A stored area is shown as
+                                        held; otherwise it is read off the recruiter, and the note says whose it is --
+                                        or why there is none (`recordArea`, above). */}
+                                    <Detail label="Area Recruited" value={recordArea.text} note={recordArea.note} isEditing={false} />
                                     <Detail label="Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={false} />
                                 </div>
                             )}
@@ -1841,14 +1875,17 @@ function recordIsDirty({ isEditing, baseline, editForm }) {
     return isEditing && baseline !== null && JSON.stringify(editForm) !== baseline;
 }
 
-function Detail({ label, value, isEditing, onChange, className = "", options = null, kind = "text", error = null, disabled = false, required = false, loadError = null, onRetryLoad }) {
+function Detail({ label, value, isEditing, onChange, className = "", options = null, kind = "text", error = null, disabled = false, required = false, loadError = null, onRetryLoad, note = null }) {
     if (!isEditing) {
         /* card.css `.field`: the label in small capitals, the value in ink, no box around
-           either -- a record reads as a record, not as a form with its inputs disabled. */
+           either -- a record reads as a record, not as a form with its inputs disabled.
+           `note` is a DERIVED value's provenance (`utils/derivation.js`): where it came from, or why
+           it is empty -- in the muted small type every other note on these screens uses. */
         return (
             <div className={cn("field record-rise min-w-0", className)}>
                 <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">{label}</p>
                 <p className="min-h-[21px] text-base font-medium text-ink [overflow-wrap:anywhere]">{value || "—"}</p>
+                {note && <p className="mt-1 text-xs text-ink-muted">{note}</p>}
             </div>
         );
     }
