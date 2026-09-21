@@ -14,7 +14,7 @@ import {
   LucideDatabase, LucideMails, LucideMenu,
   LucideUserRoundPlus, LucideFile, LucideTags,
   LucidePiggyBank, LucidePresentation,
-  LucideConstruction, LucideCopyCheck
+  LucideConstruction, LucideCopyCheck, UserRoundPen
 } from "lucide-react";
 
 export const navItems = [
@@ -216,10 +216,21 @@ export const navItems = [
         desc: "Manage System",
         href:'/admin/maintenance',
         icon: LucideConstruction,
+        // 🗣️ SASBO, 18 Sep 2026: "in maintenance there was an option where we could edit the member"
+        // -- it went when the menus were rebuilt, and Bank/Branch was "not linking". Both now go where
+        // that work is actually done: the member register (open a member, then Edit) and /banks, whose
+        // add and edit have been live all along. Mirrors `Maintenance.jsx`'s cards.
         subItems: [
+          {
+            title: 'Edit Member',
+            icon: UserRoundPen,
+            href: '/members',
+            desc: 'Find a member and edit their record'
+          },
           {
             title: 'Bank/Branch',
             icon: Landmark,
+            href: '/banks',
             desc: 'Maintain Bank/Branch'
           },
           {
@@ -369,8 +380,8 @@ export const navItems = [
       // rail rendered a BLANK PAGE -- the shell with nothing in it, no error, no message.
       // card.html's rail shows Labels under Members, so the entry belongs; what it must not
       // do is promise a screen that does not exist. `SidebarItem` renders an entry with no
-      // href as a quiet, non-navigating label, which is what Maintenance > Bank/Branch has
-      // always been. It becomes a link again the day the route lands.
+      // href as a quiet, non-navigating label (Maintenance > Bank/Branch was one too, until it
+      // was pointed at /banks on 18 Sep 2026). It becomes a link again the day the route lands.
       { title: 'Labels', icon: LucideTags, desc: 'Print Member Labels - Selection' }
     ]
   },
