@@ -164,6 +164,35 @@ const acbExclusions = members.slice(30, 33).map((m, i) => ({
   memberId: m.id, membershipNumber: m.membershipNumber, surname: m.surname, initials: m.initials,
   reason: ['NO_BANK_ON_RECORD', 'NO_BANK_ON_RECORD', 'DAY_OUT_OF_WINDOW'][i], detail: [m.bankName, m.bankName, '5'][i],
 }));
+/**
+ * The Debits screen (`04.1`): run 40's unpaids -- every reason, one decided, one Invalid Account Number with its
+ * banking cure -- run 41's one held-over re-debit, run 40's two held letters, and the member search's page. The
+ * search answers the same page whatever is asked: it measures the table, not the matching.
+ */
+const UNPAID_CASES = [
+  ['2', 'NOT_PROVIDED_FOR', 'RE_PRESENT', null, 'QUEUED'],
+  ['4', 'PAYMENT_STOPPED', 'SUSPEND', null, 'RENDERED'],
+  ['8', 'INVALID_ACCOUNT_NUMBER', null, null, 'QUEUED'],
+  ['12', 'ACCOUNT_CLOSED', 'SUSPEND', null, 'RENDERED'],
+  ['2', 'NOT_PROVIDED_FOR', null, 'RE_PRESENT', 'SENT'],
+  ['30', 'OTHER', null, null, null],
+];
+const acbUnpaids = UNPAID_CASES.map(([code, reason, suggested, decided, letterStatus], i) => ({
+  ...acbLines[i], id: 2000 + i, outcome: 'UNPAID', actionDate: '2026-09-25', unpaidCode: code, unpaidReason: reason,
+  decision: decided, suggestedDecision: decided ? null : suggested, permissionNote: null, letterStatus,
+}));
+const acbHeldOver = [{
+  lineId: 1900, runId: 38, memberId: members[1].id, membershipNumber: members[1].membershipNumber,
+  surname: members[1].surname, month: '2026-07', amount: 174, permitted: false,
+}];
+const acbHeldLetters = members.slice(0, 2).map((m, i) => ({
+  letterId: 3000 + i, lineId: 2000 + i, memberId: m.id, membershipNumber: m.membershipNumber, surname: m.surname,
+  template: ['RE_DEBIT', 'RETURN_DEBIT'][i], reason: 'NO_EMAIL', canSend: i === 0,
+}));
+const acbFound = members.slice(0, 25).map((m, i) => ({
+  id: m.id, membershipNumber: m.membershipNumber, title: m.title, initials: m.initials, surname: m.surname,
+  bankName: m.bankName, accountLastFour: String(1000 + i * 37).slice(-4), debitDay: 20 + (i % 12), status: m.status,
+}));
 let acbPreparedReads = 0;
 
 /** The A.C.B. run shapes a prefix match cannot answer; `false` when the path is not one of them. */
@@ -176,6 +205,26 @@ const acbRunAnswer = (req, path) => {
   let m = /^\/api\/acb\/runs\/(\d+)\/cancel$/.exec(path);
   if (req.method === 'POST' && m) return reply(200, acbRun(Number(m[1]), '2026-10', 'CANCELLED', { version: 2 }));
   if (req.method !== 'GET') return false;
+  if (req.method === 'POST' && path === '/api/acb/members/search') {
+    return reply(200, { content: acbFound, page: 0, size: 25, totalElements: 57, totalPages: 3 });
+  }
+  if (/^\/api\/acb\/runs\/\d+\/unpaids$/.test(path)) return reply(200, acbPage(acbUnpaids, 50));
+  if (/^\/api\/acb\/runs\/\d+\/held-over$/.test(path)) return reply(200, acbPage(acbHeldOver, 50));
+  if (/^\/api\/acb\/runs\/\d+\/letters\/held$/.test(path)) return reply(200, acbPage(acbHeldLetters, 50));
+  m = /^\/api\/acb\/runs\/\d+\/lines\/(\d+)\/decision$/.exec(path);
+  if (req.method === 'POST' && m) {
+    const line = acbUnpaids.find((l) => l.id === Number(m[1])) ?? acbUnpaids[0];
+    return reply(200, { ...line, decision: line.suggestedDecision ?? 'RE_PRESENT', suggestedDecision: null });
+  }
+  m = /^\/api\/acb\/runs\/\d+\/lines\/(\d+)\/permission$/.exec(path);
+  if (req.method === 'POST' && m) return reply(200, { ...acbUnpaids[0], decision: 'RE_PRESENT', permissionNote: 'noted' });
+  m = /^\/api\/acb\/runs\/\d+\/letters\/(\d+)\/handled$/.exec(path);
+  if (req.method === 'POST' && m) return reply(200, acbHeldLetters.find((l) => l.letterId === Number(m[1])) ?? acbHeldLetters[0]);
+  // As the server answers today: the send waits for sign-in (B1).
+  if (req.method === 'POST' && /^\/api\/acb\/runs\/\d+\/letters\/\d+\/send$/.test(path)) {
+    return reply(403, { status: 403, code: 'IDENTITY_REQUIRED', details: {},
+      message: 'Sending a letter to a member waits until administrators sign in to this system. Nothing has been sent.' });
+  }
   if (/^\/api\/acb\/runs\/\d+\/lines$/.test(path)) return reply(200, acbPage(acbLines, 50));
   if (/^\/api\/acb\/runs\/\d+\/exclusions$/.test(path)) return reply(200, acbPage(acbExclusions, 50));
   m = /^\/api\/acb\/runs\/(\d+)$/.exec(path);
@@ -192,6 +241,9 @@ const API = {
   '/api/members': members,
   // The runs list; one run and its sheets are answered per shape by `acbRunAnswer`.
   '/api/acb/runs': acbPage(acbRuns, 12),
+  // The Debits screen's member search (`04.1`) -- a POST, answered by `acbRunAnswer` first; the key is what
+  // `stubDrift` reads, so the path is covered by name rather than by accident.
+  '/api/acb/members/search': { content: acbFound, page: 0, size: 25, totalElements: 57, totalPages: 3 },
   // The dated rates the Runs screen reads (Q43): V41's one row, and no January notice in September.
   '/api/acb/rates': {
     rates: [{ effectiveFrom: '2026-01-01', amount: 174, source: 'From January -- confirmed by SASBO 2026-09-21 (Q43)' }],

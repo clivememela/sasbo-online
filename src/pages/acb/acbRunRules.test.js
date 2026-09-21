@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import { committedVocabulary } from '../../test/apiContractScan'
 import {
-  CANCELLABLE, DECLINE_REASON_LABEL, EXCLUSION_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, calendarNotice,
-  declinedMonthWarning, maskedAccount, monthLabel, pollRun, preparableMonths, rateNote,
+  CANCELLABLE, DEBIT_DAYS, DECIDABLE, DECISION_LABEL, DECLINE_REASON_LABEL, EXCLUSION_LABEL, LETTER_STATUS_LABEL,
+  LETTER_TEMPLATE_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, UNPAID_REASON_LABEL, asPage, calendarNotice,
+  debitDayReplaced, debitsRuns, declinedMonthWarning, maskedAccount, monthLabel, ordinal, pollRun, preparableMonths,
+  rateNote,
 } from './acbRunRules'
 
 /**
@@ -31,6 +33,17 @@ describe('the run vocabulary is the server\'s', () => {
   it('the refusal codes the screen branches on are codes the server gives', () => {
     const published = acb.refusalCodes.map((c) => c.code)
     expect(published).toEqual(expect.arrayContaining(Object.values(REFUSAL)))
+  })
+
+  it('every unpaid reason, decision, letter status and letter the server publishes has its words (04.1)', () => {
+    expect(Object.keys(UNPAID_REASON_LABEL)).toEqual(acb.unpaidReasons)
+    expect(Object.keys(DECISION_LABEL)).toEqual(acb.unpaidDecisions)
+    expect(Object.keys(LETTER_STATUS_LABEL)).toEqual(acb.letterStatuses)
+    expect(Object.keys(LETTER_TEMPLATE_LABEL)).toEqual(acb.letterTemplates)
+  })
+
+  it('only a sent run whose month is not closed takes decisions -- what the server\'s returns allow', () => {
+    expect([...DECIDABLE].sort()).toEqual([RUN_STATUS.RETURNED, RUN_STATUS.SUBMITTED])
   })
 
   it('only a proposal can be cancelled -- what the server\'s state table allows', () => {
@@ -174,5 +187,45 @@ describe('pollRun', () => {
   it('a failed read rejects -- the screen says what it could not confirm', async () => {
     const failing = async () => { throw new Error('lost') }
     await expect(pollRun(failing, 41, { delays: [0] })).rejects.toThrow('lost')
+  })
+})
+
+describe('debitsRuns (04.1)', () => {
+  const run = (id, actionMonth, status) => ({ id, actionMonth, status })
+
+  it('takes the newest run whose unpaids still take a decision, and the newest proposal after it', () => {
+    const runs = [run(42, '2026-11', 'CANCELLED'), run(41, '2026-10', 'PREPARED'), run(40, '2026-09', 'RETURNED'),
+      run(39, '2026-08', 'CLOSED')]
+    expect(debitsRuns(runs)).toEqual({ returned: runs[2], next: runs[1] })
+  })
+
+  it('a proposal older than the returned run is not its next run; a closed month takes no decisions', () => {
+    expect(debitsRuns([run(40, '2026-09', 'SUBMITTED'), run(38, '2026-07', 'PREPARED')]).next).toBeNull()
+    expect(debitsRuns([run(39, '2026-08', 'CLOSED')])).toEqual({ returned: null, next: null })
+  })
+
+  it('anything that is not a list -- the route smoke\'s [] among them -- is no runs, never a crash', () => {
+    expect(debitsRuns(undefined)).toEqual({ returned: null, next: null })
+    expect(debitsRuns([])).toEqual({ returned: null, next: null })
+  })
+})
+
+describe('the debit day (Q42)', () => {
+  it('is any day from the 20th to the 31st, and each is said as a day of the month', () => {
+    expect(DEBIT_DAYS).toEqual([20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31])
+    expect(DEBIT_DAYS.map(ordinal)).toEqual(['20th', '21st', '22nd', '23rd', '24th', '25th', '26th', '27th', '28th',
+      '29th', '30th', '31st'])
+    expect([1, 2, 3, 11, 12, 13, 111].map(ordinal)).toEqual(['1st', '2nd', '3rd', '11th', '12th', '13th', '111th'])
+  })
+
+  it('A67: a day the server kept other than the one chosen is said', () => {
+    expect(debitDayReplaced('28', 25)).toBe('The debit day was saved as the 25th, not the 28th chosen: '
+      + 'this system still sets the bank’s day over the member’s own. It is a known fault.')
+  })
+
+  it('the must-pass twins: the day kept as chosen, or no day chosen, says nothing', () => {
+    expect(debitDayReplaced('25', 25)).toBeNull()
+    expect(debitDayReplaced('', 25)).toBeNull()
+    expect(debitDayReplaced('25', null)).toBeNull()
   })
 })

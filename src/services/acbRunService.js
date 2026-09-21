@@ -68,6 +68,92 @@ export const acbRunService = {
             signal,
         })),
 
+    /**
+     * A run's unpaids, a page at a time -- every one, or one reason's: `INVALID_ACCOUNT_NUMBER` is the
+     * legacy *Invalid Accounts* list (Q11). Each says its code, its reason, where its letter is and its
+     * decision -- or, undecided, the decision its code suggests (Q40, Q44).
+     */
+    unpaids: (id, reason, page = 0, size = 50) => {
+        const query = pageQuery(page, size);
+        if (reason) query.set('reason', reason);
+        return requestJson((signal) => fetch(apiUrl(`/api/acb/runs/${id}/unpaids?${query}`), {
+            credentials: 'include',
+            signal,
+        }));
+    },
+
+    /** Records the decision on one unpaid -- `RE_PRESENT` or `SUSPEND`. Once recorded it stands. */
+    decide: (id, lineId, decision) =>
+        requestJsonWrite((signal) => fetch(apiUrl(`/api/acb/runs/${id}/lines/${lineId}/decision`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ decision }),
+            signal,
+        })),
+
+    /** The re-debits run `id` holds over for want of the member's permission (D32), a page at a time. */
+    heldOver: (id, page = 0, size = 50) =>
+        requestJson((signal) => fetch(apiUrl(`/api/acb/runs/${id}/held-over?${pageQuery(page, size)}`), {
+            credentials: 'include',
+            signal,
+        })),
+
+    /**
+     * The member's permission for a further re-debit in one run (D32): who agreed, when and how. `id`
+     * and `lineId` are the UNPAID's -- the earlier run's line -- as the held-over list names them.
+     */
+    permit: (id, lineId, note) =>
+        requestJsonWrite((signal) => fetch(apiUrl(`/api/acb/runs/${id}/lines/${lineId}/permission`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ note }),
+            signal,
+        })),
+
+    /** The run's letters held for want of an address it could go to (Q46), a page at a time. */
+    heldLetters: (id, page = 0, size = 50) =>
+        requestJson((signal) => fetch(apiUrl(`/api/acb/runs/${id}/letters/held?${pageQuery(page, size)}`), {
+            credentials: 'include',
+            signal,
+        })),
+
+    /** A held letter dealt with by hand, and how (Q46). It leaves the worklist and is never sent. */
+    markHandled: (id, letterId, note) =>
+        requestJsonWrite((signal) => fetch(apiUrl(`/api/acb/runs/${id}/letters/${letterId}/handled`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ note }),
+            signal,
+        })),
+
+    /**
+     * Sends a held letter once the member has an address (Q46). The server refuses every caller until
+     * administrators sign in to this system (B1); its refusal says so, and nothing is sent.
+     */
+    sendLetter: (id, letterId) =>
+        requestJsonWrite((signal) => fetch(apiUrl(`/api/acb/runs/${id}/letters/${letterId}/send`), {
+            method: 'POST',
+            credentials: 'include',
+            signal,
+        })),
+
+    /**
+     * The Debits screen's member search, paged on the server (R-SEC-B, R-PERF-D). A POST, so an identity
+     * number never travels in a URL. Answers each member's account as its last four digits, and no
+     * identity number; the full record is one member's, loaded when chosen.
+     */
+    searchMembers: ({ surname = '', membershipNumber = '', identityNumber = '' } = {}, page = 0, size = 25) =>
+        requestJson((signal) => fetch(apiUrl('/api/acb/members/search'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ surname, membershipNumber, identityNumber, page, size }),
+            signal,
+        })),
+
     /** Withdraws a prepared or approved run. `version` is the one the screen was showing. */
     cancel: (id, version, reason) =>
         requestJsonWrite((signal) => fetch(apiUrl(`/api/acb/runs/${id}/cancel`), {

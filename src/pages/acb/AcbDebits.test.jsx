@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw'
 import AcbDebits from './AcbDebits'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
+import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
 
 /**
@@ -14,26 +15,29 @@ import { setupUser } from '../../test/user'
  * 🔴 Choosing a member here fetches their full record, and a failure used to open the REGISTER ROW
  * in its place -- `.catch(() => setSelectedMember(m))`. The row is the list's summary. On the screen
  * that changes a member's debit order that meant: banking fields the row does not carry printed as
- * "-", *Confirm Details* confirmed details nobody had loaded, and *Edit Details* seeded its form with
- * blanks that *Update* would have written over the member's account number.
+ * "-", and *Edit Details* seeded its form with blanks that *Update* would have written over the
+ * member's account number.
  *
  * The two cases are the guard and its must-pass: without the second, a page that never opens any
  * member would satisfy the first.
  */
 
-/** What `/api/members` carries for a member: no account number, no branch, no debit day. */
+/** What the search carries for a member (`04.1`): the account's last four digits, no identity number. */
 const ROW = {
   id: 7,
   membershipNumber: 'SYN-0007',
   title: 'Mr',
   initials: 'S',
   surname: 'Testperson',
-  identityNumber: '9001010000080',
   bankName: 'Synthetic Bank',
+  accountLastFour: '0001',
+  debitDay: 25,
   status: 'Active',
 }
 
 const RECORD = { ...ROW, branch: 'Sample Branch', bankAccountNumber: '62000000001', debitDay: '25' }
+
+const pageOf = (content) => ({ content, page: 0, size: 25, totalElements: content.length, totalPages: 1 })
 
 async function chooseTheMember() {
   const user = setupUser()
@@ -48,7 +52,10 @@ describe('AcbDebits, choosing a member', () => {
   beforeEach(() => {
     // The page reports the failure through the sink as well as showing it.
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    server.use(http.get('*/api/members', () => HttpResponse.json([ROW])))
+    server.use(
+      http.post('*/api/acb/members/search', () => HttpResponse.json(pageOf([ROW]))),
+      ...pageFixtures,
+    )
   })
 
   it('does not open the register row as the record when the record will not load', async () => {
@@ -60,7 +67,6 @@ describe('AcbDebits, choosing a member', () => {
     expect(await screen.findByText(/banking details for SYN-0007 could not be loaded/i)).toBeInTheDocument()
     expect(screen.queryByText('Banking Details')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit Details' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Confirm Details' })).not.toBeInTheDocument()
   })
 
   it('the must-pass: a record that loads opens with its banking details', async () => {

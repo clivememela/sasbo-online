@@ -65,6 +65,14 @@ const ARGS = {
   'acbRunService.cancel': ['7', 3, 'Synthetic reason'],
   'acbRunService.holidayCalendar': [2026],
   'acbRunService.rates': [],
+  'acbRunService.unpaids': ['7', null, 0, 50],
+  'acbRunService.decide': ['7', '3', 'RE_PRESENT'],
+  'acbRunService.heldOver': ['7', 0, 50],
+  'acbRunService.permit': ['7', '3', 'Synthetic permission note'],
+  'acbRunService.heldLetters': ['7', 0, 50],
+  'acbRunService.markHandled': ['7', '21', 'Synthetic handled note'],
+  'acbRunService.sendLetter': ['7', '21'],
+  'acbRunService.searchMembers': [{ surname: 'Synthetic' }, 0, 25],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS

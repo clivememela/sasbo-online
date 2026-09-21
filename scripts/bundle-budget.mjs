@@ -167,7 +167,20 @@ const CEILINGS = {
   // slack nobody earned. It is 687.34, not 687.33, because the measurement is 703,827 B -- 687.331
   // KiB -- and a ceiling written to the hundredth must round UP or it refuses the build it was
   // measured from (it did, by one byte). Still no headroom on top.
-  js: 687.34 * KB,
+  //
+  // 687.34 -> 708.23 on 2026-09-21, MEASURED, three builds from one install in C:\tmp\acb-client,
+  // the tracked `.env`: e3285a3 703,827 B (the 687.33 above, reproduced to the byte) -> 650ea61
+  // 707,242 B -> the 04.1 tree 725,224 B. The remote gate had already refused 650ea61 at 690.67.
+  //   e3285a3 -> 650ea61, +3,415 B   AcbRuns +3,197 (01.8's calendar notice, 01.9's rate note, 02.7's
+  //                                  made-on and make-by, 02.8's decline notes) · Acb +213 (04.2's
+  //                                  honest rows) · DataState +5.
+  //   650ea61 -> 04.1, +17,982 B     AcbDebits 8,338 -> 22,678 (the Re-Debits screen: the unpaids and
+  //                                  their decisions, the held-over permissions, the held letters,
+  //                                  the server-side search) · acbPaging 0 -> 8,409 and AcbRuns -4,819
+  //                                  (the paging hook and pager, moved out of the Runs panel to be
+  //                                  shared) · index +52.
+  // 725,224 B is 708.227 KiB, so 708.23. Still no headroom on top.
+  js: 708.23 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before

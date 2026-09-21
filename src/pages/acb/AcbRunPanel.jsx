@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Sheet from '../../components/common/Sheet.jsx';
-import Pager from '../../components/common/Pager.jsx';
 import DataState from '../../components/common/DataState.jsx';
 import StatusChip from '../../components/common/StatusChip.jsx';
 import DialogNotice from '../../components/common/DialogNotice.jsx';
 import Table from '../../components/table/Table.jsx';
 import { ConfirmDialog, closeOn } from '../../components/overlay/Modal.jsx';
+import { PagerFor, usePagedRead } from './acbPaging.jsx';
 import { Button } from '../../components/form';
 import reportError from '../../lib/reportError.js';
 import { formatDate, formatInt, formatZar } from '../../lib/format.js';
 import { acbRefusalOf, acbRunService } from '../../services/acbRunService.js';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import {
-  CANCELLABLE, DECLINE_REASON_LABEL, EXCLUSION_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, maskedAccount,
+  CANCELLABLE, DECLINE_REASON_LABEL, EXCLUSION_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, maskedAccount,
   monthLabel,
 } from './acbRunRules.js';
 
@@ -225,47 +225,9 @@ function Fact({ term, value }) {
   );
 }
 
-/** A server-paged sheet: loading on the way in, and back to loading on every page and retry. */
-function usePagedRead(read) {
-  const [page, setPage] = useState(1);
-  const [state, setState] = useState('loading');
-  const [data, setData] = useState(() => asPage(null));
-  const left = useRef(false);
-  useEffect(() => () => { left.current = true; }, []);
-
-  // Only the newest read may paint: a page's answer arriving after the next page's must not
-  // put its rows under the next page's number (R3-F4).
-  const ticket = useRef(0);
-  const load = useCallback((pageNumber) => {
-    const mine = ++ticket.current;
-    const current = () => !left.current && mine === ticket.current;
-    return read(pageNumber - 1, PAGE_SIZE)
-      .then((result) => {
-        if (!current()) return;
-        setData(asPage(result));
-        setState('ready');
-      })
-      .catch((err) => {
-        reportError('AcbRunPanel.read', err);
-        if (current()) setState('error');
-      });
-  }, [read]);
-
-  useEffect(() => {
-    load(page);
-  }, [load, page]);
-
-  const goTo = (pageNumber) => {
-    setState('loading');
-    if (pageNumber === page) load(pageNumber);
-    else setPage(pageNumber);
-  };
-  return { data, state, goTo, retry: () => goTo(page) };
-}
-
 function RunLines({ runId }) {
   const read = useCallback((page, size) => acbRunService.lines(runId, page, size), [runId]);
-  const { data, state, goTo, retry } = usePagedRead(read);
+  const { data, state, goTo, retry } = usePagedRead(read, { size: PAGE_SIZE, label: 'AcbRunPanel.read' });
   const columns = [
     {
       key: 'member', header: 'Member', priority: 'essential',
@@ -297,14 +259,14 @@ function RunLines({ runId }) {
         emptyMessage="Every member was left out — the list below says why."
         dense
       />
-      <PagerFor data={data} state={state} goTo={goTo} noun="debits" />
+      <PagerFor data={data} state={state} goTo={goTo} noun="debits" size={PAGE_SIZE} />
     </section>
   );
 }
 
 function RunExclusions({ runId, summary }) {
   const read = useCallback((page, size) => acbRunService.exclusions(runId, page, size), [runId]);
-  const { data, state, goTo, retry } = usePagedRead(read);
+  const { data, state, goTo, retry } = usePagedRead(read, { size: PAGE_SIZE, label: 'AcbRunPanel.read' });
   const counted = summary.filter((s) => !s.listed);
   const columns = [
     { key: 'member', header: 'Member', priority: 'essential',
@@ -328,7 +290,7 @@ function RunExclusions({ runId, summary }) {
         emptyMessage="Every debit-order member who is Active is in this run."
         dense
       />
-      <PagerFor data={data} state={state} goTo={goTo} noun="members" />
+      <PagerFor data={data} state={state} goTo={goTo} noun="members" size={PAGE_SIZE} />
       {counted.length > 0 && (
         <p className="mt-3 text-sm text-ink-muted">
           Outside this run, and counted rather than listed:{' '}
@@ -336,22 +298,5 @@ function RunExclusions({ runId, summary }) {
         </p>
       )}
     </section>
-  );
-}
-
-function PagerFor({ data, state, goTo, noun }) {
-  const start = data.page * PAGE_SIZE + 1;
-  return (
-    <Pager
-      page={data.page + 1}
-      totalPages={Math.max(data.totalPages, 1)}
-      onPageChange={goTo}
-      count={data.totalElements}
-      start={start}
-      end={data.page * PAGE_SIZE + data.content.length}
-      noun={noun}
-      loading={state === 'loading'}
-      error={state === 'error'}
-    />
   );
 }

@@ -72,7 +72,98 @@ export const REFUSAL = Object.freeze({
   RUN_ALREADY_EXISTS: 'RUN_ALREADY_EXISTS',
   RUN_VERSION_CONFLICT: 'RUN_VERSION_CONFLICT',
   RUN_NOT_IN_STATE: 'RUN_NOT_IN_STATE',
+  UNPAID_ALREADY_RECORDED: 'UNPAID_ALREADY_RECORDED',
+  PERMISSION_NOTE_REQUIRED: 'PERMISSION_NOTE_REQUIRED',
+  LETTER_NOT_HELD: 'LETTER_NOT_HELD',
 });
+
+/** The bank's reasons for an unpaid, in the words of the union's own letters -- the server's list. */
+export const UNPAID_REASON_LABEL = Object.freeze({
+  NOT_PROVIDED_FOR: 'Not Provided For',
+  PAYMENT_STOPPED: 'Payment Stopped',
+  ACCOUNT_FROZEN: 'Account Frozen',
+  INVALID_ACCOUNT_NUMBER: 'Invalid Account Number',
+  ACCOUNT_CLOSED: 'Account Closed',
+  NO_AUTHORITY_TO_DEBIT: 'No Authority To Debit',
+  AUTHORISATION_CANCELLED: 'Authorisation Cancelled',
+  OTHER: 'Unrecognised bank code',
+});
+
+/** The reasons whose cure is the member's banking: the sheet and *Edit Details* stay for these (`04.1`). */
+export const BANKING_REASONS = new Set(['INVALID_ACCOUNT_NUMBER', 'ACCOUNT_CLOSED']);
+
+/** The choice SASBO makes on each unpaid (Q7, Q9). */
+export const DECISION_LABEL = Object.freeze({
+  RE_PRESENT: 'Present again',
+  SUSPEND: 'Suspend',
+});
+
+/** Where an unpaid's letter is. `QUEUED` is a letter that is waiting -- for an address, or for the send. */
+export const LETTER_STATUS_LABEL = Object.freeze({
+  QUEUED: 'Held',
+  RENDERED: 'Waiting to send',
+  SENT: 'Sent',
+  FAILED: 'Failed',
+  HANDLED: 'Dealt with by hand',
+});
+
+/** The union's three letters. */
+export const LETTER_TEMPLATE_LABEL = Object.freeze({
+  RETURN_DEBIT: 'Return debit',
+  ACCOUNT_CLOSED: 'Account closed',
+  RE_DEBIT: 'Re-debit',
+});
+
+/** Why a letter is held (Q46, SD3-C). */
+export const HELD_REASON_LABEL = Object.freeze({
+  NO_EMAIL: 'No email address on record',
+  INVALID_ADDRESS: 'The address on record cannot be used',
+});
+
+/**
+ * The debit days a member may have: any day from the 20th to the 31st, the member's own -- no bank
+ * dictates it (Q42, 2026-09-21).
+ */
+export const DEBIT_DAYS = Object.freeze(Array.from({ length: 12 }, (_, i) => 20 + i));
+
+/** The runs whose unpaids still take a decision: the file went to the bank, and the month is not closed. */
+export const DECIDABLE = new Set([RUN_STATUS.SUBMITTED, RUN_STATUS.RETURNED]);
+
+/** The runs that can hold a re-debit over for the member's permission: a proposal (D32). */
+const PROPOSED = new Set([RUN_STATUS.PREPARED, RUN_STATUS.APPROVED]);
+
+/**
+ * The runs the Debits screen works on, from a page of the runs list (newest first): the newest whose
+ * unpaids still take a decision, and the newest proposal after it -- the run that holds re-debits over
+ * for permission. Either is `null` when there is none.
+ */
+export const debitsRuns = (runs) => {
+  const list = Array.isArray(runs) ? runs : [];
+  const returned = list.find((run) => DECIDABLE.has(run.status)) ?? null;
+  const next = list.find((run) => PROPOSED.has(run.status)
+    && (!returned || String(run.actionMonth) > String(returned.actionMonth))) ?? null;
+  return { returned, next };
+};
+
+/**
+ * What the screen says when the member service answered a different debit day from the one chosen, or
+ * `null`. 🔴 Register A67: `main`'s member service applies the bank's day over the member's own
+ * whenever the bank's row has one in the window -- against SASBO's *"we have asked that this is
+ * flexible"* (Q42). The screen shows the day the server kept, and says so, rather than the one chosen.
+ */
+export const debitDayReplaced = (chosen, answered) => {
+  if (chosen === '' || chosen == null || answered == null) return null;
+  if (String(chosen) === String(answered)) return null;
+  return `The debit day was saved as the ${ordinal(answered)}, not the ${ordinal(chosen)} chosen: `
+    + 'this system still sets the bank’s day over the member’s own. It is a known fault.';
+};
+
+export const ordinal = (day) => {
+  const n = Number(day);
+  const tens = n % 100;
+  const suffix = tens >= 11 && tens <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th');
+  return `${n}${suffix}`;
+};
 
 /**
  * What the Runs screen says about the holiday calendar (D30), or `null` when there is nothing to say.
