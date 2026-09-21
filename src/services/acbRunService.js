@@ -51,11 +51,15 @@ export const acbRunService = {
      * and one year of it: this year's unless `year` is given (D30). Public, and read-only here: the
      * server refuses its writes to every caller until the API knows who is calling (B1).
      */
-    holidayCalendar: (year) =>
-        requestJson((signal) => fetch(apiUrl(`/api/acb/holidays${year == null ? '' : `?${new URLSearchParams({ year: String(year) })}`}`), {
+    holidayCalendar: (year) => {
+        // The query is built BEFORE `apiUrl`: the contract scan reads the literal it is given, and a nested
+        // template with quotes inside it hid this endpoint from the scan (the runtime witness, gate 1).
+        const query = year == null ? '' : `?${new URLSearchParams({ year: String(year) })}`;
+        return requestJson((signal) => fetch(apiUrl(`/api/acb/holidays${query}`), {
             credentials: 'include',
             signal,
-        })),
+        }));
+    },
 
     /** Every dated flat rate, oldest first, and -- from December -- the January notice (Q43). Read-only here. */
     rates: () =>
