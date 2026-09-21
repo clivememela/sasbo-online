@@ -15,6 +15,7 @@ export const RUN_STATUS = Object.freeze({
   SUBMITTED: 'SUBMITTED',
   RETURNED: 'RETURNED',
   CLOSED: 'CLOSED',
+  DECLINED: 'DECLINED',
   FAILED: 'FAILED',
   CANCELLED: 'CANCELLED',
 });
@@ -27,6 +28,7 @@ export const RUN_STATUS_LABEL = Object.freeze({
   SUBMITTED: 'Submitted',
   RETURNED: 'Returned',
   CLOSED: 'Closed',
+  DECLINED: 'Declined by the bank',
   FAILED: 'Failed',
   CANCELLED: 'Cancelled',
 });
@@ -44,6 +46,27 @@ export const EXCLUSION_LABEL = Object.freeze({
   ACCOUNT_SHAPE_INVALID: 'Account number cannot go in the file',
   SNAPSHOT_INCOMPLETE: 'Membership number or surname missing',
 });
+
+/** Why the bank declined a file, from the server's short list (D29, SD3-H). */
+export const DECLINE_REASON_LABEL = Object.freeze({
+  WRONG_DEBIT_DATE: 'A wrong debit date',
+  LAYOUT: 'The file layout',
+  OTHER: 'Another reason',
+});
+
+/**
+ * What the prepare dialog says about a month whose last file the bank declined for a wrong debit date,
+ * or `null`. A warning, never a refusal: the bank's complaint may be about a day that is no public
+ * holiday -- but if the holiday calendar has not changed since, the new file's dates are the old
+ * file's dates (SD3-H). `runs` is the list page the screen holds, newest first.
+ */
+export const declinedMonthWarning = (runs, month) => {
+  const declined = (runs ?? []).find((run) => run.actionMonth === month && run.status === RUN_STATUS.DECLINED);
+  if (!declined || declined.declinedReason !== 'WRONG_DEBIT_DATE') return null;
+  return declined.calendarAgrees === false
+    ? `The bank declined the ${monthLabel(month)} file for a wrong debit date. The holiday calendar has changed since, so this run's dates can differ.`
+    : `The bank declined the ${monthLabel(month)} file for a wrong debit date, and the holiday calendar has not changed since — this run would carry the same dates. Check the date the bank named first.`;
+};
 
 export const REFUSAL = Object.freeze({
   RUN_ALREADY_EXISTS: 'RUN_ALREADY_EXISTS',

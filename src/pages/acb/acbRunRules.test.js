@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { committedVocabulary } from '../../test/apiContractScan'
 import {
-  CANCELLABLE, EXCLUSION_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, calendarNotice, maskedAccount, monthLabel,
-  pollRun, preparableMonths,
+  CANCELLABLE, DECLINE_REASON_LABEL, EXCLUSION_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, calendarNotice,
+  declinedMonthWarning, maskedAccount, monthLabel, pollRun, preparableMonths,
 } from './acbRunRules'
 
 /**
@@ -18,6 +18,10 @@ describe('the run vocabulary is the server\'s', () => {
   it('every run state the server publishes, and no other, with a label for each', () => {
     expect(Object.values(RUN_STATUS)).toEqual(acb.runStatuses)
     expect(Object.keys(RUN_STATUS_LABEL)).toEqual(acb.runStatuses)
+  })
+
+  it('every reason the bank can decline a file for, as the server lists them, has its words (D29)', () => {
+    expect(Object.keys(DECLINE_REASON_LABEL)).toEqual(acb.declineReasons)
   })
 
   it('every exclusion reason the server publishes has the words an administrator reads', () => {
@@ -69,6 +73,25 @@ describe('calendarNotice (D30, SD3-G)', () => {
     expect(calendarNotice([])).toBeNull()
     expect(calendarNotice(null)).toBeNull()
     expect(calendarNotice('za-statutory')).toBeNull()
+  })
+})
+
+describe('declinedMonthWarning (SD3-H)', () => {
+  const DECLINED = { id: 40, actionMonth: '2026-10', status: 'DECLINED', declinedReason: 'WRONG_DEBIT_DATE', calendarAgrees: true }
+
+  it('a wrong-date decline with the calendar unchanged says the new run would carry the same dates', () => {
+    expect(declinedMonthWarning([DECLINED], '2026-10')).toMatch(/has not changed since — this run would carry the same dates/)
+  })
+
+  it('a wrong-date decline with the calendar changed since says the dates can differ', () => {
+    expect(declinedMonthWarning([{ ...DECLINED, calendarAgrees: false }], '2026-10')).toMatch(/has changed since, so this run's dates can differ/)
+  })
+
+  it('the must-pass twins: another month, another reason, or no decline at all says nothing', () => {
+    expect(declinedMonthWarning([DECLINED], '2026-11')).toBeNull()
+    expect(declinedMonthWarning([{ ...DECLINED, declinedReason: 'LAYOUT' }], '2026-10')).toBeNull()
+    expect(declinedMonthWarning([{ ...DECLINED, status: 'CANCELLED' }], '2026-10')).toBeNull()
+    expect(declinedMonthWarning(undefined, '2026-10')).toBeNull()
   })
 })
 

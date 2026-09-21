@@ -80,6 +80,22 @@ describe('the run', () => {
     expect(screen.getByText(/the bank decides whether it accepts a late file/)).toBeInTheDocument()
   })
 
+  it('a declined run says why, from the short list, with the bank\'s own words beside it (D29)', async () => {
+    server.use(http.get('*/api/acb/runs/41', () => HttpResponse.json({
+      ...RUN, status: 'DECLINED', declinedReason: 'WRONG_DEBIT_DATE', declinedWords: 'Heritage Day on some lines',
+    })))
+    renderPanel()
+    expect(await screen.findByText(/The bank declined this file: A wrong debit date — “Heritage Day on some lines”/)).toBeInTheDocument()
+    expect(screen.getByText('Declined by the bank')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel this run' })).not.toBeInTheDocument()
+  })
+
+  it('a run prepared after a decline names what it replaces (SD3-H)', async () => {
+    server.use(http.get('*/api/acb/runs/41', () => HttpResponse.json({ ...RUN, replacesRunId: 40 })))
+    renderPanel()
+    expect(await screen.findByText('This run was prepared to replace the one the bank declined.')).toBeInTheDocument()
+  })
+
   it('a run whose month gained a holiday after it was prepared says to prepare it again (SD3-F)', async () => {
     server.use(http.get('*/api/acb/runs/41', () => HttpResponse.json({ ...RUN, calendarAgrees: false })))
     renderPanel()

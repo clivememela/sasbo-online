@@ -12,7 +12,8 @@ import { formatDate, formatInt, formatZar } from '../../lib/format.js';
 import { acbRefusalOf, acbRunService } from '../../services/acbRunService.js';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import {
-  CANCELLABLE, EXCLUSION_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, maskedAccount, monthLabel,
+  CANCELLABLE, DECLINE_REASON_LABEL, EXCLUSION_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, maskedAccount,
+  monthLabel,
 } from './acbRunRules.js';
 
 const PAGE_SIZE = 50;
@@ -133,6 +134,15 @@ export default function AcbRunPanel({ runId, onChanged, onClose }) {
         <p className="mt-3 text-sm text-ink-muted">
           Preparing — who would be debited, and who is left out, appears here when it is done.
         </p>
+      )}
+      {run.status === RUN_STATUS.DECLINED && (
+        <p className="mt-3 text-sm text-status-suspended">
+          The bank declined this file: {DECLINE_REASON_LABEL[run.declinedReason] ?? run.declinedReason}
+          {run.declinedWords ? ` — “${run.declinedWords}”` : ''}. The month is released, to be prepared again as a new run.
+        </p>
+      )}
+      {run.replacesRunId != null && (
+        <p className="mt-3 text-sm text-ink-muted">This run was prepared to replace the one the bank declined.</p>
       )}
       {run.status === RUN_STATUS.FAILED && run.failureReason && (
         <p className="mt-3 text-sm text-status-suspended">This run could not be prepared: {run.failureReason}</p>

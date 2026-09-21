@@ -14,8 +14,8 @@ import { acbRefusalOf, acbRunService } from '../../services/acbRunService.js';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import AcbRunPanel from './AcbRunPanel.jsx';
 import {
-  CANCELLABLE, POLL_DELAYS_MS, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, calendarNotice, monthLabel, pollRun,
-  preparableMonths,
+  CANCELLABLE, POLL_DELAYS_MS, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, calendarNotice, declinedMonthWarning,
+  monthLabel, pollRun, preparableMonths,
 } from './acbRunRules.js';
 
 /** Twelve runs to a page: a year of months. */
@@ -194,6 +194,8 @@ export default function AcbRuns({ pollDelaysMs = POLL_DELAYS_MS }) {
     { key: 'setupDate', header: 'Prepared', priority: 'detail', cell: (run) => formatDate(run.setupDate) },
   ];
 
+  // SD3-H: after a wrong-date decline, the month's prepare dialog says so, and whether the calendar moved.
+  const declinedWarning = declinedMonthWarning(runs.content, month);
   const start = runs.page * PAGE_SIZE + 1;
   const end = runs.page * PAGE_SIZE + runs.content.length;
 
@@ -264,6 +266,7 @@ export default function AcbRuns({ pollDelaysMs = POLL_DELAYS_MS }) {
         loading={preparing}
         onConfirm={prepare}
       >
+        {declinedWarning && <p className="text-sm text-status-suspended">{declinedWarning}</p>}
         <DialogNotice notice={prepareNotice} onDismiss={() => setPrepareNotice(null)} />
       </ConfirmDialog>
     </Page>

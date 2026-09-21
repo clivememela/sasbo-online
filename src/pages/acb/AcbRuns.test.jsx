@@ -53,6 +53,29 @@ const openPrepare = async (user) => {
   return screen.findByRole('dialog', { name: /^Prepare the .* run\?$/ })
 }
 
+describe('a month the bank declined (D29, SD3-H)', () => {
+  it('the prepare dialog warns when the month\'s last file was declined for a wrong date -- a warning, never a refusal', async () => {
+    const declined = { ...SUMMARY, id: 40, status: 'DECLINED', declinedReason: 'WRONG_DEBIT_DATE', calendarAgrees: true }
+    server.use(http.get('*/api/acb/runs', () => HttpResponse.json(pageOf([declined]))))
+    const user = setupUser()
+    renderWithProviders(<AcbRuns />)
+    await screen.findByRole('button', { name: 'Open the October 2026 run' })
+    await user.selectOptions(screen.getByLabelText('Action month'), '2026-10')
+    const dialog = await openPrepare(user)
+    expect(within(dialog).getByText(/declined the October 2026 file for a wrong debit date/)).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Prepare' })).toBeEnabled()
+  })
+
+  it('the must-pass twin: a month with no decline says nothing in the dialog', async () => {
+    const user = setupUser()
+    renderWithProviders(<AcbRuns />)
+    await screen.findByRole('button', { name: 'Open the October 2026 run' })
+    await user.selectOptions(screen.getByLabelText('Action month'), '2026-10')
+    const dialog = await openPrepare(user)
+    expect(within(dialog).queryByText(/declined/)).not.toBeInTheDocument()
+  })
+})
+
 describe('the holiday calendar (D30)', () => {
   it('from sixty days before its end, the screen names the date it is known until (SD3-G)', async () => {
     server.use(http.get('*/api/acb/holidays', () => HttpResponse.json({ ...CALENDAR, endingSoon: true })))
