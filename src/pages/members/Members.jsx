@@ -5,39 +5,41 @@ import {
     LucideUserRoundPlus, AlertCircle, CircleCheck, Printer, SlidersHorizontal,
     Pencil, Check,
 } from "lucide-react";
-import { memberService } from "../../services/memberService.js";
-import { jobGradeService } from "../../services/jobGradeService.js";
-import { bankService } from "../../services/bankService.js";
+import { memberService } from "@/services/memberService.js";
+import { jobGradeService } from "@/services/jobGradeService.js";
+import { bankService } from "@/services/bankService.js";
 import { TextInput, SearchableSelect, SelectInput, Button, DateField } from "../../components/form";
 import StatusChip, { CANCELLED_STATUSES } from "../../components/common/StatusChip.jsx";
 import Table from "../../components/table/Table.jsx";
-import { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
+import Modal,{ ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
 import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, IDENTITY_TYPE_PASSPORT,
     DEBIT_DAY_OPTIONS, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
-} from "../../config/memberConstants.js";
+} from "@/config/memberConstants.js";
 import {
     validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID
-} from "../../utils/validateSAID.js";
+} from "@/utils/validateSAID.js";
 import PageTitle from "../../components/common/PageTitle.jsx";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState.jsx";
 import FigureStrip from "../../components/members/FigureStrip.jsx";
-import MemberPanel from "../../components/members/MemberPanel.jsx";
 import Criteria, { CRITERION } from "../../components/common/Criteria.jsx";
 import Pager from "../../components/common/Pager.jsx";
 import KeyHints from "../../components/common/KeyHints.jsx";
 import Sheet from "../../components/common/Sheet.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
-import { writeMayHaveLanded } from "../../services/parseApiError.js";
-import { formatDate, parseDate, sameDate, today } from "../../lib/format.js";
-import { sanitiseField, validateField } from "../../utils/inputRules.js";
-import { branchNamesForBank } from "../../utils/bankBranches.js";
-import { cn } from "../../lib/utils";
-import { personName } from "../../lib/names.js";
+import { writeMayHaveLanded } from "@/services/parseApiError.js";
+import { formatDate, parseDate, sameDate, today } from "@/lib/format.js";
+import { sanitiseField, validateField } from "@/utils/inputRules.js";
+import { branchNamesForBank } from "@/utils/bankBranches.js";
+import { cn } from "@/lib/utils.js";
+import { personName } from "@/lib/names.js";
+
+import MembershipCard from "../../components/members/MembershipCard.jsx";
+
 
 const PAGE_SIZE = memberService.getPageSize();
 
@@ -110,42 +112,6 @@ const TABS = RECORD_TABS;
 
 /** A record field's value, or "Not on file" when the record holds none -- never an invented default. */
 const notOnFile = (value) => (value === null || value === undefined || String(value).trim() === "" ? "Not on file" : value);
-
-/*
- * 🗣️ WHERE EACH OF THE FIVE SECTIONS SITS IN THE RECORD'S TAB STRIP -- the owner's
- * arrangement, settled over three rounds on 2026-09-10:
- *
- *     Personal                      Membership
- *                  Employment
- *     Recruitment                    Structures
- *
- * ① Three columns, so the sections line up under each other whatever the width. Left to
- *    `flex-wrap` the strip broke 4+1 on a 448px panel and 3+2 on the owner's own window,
- *    because the split was whatever the labels happened to measure.
- * ② The last section takes the THIRD column, not the second -- *"so that there's a gap in
- *    the middle between Recruitment and Structures."*
- * ③ That leaves the middle column holding one tab where the outer two hold two, so it spans
- *    both rows and centres in them -- *"right in the center, relative to all the other panel
- *    tabs."*
- * ④ And the strip is SYMMETRICAL about its own centre line: the left column reads from the
- *    left edge, the right column to the right edge, and the middle one is centred. Aligning
- *    all three from the left is what left "Membership" and "Structures" ending in different
- *    places and the whole block leaning.
- *
- * It is a list rather than three conditionals because it is one composition, and a
- * composition is easier to check when you can see it. It applies only at five sections --
- * a sixth would fill a 3x2 grid with nothing left to balance, so any other count falls back
- * to the plain left-aligned flow.
- */
-const TAB_PLACE = TABS.length === 5
-  ? [
-      'justify-self-start',
-      'row-span-2 justify-self-center self-center',
-      'justify-self-end',
-      'justify-self-start',
-      'col-start-3 justify-self-end',
-    ]
-  : [];
 
 const FIELD_TO_TAB_MAP = {
     title: "personal",
@@ -279,7 +245,7 @@ const RECORD_FIELD_LABELS = {
 };
 
 /** Never listed: identifiers, and a name the form derives from a field that is listed (the committee's id). */
-const UNLISTED_KEYS = ["id", "membershipNumber", "memberId", "becCommitteeName"];
+const UNLISTED_KEYS = new Set(["id", "membershipNumber", "memberId", "becCommitteeName"]);
 
 /**
  * A stored yes/no as a person reads it. `null` is its own answer on the read side -- Shop Steward
@@ -327,7 +293,7 @@ const fieldLabel = (key) =>
     RECORD_FIELD_LABELS[key] || MEMBER_FIELD_LABEL_MAP[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 
 const getChangedFields = (draft, original) => Object.keys(draft)
-    .filter((key) => !UNLISTED_KEYS.includes(key))
+    .filter((key) => !UNLISTED_KEYS.has(key))
     .filter((key) => comparable(key, draft[key]) !== comparable(key, original[key]))
     .map((key) => `${fieldLabel(key)}: ${readable(key, original[key])} → ${readable(key, draft[key])}`);
 
@@ -1439,14 +1405,17 @@ export default function Members() {
             </section>
 
             {/* card.css `.toast`: the save's confirmation, low and centred, gone in 2.6s. */}
+            {/* card.css `.toast`: the save's confirmation, low and centred, gone in 2.6s.
+                `<output>` NOT `<div role="status">`: its implicit role IS `status`, so the
+                live region is native semantics rather than a generic box wearing an ARIA hat --
+                consistent across every device and screen reader. */}
             {showSavedNotification && (
-                <div
-                    role="status"
+                <output
                     className="kind-in fixed bottom-[84px] left-1/2 z-50 flex -translate-x-1/2 items-center gap-2.5 rounded-[10px] bg-ink px-3.5 py-2.5 text-[13.5px] font-medium text-bg shadow-(--shadow-2)"
                 >
                     <CircleCheck size={16} strokeWidth={2} aria-hidden="true" className="text-brand" />
                     <span>{savedName ? `${savedName}’s record saved` : "Changes saved"}</span>
-                </div>
+                </output>
             )}
 
             {/* ✅ THE RECORD IS A DOCKED PANEL, NOT A MODAL.
@@ -1462,10 +1431,12 @@ export default function Members() {
                 `selectedMember.address` runs on every render of this page. Passing only
                 `open={Boolean(selectedMember)}` threw `Cannot read properties of null` the
                 moment the page mounted -- caught by the route smoke, not by reading. */}
-            <MemberPanel
-                member={selectedMember}
+            <Modal
                 open={Boolean(selectedMember) && !panelClosing}
-                onClose={requestCloseRecord}
+                onOpenChange={(next) => { if (!next) requestCloseRecord(); }}
+                title={personName(selectedMember) || "Member record"}
+                description={selectedMember?.membershipNumber ? `Membership no. ${selectedMember.membershipNumber}` : undefined}
+                size="lg"
                 footer={
                     isEditing ? (
                         <>
@@ -1476,12 +1447,6 @@ export default function Members() {
                         </>
                     ) : (
                         <>
-                            {/* 🗣️ PRINT IS LIVE (the owner, 2026-09-09) and the member record is
-                                the first thing to get a real print layout: index.css hides the
-                                shell and every control, drops the record to a single column, and
-                                forces the light theme so a dark-mode user does not print a black
-                                page. The mock's foot has Edit alone; print earns the one quiet
-                                control beside it. */}
                             <Button size="icon" onClick={() => printWith("record")} aria-label="Print this member's record">
                                 <Printer size={16} strokeWidth={1.75} aria-hidden="true" />
                             </Button>
@@ -1501,6 +1466,13 @@ export default function Members() {
                     comment recorded, reintroduced by the commit that removed the Modal. */}
                 {selectedMember && (
                     <div className={cn("member-record", printScope === "record" && "print-area")}>
+                        <MembershipCard
+                            name={personName(selectedMember) || "—"}
+                            membershipNumber={selectedMember.membershipNumber}
+                            status={selectedMember.status}
+                            since={selectedMember.joinDate}
+                            employer={selectedMember.bankName}
+                        />
                         {/* THE ERROR SUMMARY that replaced three `alert()` calls. Focused
                             rather than `role="alert"`: `Field` already gives every inline
                             message that role, so a form failing four validations would
@@ -1542,66 +1514,26 @@ export default function Members() {
                             ⏳ The full pattern needs roving focus, and a shared
                             `useRovingFocus` is already on RF's list precisely because this
                             application has three places that want it. */}
-                        {/* 🔴 FIVE TABS WRAPPED TO THREE ROWS IN THE PANEL. Docked, the record
-                            is a `clamp(360px, 32vw, 448px)` column, and "Personal Information",
-                            "Employment & Bank", "Membership & Subscriptions", "Recruitment
-                            Channel" and "Sasbo Structures" do not fit across it — so the strip
-                            broke into three stacked lines with the rule under only the last of
-                            them, and the record's own heading took 90px before a single field.
-                            The mock's tab strip is ONE line with a rule under it, and one line
-                            is what it stays: the row scrolls sideways instead of wrapping.
-                            The scrollbar itself is hidden: `scroll-quiet` draws a THIN one,
-                            which laid a second horizontal line directly on top of the strip's
-                            own rule. The tabs are their own affordance — the cut-off edge of
-                            the next label is what says there is more. */}
+                        {/* 🔴 ONE LINE, NOT A GRID. The record opens in a wide modal now (`size="xl"`),
+                            so all five short labels fit across a single row. The three-column
+                            arrangement only existed to fold them inside the old 448px docked column;
+                            `overflow-x-auto` is the safety valve if a narrow screen ever runs out of room. */}
                         <div className="no-print mt-4 border-b border-line">
-                        {/* 🔑 IT WRAPS. IT DOES NOT SCROLL — AND THE MOCK SETTLED THAT.
-                            `card.css:357` is `.tabs { display: flex; flex-wrap: wrap; }` at
-                            13px: every section is on screen, always, and nothing is reached by
-                            swiping. This build had it scrolling for one round, and the owner
-                            put it plainly — *"I didn't even know they were there until I opened
-                            up the console. There mustn't be any trickyness to it."* A tab you
-                            cannot see is a tab that does not exist, and a fading edge is a hint,
-                            not a control.
-
-                            What made wrapping look wrong before was not the wrap. It was FIVE
-                            LONG LABELS breaking into three ragged rows, with the rule under only
-                            the last of them. Short labels at the mock's own 13px fit two, and the
-                            rule sits on the wrapper so it runs under the whole block the way
-                            `.tabs`'s `border-bottom` does.
-
-                            📐 THREE COLUMNS, NOT `flex-wrap` — AND THE DIFFERENCE IS THAT THIS
-                            ONE IS THE SAME EVERY TIME. Left to wrap, the strip broke 4+1 on a
-                            448px panel and 3+2 on the owner's own window, because the split was
-                            whatever the labels happened to measure at that width. A grid gives
-                            the five sections three fixed columns, so they line up under each
-                            other in both rows and the arrangement does not change with the
-                            window. `justify-self-start` keeps each button its own width, so the
-                            active underline stays under the LABEL and not under the column.
-
-                            🗣️ The last tab is placed in the third column rather than the second,
-                            at the owner's instruction: *"Make structures aligned under Membership
-                            so that there's a gap in the middle between Recruitment and
-                            Structures."* The gap is the point -- it reads as a deliberate
-                            arrangement rather than as a row that ran out. */}
-                        <div className="grid grid-cols-3 gap-x-0.5">
-                            {TABS.map((tab, index) => (
-                                <button
-                                    key={tab.id}
-                                    type="button"
-                                    aria-current={activeTab === tab.id ? "true" : undefined}
-                                    onClick={() => changeTab(tab.id)}
-                                    className={cn(
-                                        // card.css:358 -- 13px, not 14: the strip is a quiet index of the record, not a
-                                        // second row of headings, and the extra pixel is what pushed it to three rows.
-                                        "touch-target inline-flex items-center justify-self-start gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-[13px] font-medium",
-                                        // Where this one sits in the composition -- see `TAB_PLACE`.
-                                        TAB_PLACE[index],
-                                        "transition-[color,box-shadow] duration-(--duration-instant) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
-                                        activeTab === tab.id
-                                            ? "font-semibold text-brand-ink shadow-[inset_0_-2px_0_var(--color-brand)]"
-                                            : "text-ink-muted shadow-[inset_0_-2px_0_transparent] hover-hover:hover:text-ink",
-                                    )}
+                            <div className="flex flex-nowrap items-center gap-x-1 overflow-x-auto">
+                                {TABS.map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        type="button"
+                                        aria-current={activeTab === tab.id ? "true" : undefined}
+                                        onClick={() => changeTab(tab.id)}
+                                        className={cn(
+                                            // card.css:358 -- 13px, not 14: a quiet index of the record, not a second row of headings.
+                                            "touch-target inline-flex items-center gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-[13px] font-medium",
+                                            "transition-[color,box-shadow] duration-(--duration-instant) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
+                                            activeTab === tab.id
+                                                ? "font-semibold text-brand-ink shadow-[inset_0_-2px_0_var(--color-brand)]"
+                                                : "text-ink-muted shadow-[inset_0_-2px_0_transparent] hover-hover:hover:text-ink",
+                                        )}
                                 >
                                     {/* Shown short, named in full -- see `RECORD_TABS`. Not `aria-label`: that would
                                         also silence the "has errors" text a screen reader gets below. */}
@@ -1830,7 +1762,7 @@ export default function Members() {
 
                     </div>
                 )}
-            </MemberPanel>
+            </Modal>
 
             <ConfirmDialog
                 open={Boolean(pendingSave)}

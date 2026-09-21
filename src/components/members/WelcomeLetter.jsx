@@ -18,7 +18,7 @@ import { formatDate } from '@/utils/validateSAID.js';
  * the application's type -- in both themes. The words are the template's, including its sign-off, so the preview
  * says what the member will receive.
  */
-export default function WelcomeLetter({ open, onClose, member }) {
+export default function WelcomeLetter({ open, onClose, member, onSuccess }) {
     const [sendState, setSendState] = useState('idle'); // idle | sending | sent | error
     const [errorMessage, setErrorMessage] = useState('');
 
@@ -28,7 +28,7 @@ export default function WelcomeLetter({ open, onClose, member }) {
      * Send button. Reset when the member changes, during render (React's pattern for state derived from a prop),
      * never on a re-render of the same member.
      */
-    const memberKey = member?.id ?? null;
+    const memberKey = member?.id ?? (member ? (member.identityNumber || member.surname || 'new') : null);
     const [stateFor, setStateFor] = useState(memberKey);
     if (stateFor !== memberKey) {
         setStateFor(memberKey);
@@ -69,17 +69,19 @@ export default function WelcomeLetter({ open, onClose, member }) {
     const hasAddress = Boolean(member.personalEmail || member.workEmail);
 
     const handleSend = () => {
-        if (!member.id) {
-            setErrorMessage('Member ID is missing — cannot send email.');
-            setSendState('error');
-            return;
-        }
         setSendState('sending');
         setErrorMessage('');
-        memberService.sendWelcomeLetter(member.id)
-            .then(() => setSendState('sent'))
+        const sendPromise = member.id
+            ? memberService.sendWelcomeLetter(member.id)
+            : memberService.createMember(member, { sendWelcome: true });
+
+        sendPromise
+            .then((savedMember) => {
+                setSendState('sent');
+                onSuccess?.(savedMember || member);
+            })
             .catch((err) => {
-                setErrorMessage(err?.message || 'The email could not be sent. Please try again.');
+                setErrorMessage(err?.message || 'The email could not be sent and member was not saved. Please try again.');
                 setSendState('error');
             });
     };

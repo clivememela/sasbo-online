@@ -78,6 +78,7 @@ describe('Capture Member', () => {
     }
     await type('First Name\\(s\\)', 'Synthetic')
     await type('Surname', 'Testperson')
+    await type('Personal Email', 'synthetic@example.test')
     await user.selectOptions(field('Identity Type'), 'I.D. Number')
     await type('I.D. Number', '9001010000080')
 
@@ -91,6 +92,8 @@ describe('Capture Member', () => {
     await user.selectOptions(field('Debit Day'), '28')
     await type('Bank Account Number', '62000987654')
     await user.click(screen.getByRole('button', { name: /save member/i }))
+    const send = await screen.findByRole('button', { name: /send welcome letter/i })
+    await user.click(send)
 
     await waitFor(() => expect(posted, 'the form refused a day inside the agreed range').toBeDefined())
     expect(String(posted.debitDay)).toBe('28')

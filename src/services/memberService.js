@@ -90,8 +90,8 @@ export const memberService = {
       signal,
     })).then(normalizeMember),
 
-  createMember: (member) =>
-    requestJsonWrite((signal) => fetch(apiUrl('/api/members'), {
+  createMember: (member, options = {}) =>
+    requestJsonWrite((signal) => fetch(apiUrl(options.sendWelcome ? '/api/members?sendWelcome=true' : '/api/members'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',

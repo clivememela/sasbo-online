@@ -399,6 +399,7 @@ describe('the job grade can be typed, not only chosen', () => {
     await screen.findByLabelText(/^First Name\(s\)/)
     await user.type(field('First Name'), 'Synthetic')
     await user.type(field('Surname'), 'Testperson')
+    await user.type(field('Personal Email'), 'synthetic@example.test')
     await user.selectOptions(field('Identity Type'), 'I.D. Number')
     await user.type(field('I.D. Number'), '9001010000080')
 
@@ -409,6 +410,8 @@ describe('the job grade can be typed, not only chosen', () => {
     await typeGrade(user, 'Prokureur')
 
     await user.click(screen.getByRole('button', { name: /save member/i }))
+    const sendBtn = await screen.findByRole('button', { name: /send welcome letter/i })
+    await user.click(sendBtn)
     await waitFor(() => expect(posted).toBeDefined())
     expect(posted.jobGrade).toBe('Prokureur')
   })

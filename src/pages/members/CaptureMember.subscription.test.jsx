@@ -69,11 +69,14 @@ describe('Monthly Subscription on Capture Member', () => {
     }
     await type('First Name\\(s\\)', 'Synthetic')
     await type('Surname', 'Testperson')
+    await type('Personal Email', 'synthetic@example.test')
     await user.selectOptions(screen.getByLabelText(/^Identity Type/), 'I.D. Number')
     await type('I.D. Number', '9001010000080')
     await user.click(screen.getByRole('button', { name: /Employment & Bank/i }))
     await user.selectOptions(screen.getByLabelText(/^Payment Type/), 'Payroll Deduction')
     await user.click(screen.getByRole('button', { name: /save member/i }))
+    const sendBtn = await screen.findByRole('button', { name: /send welcome letter/i })
+    await user.click(sendBtn)
 
     await waitFor(() => expect(posted).toBeDefined())
     expect(Number(posted.monthlySubscription)).toBe(174)
