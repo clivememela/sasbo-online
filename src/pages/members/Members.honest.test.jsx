@@ -59,10 +59,10 @@ describe('Members', () => {
       expect(panel.getByText('Billing Frequency').nextElementSibling).toHaveTextContent('Not on file')
     })
 
-    it('the must-pass: one the record does hold is shown as it is', async () => {
+    it('the must-pass: one the record does hold is shown, in rands (00.2)', async () => {
       const panel = await openMembership({ ...MEMBER, monthlySubscription: '250.00', subscriptionFrequency: 'Annually' })
 
-      expect((await panel.findByText('Monthly Subscription (ZAR)')).nextElementSibling).toHaveTextContent('250.00')
+      expect((await panel.findByText('Monthly Subscription (ZAR)')).nextElementSibling).toHaveTextContent(/^R\s250,00$/)
       expect(panel.getByText('Billing Frequency').nextElementSibling).toHaveTextContent('Annually')
     })
   })

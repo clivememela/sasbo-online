@@ -38,6 +38,8 @@ const shotsDir = process.argv[3];
 
 /** Real rows. A skeleton row is `data-skeleton`, never `data-row` (Table.jsx). */
 const ROWS = `document.querySelectorAll('tr[data-row]').length > 1`;
+/** The Debits screen's search results, by the table's own caption. */
+const SEARCH_ROWS = `[...document.querySelectorAll('main table')].some((t) => t.querySelector('caption')?.textContent === 'Members matching the ACB search' && t.querySelectorAll('tr[data-row]').length > 1)`;
 const RECORD_OPEN = `!!document.querySelector('[data-testid="member-panel"][data-open="true"] .mcard')`;
 const OPEN_FIRST_MEMBER = {
   what: 'open the first member',
@@ -112,7 +114,8 @@ const STATES = [
     ready: `!!document.querySelector('main input')`,
     steps: [
       { what: 'type a surname', run: `(() => { const i = document.querySelector('main input'); if (!i) return false; const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set; s.call(i,'Nkosi'); i.dispatchEvent(new Event('input',{bubbles:true})); return true; })()` },
-      { what: 'run the search', run: clickByText('main button', '/^Search$/i'), until: ROWS },
+      // The search's own table: the unpaid list above it has rows before any search is made (`04.1`).
+      { what: 'run the search', run: clickByText('main button', '/^Search$/i'), until: SEARCH_ROWS },
     ],
   },
   {

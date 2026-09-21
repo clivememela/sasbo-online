@@ -13,7 +13,7 @@ import {
   MapPinnedIcon,
   LucideDatabase, LucideMails, LucideMenu,
   LucideUserRoundPlus, LucideFile, LucideTags,
-  LucidePiggyBank, LucidePresentation,
+  LucidePiggyBank, LucidePresentation, LucideCalendarRange,
   LucideConstruction, LucideCopyCheck, UserRoundPen
 } from "lucide-react";
 
@@ -160,55 +160,12 @@ export const navItems = [
             href: "/admin/acb/debits",
             icon: LucidePiggyBank,
           },
-          /*{
-            title: "Credits",
-            desc: "Manage Credits",
-            //href: "/admin/membership/roles",
-            icon: LucidePiggyBank,
-            color: 'text-red-600 dark:text-red-400'
-          },
           {
-            title: "Subscriptions",
-            desc: "Manage Subscriptions",
-            //href: "/admin/membership/permissions",
-            icon: LucideMails,
-            color: 'text-red-600 dark:text-red-400'
+            title: "Runs",
+            desc: "Debit Order Runs",
+            href: "/admin/acb/runs",
+            icon: LucideCalendarRange,
           },
-          {
-            title: "Benevolent Funds",
-            desc: "Manage Benevolent Funds",
-            //href: "/admin/membership/users",
-            icon: LucideCalendar,
-            color: 'text-red-600 dark:text-red-400'
-          },
-          {
-            title: "Death Benefit Funds",
-            desc: "Manage Death Benefit Funds",
-            //href: "/admin/membership/roles",
-            icon: LucideCalendar,
-            color: 'text-red-600 dark:text-red-400'
-          },
-          {
-            title: "Endowment Funds",
-            desc: "Manage Endowment Funds",
-            //href: "/admin/membership/permissions",
-            icon: LucideCalendar,
-            color: 'text-red-600 dark:text-red-400'
-          },
-          {
-            title: "Criticare",
-            desc: "Manage Criticare",
-            //href: "/admin/membership/permissions",
-            icon: LucideCross,
-            color: 'text-red-600 dark:text-red-400'
-          },
-          {
-            title: "Accounts",
-            desc: "Manage Accounts",
-            //href: "/admin/membership/permissions",
-            icon: LucideBuilding,
-            color: 'text-red-600 dark:text-red-400'
-          },*/
         ]
       },
       {
@@ -270,6 +227,12 @@ export const navItems = [
         desc: "Manage Re-Debits",
         href: "/admin/acb/debits",
         icon: LucidePiggyBank,
+      },
+      {
+        title: "Runs",
+        desc: "Debit Order Runs",
+        href: "/admin/acb/runs",
+        icon: LucideCalendarRange,
       },
       /*{
         title: "Credits",

@@ -42,15 +42,17 @@ const openMembership = async (user) =>
   user.click(await screen.findByRole('button', { name: /Membership & Subscriptions/i }))
 
 const subscriptionField = () => screen.getByLabelText(/^Monthly Subscription/)
+/** The amount as the one formatter prints it (00.2, F33): rands, en-ZA's comma, two decimals. */
+const RANDS_174 = /^R\s174,00$/
 
 describe('Monthly Subscription on Capture Member', () => {
-  it('🔴 shows 174.00 with NO bank chosen, because every row agrees on it', async () => {
+  it('🔴 shows R 174,00 with NO bank chosen, because every row agrees on it', async () => {
     server.use(http.get('*/api/subscriptions', () => HttpResponse.json(rows(174, 174, 174))))
     const user = setupUser()
     renderWithProviders(<CaptureMember />)
     await openMembership(user)
 
-    await waitFor(() => expect(subscriptionField()).toHaveValue('174.00'))
+    await waitFor(() => expect(subscriptionField().value).toMatch(RANDS_174))
     expect(subscriptionField(), 'it is set by the union, not typed').toBeDisabled()
   })
 
@@ -59,7 +61,7 @@ describe('Monthly Subscription on Capture Member', () => {
     const user = setupUser()
     renderWithProviders(<CaptureMember />)
     await openMembership(user)
-    await waitFor(() => expect(subscriptionField()).toHaveValue('174.00'))
+    await waitFor(() => expect(subscriptionField().value).toMatch(RANDS_174))
 
     await user.click(screen.getByRole('button', { name: /Personal Information/i }))
     const type = async (label, value) => {
@@ -79,7 +81,9 @@ describe('Monthly Subscription on Capture Member', () => {
     await user.click(sendBtn)
 
     await waitFor(() => expect(posted).toBeDefined())
-    expect(Number(posted.monthlySubscription)).toBe(174)
+    // 🔒 00.2: a NUMBER on the wire, never the string the form shows -- "174,00" is a 400 on the server, and a
+    // client that posted its display text would be a second source of the comma-decimal risk V40's report exists for.
+    expect(posted.monthlySubscription).toBe(174)
   })
 
   it('does NOT guess when the rows disagree and no bank is chosen', async () => {

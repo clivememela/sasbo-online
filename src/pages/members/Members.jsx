@@ -37,7 +37,7 @@ import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
 import { ERROR_KINDS, writeMayHaveLanded } from "@/services/parseApiError.js";
 import useFocusOn from "../../hooks/useFocusOn.js";
-import { formatDate, parseDate, sameDate, sameMonth, today } from "@/lib/format.js";
+import { EMPTY, formatDate, formatZar, parseDate, sameDate, sameMonth, today } from "@/lib/format.js";
 import { finishField, sanitiseField, validateField } from "@/utils/inputRules.js";
 import { branchNamesForBank } from "@/utils/bankBranches.js";
 import { cn } from "@/lib/utils.js";
@@ -119,6 +119,12 @@ const TABS = RECORD_TABS;
 
 /** A record field's value, or "Not on file" when the record holds none -- never an invented default. */
 const notOnFile = (value) => (value === null || value === undefined || String(value).trim() === "" ? "Not on file" : value);
+
+/** An amount on file through the one formatter (00.2, F33), or "Not on file" -- never R 0,00 for nothing. */
+const amountOnFile = (value) => {
+    const shown = formatZar(value);
+    return shown === EMPTY ? notOnFile(null) : shown;
+};
 
 /*
  * 🗣️ WHERE EACH OF THE FIVE SECTIONS SITS IN THE RECORD'S TAB STRIP -- the owner's
@@ -1728,7 +1734,7 @@ export default function Members() {
                                     <h4 className="col-span-full mt-1.5 border-t border-line pt-[18px] text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Sasbo Subscription Fee Details</h4>
                                     {/* 🔴 A MEMBER WITH NO SUBSCRIPTION ON FILE WAS SHOWN R182.77, MONTHLY (`06.4`) -- two invented
                                         facts about their money, printed as if the record held them. The absence is said instead. */}
-                                    <Detail label="Monthly Subscription (ZAR)" value={notOnFile(selectedMember.monthlySubscription)} isEditing={false} />
+                                    <Detail label="Monthly Subscription (ZAR)" value={amountOnFile(selectedMember.monthlySubscription)} isEditing={false} />
                                     <Detail label="Billing Frequency" value={notOnFile(selectedMember.subscriptionFrequency)} isEditing={false} />
                                 </div>
                             )}

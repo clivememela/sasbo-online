@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { findSubscriptionForBank, formatSubscriptionAmount } from './bankSubscription'
+import { findSubscriptionForBank } from './bankSubscription'
 
 /**
  * THE SUBSCRIPTION LOOKUP MUST AGREE WITH THE SERVER'S, EXACTLY.
@@ -43,23 +43,3 @@ describe('findSubscriptionForBank matches the way the server matches', () => {
   })
 })
 
-describe('formatSubscriptionAmount', () => {
-  it('shows rands and cents, because 120 beside 99.99 reads as two different things', () => {
-    expect(formatSubscriptionAmount(120.0)).toBe('120.00')
-    expect(formatSubscriptionAmount(99.99)).toBe('99.99')
-  })
-
-  it('🔴 a MISSING amount is empty, never "0.00"', () => {
-    // The obvious implementation is Number(amount) + isFinite, and Number(null),
-    // Number('') and Number([]) are all 0 -- so a member with no subscription row
-    // would be shown as one who pays nothing. Different facts, and the second is
-    // the kind that reaches a finance report.
-    for (const missing of [null, undefined, '', '   ', {}, [], 'free', NaN, Infinity]) {
-      expect(formatSubscriptionAmount(missing), String(missing)).toBe('')
-    }
-  })
-
-  it('a numeric STRING is still an amount -- BigDecimal can arrive either way', () => {
-    expect(formatSubscriptionAmount('120')).toBe('120.00')
-  })
-})
