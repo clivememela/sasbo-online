@@ -11,7 +11,7 @@ import { bankService } from "@/services/bankService.js";
 import { TextInput, SearchableSelect, SelectInput, Button, DateField } from "../../components/form";
 import StatusChip, { CANCELLED_STATUSES } from "../../components/common/StatusChip.jsx";
 import Table from "../../components/table/Table.jsx";
-import Modal,{ ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
+import { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
 import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
@@ -25,6 +25,7 @@ import PageTitle from "../../components/common/PageTitle.jsx";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState.jsx";
 import FigureStrip from "../../components/members/FigureStrip.jsx";
+import MemberPanel from "../../components/members/MemberPanel.jsx";
 import Criteria, { CRITERION } from "../../components/common/Criteria.jsx";
 import Pager from "../../components/common/Pager.jsx";
 import KeyHints from "../../components/common/KeyHints.jsx";
@@ -39,8 +40,6 @@ import { branchNamesForBank } from "@/utils/bankBranches.js";
 import { cn } from "@/lib/utils.js";
 import { formalName, personName } from "@/lib/names.js";
 import { fieldValue } from "@/lib/fieldValue.js";
-
-import MembershipCard from "../../components/members/MembershipCard.jsx";
 
 
 const PAGE_SIZE = memberService.getPageSize();
@@ -59,7 +58,7 @@ const memberRows = (res) => (Array.isArray(res) ? res : (res.data || res.members
  */
 const PANEL_MS = 380;
 
-/** The fields the topbar's search reads -- card.js `visible()`, plus the wire's own names. */
+/** The fields in the topbar's search reads -- card.js `visible()`, plus the wire's own names. */
 const SEARCH_FIELDS = [
     "membershipNumber", "employeeNumber", "surname", "firstNames", "initials", "bankName",
     "branch", "status", "identityNumber", "workEmail", "personalEmail", "email", "phone",
@@ -117,6 +116,38 @@ const TABS = RECORD_TABS;
 
 /** A record field's value, or "Not on file" when the record holds none -- never an invented default. */
 const notOnFile = (value) => (value === null || value === undefined || String(value).trim() === "" ? "Not on file" : value);
+
+/*
+ * 🗣️ WHERE EACH OF THE FIVE SECTIONS SITS IN THE RECORD'S TAB STRIP -- the owner's
+ * arrangement, settled over three rounds on 2026-09-10:
+ *
+ *     Personal                      Membership
+ *                  Employment
+ *     Recruitment                    Structures
+ *
+ * ① Three columns, so the sections line up under each other whatever the width. Left to
+ *    `flex-wrap` the strip broke 4+1 on a 448px panel and 3+2 on the owner's own window,
+ *    because the split was whatever the labels happened to measure.
+ * ② The last section takes the THIRD column, not the second -- *"so that there's a gap in
+ *    the middle between Recruitment and Structures."*
+ * ③ That leaves the middle column holding one tab where the outer two hold two, so it spans
+ *    both rows and centres in them -- *"right in the center, relative to all the other panel
+ *    tabs."*
+ * ④ And the strip is SYMMETRICAL about its own centre line: the left column reads from the
+ *    left edge, the right column to the right edge, and the middle one is centred.
+ *
+ * It applies only at five sections -- a sixth would fill a 3x2 grid with nothing left to
+ * balance, so any other count falls back to the plain left-aligned flow.
+ */
+const TAB_PLACE = TABS.length === 5
+  ? [
+      'justify-self-start',
+      'row-span-2 justify-self-center self-center',
+      'justify-self-end',
+      'justify-self-start',
+      'col-start-3 justify-self-end',
+    ]
+  : [];
 
 const FIELD_TO_TAB_MAP = {
     title: "personal",
@@ -1429,14 +1460,10 @@ export default function Members() {
                 `selectedMember.address` runs on every render of this page. Passing only
                 `open={Boolean(selectedMember)}` threw `Cannot read properties of null` the
                 moment the page mounted -- caught by the route smoke, not by reading. */}
-            <Modal
+            <MemberPanel
+                member={selectedMember}
                 open={Boolean(selectedMember) && !panelClosing}
-                onOpenChange={(next) => { if (!next) requestCloseRecord(); }}
-                title={personName(selectedMember) || "Member record"}
-                description={selectedMember?.membershipNumber ? `Membership no. ${selectedMember.membershipNumber}` : undefined}
-                size="lg"
-                // The record keeps the name the suite has always held it by, through main's move to a dialog.
-                testId="member-panel"
+                onClose={requestCloseRecord}
                 footer={
                     isEditing ? (
                         <>
@@ -1466,13 +1493,6 @@ export default function Members() {
                     comment recorded, reintroduced by the commit that removed the Modal. */}
                 {selectedMember && (
                     <div className={cn("member-record", printScope === "record" && "print-area")}>
-                        <MembershipCard
-                            name={personName(selectedMember) || "—"}
-                            membershipNumber={selectedMember.membershipNumber}
-                            status={selectedMember.status}
-                            since={selectedMember.joinDate}
-                            employer={selectedMember.bankName}
-                        />
                         {/* THE ERROR SUMMARY that replaced three `alert()` calls. Focused
                             rather than `role="alert"`: `Field` already gives every inline
                             message that role, so a form failing four validations would
@@ -1514,13 +1534,13 @@ export default function Members() {
                             ⏳ The full pattern needs roving focus, and a shared
                             `useRovingFocus` is already on RF's list precisely because this
                             application has three places that want it. */}
-                        {/* 🔴 ONE LINE, NOT A GRID. The record opens in a wide modal now (`size="xl"`),
-                            so all five short labels fit across a single row. The three-column
-                            arrangement only existed to fold them inside the old 448px docked column;
-                            `overflow-x-auto` is the safety valve if a narrow screen ever runs out of room. */}
+                        {/* 🔑 IT WRAPS. IT DOES NOT SCROLL — AND THE MOCK SETTLED THAT.
+                            Short labels at the mock's own 13px fit a three-column composition
+                            in the docked `clamp(360px, 32vw, 448px)` panel. The rule sits on
+                            the wrapper so it runs under the whole block. */}
                         <div className="no-print mt-4 border-b border-line">
-                            <div className="flex flex-nowrap items-center gap-x-1 overflow-x-auto">
-                                {TABS.map((tab) => (
+                            <div className="grid grid-cols-3 gap-x-0.5">
+                                {TABS.map((tab, index) => (
                                     <button
                                         key={tab.id}
                                         type="button"
@@ -1529,6 +1549,7 @@ export default function Members() {
                                         className={cn(
                                             // card.css:358 -- 13px, not 14: a quiet index of the record, not a second row of headings.
                                             "touch-target inline-flex items-center gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-[13px] font-medium",
+                                            TAB_PLACE[index],
                                             "transition-[color,box-shadow] duration-(--duration-instant) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
                                             activeTab === tab.id
                                                 ? "font-semibold text-brand-ink shadow-[inset_0_-2px_0_var(--color-brand)]"
@@ -1762,7 +1783,7 @@ export default function Members() {
 
                     </div>
                 )}
-            </Modal>
+            </MemberPanel>
 
             <ConfirmDialog
                 open={Boolean(pendingSave)}
