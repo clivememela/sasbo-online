@@ -358,6 +358,15 @@ describe('vocabulary parity between this browser and its server', () => {
           'choosing it reaches a real person as a failed capture, not as a warning.',
       ).toEqual(expect.arrayContaining(memberConstants.PAYMENT_TYPE_OPTIONS))
     })
+
+    it('00.5 offers exactly the account types the server stores', () => {
+      // EQUALITY, unlike the payment types: the bureau file has exactly these digits, and a type the browser
+      // cannot offer is a member who cannot be captured with the account they have.
+      expect(
+        memberConstants.ACCOUNT_TYPE_OPTIONS,
+        'ACCOUNT_TYPE_OPTIONS is not the list the server publishes from AccountType.',
+      ).toEqual(vocabulary.accountTypes)
+    })
   })
 
   describe('the failure envelope', () => {

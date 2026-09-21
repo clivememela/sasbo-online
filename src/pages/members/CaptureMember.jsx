@@ -16,7 +16,7 @@ import {
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, MEMBER_TABS,
     BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS, IDENTITY_TYPE_PASSPORT,
     DEBIT_DAY_EARLIEST, DEBIT_DAY_LATEST, isDebitDayInRange,
-    PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL
+    PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL, ACCOUNT_TYPE_OPTIONS
 } from "@/config/memberConstants.js";
 import { formatZar, toWireDate, today } from "@/lib/format.js";
 import { sanitiseField, validateField } from "@/utils/inputRules.js";
@@ -60,6 +60,7 @@ const FIELD_TO_TAB_MAP = {
     branch: "employment",
     paymentType: "employment",
     bankAccountNumber: "employment",
+    accountType: "employment",
     debitDay: "employment",
 };
 
@@ -108,6 +109,7 @@ export default function CaptureMember() {
         jobGrade: "",
         bankName: "",
         bankAccountNumber: "",
+        accountType: "",
         branch: "",
         employmentType: "",
         ibtNo: "",
@@ -330,6 +332,7 @@ export default function CaptureMember() {
             }
             if (field === "paymentType" && value !== "Debit Order") {
                 delete newErrors.bankAccountNumber;
+                delete newErrors.accountType;
                 delete newErrors.bankName;
                 delete newErrors.branch;
             }
@@ -378,6 +381,8 @@ export default function CaptureMember() {
 
         if (form.paymentType === "Debit Order") {
             if (!form.bankAccountNumber.trim()) errors.bankAccountNumber = "Bank Account Number is required for Debit Orders";
+            // 00.5: the debit order file prints it on every debit, and the server refuses a new debit order without it.
+            if (!form.accountType) errors.accountType = "Account Type is required for Debit Orders";
             if (!form.bankName.trim()) errors.bankName = "Bank Employer alignment name is required for Debit Orders";
             if (!form.branch.trim()) errors.branch = "Bank Branch selection is required for Debit Orders";
 
@@ -659,6 +664,7 @@ export default function CaptureMember() {
                                 {form.paymentType === "Debit Order" && (
                                     <>
                                         <Field label="Bank Account Number" kind="identifier" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} error={fieldErrors.bankAccountNumber} required />
+                                        <Field label="Account Type" value={form.accountType} onChange={handleChange("accountType")} options={ACCOUNT_TYPE_OPTIONS} error={fieldErrors.accountType} required />
                                         <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={DEBIT_DAY_OPTIONS} note={debitDateHint} />
                                     </>
                                 )}

@@ -91,6 +91,7 @@ describe('Capture Member', () => {
     // 28 is a real ACB day for several banks and could not be chosen at all before (A32's other half).
     await user.selectOptions(field('Debit Day'), '28')
     await type('Bank Account Number', '62000987654')
+    await user.selectOptions(field('Account Type'), 'Savings')
     await user.click(screen.getByRole('button', { name: /save member/i }))
     const send = await screen.findByRole('button', { name: /send welcome letter/i })
     await user.click(send)
@@ -98,6 +99,31 @@ describe('Capture Member', () => {
     await waitFor(() => expect(posted, 'the form refused a day inside the agreed range').toBeDefined())
     expect(String(posted.debitDay)).toBe('28')
     expect(posted.paymentType).toBe('Debit Order')
+    expect(posted.accountType, '00.5: the type the administrator chose').toBe('Savings')
+  })
+
+  it('00.5 a debit order without its account type is refused at save, under the field', async () => {
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+    await screen.findByLabelText(/^First Name\(s\)/)
+    await user.type(field('First Name\\(s\\)'), 'Synthetic')
+    await user.type(field('Surname'), 'Testperson')
+    await user.type(field('Personal Email'), 'synthetic@example.test')
+    await user.selectOptions(field('Identity Type'), 'I.D. Number')
+    await user.type(field('I.D. Number'), '9001010000080')
+
+    await openEmployment(user)
+    await chooseFrom(user, 'Bank Where Employed', 'Absa', 'Absa Bank Limited')
+    await chooseFrom(user, 'Bank Branch', 'Sandton', 'Sandton City')
+    await user.selectOptions(field('Payment Type'), 'Debit Order')
+    await user.type(field('Bank Account Number'), '62000987654')
+    expect(optionTexts(field('Account Type')), 'the server\'s three, and nothing else').toEqual(
+      expect.arrayContaining(['Cheque', 'Savings', 'Transmission']))
+    await user.click(screen.getByRole('button', { name: /save member/i }))
+
+    expect(await screen.findAllByText('Account Type is required for Debit Orders')).not.toHaveLength(0)
+    expect(screen.queryByRole('button', { name: /send welcome letter/i }), 'refused before the letter').toBeNull()
+    expect(posted).toBeUndefined()
   })
 
   it('names Payroll Deduction as the server does', async () => {

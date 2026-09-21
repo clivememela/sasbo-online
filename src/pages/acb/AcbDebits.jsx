@@ -17,6 +17,7 @@ import useFocusOn from '../../hooks/useFocusOn.js';
 import DialogNotice, { PageNotice } from '../../components/common/DialogNotice.jsx';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import { formatZar } from '../../lib/format.js';
+import { ACCOUNT_TYPE_OPTIONS } from '../../config/memberConstants.js';
 import AcbUnpaids from './AcbUnpaids.jsx';
 import AcbHeldOver from './AcbHeldOver.jsx';
 import AcbHeldLetters from './AcbHeldLetters.jsx';
@@ -149,6 +150,7 @@ export default function AcbDebits() {
             bankName: selectedMember.bankName || "",
             branch: selectedMember.branch || "",
             bankAccountNumber: selectedMember.bankAccountNumber || "",
+            accountType: selectedMember.accountType || "",
             ibtNo: selectedMember.ibtNo || "",
             bankAddress: selectedMember.bankAddress || "",
             workBankAddress: selectedMember.workBankAddress || "",
@@ -339,6 +341,14 @@ export default function AcbDebits() {
                                 <TextInput label="Bank" value={bankForm.bankName} onChange={handleBankChange('bankName')} />
                                 <TextInput label="Branch" value={bankForm.branch} onChange={handleBankChange('branch')} />
                                 <TextInput label="Account Number" value={bankForm.bankAccountNumber} onChange={handleBankChange('bankAccountNumber')} />
+                                {/* 00.5: the file prints it on every debit, so a debit order saved here must carry one -- the server says so if not. */}
+                                <SelectInput
+                                    label="Account Type"
+                                    value={bankForm.accountType}
+                                    onChange={(value) => setBankForm(f => ({ ...f, accountType: value }))}
+                                    options={ACCOUNT_TYPE_OPTIONS}
+                                    placeholder="No account type"
+                                />
                                 <TextInput label="IBT No." value={bankForm.ibtNo} onChange={handleBankChange('ibtNo')} />
                                 <TextInput label="Payment Type" value={bankForm.paymentType} onChange={handleBankChange('paymentType')} />
                                 {/* Q42: any day from the 20th to the 31st, the member's own -- a choice, not a text box. */}

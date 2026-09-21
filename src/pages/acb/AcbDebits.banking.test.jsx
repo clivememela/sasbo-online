@@ -32,6 +32,7 @@ const RECORD = {
   bankName: 'Synthetic Bank',
   branch: 'Sample Branch',
   bankAccountNumber: '62000000001',
+  accountType: 'Savings',
   status: 'Active',
 }
 
@@ -53,6 +54,36 @@ async function openTheBankingDialog() {
   const dialog = await screen.findByRole('dialog', { name: 'Update Banking Details' })
   return { user, dialog }
 }
+
+describe('AcbDebits, the account type in the banking dialog (00.5)', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    server.use(
+      http.post('*/api/acb/members/search', () => HttpResponse.json(FOUND)),
+      http.get('*/api/members/:id', () => HttpResponse.json(RECORD)),
+      ...pageFixtures,
+    )
+  })
+
+  it('opens on the type the member has, and sends the one chosen', async () => {
+    let sent
+    server.use(
+      http.patch('*/api/members/:id/banking', async ({ request }) => {
+        sent = await request.json()
+        return HttpResponse.json({ ...RECORD, ...sent })
+      }),
+    )
+    const { user, dialog } = await openTheBankingDialog()
+    const type = within(dialog).getByLabelText(/^Account Type/)
+    expect(type).toHaveValue('Savings')
+
+    await user.selectOptions(type, 'Cheque')
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(sent).toBeDefined())
+    expect(sent.accountType).toBe('Cheque')
+  })
+})
 
 describe('AcbDebits, updating banking details', () => {
   beforeEach(() => {
