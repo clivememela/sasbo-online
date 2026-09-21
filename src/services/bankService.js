@@ -1,5 +1,6 @@
 import { apiUrl } from './api';
 import { requestJson, requestJsonWrite, requestOptionalJson } from './parseApiError';
+import { nameKey } from '../utils/nameKey.js';
 
 const PAGE_SIZE = 100;
 
@@ -10,8 +11,6 @@ const normalizeListPayload = (payload) => {
   if (Array.isArray(payload?.items)) return payload.items;
   return [];
 };
-
-const toNameKey = (value) => String(value ?? '').trim().toLowerCase();
 
 const toComparableNameKey = (value) =>
   String(value ?? '')
@@ -36,8 +35,6 @@ const toComparableNameKey = (value) =>
     .trim();
 
 const toCodeValue = (value) => String(value ?? '').trim();
-
-const toBranchCodeKey = (value) => String(value ?? '').trim().toLowerCase();
 
 const getUniversalCode = (record) =>
   toCodeValue(
@@ -86,7 +83,7 @@ export const bankService = {
         banksResult.forEach((bank) => {
           const bankName = bank.name ?? bank.bankName;
           const universalCode = getUniversalCode(bank);
-          const exactKey = toNameKey(bankName);
+          const exactKey = nameKey(bankName);
           const comparableKey = toComparableNameKey(bankName);
 
           if (exactKey && universalCode && !universalCodeByBankName.has(exactKey)) {
@@ -103,7 +100,7 @@ export const bankService = {
                 universalCodeByBranchId.set(branch.id, universalCode);
               }
 
-              const branchCodeKey = toBranchCodeKey(branch?.branchCode ?? branch?.branch_code);
+              const branchCodeKey = nameKey(branch?.branchCode ?? branch?.branch_code);
               if (branchCodeKey && !universalCodeByBranchCode.has(branchCodeKey)) {
                 universalCodeByBranchCode.set(branchCodeKey, universalCode);
               }
@@ -116,9 +113,9 @@ export const bankService = {
         // depended on a request the caller never made (bankService.test.js recorded it).
         const mapped = branches.map((branch) => {
           const bankName = branch.bankName ?? branch.name ?? '';
-          const exactKey = toNameKey(bankName);
+          const exactKey = nameKey(bankName);
           const comparableKey = toComparableNameKey(bankName);
-          const branchCodeKey = toBranchCodeKey(branch.branchCode ?? branch.branch_code);
+          const branchCodeKey = nameKey(branch.branchCode ?? branch.branch_code);
           const bankCode =
             universalCodeByBranchId.get(branch.id)
             ?? universalCodeByBranchCode.get(branchCodeKey)

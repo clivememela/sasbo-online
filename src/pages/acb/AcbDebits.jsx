@@ -1,16 +1,18 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { AlertCircle, CheckCircle2, Search } from "lucide-react";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { CheckCircle2, Search } from "lucide-react";
 import PageTitle from "../../components/common/PageTitle.jsx";
 import Criteria, { CRITERION, CRITERION_WIDE } from "../../components/common/Criteria.jsx";
 import { TextInput, Button } from "../../components/form";
-import Modal from "../../components/overlay/Modal.jsx";
+import Modal, { ModalClose } from "../../components/overlay/Modal.jsx";
 import { memberService } from "../../services/memberService.js";
 import { validateSAID } from "../../utils/validateSAID.js";
 import Table from '../../components/table/Table.jsx';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import StatusChip from '../../components/common/StatusChip.jsx';
 import reportError from '../../lib/reportError.js';
-import DialogNotice from '../../components/common/DialogNotice.jsx';
+import { formalName } from '../../lib/names.js';
+import useFocusOn from '../../hooks/useFocusOn.js';
+import DialogNotice, { PageNotice } from '../../components/common/DialogNotice.jsx';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 
 export default function AcbDebits() {
@@ -21,10 +23,7 @@ export default function AcbDebits() {
     const [selectedMember, setSelectedMember] = useState(null);
     const [loadingId, setLoadingId] = useState(null);
     const [notice, setNotice] = useState(null);
-    const noticeRef = useRef(null);
-    useEffect(() => {
-        if (notice) noticeRef.current?.focus();
-    }, [notice]);
+    const noticeRef = useFocusOn(notice);
     const [confirmed, setConfirmed] = useState(false);
 
     // Edit modal state
@@ -177,7 +176,7 @@ export default function AcbDebits() {
                     type="button"
                     onClick={() => handleSelectMember(m)}
                     aria-pressed={selectedMember?.id === m.id}
-                    aria-label={`${m.membershipNumber || 'This member'} \u2014 load banking details for ${[m.title, m.initials, m.surname].filter(Boolean).join(' ') || 'this member'}`}
+                    aria-label={`${m.membershipNumber || 'This member'} \u2014 load banking details for ${formalName(m) || 'this member'}`}
                     className="touch-target inline-flex items-center gap-2 rounded-sm font-medium text-brand-ink underline-offset-2 hover-hover:hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
                 >
                     {m.membershipNumber}
@@ -196,7 +195,7 @@ export default function AcbDebits() {
             header: 'Name',
             priority: 'essential',
             truncate: true,
-            cell: (m) => `${m.title ? `${m.title} ` : ''}${m.initials || ''} ${m.surname || ''}`.trim() || '\u2014',
+            cell: (m) => formalName(m) || '\u2014',
         },
         { key: 'identityNumber', header: 'ID Number', priority: 'secondary', truncate: true, cell: (m) => m.identityNumber || '\u2014' },
         { key: 'bankName', header: 'Bank', priority: 'secondary', truncate: true, cell: (m) => m.bankName || '\u2014' },
@@ -211,16 +210,7 @@ export default function AcbDebits() {
                 form primitives already give inline messages that role, and stacking a
                 page-level live region on top is two announcements for one failure. */}
             {notice && (
-                <div
-                    ref={noticeRef}
-                    tabIndex={-1}
-                    aria-labelledby="acb-notice-title"
-                    className="mt-4 flex items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
-                >
-                    <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
-                    <p id="acb-notice-title" className="flex-1">{notice}</p>
-                    <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dismiss</Button>
-                </div>
+                <PageNotice ref={noticeRef} id="acb-notice-title" onDismiss={() => setNotice(null)}>{notice}</PageNotice>
             )}
 
             <div className="mt-5 max-w-4xl">
@@ -335,7 +325,7 @@ export default function AcbDebits() {
                             busy={saving}
                             footer={
                                 <>
-                                    <Button onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
+                                    <ModalClose>Cancel</ModalClose>
                                     <Button variant="primary" onClick={saveBanking} loading={saving}>Update</Button>
                                 </>
                             }

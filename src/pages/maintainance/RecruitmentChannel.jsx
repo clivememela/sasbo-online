@@ -1,17 +1,19 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { AlertCircle, Pencil, Trash2, UserPlus, Check, X } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Pencil, Trash2, UserPlus, Check, X } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import Criteria, { CRITERION_WIDE } from '../../components/common/Criteria.jsx';
 import TableScroller from '../../components/table/TableScroller.jsx';
+import { HEAD_CELL } from '../../components/table/Table.jsx';
 import { Button, TextInput } from '../../components/form';
 import { ConfirmDialog, closeOn } from '../../components/overlay/Modal.jsx';
 import { recruitmentChannelService } from '../../services/recruitmentChannelService.js';
 import DataState from '../../components/common/DataState.jsx';
 import reportError from '../../lib/reportError.js';
-import DialogNotice from '../../components/common/DialogNotice.jsx';
+import DialogNotice, { PageNotice } from '../../components/common/DialogNotice.jsx';
 import { focusOnMount } from '../../lib/focusOnMount.js';
-import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
+import useFocusOn from '../../hooks/useFocusOn.js';
+import { messageOf, writeFailure, writeMayHaveLanded } from '../../services/parseApiError.js';
 
 /*
  * 📐 THE CHROME OF AN IN-ROW EDITOR -- one constant, with the same classes as `Subscriptions.jsx`'s
@@ -23,26 +25,9 @@ import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 // `touch-size`: an in-row input is a replaced element, so it GROWS to 44px on a coarse pointer (`07.2`; index.css).
 const CELL_INPUT = 'w-full rounded border border-line-strong bg-surface-2 px-2 py-1 field-text text-ink touch-size';
 
-const HEAD_CELL = 'whitespace-nowrap px-3.5 pb-[11px] pt-[13px] text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5';
-
-/**
- * 🔴 R3-F2, WIDENED: "could not be saved" is a claim about the SERVER, and only a refusal supports it.
- *
- * The delete learnt this first; add, rename and enable/disable were left saying it after a timeout or a lost
- * connection, when the change may well have landed -- and an administrator who believes that adds the channel twice.
- * `writeMayHaveLanded` is the one place the rule lives (`parseApiError.js`); this is the sentence it chooses.
- */
-const writeFailureNotice = (err, what) => (writeMayHaveLanded(err)
-    ? `${what} could not be confirmed. Reload the list and check before trying again.`
-    : `${what} was not saved. ${messageOf(err)}`.trim());
-
 export default function RecruitmentChannel() {
     const [notice, setNotice] = useState(null);
-    const noticeRef = useRef(null);
-
-    useEffect(() => {
-        if (notice) noticeRef.current?.focus();
-    }, [notice]);
+    const noticeRef = useFocusOn(notice);
 
     const [recruitmentChannels, setRecruipmentChannels] = useState([]);
     const [search, setSearch] = useState('');
@@ -123,51 +108,42 @@ export default function RecruitmentChannel() {
             .sort((a, b) => a.name.localeCompare(b.name));
     }, [recruitmentChannels, search]);
 
-    const handleAdd = async () => {
-        const what = 'That recruitment channel';
-        const name = newName.trim();
-        if (!name) return;
+    /**
+     * The three in-row writes, one shape (RF -- each held its own copy of this try/catch/finally): write, re-read
+     * the table (with its loading state -- see `reloadChannels`), then the caller's own step, which runs only on
+     * success, so a failed add keeps what was typed. A failure is the sentence `writeFailure` chooses.
+     */
+    const runWrite = async (what, write, then) => {
         setSaving(true);
         try {
-            await recruitmentChannelService.create(name);
+            await write();
             await reloadChannels();
-            setNewName('');
-            setShowAdd(false);
+            then?.();
         } catch (err) {
-            setNotice(writeFailureNotice(err, what));
+            setNotice(writeFailure(err, what));
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleAdd = async () => {
+        const name = newName.trim();
+        if (!name) return;
+        await runWrite('That recruitment channel', () => recruitmentChannelService.create(name), () => {
+            setNewName('');
+            setShowAdd(false);
+        });
     };
 
     const handleEdit = async (r) => {
-        const what = `The new name for ${r.name}`;
         const name = editName.trim();
         if (!name) return;
-        setSaving(true);
-        try {
-            await recruitmentChannelService.update(r.id, { name, enabled: r.enabled });
-            await reloadChannels();
-            setEditingId(null);
-        } catch (err) {
-            setNotice(writeFailureNotice(err, what));
-        } finally {
-            setSaving(false);
-        }
+        await runWrite(`The new name for ${r.name}`, () => recruitmentChannelService.update(r.id, { name, enabled: r.enabled }),
+            () => setEditingId(null));
     };
 
-    const handleToggleEnabled = async (r) => {
-        const what = `The change to ${r.name}`;
-        setSaving(true);
-        try {
-            await recruitmentChannelService.update(r.id, { name: r.name, enabled: !r.enabled });
-            await reloadChannels();
-        } catch (err) {
-            setNotice(writeFailureNotice(err, what));
-        } finally {
-            setSaving(false);
-        }
-    };
+    const handleToggleEnabled = (r) => runWrite(`The change to ${r.name}`,
+        () => recruitmentChannelService.update(r.id, { name: r.name, enabled: !r.enabled }));
 
     // 🔴 `03.4`: was `window.confirm()`. That dialog is unstyleable, says only OK/Cancel
     // rather than naming what will happen, blocks the whole browser thread, and is
@@ -211,16 +187,7 @@ export default function RecruitmentChannel() {
                 prints "[object Error]" in some browsers -- so the member was shown a dialog
                 that told them nothing, and told them it modally. */}
             {notice && (
-                <div
-                    ref={noticeRef}
-                    tabIndex={-1}
-                    aria-labelledby="channel-notice-title"
-                    className="mt-4 flex max-w-4xl items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
-                >
-                    <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
-                    <p id="channel-notice-title" className="flex-1">{notice}</p>
-                    <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dismiss</Button>
-                </div>
+                <PageNotice ref={noticeRef} id="channel-notice-title" className="max-w-4xl" onDismiss={() => setNotice(null)}>{notice}</PageNotice>
             )}
 
             {/* 🔴 THE SEARCH WAS A RAW <input> WITH NO VISIBLE LABEL, held together by an

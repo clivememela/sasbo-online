@@ -1,9 +1,9 @@
-import { Download, FileText, ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useMemo } from "react";
 import PageTitle from '../../components/common/PageTitle';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import ArchiveEmpty from '../../components/archives/ArchiveEmpty.jsx';
-import { Button, TextInput } from '../../components/form';
+import { ArchiveFile, ArchiveSearchBar } from '../../components/archives/ArchiveParts.jsx';
 
 export default function AffiliationsOtherTradeUnions() {
   const [expandedFolders, setExpandedFolders] = useState({});
@@ -165,29 +165,12 @@ export default function AffiliationsOtherTradeUnions() {
         {totalFiles} documents in {Object.keys(fileStructure).length} categories
       </p>
 
-      <div className="mb-6 max-w-xl">
-        {/* 🔴 THE CLEAR BUTTON HAD NO ACCESSIBLE NAME -- an `<X>` icon and
-            nothing else. `TextInput kind="search"` also brings the search
-            keyboard and the "Search" return key on a phone, and the 16px rule. */}
-        <div className="flex items-end gap-2">
-          <TextInput
-            label="Search"
-            kind="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search documents and folders..."
-            className="flex-1"
-          />
-          {searchQuery && (
-            <Button variant="ghost" onClick={() => setSearchQuery("")}>Clear</Button>
-          )}
-        </div>
-        {searchQuery && Object.keys(filteredStructure).length > 0 && (
-          <p className="text-sm text-ink-muted mt-2">
-            Found {Object.keys(filteredStructure).length} categories with {Object.values(filteredStructure).reduce((sum, files) => sum + files.length, 0)} matching documents
-          </p>
-        )}
-      </div>
+      <ArchiveSearchBar
+        query={searchQuery}
+        onChange={setSearchQuery}
+        found={Object.keys(filteredStructure).length > 0 &&
+          `Found ${Object.keys(filteredStructure).length} categories with ${Object.values(filteredStructure).reduce((sum, files) => sum + files.length, 0)} matching documents`}
+      />
 
       <div className="max-w-4xl">
         {/* A search that matched nothing says so, with the way out -- `ArchiveEmpty`, shared by the three archives. */}
@@ -215,18 +198,7 @@ export default function AffiliationsOtherTradeUnions() {
             {expandedFolders[folder] && (
               <div className="border-t border-line bg-surface-2/60 py-1.5 pl-[38px] pr-3 sm:pl-[46px]">
                 {files.map((file, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between rounded-md px-3 py-1.5 transition-colors hover-hover:hover:bg-surface"
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <FileText size={16} className="text-brand-ink flex-shrink-0" />
-                      <span className="text-sm truncate">{file}</span>
-                    </div>
-                    <Button size="icon" variant="ghost" aria-label={`Download ${file}`} className="ml-2 shrink-0">
-                      <Download size={16} aria-hidden="true" className="text-brand-ink" />
-                    </Button>
-                  </div>
+                  <ArchiveFile key={index} name={file} />
                 ))}
               </div>
             )}

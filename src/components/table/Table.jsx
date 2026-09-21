@@ -95,6 +95,15 @@ function cellValue(column, row, index) {
 
 const INTERACTIVE = 'a, button, input, select, textarea, summary, [role="button"], [contenteditable]';
 
+// card.css `.table th`: 11.5px, 600, tracked .08em, on the quiet surface, head ink.
+const HEAD_CELL_BASE = 'whitespace-nowrap px-3.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink first:pl-5';
+const HEAD_CELL_DENSE = `${HEAD_CELL_BASE} py-2`;
+/**
+ * A head cell at the table's own density. Exported for the two tables that are hand-built because their rows are
+ * editors (Subscriptions, Recruitment Channel), which carried this string as copies of each other (RF).
+ */
+export const HEAD_CELL = `${HEAD_CELL_BASE} pb-[11px] pt-[13px]`;
+
 export default function Table({
   columns = [],
   rows = [],
@@ -126,12 +135,7 @@ export default function Table({
     );
   }
 
-  // card.css `.table th`: 11.5px, 600, tracked .08em, on the quiet surface, head ink.
-  const headCell = cn(
-    'whitespace-nowrap px-3.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-head-ink',
-    'first:pl-5',
-    dense ? 'py-2' : 'pb-[11px] pt-[13px]',
-  );
+  const headCell = dense ? HEAD_CELL_DENSE : HEAD_CELL;
   // card.css `.table td`: 11px 14px, hairline under, the first column at 20px.
   const bodyCell = cn('px-3.5 align-middle text-base text-ink first:pl-5', dense ? 'py-2' : 'py-[11px]');
 

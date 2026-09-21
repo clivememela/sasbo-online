@@ -216,7 +216,7 @@ export function networkError(cause, { timedOut = false } = {}) {
  * @param {{ parseBody?: boolean }} [options] `parseBody: false` for a 204/DELETE.
  * @returns {Promise<unknown>}
  */
-export async function requestJson(send, { parseBody = true, allowEmpty = false, timeoutMs = READ_CEILING_MS } = {}) {
+export async function requestJson(send, { parseBody = true, allowEmpty = false, optionalBody = false, timeoutMs = READ_CEILING_MS } = {}) {
   /*
    * 🔴 THE CEILING. A14, and the failure mode with the LONGEST time to detection in this
    * application: a hung backend renders the loading state forever, which an administrator reads
@@ -259,7 +259,7 @@ export async function requestJson(send, { parseBody = true, allowEmpty = false, 
   try {
     if (!response.ok) throw await apiErrorFrom(response)
     if (!parseBody) return undefined
-    return await readBody(response, { allowEmpty })
+    return await readBody(response, { allowEmpty, optionalBody })
   } catch (cause) {
     /*
      * 🔑 THE DEADLINE IS AUTHORITATIVE, NOT THE ERROR'S SHAPE. An aborted `response.json()` is caught inside
@@ -275,32 +275,27 @@ export async function requestJson(send, { parseBody = true, allowEmpty = false, 
 }
 
 /**
- * The body of a successful response, in the two shapes `requestJson` supports.
+ * The body of a successful response, in the three shapes `requestJson` supports.
  *
  * Its own function because the ceiling above has to wrap every read in one `try`, and a `finally` around a block this
- * long is where the next exit path forgets to clear the timer.
+ * long is where the next exit path forgets to clear the timer. One parse path for all three: `response.json()` is
+ * UTF-8-decode-then-parse, which is exactly `text()` then `JSON.parse`, so the default shape did not need its own.
+ *
+ *   default         a body is expected: empty or not JSON rejects (case ④).
+ *   `allowEmpty`    a success that says NOTHING is a success, and a success that says something must still be JSON.
+ *                   `POST /api/members/{id}/send-welcome` answers an empty 200 (A50) -- rejected as not-JSON, a sent
+ *                   letter read as failed; `optionalBody` would accept it, and also a proxy's HTML page as sent.
+ *   `optionalBody`  a body MAY arrive, and an unreadable one is not a failure -- `requestOptionalJson` below.
  */
-async function readBody(response, { allowEmpty }) {
-
-  /*
-   * `allowEmpty`: a success that says NOTHING is a success, and a success that says something must still be JSON.
-   * `POST /api/members/{id}/send-welcome` answers an empty 200 (A50) -- rejected as not-JSON, a sent letter read as
-   * failed. `requestOptionalJson` would accept it, and also accept a proxy's HTML page as sent (case 4). This is the
-   * shape in between: empty resolves `undefined`; any body is parsed, and one that is not JSON rejects as before.
-   */
-  if (allowEmpty) {
-    const text = await response.text()
-    if (!text) return undefined
-    try {
-      return JSON.parse(text)
-    } catch (cause) {
-      throw apiError(NOT_JSON, { kind: ERROR_KINDS.NON_JSON, status: response.status, cause })
-    }
-  }
-
+async function readBody(response, { allowEmpty, optionalBody }) {
+  const text = await response.text()
+  if (!text && (allowEmpty || optionalBody)) return undefined
   try {
-    return await response.json()
+    return JSON.parse(text)
   } catch (cause) {
+    // A successful write that answered with something unparseable: the write happened, the echo is unreadable, and
+    // reporting a failure would turn a saved change into a reported error.
+    if (optionalBody) return undefined
     throw apiError(NOT_JSON, { kind: ERROR_KINDS.NON_JSON, status: response.status, cause })
   }
 }
@@ -336,46 +331,12 @@ export const requestJsonWrite = (send, options = {}) =>
  * ⚠️ THE FAILURE PATH IS IDENTICAL. A 4xx/5xx still rejects with the server's own message,
  * `status` and `validationErrors`; a network failure and the ceiling behave exactly as above. What
  * is tolerated here is a SUCCESSFUL response that says nothing — never a failed one.
+ *
+ * 🔑 ONE CEILING, NOT TWO (RF). This was a second copy of `requestJson`'s timer, abort and R2-F4 body deadline; a
+ * third shape of BODY is `readBody`'s concern, so it is `requestJson` with `optionalBody` at the write ceiling.
  */
-export async function requestOptionalJson(send, { timeoutMs = WRITE_CEILING_MS } = {}) {
-  const controller = new AbortController()
-  let timedOut = false
-  const deadline = setTimeout(() => {
-    timedOut = true
-    controller.abort()
-  }, timeoutMs)
-
-  let response
-  try {
-    response = await send(controller.signal)
-  } catch (cause) {
-    clearTimeout(deadline)
-    throw networkError(cause, { timedOut })
-  }
-
-  // R2-F4 again: the deadline covers the body here too. `text()` on a stalled response never settled, and this is the
-  // helper the BANK WRITE uses -- the one place where "did my change land?" is hardest to answer afterwards.
-  let text
-  try {
-    if (!response.ok) throw await apiErrorFrom(response)
-    text = await response.text()
-  } catch (cause) {
-    // As above: the timer having fired is what makes this a timeout, whatever shape the read's own failure took.
-    if (timedOut) throw networkError(cause, { timedOut })
-    throw cause
-  } finally {
-    clearTimeout(deadline)
-  }
-
-  if (!text) return undefined
-  try {
-    return JSON.parse(text)
-  } catch {
-    // A successful write that answered with something unparseable. The write happened; the echo
-    // is unreadable. Reporting a failure here would turn a saved change into a reported error.
-    return undefined
-  }
-}
+export const requestOptionalJson = (send, { timeoutMs = WRITE_CEILING_MS } = {}) =>
+  requestJson(send, { optionalBody: true, timeoutMs })
 
 /**
  * Reads a message off anything a `catch` block might receive, so a component
@@ -404,6 +365,21 @@ export function messageOf(error) {
  */
 export function writeMayHaveLanded(error) {
   return !(error?.kind === ERROR_KINDS.HTTP && error.status >= 400 && error.status < 500)
+}
+
+/**
+ * The sentence `writeMayHaveLanded` chooses, for a screen whose notice is one line: "was not saved" only on a refusal,
+ * otherwise "could not be confirmed" and where to go and look. Recruiters and Recruitment Channel each wrote this
+ * sentence themselves, identically but for the place named (RF); the rule and its words now live together.
+ * @param {unknown} error
+ * @param {string} what the thing written, as the subject of the sentence -- "That recruiter"
+ * @param {string} [whereToCheck] what to reload and check -- "the recruiter"
+ * @returns {string}
+ */
+export function writeFailure(error, what, whereToCheck = 'the list') {
+  return writeMayHaveLanded(error)
+    ? `${what} could not be confirmed. Reload ${whereToCheck} and check before trying again.`
+    : `${what} was not saved. ${messageOf(error)}`.trim()
 }
 
 /**

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Send, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import Modal, { closeOn } from '../overlay/Modal';
+import Modal, { ModalClose, closeOn } from '../overlay/Modal';
 import Button from '../form/Button';
 import { memberService } from '@/services/memberService.js';
 import { formatDate } from '@/utils/validateSAID.js';
@@ -97,9 +97,7 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess }) {
             size="xl"
             footer={
                 <>
-                    {/* ⚠️ `busy` cannot reach this: it is the caller's own button calling `onClose` directly, so it is
-                        disabled here while sending -- exactly what `ConfirmDialog` does with its Cancel. */}
-                    <Button variant="ghost" onClick={onClose} disabled={sendState === 'sending'}>Close</Button>
+                    <ModalClose variant="ghost">Close</ModalClose>
                     {sendState === 'sent' ? (
                         <span role="status" className="flex items-center gap-2 text-sm font-medium text-status-active">
                             <CheckCircle2 className="size-4" aria-hidden="true" />
