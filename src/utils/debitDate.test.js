@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { actualDebitDate, debitDateSentence, lastBusinessDayOnOrBefore } from './debitDate'
+import { actualDebitDate, debitDateSentence, holidaySetFor, lastBusinessDayOnOrBefore } from './debitDate'
 
 /**
  * 04.3 — the actual debit date.
@@ -61,9 +61,8 @@ describe('actualDebitDate', () => {
   })
 
   it('says whether public holidays were accounted for -- and by default they are not', () => {
-    // The fallback has to be VISIBLE, not assumed. No maintained holiday source is
-    // wired to this application, so an answer that did not say so would be
-    // overstating what it knows.
+    // The fallback has to be VISIBLE, not assumed. Without the run's calendar an
+    // answer that did not say so would be overstating what it knows.
     expect(actualDebitDate(21, AUG_2026).holidaysKnown).toBe(false)
     expect(actualDebitDate(21, AUG_2026, new Set(['2026-08-09'])).holidaysKnown).toBe(true)
   })
@@ -150,7 +149,7 @@ describe('debitDateSentence', () => {
     expect(sentence).toContain('Friday 27 February')
   })
 
-  it('carries the weekends-only caveat while no holiday source is wired', () => {
+  it('carries the weekends-only caveat when no calendar is supplied', () => {
     expect(debitDateSentence(31, new Date(2026, 1, 10)))
       .toContain('Weekends only — public holidays are not accounted for.')
   })
@@ -161,8 +160,22 @@ describe('debitDateSentence', () => {
       .not.toContain('Weekends only')
   })
 
-  it('stays plain when nothing was adjusted', () => {
-    expect(debitDateSentence(21, AUG_2026)).toBe('This member will be debited on Friday 21 August.')
+  it('🔴 carries the caveat on an UNMOVED date too -- a weekday can be a public holiday', () => {
+    // It used to stay plain here, which is the one case the caveat exists for: Heritage Day, Thursday
+    // 24 September 2026, read as certain while the run debited Friday the 25th.
+    expect(debitDateSentence(24, new Date(2026, 8, 22))).toBe(
+      'This member will be debited on Thursday 24 September.'
+      + ' Weekends only — public holidays are not accounted for.')
+  })
+
+  it('stays plain when nothing was adjusted and the calendar is known', () => {
+    expect(debitDateSentence(21, AUG_2026, new Set(['2026-08-09', '2026-08-10'])))
+      .toBe('This member will be debited on Friday 21 August.')
+  })
+
+  it('🔴 with the calendar, a weekday holiday moves like a weekend: day 24 in September 2026 is Friday the 25th', () => {
+    expect(debitDateSentence(24, new Date(2026, 8, 22), new Set(['2026-09-24']))).toBe(
+      'That day is not a business day, so this member will be debited on Friday 25 September.')
   })
 
   it('starts with a capital letter whichever reason leads it', () => {
@@ -173,5 +186,27 @@ describe('debitDateSentence', () => {
       + ' Weekends only — public holidays are not accounted for.')
     // The twin: when the month is short, its name leads, as it always did.
     expect(debitDateSentence(31, new Date(2026, 1, 10))).toMatch(/^February has no 31st, and that day/)
+  })
+})
+
+describe('holidaySetFor -- the run\'s calendar, as the set the sentence takes (D30)', () => {
+  const HERITAGE_DAY = { date: '2026-09-24', name: 'Heritage Day', source: 'STATUTORY' }
+  const calendar = (knownUntil) => ({ name: 'za-statutory', knownUntil, endingSoon: false, year: 2026, holidays: [HERITAGE_DAY] })
+
+  it('is the year\'s dates when the calendar reaches the end of the month', () => {
+    expect([...holidaySetFor(calendar('2027-12-31'), new Date(2026, 8, 22))]).toEqual(['2026-09-24'])
+    // The boundary: reaching the month's last day exactly is reaching it.
+    expect(holidaySetFor(calendar('2026-09-30'), new Date(2026, 8, 22)).size).toBe(1)
+  })
+
+  it('is EMPTY when the calendar stops before the month ends -- the run refuses that month (HOLIDAYS_NOT_KNOWN)', () => {
+    expect(holidaySetFor(calendar('2026-09-29'), new Date(2026, 8, 22)).size).toBe(0)
+  })
+
+  it('is EMPTY for anything that is not a calendar', () => {
+    // `[]` is what the page tests' GET wildcard answers; `none` is a database that holds no calendar.
+    for (const notACalendar of [[], null, undefined, { name: 'none', knownUntil: null, holidays: [] }]) {
+      expect(holidaySetFor(notACalendar, new Date(2026, 8, 22)).size).toBe(0)
+    }
   })
 })

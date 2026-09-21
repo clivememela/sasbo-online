@@ -46,6 +46,18 @@ const NEDBANK_CT = {
   physicalAddress: { streetNumber: '1', streetName: 'Dock Rd', city: { id: 3, name: 'Cape Town' } },
 }
 
+/** `GET /api/acb/holidays?year=2026` as the server answers it: V47's statutory rows for the year (D30). */
+const CALENDAR_2026 = {
+  name: 'za-statutory', knownUntil: '2027-12-31', endingSoon: false, year: 2026,
+  holidays: [
+    ['2026-01-01', "New Year's Day"], ['2026-03-21', 'Human Rights Day'], ['2026-04-03', 'Good Friday'],
+    ['2026-04-06', 'Family Day'], ['2026-04-27', 'Freedom Day'], ['2026-05-01', "Workers' Day"],
+    ['2026-06-16', 'Youth Day'], ['2026-08-09', "National Women's Day"],
+    ['2026-08-10', "National Women's Day, observed"], ['2026-09-24', 'Heritage Day'],
+    ['2026-12-16', 'Day of Reconciliation'], ['2026-12-25', 'Christmas Day'], ['2026-12-26', 'Day of Goodwill'],
+  ].map(([date, name]) => ({ date, name, source: 'STATUTORY' })),
+}
+
 /** The specific handlers go FIRST -- pageFixtures is a wildcard and msw takes the first match. */
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -202,24 +214,53 @@ describe('04.3 -- the actual debit date, under the field that chooses the day', 
     }
   })
 
-  it('and says what it does not know -- no public-holiday source is wired', async () => {
-    // Asserted as a PAIR with the adjustment: the caveat is only shown where an adjustment was made, so a
-    // test for the wording alone would pass against markup no condition controls.
+  it('🔴 with the run\'s calendar it gives the run\'s date -- day 24 in Heritage Day\'s week is Friday the 25th', async () => {
+    // The presentation arc's finding, 2026-09-21: the sentence counted weekends only while the run also steps
+    // over public holidays (D30), and an UNMOVED date carried no caveat -- so Thursday 24 September 2026,
+    // Heritage Day, was shown as certain. The clock is pinned to that week; only Date is faked, and setup.js
+    // puts the real one back after every test.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 8, 22, 9))
+    const asked = []
+    server.use(http.get('*/api/acb/holidays', ({ request }) => {
+      asked.push(new URL(request.url).searchParams.get('year'))
+      return HttpResponse.json(CALENDAR_2026)
+    }))
     const user = setupUser()
     renderWithProviders(<CaptureMember />)
     await openEmployment(user)
     const day = screen.getByLabelText(/^Debit Day/)
 
-    const caveats = []
+    await user.selectOptions(day, '24')
+    await waitFor(() => expect(screen.getByText(/will be debited on/i).textContent).toBe(
+      'That day is not a business day, so this member will be debited on Friday 25 September.'))
+    expect(asked, 'the page reads the calendar of the year it is in').toContain('2026')
+
     for (const chosen of ['20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31']) {
       await user.selectOptions(day, chosen)
       const note = await screen.findByText(/will be debited on/i)
-      const adjusted = /has no \d+\w\w|not a business day/.test(note.textContent)
-      const caveated = /Weekends only/.test(note.textContent)
-      expect(caveated, `day ${chosen}: the caveat and the adjustment must travel together`).toBe(adjusted)
-      if (adjusted) caveats.push(chosen)
+      expect(note.textContent, `day ${chosen}: the calendar is known, so nothing is caveated`).not.toMatch(/Weekends only/)
     }
-    // Non-vacuity: in any month at least one of the twelve days lands on a weekend.
-    expect(caveats.length, 'no day in the range was adjusted, so the pair above asserted nothing').toBeGreaterThan(0)
+  })
+
+  it('🔴 without the calendar, every date says it counts weekends only -- moved or not', async () => {
+    // Asserted on the UNMOVED dates as well: an unmoved weekday can be a public holiday, which is the case the
+    // caveat exists for. It used to travel with the adjustment alone.
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    server.use(http.get('*/api/acb/holidays', () => HttpResponse.json({ status: 500, message: 'boom' }, { status: 500 })))
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+    await openEmployment(user)
+    const day = screen.getByLabelText(/^Debit Day/)
+
+    const unmoved = []
+    for (const chosen of ['20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31']) {
+      await user.selectOptions(day, chosen)
+      const note = await screen.findByText(/will be debited on/i)
+      expect(note.textContent, `day ${chosen}`).toMatch(/Weekends only — public holidays are not accounted for\.$/)
+      if (!/has no \d+\w\w|not a business day/.test(note.textContent)) unmoved.push(chosen)
+    }
+    // Non-vacuity: any month has weekdays among the twelve, so the unmoved case was asserted.
+    expect(unmoved.length, 'every day in the range was moved, so the unmoved case went unasserted').toBeGreaterThan(0)
   })
 })

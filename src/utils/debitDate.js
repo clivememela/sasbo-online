@@ -33,14 +33,18 @@
  * 9 August, so Monday 10 August is also a holiday. A one-step implementation is
  * correct for most of the year and wrong in the week somebody checks.
  *
- * <h2>⚠️ WEEKENDS-ONLY IS THE DOCUMENTED FALLBACK, AND IT SAYS SO ON SCREEN</h2>
- * No maintained public-holiday source is wired to this application. A hardcoded
- * table is explicitly ruled out — the set changes, and 2026 carries a one-off
+ * <h2>THE HOLIDAYS ARE THE RUN'S OWN CALENDAR, AND WITHOUT IT THE SENTENCE SAYS SO</h2>
+ * The run moves a debit off public holidays as well as weekends, from the table
+ * ACB's `01.8` made (D30), and `GET /api/acb/holidays` serves it: the screen passes
+ * that set in (`holidaySetFor`), so the sentence and the run give one date. A
+ * hardcoded table is still ruled out — the set changes, and 2026 carries a one-off
  * local-government-election holiday that no table written last year contains. So
- * this computes weekends only, `holidaysKnown` is `false`, and the caller renders
- * that qualification rather than presenting the date as certain. Passing a
- * maintained list later is the only change needed: the iteration already handles
- * consecutive non-business days, which is the part a holiday source would need.
+ * when the calendar cannot be read, or does not reach the month, this computes
+ * weekends only, `holidaysKnown` is `false`, and the sentence says so on EVERY date.
+ * 🔴 It used to say so only on a MOVED date, which presented the one case the
+ * caveat exists for as certain: an unmoved weekday that is a public holiday. Day 24
+ * read "Thursday 24 September" in Heritage Day's week while the run debited Friday
+ * the 25th (the presentation arc found it, 2026-09-21).
  */
 
 import { toWireDate } from '../lib/format.js'
@@ -115,10 +119,23 @@ export const actualDebitDate = (day, reference = new Date(), holidays = new Set(
     day: actual.getDate(),
     clamped: clampedDay !== requested,
     adjusted: actual.getDate() !== clampedDay,
-    // Honest by construction: no maintained holiday source is wired, so unless a
-    // caller supplies one this answer accounts for weekends only.
+    // Honest by construction: unless the caller supplies the calendar, this answer
+    // accounts for weekends only.
     holidaysKnown: holidays.size > 0,
   }
+}
+
+/**
+ * The set the functions above take, from `GET /api/acb/holidays` (D30): the year's
+ * dates when the calendar reaches the end of `reference`'s month, and EMPTY otherwise,
+ * so a month the run itself refuses (`HOLIDAYS_NOT_KNOWN`) is never presented as known.
+ * Anything that is not a calendar -- no answer, an empty list -- is empty too.
+ */
+export const holidaySetFor = (calendar, reference = new Date()) => {
+  const monthEnd = isoOf(new Date(reference.getFullYear(), reference.getMonth() + 1, 0))
+  const reaches = typeof calendar?.knownUntil === 'string' && calendar.knownUntil >= monthEnd
+  if (!reaches || !Array.isArray(calendar.holidays)) return new Set()
+  return new Set(calendar.holidays.map((holiday) => holiday.date))
 }
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -139,17 +156,18 @@ export const debitDateSentence = (day, reference = new Date(), holidays = new Se
   const date = new Date(`${result.iso}T00:00:00`)
   const written = `${WEEKDAYS[date.getDay()]} ${result.day} ${MONTHS[date.getMonth()]}`
 
+  // On every date, moved or not: without the calendar an unmoved weekday can still be a public holiday.
+  const caveat = result.holidaysKnown
+    ? ''
+    : ' Weekends only — public holidays are not accounted for.'
+
   if (!result.clamped && !result.adjusted) {
-    return `This member will be debited on ${written}.`
+    return `This member will be debited on ${written}.${caveat}`
   }
 
   const because = []
   if (result.clamped) because.push(`${MONTHS[date.getMonth()]} has no ${ordinal(Number(day))}`)
   if (result.adjusted) because.push('that day is not a business day')
-
-  const caveat = result.holidaysKnown
-    ? ''
-    : ' Weekends only — public holidays are not accounted for.'
 
   // A sentence starts with a capital whichever reason leads it -- "that day is not a
   // business day" leads when the day was only moved.

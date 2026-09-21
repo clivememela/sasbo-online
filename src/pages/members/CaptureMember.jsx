@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import WelcomeLetter from "../../components/members/WelcomeLetter";
 import { recruiterService } from "@/services/recruiterService.js";
@@ -24,7 +24,9 @@ import { subscriptionsService } from "@/services/subscriptionsService.js";
 import { findSubscriptionForBank, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
 import { branchCodeOf, branchNamesForBank, findBranchRecord, formatBranchAddress } from "@/utils/bankBranches.js";
 import { DERIVATION, derivationNote, derivationStateOf } from "@/utils/derivation.js";
-import { debitDateSentence } from "@/utils/debitDate.js";
+import { debitDateSentence, holidaySetFor } from "@/utils/debitDate.js";
+import { acbRunService } from "@/services/acbRunService.js";
+import reportError from "@/lib/reportError.js";
 import { nearMisses, resolveToOption } from "@/utils/jobGradeMatch.js";
 import { nameKey } from "@/utils/nameKey.js";
 import { fieldValue } from "@/lib/fieldValue.js";
@@ -246,13 +248,23 @@ export default function CaptureMember() {
     /**
      * 04.3 -- the one thing this screen can say that no other screen can: the DATE, not the day.
      *
-     * The rule is the signed spec's, and A57 corrected it: back to the last business day, forward only where
-     * back would fall out of the 20th-to-31st window. The sentence carries its own issue, because no
-     * maintained public-holiday source is wired to this application and presenting the date as certain would
+     * The rule is SASBO's answer to question 33 (A57): forward to the next business day, back only where
+     * forward would leave the month (`utils/debitDate.js`). The business days are the run's own -- weekends,
+     * and the public holidays of its calendar (D30), read once below. A calendar that cannot be read leaves
+     * the sentence on weekends only, and the sentence says so: presenting that date as certain would
      * overstate it.
      */
+    const [holidays, setHolidays] = useState(() => new Set());
+    useEffect(() => {
+        let left = false;
+        const now = new Date();
+        acbRunService.holidayCalendar(now.getFullYear())
+            .then((calendar) => { if (!left) setHolidays(holidaySetFor(calendar, now)); })
+            .catch((err) => reportError("CaptureMember.loadHolidays", err));
+        return () => { left = true; };
+    }, []);
     const debitDateHint = form.paymentType === PAYMENT_TYPE_DEBIT_ORDER
-        ? debitDateSentence(form.debitDay)
+        ? debitDateSentence(form.debitDay, new Date(), holidays)
         : null;
 
     // An event from a text field, or a bare value from a select: `fieldValue` reads either (RF -- the selects
