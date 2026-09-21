@@ -9,7 +9,7 @@ import { acbRefusalOf, acbRunService } from '../../services/acbRunService.js';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import { PagerFor, usePagedRead } from './acbPaging.jsx';
 import {
-  BANKING_REASONS, DECISION_LABEL, LETTER_STATUS_LABEL, REFUSAL, RUN_STATUS_LABEL, UNPAID_REASON_LABEL, monthLabel,
+  BANKING_REASONS, DECISION_LABEL, LETTER_STATUS_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, UNPAID_REASON_LABEL, monthLabel,
 } from './acbRunRules.js';
 
 const PAGE_SIZE = 50;
@@ -198,7 +198,7 @@ function UnpaidList({ run, reason, onBanking }) {
         onRetry={retry}
         emptyTitle={reason ? 'No unpaid debits for this reason' : 'No unpaid debits in this run'}
         emptyMessage={reason ? 'Choose another reason, or every reason.'
-          : run.status === 'RETURNED' ? 'The bank returned every debit of this run paid.'
+          : run.status === RUN_STATUS.RETURNED ? 'The bank returned every debit of this run paid.'
             : 'No unpaid has been recorded for this run yet.'}
         dense
       />

@@ -190,8 +190,7 @@ export default function AcbDebits() {
     };
 
     // A day on record outside the window is shown, never silently replaced: the choice starts blank and says why.
-    const dayOutsideWindow = bankForm.debitDay !== "" && bankForm.debitDay != null
-        && !DEBIT_DAYS.includes(Number(bankForm.debitDay));
+    const dayOutsideWindow = Boolean(bankForm.debitDay) && !DEBIT_DAYS.includes(Number(bankForm.debitDay));
 
     /**
      * 🔴 THE ROW WAS A `<div onClick>` INSIDE A `grid-cols-5`. Selecting a member for an
