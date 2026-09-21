@@ -148,7 +148,24 @@ const CEILINGS = {
   //                            · CaptureMember +57 (+74 before the flip: debitDate.js's
   //                            forward-first rule is 17 B shorter) · BankBranch, Forms +30 each.
   // Still no headroom on top.
-  js: 693.35 * KB,
+  //
+  // 693.35 -> 687.33 on 2026-09-21, MEASURED, after merging origin/main 3a3cc3c (design's RF and
+  // the panel width) into the ACB branch. Both builds from one install of the same lock, the
+  // tracked `.env`, in C:\tmp\acb-client:
+  //   main 3a3cc3c ON ITS OWN   670.27 KiB -- still over its own 650, and still the design arc's
+  //                            number; RF took 6.33 KiB off e70b675's 676.60.
+  //   the ACB branch (e3285a3)  687.33 KiB, +17.06 over main, chunk by chunk:
+  //                            AcbRuns 0 -> 15,742 B · SelectInput 0 -> 1,475 · options 0 -> 912
+  //                            · useReferenceData -1,440 · SearchableSelect -794 · index +873
+  //                            · circle-alert 0 -> 251 and useFocusOn -214 (Rollup re-splitting a
+  //                            shared icon and hook once the ACB route imports them)
+  //                            · CaptureMember +131 (the flip, and the debit-date sentence's
+  //                            capital letter) · Members +109 · Recruiters +104 · Acb +76
+  //                            · Subscriptions +64 · Auth +40 · AcbDebits +35 · RecruitmentChannel +35
+  //                            · Forms, BankBranch +30 each · AddressAutocomplete +5 · DialogNotice +2.
+  // The ceiling comes DOWN, to exactly the measurement: carrying e70b675's 676.60 would have left
+  // 6 KiB of slack nobody earned. Still no headroom on top.
+  js: 687.33 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
