@@ -1536,7 +1536,7 @@ export default function Members() {
                             application has three places that want it. */}
                         {/* 🔑 IT WRAPS. IT DOES NOT SCROLL — AND THE MOCK SETTLED THAT.
                             Short labels at the mock's own 13px fit a three-column composition
-                            in the docked `clamp(360px, 32vw, 448px)` panel. The rule sits on
+                            in the docked `clamp(424px, 32vw, 448px)` panel. The rule sits on
                             the wrapper so it runs under the whole block. */}
                         <div className="no-print mt-4 border-b border-line">
                             <div className="grid grid-cols-3 gap-x-0.5">

@@ -862,7 +862,7 @@ export function Recruiters() {
                 record obeys it — it is the docked third column. This surface is a different
                 shape: it is not a record you read and edit in place, it is a LIST you work
                 on — filter this channel's members, add one, remove one — and the panel it
-                would dock into is `clamp(360px, 32vw, 448px)`. A five-column members table
+                would dock into is `clamp(424px, 32vw, 448px)`. A five-column members table
                 with its own criteria row does not fit in 448px; forcing it there would
                 trade a correct pattern for a cramped one and lose the task.
                 The dialog is the world's own surface: same radius, same shadow-2, same

@@ -302,7 +302,7 @@ The shipped ramp is nine rem steps — 10.5 · 11.5 · 13 · 14 · 15 · 16 · 2
 
 ## Layout
 
-A three-column shell on a desk: the navigation rail at a fixed **256px**, the register in the middle, and the record panel at `clamp(360px, 32vw, 448px)` on the right — **present only while a record is open**, travelling over `--duration-panel: 380ms`. Below `xl` (1280px) the panel is a drawer; at ≤ 760px everything is one column and the register's rows become small cards, with nothing hidden and nothing scrolling sideways. Content sits in a 28px page gutter (16px below `lg`), and rows are 40px, controls 38px, nav rows 36px.
+A three-column shell on a desk: the navigation rail at a fixed **256px**, the register in the middle, and the record panel at `clamp(424px, 32vw, 448px)` on the right — **present only while a record is open**, travelling over `--duration-panel: 380ms`. Below `xl` (1280px) the panel is a drawer; at ≤ 760px everything is one column and the register's rows become small cards, with nothing hidden and nothing scrolling sideways. Content sits in a 28px page gutter (16px below `lg`), and rows are 40px, controls 38px, nav rows 36px.
 
 Spacing runs on a 4 · 8 · 12 · 16 · 24 · 32 · 48 rhythm and nothing in between. Full-height measurements are `dvh`, never `vh`.
 
