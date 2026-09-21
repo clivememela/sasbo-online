@@ -38,37 +38,24 @@ describe('focus and the member record', () => {
     server.use(http.get('*/api/members', () => HttpResponse.json([MEMBER])))
   })
 
-  /*
-   * 🔄 FOLLOWING MAIN `8c6b675`: the record is a dialog. Radix puts focus inside it on open, and `Modal`'s own
-   * `returnFocus` gives it back to the element that opened it -- the same promise the docked panel made, kept by a
-   * different mechanism, so it is asserted the same way: focus lands inside, and comes back to the row.
-   */
   it('opening a record moves focus into it, and closing it gives focus back to the row that opened it', async () => {
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     const row = await screen.findByRole('button', { name: /open the record for.*Focus/i })
 
     await user.click(row)
-    const record = await screen.findByTestId('member-panel')
-    await waitFor(() => expect(record).toContainElement(document.activeElement))
+    const panel = within(screen.getByTestId('member-panel'))
+    await waitFor(() => expect(panel.getByText('Member record')).toHaveFocus())
 
-    await user.click(within(record).getByRole('button', { name: 'Close' }))
+    await user.click(panel.getByRole('button', { name: 'Close member details' }))
     await waitFor(() => expect(row).toHaveFocus())
   })
 
-  it('the record has exactly one close control, and a press outside is the other way out', async () => {
+  it('the scrim is not a second "Close member details" button', async () => {
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     await user.click(await screen.findByRole('button', { name: /open the record for.*Focus/i }))
-    const record = await screen.findByTestId('member-panel')
 
-    // 🔄 The docked panel carried a second, screen-reader-only close beside the visible one; the dialog has one.
-    expect(within(record).getAllByRole('button', { name: 'Close' })).toHaveLength(1)
-
-    // And Escape is the other way out, through the same `onOpenChange` as the X -- so an unsaved edit is asked
-    // about either way (`Members.edits` ④). A press on the scrim is Radix's third, and is not asserted here:
-    // dismissal by pointer is not reproducible under jsdom, and an assertion that cannot fail is worse than none.
-    await user.keyboard('{Escape}')
-    await waitFor(() => expect(screen.queryByTestId('member-panel')).not.toBeInTheDocument())
+    expect(screen.getAllByRole('button', { name: 'Close member details' })).toHaveLength(1)
   })
 })

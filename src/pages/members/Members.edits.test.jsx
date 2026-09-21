@@ -62,51 +62,54 @@ describe('the member record, mid-edit', () => {
     server.use(http.get('*/api/members', () => HttpResponse.json([ALPHA, BRAVO])))
   })
 
-  /*
-   * 🔄 FOLLOWING MAIN `8c6b675`: the record is a DIALOG over the register, not a column beside it. The register's
-   * rows are behind it, so a member is no longer chosen while another is open -- you leave first. The guard these
-   * four exist for is unchanged and still on `requestCloseRecord`: every way out of a changed edit asks first.
-   * ① and ④ therefore drive the two ways OUT (the close button, and Escape), and ② and ③ leave, then choose.
-   */
-  it('① leaving a changed edit asks first -- and "Keep editing" keeps the change', async () => {
+  it('① choosing another member with a changed field asks first -- and "Keep editing" keeps the change', async () => {
     const user = await editAlpha({ change: true })
-    await user.click(panel().getByRole('button', { name: 'Close' }))
+    await user.click(screen.getByRole('button', { name: /open the record for.*Bravo/i }))
 
     const dialog = await screen.findByRole('dialog', { name: /Discard your changes/ })
     await user.click(within(dialog).getByRole('button', { name: 'Keep editing' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /Discard your changes/ })).not.toBeInTheDocument())
     expect(panel().getByLabelText(/^Initials/)).toHaveValue('Q')
-    expect(screen.getByTestId('member-panel')).toHaveAccessibleName(/Synthetic Alpha/)
+    expect(panel().getByText('Synthetic Alpha')).toBeInTheDocument()
   })
 
-  it('② the must-pass: "Discard changes" lets you leave, and the next member opens to be read', async () => {
+  it('② the must-pass: "Discard changes" switches, and the next member opens to be read', async () => {
     const user = await editAlpha({ change: true })
-    await user.click(panel().getByRole('button', { name: 'Close' }))
+    await user.click(screen.getByRole('button', { name: /open the record for.*Bravo/i }))
     const dialog = await screen.findByRole('dialog', { name: /Discard your changes/ })
     await user.click(within(dialog).getByRole('button', { name: 'Discard changes' }))
 
-    await waitFor(() => expect(screen.queryByTestId('member-panel')).not.toBeInTheDocument())
-    await user.click(await screen.findByRole('button', { name: /open the record for.*Bravo/i }))
-
-    await waitFor(() => expect(screen.getByTestId('member-panel')).toHaveAccessibleName(/Synthetic Bravo/))
+    expect(await panel().findByText('Synthetic Bravo')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Edit Member/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Save changes$/ })).not.toBeInTheDocument()
   })
 
-  it('③ an edit with no changes leaves without asking -- and the next member opens to be read, not edited', async () => {
+  it('③ an edit with no changes switches without asking -- and the next member opens to be read, not edited', async () => {
     const user = await editAlpha({ change: false })
-    await user.click(panel().getByRole('button', { name: 'Close' }))
+    await user.click(screen.getByRole('button', { name: /open the record for.*Bravo/i }))
 
-    await waitFor(() => expect(screen.queryByTestId('member-panel')).not.toBeInTheDocument())
+    expect(await panel().findByText('Synthetic Bravo')).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: /Discard your changes/ })).not.toBeInTheDocument()
-
-    await user.click(await screen.findByRole('button', { name: /open the record for.*Bravo/i }))
-    await waitFor(() => expect(screen.getByTestId('member-panel')).toHaveAccessibleName(/Synthetic Bravo/))
     expect(screen.getByRole('button', { name: /Edit Member/i })).toBeInTheDocument()
   })
 
-  it('④ Escape asks too, when the edit has changes -- the second way out, and it is guarded as well', async () => {
+  it('④ the close button asks too, when the edit has changes', async () => {
+    const user = await editAlpha({ change: true })
+    await user.click(panel().getByRole('button', { name: 'Close member details' }))
+
+    expect(await screen.findByRole('dialog', { name: /Discard your changes/ })).toBeInTheDocument()
+    expect(panel().getByLabelText(/^Initials/)).toHaveValue('Q')
+  })
+
+  /*
+   * ⑤ and ⑥ — ESCAPE, THE WAY OUT NOTHING TESTED. It is not the record's own control: the listener
+   * is window-level, registered once in `Members.jsx` (the guarded close), and it predates the record ever
+   * being a dialog -- so it is the docked panel's way out too, and it must ask exactly as the close button
+   * does. ⑥ is the must-pass: without it, a ⑤ that passed because Escape did nothing at all would look
+   * identical to one that passed because the guard held.
+   */
+  it('⑤ Escape asks too, when the edit has changes -- the same guard, a different way out', async () => {
     const user = await editAlpha({ change: true })
     await user.keyboard('{Escape}')
 
@@ -114,7 +117,15 @@ describe('the member record, mid-edit', () => {
     expect(panel().getByLabelText(/^Initials/)).toHaveValue('Q')
   })
 
-  it('⑤ the save confirmation stays open and busy until the save has answered, then closes and says so', async () => {
+  it('⑥ the must-pass: Escape on an edit with no changes closes the record, without asking', async () => {
+    const user = await editAlpha({ change: false })
+    await user.keyboard('{Escape}')
+
+    await waitFor(() => expect(screen.getByTestId('member-panel')).not.toHaveAttribute('data-open'))
+    expect(screen.queryByRole('dialog', { name: /Discard your changes/ })).not.toBeInTheDocument()
+  })
+
+  it('⑦ the save confirmation stays open and busy until the save has answered, then closes and says so', async () => {
     const { promise: answered, resolve: answer } = deferred()
     server.use(
       http.put('*/api/members/:id', async ({ request }) => {
@@ -137,7 +148,7 @@ describe('the member record, mid-edit', () => {
     expect(await screen.findByText(/record saved/)).toBeInTheDocument()
   })
 
-  it("⑥ COSATU positions that arrive as the server's string are saved back as a list, untouched", async () => {
+  it("⑧ COSATU positions that arrive as the server's string are saved back as a list, untouched", async () => {
     // 🔴 `MemberDto.cosatuPositions` is a String ("PEC,CEC"). Entering edit mode copied the record raw, so an edit
     // anywhere on the record wrote the string back, or threw on `.filter`. Positions are no longer on the Structures
     // tab (2026-09-17), which makes this the case that matters: data the screen does not show must survive a save of
@@ -164,7 +175,7 @@ describe('the member record, mid-edit', () => {
     await waitFor(() => expect(saved).toBeDefined())
     expect(saved.cosatuPositions).toEqual(['PEC', 'CEC'])
   })
-  it('⑦ A7 (fixed): a passport member with no date of birth is not saved, and is told why', async () => {
+  it('⑨ A7 (fixed): a passport member with no date of birth is not saved, and is told why', async () => {
     // 🔴 The second site of A7: Edit Member required a date of birth when identityType === "Passport", and the only
     // option is "Passport Number", so the rule never ran and a passport member saved with no date on file.
     let saved

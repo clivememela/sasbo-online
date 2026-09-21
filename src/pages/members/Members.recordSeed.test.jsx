@@ -64,7 +64,7 @@ describe('the record, when another member is opened', () => {
     await user.click(section(/Employment & Bank/i))
     expect(section(/Employment & Bank/i)).toHaveAttribute('aria-current', 'true')
 
-    await user.click(panel().getByRole('button', { name: 'Close' }))
+    await user.click(panel().getAllByRole('button', { name: 'Close member details' })[0])
     await open(user, 'M0002')
 
     expect(section(/Personal Information/i)).toHaveAttribute('aria-current', 'true')
@@ -107,7 +107,7 @@ describe('the record, when another member is opened', () => {
     await user.type(initials, 'XYZ')
     await user.click(panel().getByRole('button', { name: /Cancel/i }))
 
-    await user.click(panel().getByRole('button', { name: 'Close' }))
+    await user.click(panel().getAllByRole('button', { name: 'Close member details' })[0])
     await open(user, 'M0002')
     await user.click(panel().getByRole('button', { name: /Edit Member/i }))
 
