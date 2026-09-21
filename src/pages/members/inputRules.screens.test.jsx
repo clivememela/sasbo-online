@@ -49,6 +49,7 @@ describe('Capture Member', () => {
   const fillValidPayrollMember = async (user) => {
     await retype(user, 'First Name(s)', 'Synthetic')
     await retype(user, 'Surname', 'Testperson')
+    await retype(user, 'Personal Email', 'synthetic@example.test')
     await user.selectOptions(field('Identity Type'), 'I.D. Number')
     await retype(user, 'I.D. Number', '9001010000080')
   }
@@ -98,6 +99,8 @@ describe('Capture Member', () => {
     await user.selectOptions(field('Payment Type'), 'Payroll Deduction')
 
     await user.click(screen.getByRole('button', { name: /save member/i }))
+    const sendBtn = await screen.findByRole('button', { name: /send welcome letter/i })
+    await user.click(sendBtn)
 
     await waitFor(() => expect(posted, 'a stale value in a field nobody can see blocked the save').toBeDefined())
   })

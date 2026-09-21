@@ -136,6 +136,7 @@ describe('Capture Member · the three fields, in the stakeholder order', () => {
     await screen.findByLabelText(/^First Name\(s\)/)
     await user.type(field('First Name\\(s\\)'), 'Synthetic')
     await user.type(field('Surname'), 'Testperson')
+    await user.type(field('Personal Email'), 'synthetic@example.test')
     await user.selectOptions(field('Identity Type'), 'I.D. Number')
     await user.type(field('I.D. Number'), '9001010000080')
 
@@ -149,6 +150,8 @@ describe('Capture Member · the three fields, in the stakeholder order', () => {
     await chooseFrom(user, 'Recruiter$', 'Achmat', 'Achmat Adams')
 
     await user.click(screen.getByRole('button', { name: /save member/i }))
+    const sendBtn = await screen.findByRole('button', { name: /send welcome letter/i })
+    await user.click(sendBtn)
     await waitFor(() => expect(posted).toBeDefined())
 
     // 🔑 The names MemberDto declares. R5 is the defect where the recruiter was dropped on every save,

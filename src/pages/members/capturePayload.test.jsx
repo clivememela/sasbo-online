@@ -78,6 +78,7 @@ async function captureMinimalMember(user) {
   await screen.findByLabelText(/^First Name\(s\)/)
   await user.type(field('First Name\\(s\\)'), 'Synthetic')
   await user.type(field('Surname'), 'Testperson')
+  await user.type(field('Personal Email'), 'synthetic@example.test')
   await user.selectOptions(field('Identity Type'), 'I.D. Number')
   await user.type(field('I.D. Number'), '9001010000080')
 
@@ -85,6 +86,8 @@ async function captureMinimalMember(user) {
   await user.selectOptions(field('Payment Type'), 'Payroll Deduction')
 
   await user.click(screen.getByRole('button', { name: /save member/i }))
+  const sendBtn = await screen.findByRole('button', { name: /send welcome letter/i })
+  await user.click(sendBtn)
   await waitFor(() => expect(posted).toBeDefined())
 }
 
