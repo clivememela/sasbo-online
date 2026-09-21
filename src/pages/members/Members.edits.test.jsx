@@ -62,41 +62,53 @@ describe('the member record, mid-edit', () => {
     server.use(http.get('*/api/members', () => HttpResponse.json([ALPHA, BRAVO])))
   })
 
-  it('① choosing another member with a changed field asks first -- and "Keep editing" keeps the change', async () => {
+  /*
+   * 🔄 FOLLOWING MAIN `8c6b675`: the record is a DIALOG over the register, not a column beside it. The register's
+   * rows are behind it, so a member is no longer chosen while another is open -- you leave first. The guard these
+   * four exist for is unchanged and still on `requestCloseRecord`: every way out of a changed edit asks first.
+   * ① and ④ therefore drive the two ways OUT (the close button, and Escape), and ② and ③ leave, then choose.
+   */
+  it('① leaving a changed edit asks first -- and "Keep editing" keeps the change', async () => {
     const user = await editAlpha({ change: true })
-    await user.click(screen.getByRole('button', { name: /open the record for.*Bravo/i }))
+    await user.click(panel().getByRole('button', { name: 'Close' }))
 
     const dialog = await screen.findByRole('dialog', { name: /Discard your changes/ })
     await user.click(within(dialog).getByRole('button', { name: 'Keep editing' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /Discard your changes/ })).not.toBeInTheDocument())
     expect(panel().getByLabelText(/^Initials/)).toHaveValue('Q')
-    expect(panel().getByText('Synthetic Alpha')).toBeInTheDocument()
+    expect(screen.getByTestId('member-panel')).toHaveAccessibleName(/Synthetic Alpha/)
   })
 
-  it('② the must-pass: "Discard changes" switches, and the next member opens to be read', async () => {
+  it('② the must-pass: "Discard changes" lets you leave, and the next member opens to be read', async () => {
     const user = await editAlpha({ change: true })
-    await user.click(screen.getByRole('button', { name: /open the record for.*Bravo/i }))
+    await user.click(panel().getByRole('button', { name: 'Close' }))
     const dialog = await screen.findByRole('dialog', { name: /Discard your changes/ })
     await user.click(within(dialog).getByRole('button', { name: 'Discard changes' }))
 
-    expect(await panel().findByText('Synthetic Bravo')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByTestId('member-panel')).not.toBeInTheDocument())
+    await user.click(await screen.findByRole('button', { name: /open the record for.*Bravo/i }))
+
+    await waitFor(() => expect(screen.getByTestId('member-panel')).toHaveAccessibleName(/Synthetic Bravo/))
     expect(screen.getByRole('button', { name: /Edit Member/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Save changes$/ })).not.toBeInTheDocument()
   })
 
-  it('③ an edit with no changes switches without asking -- and the next member opens to be read, not edited', async () => {
+  it('③ an edit with no changes leaves without asking -- and the next member opens to be read, not edited', async () => {
     const user = await editAlpha({ change: false })
-    await user.click(screen.getByRole('button', { name: /open the record for.*Bravo/i }))
+    await user.click(panel().getByRole('button', { name: 'Close' }))
 
-    expect(await panel().findByText('Synthetic Bravo')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByTestId('member-panel')).not.toBeInTheDocument())
     expect(screen.queryByRole('dialog', { name: /Discard your changes/ })).not.toBeInTheDocument()
+
+    await user.click(await screen.findByRole('button', { name: /open the record for.*Bravo/i }))
+    await waitFor(() => expect(screen.getByTestId('member-panel')).toHaveAccessibleName(/Synthetic Bravo/))
     expect(screen.getByRole('button', { name: /Edit Member/i })).toBeInTheDocument()
   })
 
-  it('④ the close button asks too, when the edit has changes', async () => {
+  it('④ Escape asks too, when the edit has changes -- the second way out, and it is guarded as well', async () => {
     const user = await editAlpha({ change: true })
-    await user.click(panel().getByRole('button', { name: 'Close member details' }))
+    await user.keyboard('{Escape}')
 
     expect(await screen.findByRole('dialog', { name: /Discard your changes/ })).toBeInTheDocument()
     expect(panel().getByLabelText(/^Initials/)).toHaveValue('Q')

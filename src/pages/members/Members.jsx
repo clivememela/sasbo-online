@@ -1435,6 +1435,8 @@ export default function Members() {
                 title={personName(selectedMember) || "Member record"}
                 description={selectedMember?.membershipNumber ? `Membership no. ${selectedMember.membershipNumber}` : undefined}
                 size="lg"
+                // The record keeps the name the suite has always held it by, through main's move to a dialog.
+                testId="member-panel"
                 footer={
                     isEditing ? (
                         <>

@@ -24,7 +24,9 @@ export const HEADING = `!!document.querySelector('main h1')`;
 const TEXT = (s) => `document.body.innerText.toLowerCase().includes(${JSON.stringify(s.toLowerCase())})`;
 const STATE = (s) => `!!document.querySelector('[data-state="${s}"]')`;
 const PANEL = '[data-testid="member-panel"]';
-const PANEL_OPEN = `!!document.querySelector('${PANEL}[data-open="true"] .mcard')`;
+// 🔄 The record is a DIALOG since main `8c6b675` (it was a docked panel with `data-open`); Radix marks its
+// content `data-state="open"`, and the membership card inside it is still the proof the record ARRIVED.
+const PANEL_OPEN = `!!document.querySelector('${PANEL}[data-state="open"] .mcard')`;
 export const ANY_DIALOG = `!!document.querySelector('[role="dialog"]')`;
 /**
  * A date picker OPEN, AND ON SCREEN. "Open" alone once passed a calendar placed below the bottom of the viewport: Add
@@ -156,7 +158,8 @@ export const SURFACES = [
     covers: ['pages/members/Members.jsx#DataState@refs', 'components/form/LoadFailureFrame.jsx#DataState@loadError'] },
 
   // ── the record ────────────────────────────────────────────────────────────────────────────────
-  { name: 'record-open', route: '/members', ready: ROWS, steps: [OPEN_FIRST_MEMBER], present: { PANEL_OPEN } },
+  { name: 'record-open', route: '/members', ready: ROWS, steps: [OPEN_FIRST_MEMBER], present: { PANEL_OPEN },
+    covers: ['pages/members/Members.jsx#Modal@record'] },
   { name: 'record-structures', route: '/members', ready: ROWS,
     steps: [OPEN_FIRST_MEMBER, step('open Structures', clickByText(`${PANEL} button`, '/Structures/i'), TEXT('SASBO structures'))],
     present: { TAB: TEXT('SASBO structures') } },

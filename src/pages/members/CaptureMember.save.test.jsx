@@ -81,7 +81,7 @@ describe('Capture Member, saving and leaving', () => {
     // The sentence stays word for word -- the automation arc's MemberCapturePage waits for exactly it -- and the
     // toast names the member beside it.
     const sentence = await screen.findByText('Member captured successfully!')
-    expect(within(sentence.closest('[role="status"]')).getByText('Synthetic Testperson')).toBeInTheDocument()
+    expect(within(sentence.closest('output')).getByText('Synthetic Testperson')).toBeInTheDocument()
     expect(posts, 'the member was sent more than once').toBe(1)
   })
 
@@ -92,10 +92,10 @@ describe('Capture Member, saving and leaving', () => {
     await fill(user, 'First Name(s)', 'Synthetic')
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Discard this member?' })
+    const dialog = await screen.findByRole('dialog', { name: 'Discard?' })
     await user.click(within(dialog).getByRole('button', { name: 'Keep capturing' }))
 
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Discard this member?' })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Discard?' })).not.toBeInTheDocument())
     expect(labelled('First Name(s)')).toHaveValue('Synthetic')
     expect(back).not.toHaveBeenCalled()
   })

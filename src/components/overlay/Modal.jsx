@@ -121,6 +121,15 @@ export default function Modal({
    * through the mechanism Radix provides for it.
    */
   initialFocusRef,
+  /**
+   * 🔑 A NAME THE SUITE CAN HOLD A DIALOG BY. The register's record is a dialog now (main `8c6b675`), and the
+   * sixteen test files that drive it had held it by the docked panel's `data-testid`. A dialog is identified by
+   * its accessible NAME, which here is the member's own name -- so every one of those files would have had to
+   * learn which member it opened, and a confirm dialog open at the same time is a second `role="dialog"`.
+   * This is a test affordance and nothing else: it renders one attribute and changes no pixel. Same rule as
+   * `route-pending` and `route-error` in the shell.
+   */
+  testId,
 }) {
   if (import.meta.env?.DEV && !title) {
     throw new Error(
@@ -209,6 +218,7 @@ export default function Modal({
         <div className="pointer-events-none fixed inset-0 z-50 grid place-items-center">
         <Dialog.Content
           ref={contentRef}
+          data-testid={testId}
           // 🔑 A CONDITIONAL SPREAD, not a ternary. Radix warns when a dialog has no
           // Description, and the tempting silencer — an `sr-only` Description holding the
           // title — makes a screen reader announce the name TWICE ("Member details. Member
