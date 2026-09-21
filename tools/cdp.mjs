@@ -56,6 +56,24 @@ const PORTS = Object.freeze({
   vitals: 9900,
 });
 
+/**
+ * 🔑 THE RASTERISER, MADE REPEATABLE. With motion frozen, two captures still differed on 10 of 350 screenshots -- by one
+ * or two channel levels in scattered pixels, and along the antialiased edge of a control at a fractional x ("Add
+ * Recruiter" at x=850.84, 1024 wide). Software raster splits the frame into tiles on several threads. One raster
+ * thread, no partial raster, every compositor stage run before the frame is drawn, no LCD subpixel text, an sRGB
+ * profile and no font hinting take the variance out at the source: three subset captures, 70 of 70 identical where
+ * the data arrived. Moved here from `matrix.mjs` in RF, so the surface sweep photographs
+ * through the same rasteriser (P9's shared `still()`).
+ */
+export const STILL_FLAGS = [
+  '--num-raster-threads=1',
+  '--disable-partial-raster',
+  '--run-all-compositor-stages-before-draw',
+  '--disable-lcd-text',
+  '--force-color-profile=srgb',
+  '--font-render-hinting=none',
+];
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -71,7 +89,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  */
 export const isPhone = (width) => width < 700;
 
-export async function launch(tag, { flags = [] } = {}) {
+export async function launch(tag, { flags = [], still = false } = {}) {
   const base = PORTS[tag];
   if (!base) {
     throw new Error(
@@ -93,6 +111,7 @@ export async function launch(tag, { flags = [] } = {}) {
      * the measurement before it. The directory is removed on close, so this does not fill the disk.
      */
     `--user-data-dir=${profileDir}`,
+    ...(still ? STILL_FLAGS : []),
     ...flags,
     'about:blank',
   ], { stdio: 'ignore' });
@@ -201,6 +220,13 @@ export async function launch(tag, { flags = [] } = {}) {
 
   await send('Page.enable');
   await send('Runtime.enable');
+
+  /*
+   * 🔑 `still`: A PHOTOGRAPH THAT CAN BE COMPARED. The repeatable rasteriser above, and motion off for every page this
+   * browser opens -- an override on the target, so it survives every navigation. One owner, because the matrix had
+   * both and the surface sweep had one, and its captures of an unchanged build did not repeat (T44).
+   */
+  if (still) await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
 
   /**
    * Make one request pattern -- or several -- fail, hang, come back empty or answer with a payload for the length of
@@ -323,6 +349,30 @@ export async function launch(tag, { flags = [] } = {}) {
     return String(entry).split('/').pop();
   };
 
+  /**
+   * 🔴 A VERDICT IS TAKEN ON A FRAME THAT HOLDS STILL, AND ONLY WHEN IT REPEATS (F-P61). `SETTLED` answers for one
+   * instant: a list that is still loading can flip its control from disabled to enabled a moment later, and its text
+   * colour fades between the two. The surface sweep read axe in that moment and photographed the page after it, so
+   * three rows failed on screenshots pixel-identical to rows it passed -- 4, 0, 3, 0 and 2 failing rows over five runs
+   * of one build. So `read()` is bracketed by two photographs, and its answer counts only when the frames on both
+   * sides are identical AND a second bracketed reading returns the same answer on the same frame. The frame it
+   * returns is the one the answer was read on. A page that never holds still returns null -- UNMEASURED, never passed.
+   */
+  const steady = async (read, { tries = 8 } = {}) => {
+    const frame = async () => (await send('Page.captureScreenshot', { format: 'png' })).data;
+    let previous = null;
+    for (let i = 0; i < tries; i += 1) {
+      const before = await frame();
+      const value = await read();
+      const after = await frame();
+      const reading = before === after ? { frame: after, key: JSON.stringify(value) } : null;
+      if (reading && previous && reading.frame === previous.frame && reading.key === previous.key) return { value, frame: after };
+      previous = reading;
+      if (!reading) await sleep(150);
+    }
+    return null;
+  };
+
   const close = () => {
     try { ws.close(); } catch { /* already closed */ }
     chrome.kill();
@@ -331,7 +381,7 @@ export async function launch(tag, { flags = [] } = {}) {
     try { rmSync(profileDir, { recursive: true, force: true }); } catch { /* Chrome still has it */ }
   };
 
-  return { send, evaluate, metrics, waitFor, assertBuiltClient, close, port, sleep, on, intercept };
+  return { send, evaluate, metrics, waitFor, assertBuiltClient, close, port, sleep, on, intercept, steady };
 }
 
 export { sleep };

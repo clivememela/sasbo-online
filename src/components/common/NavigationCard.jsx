@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 
 import { cn } from "../../lib/utils";
+import Sheet from "./Sheet.jsx";
 
 /**
  * One destination on a menu page -- a ROW of the wallet, not a card.
@@ -79,5 +80,22 @@ export default function NavigationCard({ title, icon: Icon, href, desc, onSelect
         className="shrink-0 text-ink-faint transition-transform duration-(--duration-fast) hover-hover:group-hover:translate-x-0.5"
       />
     </Link>
+  );
+}
+
+/**
+ * A menu page's body: its cards as one ruled sheet (RF). Eight pages -- Home, the four admin menus, ACB, Archives and
+ * Reports -- each wrote this sheet and this map, differing only in the React key they chose and in what a press
+ * tells the shell. The key is `href` and title together, because two menus hold entries with no route yet.
+ *
+ * `onSelect(card)` is the page's word to the shell; `wide` is Home's, the one menu that spans the page.
+ */
+export function NavigationList({ cards, onSelect, wide = false }) {
+  return (
+    <Sheet className={cn("mt-6 divide-y divide-line", !wide && "max-w-4xl")}>
+      {cards.map((card) => (
+        <NavigationCard key={`${card.href}-${card.title}`} {...card} onSelect={onSelect && (() => onSelect(card))} />
+      ))}
+    </Sheet>
   );
 }

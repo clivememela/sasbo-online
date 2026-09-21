@@ -19,6 +19,7 @@ import {
   daysInMonth,
   formatDate,
   formatDateLong,
+  MONTHS as MONTHS_SHORT,
   parseDate,
   sameDate,
   shiftDays,
@@ -88,7 +89,6 @@ import {
  * field that erases what you typed is a field you cannot correct.
  */
 
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTHS_LONG = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',

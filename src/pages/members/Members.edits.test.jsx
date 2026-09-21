@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { deferred } from '../../test/deferred'
 
 /**
  * EDITS ARE NEVER LOST SILENTLY. `06.5`, the `06.3` critique, F-P55.
@@ -101,11 +102,31 @@ describe('the member record, mid-edit', () => {
     expect(panel().getByLabelText(/^Initials/)).toHaveValue('Q')
   })
 
-  it('⑤ the save confirmation stays open and busy until the save has answered, then closes and says so', async () => {
-    let answer
-    const answered = new Promise((resolve) => {
-      answer = resolve
-    })
+  /*
+   * ⑤ and ⑥ — ESCAPE, THE WAY OUT NOTHING TESTED. It is not the record's own control: the listener
+   * is window-level, registered once in `Members.jsx` (the guarded close), and it predates the record ever
+   * being a dialog -- so it is the docked panel's way out too, and it must ask exactly as the close button
+   * does. ⑥ is the must-pass: without it, a ⑤ that passed because Escape did nothing at all would look
+   * identical to one that passed because the guard held.
+   */
+  it('⑤ Escape asks too, when the edit has changes -- the same guard, a different way out', async () => {
+    const user = await editAlpha({ change: true })
+    await user.keyboard('{Escape}')
+
+    expect(await screen.findByRole('dialog', { name: /Discard your changes/ })).toBeInTheDocument()
+    expect(panel().getByLabelText(/^Initials/)).toHaveValue('Q')
+  })
+
+  it('⑥ the must-pass: Escape on an edit with no changes closes the record, without asking', async () => {
+    const user = await editAlpha({ change: false })
+    await user.keyboard('{Escape}')
+
+    await waitFor(() => expect(screen.getByTestId('member-panel')).not.toHaveAttribute('data-open'))
+    expect(screen.queryByRole('dialog', { name: /Discard your changes/ })).not.toBeInTheDocument()
+  })
+
+  it('⑦ the save confirmation stays open and busy until the save has answered, then closes and says so', async () => {
+    const { promise: answered, resolve: answer } = deferred()
     server.use(
       http.put('*/api/members/:id', async ({ request }) => {
         const body = await request.json()
@@ -127,7 +148,7 @@ describe('the member record, mid-edit', () => {
     expect(await screen.findByText(/record saved/)).toBeInTheDocument()
   })
 
-  it("⑥ COSATU positions that arrive as the server's string are saved back as a list, untouched", async () => {
+  it("⑧ COSATU positions that arrive as the server's string are saved back as a list, untouched", async () => {
     // 🔴 `MemberDto.cosatuPositions` is a String ("PEC,CEC"). Entering edit mode copied the record raw, so an edit
     // anywhere on the record wrote the string back, or threw on `.filter`. Positions are no longer on the Structures
     // tab (2026-09-17), which makes this the case that matters: data the screen does not show must survive a save of
@@ -154,7 +175,7 @@ describe('the member record, mid-edit', () => {
     await waitFor(() => expect(saved).toBeDefined())
     expect(saved.cosatuPositions).toEqual(['PEC', 'CEC'])
   })
-  it('⑦ A7 (fixed): a passport member with no date of birth is not saved, and is told why', async () => {
+  it('⑨ A7 (fixed): a passport member with no date of birth is not saved, and is told why', async () => {
     // 🔴 The second site of A7: Edit Member required a date of birth when identityType === "Passport", and the only
     // option is "Passport Number", so the rule never ran and a passport member saved with no date on file.
     let saved

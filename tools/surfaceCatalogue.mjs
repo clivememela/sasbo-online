@@ -201,7 +201,11 @@ export const SURFACES = [
       step('send the welcome letter', clickByText('[role="dialog"] button', '/^Send Welcome Letter$/'), WELCOME_SENT)],
     present: { DIALOG: dialogNamed('/^Welcome Letter Preview$/'), SENT: WELCOME_SENT },
     covers: ['components/members/WelcomeLetter.jsx#Modal@welcome'] },
-  { name: 'capture-refs-error', route: '/members/capture', intercept: { url: ['*/api/banks*', '*/api/job-grades*', '*/api/provinces*', '*/api/recruitment-channels*', '*/api/representatives*', '*/api/members/userRoles*', '*/api/members/structures/tree*', '*/api/branches*', '*/api/districts*', '*/api/areas*'], mode: 'fail' },
+  // 🔴 EVERY LIST CAPTURE LOADS, OR THE PAGE IS HONESTLY 'partial' AND THIS ROW CAN NEVER BE REACHED (RF). PR #7 gave
+  // Capture two more reference lists (`/api/recruiters`, `/api/subscriptions`) and this intercept never learnt them, so
+  // from P10's close on the four rows failed "never ready" with the census reading `states: ["partial"]` -- recorded
+  // then as the browser timing out. The census was right and the catalogue was stale.
+  { name: 'capture-refs-error', route: '/members/capture', intercept: { url: ['*/api/banks*', '*/api/job-grades*', '*/api/provinces*', '*/api/recruitment-channels*', '*/api/representatives*', '*/api/members/userRoles*', '*/api/members/structures/tree*', '*/api/branches*', '*/api/districts*', '*/api/areas*', '*/api/recruiters*', '*/api/subscriptions*'], mode: 'fail' },
     ready: STATE('error'), present: { ERROR: STATE('error') },
     covers: ['pages/members/CaptureMember.jsx#DataState@refs', 'components/form/LoadFailureFrame.jsx#DataState@loadError'] },
   { name: 'capture-listbox', route: '/members/capture', ready: TEXT('Save Member'),

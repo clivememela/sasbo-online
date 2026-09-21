@@ -101,6 +101,16 @@ describe('the rail wordmark (R1-F4)', () => {
     await user.click(wordmark)
 
     // A full reload in jsdom is "Not implemented: navigation", never a rendered Home.
-    expect(await screen.findByRole('heading', { level: 1, name: /welcome to sasbo online/i })).toBeInTheDocument()
+    /*
+     * 🔴 THE SUITE'S BUDGET, NOT TESTING LIBRARY'S DEFAULT -- the same fix, for the same reason, as
+     * `errorBoundaryRoutes.test.jsx` (`e7e92ef`). Home is already imported above, so what is left is the cost of
+     * rendering the shell and the page, and that belongs to the BOX. Measured alone on 2026-09-21, with OneDrive and
+     * Explorer holding ~1.8 cores: **355ms, 497ms, 1,307ms** -- and RED in a full run at four workers, against the
+     * implicit 1,000ms nobody chose. 5,000ms is the suite's own figure at its slowest sites, still far under
+     * `testTimeout`, so a wordmark that reloads the document (R1-F4's defect) still fails here.
+     */
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /welcome to sasbo online/i }, { timeout: 5000 }),
+    ).toBeInTheDocument()
   })
 })

@@ -1,6 +1,7 @@
 import {apiUrl} from './api';
 import {requestJson} from './parseApiError';
 import {bankService} from './bankService.js';
+import {nameKey} from '../utils/nameKey.js';
 
 /*
  * ✅ A25 IS CLOSED HERE, AND `JOB_GRADE_OPTIONS` IS WHAT WENT WITH IT. `06.1b`.
@@ -53,9 +54,9 @@ export const jobGradeService = {
       // does not know is still queried as given: that is an answer, not a failure.
       const { branches, codes, codesError } = await bankService.getBankListingDetailed();
       if (codes === 'failed') throw codesError;
-      const normalized = bankCode.toLowerCase();
+      const normalized = nameKey(bankCode);
       const found = branches.find((b) => {
-        const bn = String(b.bankName || b.name || '').trim().toLowerCase();
+        const bn = nameKey(b.bankName || b.name);
         return bn === normalized || bn.includes(normalized) || normalized.includes(bn);
       });
       if (found && found.universalBranchCode) bankCode = found.universalBranchCode;

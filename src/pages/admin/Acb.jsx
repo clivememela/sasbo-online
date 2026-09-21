@@ -3,8 +3,8 @@ import {
     LucidePiggyBank
 } from 'lucide-react';
 import PageTitle from "../../components/common/PageTitle.jsx";
-import NavigationCard from "../../components/common/NavigationCard.jsx";
-import Sheet, { Page } from '../../components/common/Sheet.jsx';
+import { NavigationList } from "../../components/common/NavigationCard.jsx";
+import { Page } from '../../components/common/Sheet.jsx';
 
 const cards = [
     {
@@ -77,9 +77,7 @@ export default function Acb() {
     return (
         <Page>
             <PageTitle title="A.C.B Menu" subtitle="Select options below" />
-            <Sheet className="mt-6 max-w-4xl divide-y divide-line">
-                {cards.map((card) => <NavigationCard key={card.href} {...card} />)}
-            </Sheet>
+            <NavigationList cards={cards} />
         </Page>
     );
 }

@@ -13,6 +13,34 @@ export function noticeTone(tone) {
         : 'border-status-suspended-dot bg-status-suspended-bg text-status-suspended';
 }
 
+/**
+ * The page's own notice -- a write's outcome, left on the page once no dialog is open to hold it (RF). AcbDebits and
+ * Recruitment Channel each drew this box by hand, class for class, beside Recruiters' copy built on `noticeTone`; the
+ * three now share one. It takes focus through the caller's ref (`useFocusOn`), and is labelled by its own sentence.
+ *
+ * A confirmation is a `status` and is announced; a failure has no live role because it TAKES FOCUS, and a focused
+ * element's label is read on arrival -- a live region as well would announce one failure twice.
+ */
+export function PageNotice({ ref, id, tone = 'error', className, onDismiss, children }) {
+    return (
+        <div
+            ref={ref}
+            tabIndex={-1}
+            {...(tone === 'ok' && { role: 'status' })}
+            aria-labelledby={id}
+            className={cn(
+                'mt-4 flex items-start gap-2 rounded-lg border p-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring',
+                noticeTone(tone),
+                className,
+            )}
+        >
+            <NoticeIcon tone={tone} />
+            <p id={id} className="flex-1">{children}</p>
+            <Button size="sm" variant="ghost" onClick={onDismiss}>Dismiss</Button>
+        </div>
+    );
+}
+
 export function NoticeIcon({ tone }) {
     return tone === 'ok'
         ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />

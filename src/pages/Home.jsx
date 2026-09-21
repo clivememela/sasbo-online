@@ -1,6 +1,6 @@
 import { useOutletContext } from 'react-router-dom';
-import NavigationCard from '../components/common/NavigationCard';
-import Sheet, { Page } from '../components/common/Sheet.jsx';
+import { NavigationList } from '../components/common/NavigationCard';
+import { Page } from '../components/common/Sheet.jsx';
 import PageTitle from '../components/common/PageTitle';
 import { navItems } from '../config/navigation';
 
@@ -45,15 +45,7 @@ export default function Home() {
   return (
     <Page>
       <PageTitle title="Welcome to SASBO Online" subtitle="Select an area to begin." />
-      <Sheet className="mt-6 divide-y divide-line">
-        {cards.map((card) => (
-          <NavigationCard
-            key={card.href}
-            {...card}
-            onSelect={() => setSelectedCardHref?.(card.href)}
-          />
-        ))}
-      </Sheet>
+      <NavigationList wide cards={cards} onSelect={(card) => setSelectedCardHref?.(card.href)} />
     </Page>
   );
 }
