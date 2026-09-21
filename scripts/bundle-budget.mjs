@@ -114,7 +114,22 @@ const CEILINGS = {
   // over the 641.29 actual -- the same margin the header argues for, and no more, so the
   // next feature still meets a real ceiling. The design arc owns this number: the ACB arc
   // raises it again, by exactly its screen's bytes, when its Runs screen lands.
-  js: 650 * KB,
+  //
+  // 650 -> 680 on 2026-09-21, MEASURED, at the design arc's close (670.22 KiB on the lockfile's own
+  // packages). The SAME code measured 641.31 on React 19.2.6: `8c6b675` (Clive, 2026-09-21) regenerated the lockfile --
+  // `package.json` untouched, 86 packages refreshed within their ranges -- and React came with it, 19.2.6 -> 19.3.0.
+  // What spent it, chunk by chunk (the lockfile's packages against 19.2.6's):
+  //   index         298.45 -> 327.13  +28.68  the entry chunk, where react-dom lives: its production client is
+  //                                           523.5 KiB at 19.2.6 and 610.5 at 19.3.0
+  //   index.modern   34.96 ->  35.74   +0.78
+  //   Modal          40.85 ->  40.31   -0.54
+  //   every other chunk within 200 B, 69 chunks both sides.
+  // Over the wire: +8.5 KiB gzipped (+7.2 brotli) on the first load, cached after. The suite and the E2E pass on 19.3,
+  // and 19.2.6 against 19.3.0 rendered 350/350 pixel-identical. Kept on the owner's word (2026-09-21): the cost is
+  // small, and rolling React back alone would fight a refresh of 86 packages. Checked before raising, as the header
+  // asks: nothing from src/test/ is imported by the product, and no test library is in the built bundle. 1.4% of
+  // headroom, as the last raise had; the ACB arc still raises it by exactly its own bytes.
+  js: 680 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
