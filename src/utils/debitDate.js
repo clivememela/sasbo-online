@@ -151,7 +151,10 @@ export const debitDateSentence = (day, reference = new Date(), holidays = new Se
     ? ''
     : ' Weekends only — public holidays are not accounted for.'
 
-  return `${because.join(', and ')}, so this member will be debited on ${written}.${caveat}`
+  // A sentence starts with a capital whichever reason leads it -- "that day is not a
+  // business day" leads when the day was only moved.
+  const reason = because.join(', and ')
+  return `${reason[0].toUpperCase()}${reason.slice(1)}, so this member will be debited on ${written}.${caveat}`
 }
 
 const ordinal = (n) => {

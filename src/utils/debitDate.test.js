@@ -164,4 +164,14 @@ describe('debitDateSentence', () => {
   it('stays plain when nothing was adjusted', () => {
     expect(debitDateSentence(21, AUG_2026)).toBe('This member will be debited on Friday 21 August.')
   })
+
+  it('starts with a capital letter whichever reason leads it', () => {
+    // Saturday 26 September 2026 moves forward to Monday the 28th: the day was only moved,
+    // so "that day is not a business day" opens the sentence.
+    expect(debitDateSentence(26, new Date(2026, 8, 1))).toBe(
+      'That day is not a business day, so this member will be debited on Monday 28 September.'
+      + ' Weekends only — public holidays are not accounted for.')
+    // The twin: when the month is short, its name leads, as it always did.
+    expect(debitDateSentence(31, new Date(2026, 1, 10))).toMatch(/^February has no 31st, and that day/)
+  })
 })
