@@ -79,7 +79,7 @@ describe('the bundle budget can fail', () => {
    * The direction the ceiling exists for: something got bigger and nobody looked.
    */
   it('FAILS when the javascript is over its ceiling', () => {
-    // 750 KiB of js against the javascript ceiling (722.63 KiB since ACB's completion on main's 680) -- and deliberately
+    // 750 KiB of js against the javascript ceiling (723.15 KiB since ACB's completion on main's 680) -- and deliberately
     // arranged as a 300 KiB entry plus 450 KiB of lazy chunks, so the ENTRY row stays green and
     // this case can only be caught by the total. Each row is proved on its own. The fixture
     // was 700 until the ceiling passed it: a fixture under the ceiling proves nothing.
