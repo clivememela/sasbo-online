@@ -96,7 +96,10 @@ export default function AcbTerminationReport() {
         emptyMessage="No member has two unpaid presentations in a row in the last thirteen months."
         dense
       />
-      <PagerFor data={data} state={state} goTo={goTo} noun="members" size={PAGE_SIZE} />
+      {/* Only when there is a next page, as the member search does: a short list needs no pager. */}
+      {data.totalPages > 1 && (
+        <PagerFor data={data} state={state} goTo={goTo} noun="members" size={PAGE_SIZE} />
+      )}
       {anyDue && (
         <p id="acb-terminate-why" className="border-t border-line px-6 py-3 text-sm text-ink-muted">
           Terminating a membership — for subscriptions in arrears — opens when administrators sign in to this system.

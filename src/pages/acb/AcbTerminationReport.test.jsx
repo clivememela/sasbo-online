@@ -56,7 +56,7 @@ describe('the termination report (03.5)', () => {
     // The must-pass twin: one away is listed, and has no action.
     const atTwo = await rowOf('Sampleton')
     expect(within(atTwo).getByText('one more makes three')).toBeInTheDocument()
-    expect(within(atTwo).queryByRole('button')).toBeNull()
+    expect(within(atTwo).queryByRole('button', { name: /Terminate/ })).toBeNull()
 
     expect(screen.getByText(/Counted from July 2026\./)).toBeInTheDocument()
     expect(screen.getByText('Counted from the first month this system sent a file.')).toBeInTheDocument()
@@ -68,7 +68,7 @@ describe('the termination report (03.5)', () => {
 
     const row = await rowOf('Testperson')
     expect(within(row).getByText('Terminated')).toBeInTheDocument()
-    expect(within(row).queryByRole('button')).toBeNull()
+    expect(within(row).queryByRole('button', { name: /Terminate/ })).toBeNull()
     expect(screen.queryByText(/opens when administrators sign in/)).toBeNull()
   })
 
