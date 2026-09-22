@@ -201,6 +201,8 @@ describe('the Members list', () => {
 
       expect(screen.queryByText(/no members match/i)).not.toBeInTheDocument()
       expect(within(screen.getByTestId('figure-strip')).queryByText('0')).not.toBeInTheDocument()
+      // And the month's figure (SASBO, 18 Sep 2026) says nothing either -- not even its second line.
+      expect(screen.getByTestId('figure-strip')).not.toHaveTextContent(/by debit order/)
     })
 
     it('the retry actually re-runs the request, and recovers', async () => {
