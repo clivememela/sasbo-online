@@ -110,12 +110,13 @@ describe('what a capture actually sends', () => {
     renderWithProviders(<CaptureMember />)
     await captureMinimalMember(user)
 
-    // Everything the form legitimately holds, plus the two the save adds itself.
+    // Everything the form legitimately holds, plus the two the save adds itself. 🗣️ No `areaRecruited` since
+    // 18 Sep 2026: SASBO asked for the area to be read off the recruiter, so no control sets it and nothing posts it.
     const expected = [
       ...AUTOMATION_ROUND_TRIP,
       'dateOfBirth', 'gender', 'preferredEmail', 'joinDate', 'status',
       'subscriptionFrequency', 'jobGrade', 'bankAddress',
-      'recruitedHow', 'areaRecruited', 'recruitmentRep',
+      'recruitedHow', 'recruitmentRep',
       'monthlySubscription',
     ].sort()
 

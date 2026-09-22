@@ -1535,15 +1535,21 @@ cards, nested cards"), so **the shape is the decision**: a ledger rules a line a
 figures and separates them with hairlines, because a box says *"this is a thing"* and a ruled column
 says *"this is a reading of one thing"*.
 
-**Props.** `total`, `active`, `pending`, `suspended`, `updatedToday` (optional — absent means the
-fifth figure is not rendered at all), `state` (`'ready'|'loading'|'error'`, default `'ready'`),
-`className`.
+**Props.** `total`, `active`, `pending`, `suspended`, `newThisMonth` and `newDebitOrders` (optional —
+the month's joiners and how many of them pay by debit order; absent means that figure is not rendered),
+`updatedToday` (optional — absent means that figure is not rendered at all), `state`
+(`'ready'|'loading'|'error'`, default `'ready'`), `className`.
+
+**"New this month" (SASBO, 18 Sep 2026).** One quiet figure with a second line, "N by debit order" —
+not two figures, because six divide evenly into the stylesheet's three- and two-column modes where
+seven leave one figure alone on a row (ruling ③). The second line is the figure's make-up, printed only
+once the figure itself was read (K1 holds for it too).
 
 **States.**
 
 | State | How |
 | --- | --- |
-| default (`ready`) | five figures (four if `updatedToday` is absent), tabular (**The Tabular Rule**), space-separated thousands (`2 418` — en-ZA, a no-break space, so a figure can never wrap mid-number) |
+| default (`ready`) | six figures (fewer when the optional ones are absent), tabular (**The Tabular Rule**), space-separated thousands (`2 418` — en-ZA, a no-break space, so a figure can never wrap mid-number); "New this month" carries its "N by debit order" line |
 | **loading** | a shimmer skeleton per figure **plus an `sr-only` "loading"**, and `aria-busy` on the `<dl>` |
 | **error** | an `ink-muted` em dash **plus an `sr-only` "not available"** |
 | **empty** | a register that really is empty still reads **zero** — that case is tested, and it is the must-pass for the two above |
@@ -1559,11 +1565,14 @@ utility classes cannot resize it. `Table`'s skeleton took the same fix for its s
 
 **Accessibility contract.** `<dl aria-label="Register summary">` with `<dt>`/`<dd>` pairs,
 `aria-busy` while loading, `data-testid="figure-strip"`. The status dots are `aria-hidden`.
-📐 The columns are the stylesheet's — five, three, then two — answering **the strip's own width**
-(**The Container Rule**), which is why the component is a wrapper plus a list.
+📐 The columns are the stylesheet's — one equal column per figure, then three, then two — answering
+**the strip's own width** (**The Container Rule**), which is why the component is a wrapper plus a list.
+Measured at 1280×661 with scrollbars shown: six columns of 160 px in one row at full width, 3 + 3 at
+534 px with a record docked, no label overflowing.
 
 **Held by.** `src/components/members/FigureStrip.test.jsx` — the three cases above, with the genuinely
-empty register as the must-pass.
+empty register as the must-pass, plus the six-figure arrangement and a caller that passes no month
+figure; `src/pages/members/Members.newThisMonth.test.jsx` reads the month against a pinned calendar.
 
 ---
 

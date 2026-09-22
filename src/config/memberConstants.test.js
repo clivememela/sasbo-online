@@ -25,6 +25,15 @@ describe('the capture form tabs', () => {
         'TABS_REMOVED_FROM_THE_CLIENT and the capture catalogue in the automation ' +
         'suite (pages/MemberCapturePage.js) in the same change, or its scenarios ' +
         'will drive a tab that is not there',
-    ).toEqual(['Personal Information', 'Employment & Bank', 'Membership & Subscriptions', 'Recruitment Channel'])
+    ).toEqual(['Personal Information', 'Employment & Bank', 'Recruitment Channel', 'Membership & Subscriptions'])
+  })
+
+  it('put Recruitment Channel straight after Employment & Bank -- SASBO\'s order, 18 Sep 2026', () => {
+    const labels = MEMBER_TABS.map((tab) => tab.label)
+    expect(
+      labels.indexOf('Recruitment Channel'),
+      'SASBO asked for the recruitment channel to come before membership & subscriptions',
+    ).toBe(labels.indexOf('Employment & Bank') + 1)
+    expect(labels.at(-1)).toBe('Membership & Subscriptions')
   })
 })

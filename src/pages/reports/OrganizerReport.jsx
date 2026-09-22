@@ -174,8 +174,11 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
                         most important thing on the page was the form's letterhead. It is
                         the form's name, so it is a heading, but a SECOND-level one under
                         the page title PageTitle now supplies. */}
+                    {/* 🗣️ SASBO, 18 Sep 2026: this letterhead is the line that confused the people filling
+                        the form in -- "it says on top ... organizers, branch or department report form". The
+                        report is of a VISIT to a location, so that is what it is called now. */}
                     <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-muted">
-                        SASBO Finance Union — Organizer's Branch / Department Report Form
+                        SASBO Finance Union — Location Visit: Branch / Department
                     </h2>
                 </div>
                 <form onSubmit={handleSubmit}>
@@ -235,8 +238,8 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
     return (
         <Page>
             <PageTitle
-                title="Organizer Report"
-                subtitle="Streamline and record organizer site visits, branch engagements, and membership recruitment across all financial institutions."
+                title="Location Visit"
+                subtitle="Record an organiser's visit to a branch or department: the engagement, the membership, and the recruitment."
             />
             {sheet}
         </Page>

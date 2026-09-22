@@ -24,9 +24,18 @@ import { formatInt } from '../../lib/format';
  * is what the mock renders.
  *
  * 📐 **THE COLUMNS ARE THE STYLESHEET'S** (index.css, "The figure strip follows the width it is
- * given"): five equal columns, three when five do not fit the strip, two on a phone. They answer
+ * given"): equal columns, three when they do not fit the strip, two on a phone. They answer
  * to the strip's own width, which is why the component is a wrapper and a list -- a container
  * query is asked of an ancestor, never of the element it lays out.
+ *
+ * 🗣️ **"NEW THIS MONTH" -- SASBO, 18 Sep 2026**: "dashboard to capture total number of new debit
+ * orders captured for the month", and "new members captured". ONE figure, not two, and the reason
+ * is the grid: six figures divide evenly into the stylesheet's three and two columns, where seven
+ * leave one figure alone on a row of the owner's own 1280 screen with a record docked (ruling ③
+ * already refused a strip that looks squashed). So the month's joiners are the figure, and how
+ * many of them pay by debit order is its second line -- a reading of one thing and its make-up,
+ * which the ledger allows, rather than another box beside it. Quiet, like "Updated today": both
+ * are readings of this month's traffic, not of what the register holds.
  */
 
 /**
@@ -39,6 +48,7 @@ const groups = (n) => (typeof n === 'number' ? formatInt(n) : n);
 /**
  * @param {{
  *   total: number, active: number, pending: number, suspended: number,
+ *   newThisMonth?: number, newDebitOrders?: number,
  *   updatedToday?: number, state?: 'ready'|'loading'|'error', className?: string,
  * }} props
  */
@@ -47,6 +57,8 @@ export default function FigureStrip({
   active,
   pending,
   suspended,
+  newThisMonth,
+  newDebitOrders,
   updatedToday,
   state = 'ready',
   className,
@@ -56,6 +68,14 @@ export default function FigureStrip({
     { label: 'Active', value: active, dot: 'bg-status-active-dot' },
     { label: 'Pending', value: pending, dot: 'bg-status-pending-dot' },
     { label: 'Suspended', value: suspended, dot: 'bg-status-suspended-dot' },
+    ...(newThisMonth === undefined
+      ? []
+      : [{
+        label: 'New this month',
+        value: newThisMonth,
+        quiet: true,
+        breakdown: newDebitOrders === undefined ? undefined : `${groups(newDebitOrders)} by debit order`,
+      }]),
     ...(updatedToday === undefined
       ? []
       : [{ label: 'Updated today', value: updatedToday, quiet: true }]),
@@ -126,6 +146,11 @@ export default function FigureStrip({
             >
               {reading(figure)}
             </dd>
+            {/* The figure's make-up, only once the figure itself was read: K1's rule holds for the
+                second line too, so a register that is loading or unreachable shows no "0 by …". */}
+            {figure.breakdown && state === 'ready' && (
+              <dd className="whitespace-nowrap text-xs tabular-nums text-ink-muted">{figure.breakdown}</dd>
+            )}
           </div>
         ))}
       </dl>

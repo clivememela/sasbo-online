@@ -38,16 +38,17 @@ describe('Capture Member, when a list it offers failed', () => {
   })
 
   /**
-   * 🔑 THREE FIELDS, THREE LISTS, THREE SEPARATE FAILURES -- and that is the point of the table below
-   * rather than one case per field. The tab used to hold two pickers reading ONE endpoint, so a single
-   * failure covered both and the test could not tell whether each field was consulting its own source.
-   * Since 03.3/03.8/03.10 each reads a different one: Recruiter Type the recruitment channels, Area
-   * Recruited the areas, Recruiter `/api/recruiters`. Driven as a table so that failing one list and
-   * asserting the OTHER TWO STAY QUIET is what proves the wiring, not just the message.
+   * 🔑 TWO PICKERS, TWO LISTS, TWO SEPARATE FAILURES -- and that is the point of the table below rather
+   * than one case per field. The tab used to hold two pickers reading ONE endpoint, so a single failure
+   * covered both and the test could not tell whether each field was consulting its own source. Recruiter
+   * Type reads the recruitment channels and Recruiter reads `/api/recruiters`. Driven as a table so that
+   * failing one list and asserting the OTHER STAYS QUIET is what proves the wiring, not just the message.
+   *
+   * 🗣️ Area Recruited left this table on 18 Sep 2026: SASBO asked for it to be read off the recruiter rather
+   * than chosen, so it has no list of its own to fail -- the case after the table holds that.
    */
   it.each([
     ['Recruiter Type', '*/api/recruitment-channels'],
-    ['Area Recruited', '*/api/areas'],
     ['Recruiter', '*/api/recruiters'],
   ])('says so at %s, and only there', async (label, endpoint) => {
     server.use(http.get(endpoint, boom), ...pageFixtures)
@@ -60,6 +61,18 @@ describe('Capture Member, when a list it offers failed', () => {
       screen.getAllByText(/could not be loaded/i),
       'one list failed; a second message means a field is reading a list that is not its own',
     ).toHaveLength(1)
+  })
+
+  it('🗣️ Area Recruited reads no list of its own any more: the suburbs failing says nothing on this tab', async () => {
+    // The area is the recruiter's demarcation letter (SASBO, 18 Sep 2026), not a pick from `/api/areas`. If the tab
+    // still read that list, failing it would put a message here.
+    server.use(http.get('*/api/areas', boom), ...pageFixtures)
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+
+    await user.click(screen.getByRole('button', { name: /^Recruitment Channel/ }))
+    await screen.findByText(/^Area Recruited/)
+    expect(screen.queryByText(/could not be loaded/i)).not.toBeInTheDocument()
   })
 
   it('⚠️ and the old shared endpoint no longer feeds this tab at all (S6/R5)', async () => {

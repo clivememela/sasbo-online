@@ -179,7 +179,7 @@ Each page component in `src/pages/`:
    - **Forms**: Generic forms page
 6. **Reports** (`reports/`):
     - **ReportOptions**: Report menu
-    - **OrganizerReport**: Generate organizer reports
+    - **OrganizerReport**: the **Location Visit** report — an organiser's visit to a branch or department (named "Location Visit" on screen since SASBO's 18 Sep 2026 ask; the route stays `/reports/organizer-report`)
     - **Locations**: Geographic reports
 7. **Archives** (`archives/`):
    - **ArchiveSearch**: Historical data search

@@ -230,6 +230,11 @@ export function sameDate(a, b) {
   return Boolean(a) && Boolean(b) && compareDates(a, b) === 0;
 }
 
+/** The same calendar MONTH -- year and month, whatever the day. Either missing is `false`, never a match. */
+export function sameMonth(a, b) {
+  return Boolean(a) && Boolean(b) && a.y === b.y && a.m === b.m;
+}
+
 /** 0 = Sunday. The CLDR first day for South Africa, and what the current app shows. */
 export function weekdayOf(date) {
   return new Date(date.y, date.m - 1, date.d).getDay();
