@@ -102,7 +102,7 @@ jobs:
       # Push only: a PR never deploys, so its decision is `true` without git being consulted, and no
       # full-history clone is bought for a branch that never reads it.
       - if: github.event_name == 'push'
-        uses: actions/checkout@v7 # SCRATCH R1-2: a tag, not a commit -- the pin check must go red
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false # history is fetched during checkout; nothing after it needs the network
