@@ -28,6 +28,10 @@ describe('the run vocabulary is the server\'s', () => {
 
   it('every exclusion reason the server publishes has the words an administrator reads', () => {
     expect(Object.keys(EXCLUSION_LABEL)).toEqual(acb.exclusionReasons.map((r) => r.name))
+    // SNAPSHOT_INCOMPLETE covers several fields -- a membership number, a surname, and since 00.5 the account type
+    // (RunPreparer.snapshotProblem) -- so its label must name none of them: the row's detail does. It once read
+    // "Membership number or surname missing" beside a detail of "no account type" (the presentation arc, 2026-09-22).
+    expect(EXCLUSION_LABEL.SNAPSHOT_INCOMPLETE).not.toMatch(/membership|surname|account type/i)
   })
 
   it('the refusal codes the screen branches on are codes the server gives', () => {

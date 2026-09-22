@@ -44,7 +44,9 @@ export const EXCLUSION_LABEL = Object.freeze({
   NO_SUBSCRIPTION_ROW: 'SASBO does not collect at this bank',
   DAY_OUT_OF_WINDOW: 'Debit day outside the 20th to the 31st',
   ACCOUNT_SHAPE_INVALID: 'Account number cannot go in the file',
-  SNAPSHOT_INCOMPLETE: 'Membership number or surname missing',
+  // General on purpose: the server files a missing membership number, a missing surname and -- since 00.5 -- a
+  // missing or unknown account type all under this reason, and the row's detail says which.
+  SNAPSHOT_INCOMPLETE: 'A detail the file needs is missing or invalid',
 });
 
 /** Why the bank declined a file, from the server's short list (D29, SD3-H). */
