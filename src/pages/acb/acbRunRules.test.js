@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { committedVocabulary } from '../../test/apiContractScan'
 import {
   CANCELLABLE, DEBIT_DAYS, DECIDABLE, DECISION_LABEL, DECLINE_REASON_LABEL, EXCLUSION_LABEL, LETTER_STATUS_LABEL,
-  LETTER_TEMPLATE_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, UNPAID_REASON_LABEL, asPage, calendarNotice,
+  LETTER_STATUS, LETTER_TEMPLATE_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, UNPAID_REASON_LABEL, asPage, calendarNotice,
   debitDayReplaced, debitsRuns, declinedMonthWarning, maskedAccount, monthLabel, ordinal, pollRun, preparableMonths,
   rateNote,
 } from './acbRunRules'
@@ -39,6 +39,7 @@ describe('the run vocabulary is the server\'s', () => {
     expect(Object.keys(UNPAID_REASON_LABEL)).toEqual(acb.unpaidReasons)
     expect(Object.keys(DECISION_LABEL)).toEqual(acb.unpaidDecisions)
     expect(Object.keys(LETTER_STATUS_LABEL)).toEqual(acb.letterStatuses)
+    expect(Object.values(LETTER_STATUS)).toEqual(acb.letterStatuses)
     expect(Object.keys(LETTER_TEMPLATE_LABEL)).toEqual(acb.letterTemplates)
   })
 

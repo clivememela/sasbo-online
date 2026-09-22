@@ -8,7 +8,7 @@ import reportError from '../../lib/reportError.js';
 import { acbRefusalOf, acbRunService } from '../../services/acbRunService.js';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import { PagerFor, usePagedRead } from './acbPaging.jsx';
-import { LETTER_TEMPLATE_LABEL, REFUSAL, couldNotGoBecause, monthLabel } from './acbRunRules.js';
+import { LETTER_STATUS, LETTER_TEMPLATE_LABEL, REFUSAL, couldNotGoBecause, monthLabel } from './acbRunRules.js';
 
 const PAGE_SIZE = 50;
 
@@ -70,7 +70,7 @@ export default function AcbHeldLetters({ run }) {
       setNotice({
         tone: 'ok',
         message: action === 'send'
-          ? `${letter.surname}’s letter was sent${letter.status === 'FAILED' ? ' again' : ''}.`
+          ? `${letter.surname}’s letter was sent${letter.status === LETTER_STATUS.FAILED ? ' again' : ''}.`
           : `${letter.surname}’s letter is marked as dealt with by hand. It leaves the list and is never sent.`,
       });
       retry();
@@ -118,8 +118,8 @@ export default function AcbHeldLetters({ run }) {
       cell: (letter) => (
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => start(letter, 'send')} disabled={!letter.canSend}
-            aria-label={`Send ${letter.surname || 'the member'}’s letter${letter.status === 'FAILED' ? ' again' : ''}`}>
-            {letter.status === 'FAILED' ? 'Send again' : 'Send'}
+            aria-label={`Send ${letter.surname || 'the member'}’s letter${letter.status === LETTER_STATUS.FAILED ? ' again' : ''}`}>
+            {letter.status === LETTER_STATUS.FAILED ? 'Send again' : 'Send'}
           </Button>
           {!letter.canSend && <span className="text-xs text-ink-muted">No address yet</span>}
           <Button variant="ghost" onClick={() => start(letter, 'handled')}
@@ -133,7 +133,7 @@ export default function AcbHeldLetters({ run }) {
 
   const letter = open?.letter;
   const sending = open?.action === 'send';
-  const again = letter?.status === 'FAILED';
+  const again = letter?.status === LETTER_STATUS.FAILED;
   return (
     <Sheet className="mt-6" aria-labelledby="acb-held-letters-heading">
       <div className="border-b border-line px-6 py-4">

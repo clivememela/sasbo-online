@@ -99,6 +99,15 @@ export const DECISION_LABEL = Object.freeze({
 });
 
 /** Where an unpaid's letter is. `QUEUED` is a letter that is waiting -- for an address, or for the send. */
+/** A letter's statuses -- the server's `letterStatuses`, named once so no screen spells one twice. */
+export const LETTER_STATUS = Object.freeze({
+  QUEUED: 'QUEUED',
+  RENDERED: 'RENDERED',
+  SENT: 'SENT',
+  FAILED: 'FAILED',
+  HANDLED: 'HANDLED',
+});
+
 export const LETTER_STATUS_LABEL = Object.freeze({
   QUEUED: 'Held',
   RENDERED: 'Waiting to send',
@@ -126,7 +135,7 @@ export const HELD_REASON_LABEL = Object.freeze({
  * message, which could carry the address.
  */
 export const couldNotGoBecause = (letter) => {
-  if (letter.status !== 'FAILED') return HELD_REASON_LABEL[letter.reason] ?? letter.reason;
+  if (letter.status !== LETTER_STATUS.FAILED) return HELD_REASON_LABEL[letter.reason] ?? letter.reason;
   if (letter.reason === 'LETTER_CHANGED_SINCE_RENDERED') return 'Not sent — the member’s details changed after it was written';
   if (letter.reason?.startsWith('LETTER_NOT_RENDERABLE')) return 'Not sent — the letter could not be written';
   return 'Sending failed';
