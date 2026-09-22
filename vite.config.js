@@ -142,8 +142,8 @@ export default defineConfig({
     // to think about it, and no test result depends on a developer's local
     // environment or on a file that ought not to be committed.
     env: {
-      VITE_API_BASE_URL: 'http://api.test.invalid',
-      VITE_GOOGLE_API_KEY: '',
+      VITE_API_BASE_URL: process.env.VITE_API_BASE_URL,
+      VITE_GOOGLE_API_KEY: process.env.VITE_GOOGLE_API_KEY,
     },
 
     // Co-located `*.test.js(x)` beside the unit under test. Stated explicitly
