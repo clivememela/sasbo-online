@@ -1,8 +1,8 @@
-// ⚠️ ONLY THE THREE ICONS THIS PAGE ACTUALLY RENDERS. Ten more were imported here and used
+// ⚠️ ONLY THE FOUR ICONS THIS PAGE ACTUALLY RENDERS. Ten more were imported here and used
 // nowhere but inside the commented-out card blocks below -- so a grep for each name found two
 // hits and concluded it was live, while eslint (which reads code, not comments) called all ten
 // dead. eslint was right. Anyone restoring one of those cards restores its icon import with it.
-import { Landmark, LucideCopyCheck, LucideMails } from "lucide-react";
+import { Landmark, LucideCopyCheck, LucideMails, UserRoundPen } from "lucide-react";
 import { NavigationList } from '../../components/common/NavigationCard.jsx';
 import { Page } from '../../components/common/Sheet.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
@@ -15,9 +15,20 @@ const maintenance_cards = [
         desc: 'Maintain Union Details',
         color: 'text-red-600 dark:text-red-400'
     },*/
+    /* 🗣️ SASBO, 18 Sep 2026 -- "in maintenance there was an option where we could edit the member",
+       and Bank/Branch was "not linking. It's not active." Editing a member happens on the member's own
+       record (the register at /members: open the member, then Edit), and /banks has had working add and
+       edit all along; this card had simply never been given its href. `navigation.js` mirrors both. */
+    {
+        title: 'Edit Member',
+        icon: UserRoundPen,
+        href: '/members',
+        desc: 'Find a member and edit their record'
+    },
     {
         title: 'Bank/Branch',
         icon: Landmark,
+        href: '/banks',
         desc: 'Maintain Bank/Branch'
     },
     /*{

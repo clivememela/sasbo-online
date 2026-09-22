@@ -8,6 +8,9 @@ import {
 import { memberService } from "@/services/memberService.js";
 import { jobGradeService } from "@/services/jobGradeService.js";
 import { bankService } from "@/services/bankService.js";
+import { recruiterService } from "@/services/recruiterService.js";
+import { recruitedArea } from "@/utils/recruitment.js";
+import useAsyncOptions from "../../hooks/useAsyncOptions.js";
 import { TextInput, SearchableSelect, SelectInput, Button, DateField } from "../../components/form";
 import StatusChip, { CANCELLED_STATUSES } from "../../components/common/StatusChip.jsx";
 import Table from "../../components/table/Table.jsx";
@@ -16,7 +19,7 @@ import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, IDENTITY_TYPE_PASSPORT,
-    DEBIT_DAY_OPTIONS, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
+    DEBIT_DAY_OPTIONS, PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
 } from "@/config/memberConstants.js";
 import {
     validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID
@@ -34,8 +37,8 @@ import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
 import { ERROR_KINDS, writeMayHaveLanded } from "@/services/parseApiError.js";
 import useFocusOn from "../../hooks/useFocusOn.js";
-import { formatDate, parseDate, sameDate, today } from "@/lib/format.js";
-import { sanitiseField, validateField } from "@/utils/inputRules.js";
+import { EMPTY, formatDate, formatZar, parseDate, sameDate, sameMonth, today } from "@/lib/format.js";
+import { finishField, sanitiseField, validateField } from "@/utils/inputRules.js";
 import { branchNamesForBank } from "@/utils/bankBranches.js";
 import { cn } from "@/lib/utils.js";
 import { formalName, personName } from "@/lib/names.js";
@@ -116,6 +119,12 @@ const TABS = RECORD_TABS;
 
 /** A record field's value, or "Not on file" when the record holds none -- never an invented default. */
 const notOnFile = (value) => (value === null || value === undefined || String(value).trim() === "" ? "Not on file" : value);
+
+/** An amount on file through the one formatter (00.2, F33), or "Not on file" -- never R 0,00 for nothing. */
+const amountOnFile = (value) => {
+    const shown = formatZar(value);
+    return shown === EMPTY ? notOnFile(null) : shown;
+};
 
 /*
  * 🗣️ WHERE EACH OF THE FIVE SECTIONS SITS IN THE RECORD'S TAB STRIP -- the owner's
@@ -428,6 +437,34 @@ export default function Members() {
     const refs = useReferenceData(REFERENCE_LOADERS);
     const bankNames = refs.data.banks;
 
+    /*
+     * 🗣️ THE AREA THE MEMBER WAS RECRUITED IN, AS THE CAPTURE SCREEN NOW SHOWS IT (SASBO, 18 Sep 2026): read off the
+     * recruiter -- their demarcation letter -- rather than chosen (`utils/recruitment.js`).
+     *
+     * 🔑 A STORED AREA WINS. It is a historical fact recorded at capture (V24) and is shown exactly as held. Only a
+     * record with none -- every member captured from now on, and the 160 the seed carries -- has it read off their
+     * recruiter, with a note saying so.
+     *
+     * ⚠️ FETCHED ONLY WHILE THE RECRUITMENT TAB IS OPEN, and only when it is needed. Not in `REFERENCE_LOADERS`:
+     * that set's failure is the whole page's `partial` notice, and a recruiter list that failed is a fact about one
+     * read-only line on one tab -- which is where it is said.
+     */
+    const recordStoredArea = String(editForm.areaRecruited ?? "").trim();
+    const recordRecruiterName = String(editForm.recruitmentRepresentativeName ?? "").trim();
+    const recordRecruiters = useAsyncOptions(
+        () => recruiterService.getRecruiters(),
+        [],
+        { enabled: activeTab === "representatives" && !recordStoredArea && Boolean(recordRecruiterName) },
+    );
+    const recordArea = recordStoredArea
+        ? { text: recordStoredArea, note: undefined }
+        : recruitedArea({
+            channel: editForm.recruitedHow,
+            recruiterName: recordRecruiterName,
+            recruiters: recordRecruiters.options,
+            listState: recordRecruiters.loading ? "loading" : recordRecruiters.error ? "failed" : "ready",
+        });
+
     /**
      * A27 — THE THREE STATES, AT LAST, AND THE DEFECT WAS THAT THERE WAS ONLY ONE.
      *
@@ -685,6 +722,18 @@ export default function Members() {
         setFieldErrors({});
         setIsEditing(true);
     };
+
+    /**
+     * 🗣️ A NAME STARTS WITH A CAPITAL (SASBO, 18 Sep 2026) -- tidied as the field is LEFT, where the change can be seen,
+     * by the rule both member screens share (`finishField`, utils/inputRules.js). Only first letters are ever raised.
+     * No new object when nothing changed, so leaving an untouched field does not count as an edit.
+     */
+    const handleEditBlur = useCallback((field) => () => {
+        setEditForm((prev) => {
+            const finished = finishField(field, prev[field]);
+            return finished === prev[field] ? prev : { ...prev, [field]: finished };
+        });
+    }, []);
 
     const handleEditChange = useCallback((field) => (event) => {
         let rawValue = fieldValue(event);
@@ -1062,11 +1111,18 @@ export default function Members() {
     const registerFigures = useMemo(() => {
         const by = (status) => membersList.filter((m) => m?.status === status).length;
         const now = today();
+        // 🗣️ SASBO, 18 Sep 2026: the month's new members, and how many of them pay by debit order. "New" is the
+        // member's own Date Joined -- the day they were captured, which capture fills in and does not let anyone
+        // change -- in this calendar month; the payment type is read through the same fold the record uses, so a
+        // legacy spelling counts as what it is.
+        const joinedThisMonth = membersList.filter((m) => sameMonth(parseDate(m?.joinDate), now));
         return {
             total: membersList.length,
             active: by("Active"),
             pending: by("Pending"),
             suspended: by("Suspended"),
+            newThisMonth: joinedThisMonth.length,
+            newDebitOrders: joinedThisMonth.filter((m) => normalizePaymentType(m?.paymentType) === PAYMENT_TYPE_DEBIT_ORDER).length,
             // card.html's fifth, quiet figure. `dateLastChanged` is the wire's name for the
             // record's last edit; a register that carries none simply reads 0.
             updatedToday: membersList.filter((m) =>
@@ -1590,9 +1646,9 @@ export default function Members() {
                             {activeTab === "personal" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
                                     <Detail label="Title" value={editForm.title} isEditing={isEditing} options={titleOptions} onChange={handleEditChange("title")} />
-                                    <Detail label="Initials" value={editForm.initials} isEditing={isEditing} onChange={handleEditChange("initials")} error={fieldErrors.initials} />
-                                    <Detail label="First Name(s)" value={editForm.firstNames} isEditing={isEditing} onChange={handleEditChange("firstNames")} error={fieldErrors.firstNames} required kind="name" />
-                                    <Detail label="Surname" value={editForm.surname} isEditing={isEditing} onChange={handleEditChange("surname")} error={fieldErrors.surname} required kind="name" />
+                                    <Detail label="Initials" value={editForm.initials} isEditing={isEditing} onChange={handleEditChange("initials")} onBlur={handleEditBlur("initials")} error={fieldErrors.initials} />
+                                    <Detail label="First Name(s)" value={editForm.firstNames} isEditing={isEditing} onChange={handleEditChange("firstNames")} onBlur={handleEditBlur("firstNames")} error={fieldErrors.firstNames} required kind="name" />
+                                    <Detail label="Surname" value={editForm.surname} isEditing={isEditing} onChange={handleEditChange("surname")} onBlur={handleEditBlur("surname")} error={fieldErrors.surname} required kind="name" />
                                     <Detail label="Identity Type" value={editForm.identityType} isEditing={isEditing} options={idTypeOptions} onChange={handleEditChange("identityType")} error={fieldErrors.identityType} required />
                                     <Detail
                                         label={editForm.identityType || "Identity Number"}
@@ -1678,7 +1734,7 @@ export default function Members() {
                                     <h4 className="col-span-full mt-1.5 border-t border-line pt-[18px] text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Sasbo Subscription Fee Details</h4>
                                     {/* 🔴 A MEMBER WITH NO SUBSCRIPTION ON FILE WAS SHOWN R182.77, MONTHLY (`06.4`) -- two invented
                                         facts about their money, printed as if the record held them. The absence is said instead. */}
-                                    <Detail label="Monthly Subscription (ZAR)" value={notOnFile(selectedMember.monthlySubscription)} isEditing={false} />
+                                    <Detail label="Monthly Subscription (ZAR)" value={amountOnFile(selectedMember.monthlySubscription)} isEditing={false} />
                                     <Detail label="Billing Frequency" value={notOnFile(selectedMember.subscriptionFrequency)} isEditing={false} />
                                 </div>
                             )}
@@ -1699,7 +1755,10 @@ export default function Members() {
                                         Read-only here, editable on capture: a recruiter is assigned where the member
                                         is captured, and these three are a historical fact about that moment. */}
                                     <Detail label="Recruiter Type" value={editForm.recruitedHow} isEditing={false} />
-                                    <Detail label="Area Recruited" value={editForm.areaRecruited} isEditing={false} />
+                                    {/* 🗣️ SASBO, 18 Sep 2026: the area follows the recruiter. A stored area is shown as
+                                        held; otherwise it is read off the recruiter, and the note says whose it is --
+                                        or why there is none (`recordArea`, above). */}
+                                    <Detail label="Area Recruited" value={recordArea.text} note={recordArea.note} isEditing={false} />
                                     <Detail label="Recruiter" value={editForm.recruitmentRepresentativeName} isEditing={false} />
                                 </div>
                             )}
@@ -1841,14 +1900,17 @@ function recordIsDirty({ isEditing, baseline, editForm }) {
     return isEditing && baseline !== null && JSON.stringify(editForm) !== baseline;
 }
 
-function Detail({ label, value, isEditing, onChange, className = "", options = null, kind = "text", error = null, disabled = false, required = false, loadError = null, onRetryLoad }) {
+function Detail({ label, value, isEditing, onChange, onBlur, className = "", options = null, kind = "text", error = null, disabled = false, required = false, loadError = null, onRetryLoad, note = null }) {
     if (!isEditing) {
         /* card.css `.field`: the label in small capitals, the value in ink, no box around
-           either -- a record reads as a record, not as a form with its inputs disabled. */
+           either -- a record reads as a record, not as a form with its inputs disabled.
+           `note` is a DERIVED value's provenance (`utils/derivation.js`): where it came from, or why
+           it is empty -- in the muted small type every other note on these screens uses. */
         return (
             <div className={cn("field record-rise min-w-0", className)}>
                 <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">{label}</p>
                 <p className="min-h-[21px] text-base font-medium text-ink [overflow-wrap:anywhere]">{value || "—"}</p>
+                {note && <p className="mt-1 text-xs text-ink-muted">{note}</p>}
             </div>
         );
     }
@@ -1882,6 +1944,7 @@ function Detail({ label, value, isEditing, onChange, className = "", options = n
             label={label}
             value={value}
             onChange={onChange}
+            onBlur={onBlur}
             kind={kind}
             error={error || undefined}
             disabled={disabled}

@@ -174,6 +174,24 @@ describe('Recruiters', () => {
       expect(said.closest('[role="status"]')).not.toBeNull()
     })
 
+    it('🔒 00.2: the PUT carries no money it would write back as R 0,00 -- an omitted key keeps what is on file', async () => {
+      // `|| 0` wrote a member with no subscription or balance on file back as a real zero. Server 0cf00e1's
+      // IGNORE strategy keeps an omitted key, so the three amounts are not sent at all.
+      let sent
+      server.use(http.put('*/api/members/:id', async ({ request }) => {
+        sent = await request.json()
+        return HttpResponse.json(sent)
+      }))
+      await addTheCandidate(setupUser())
+
+      await waitFor(() => expect(sent).toBeDefined())
+      for (const money of ['monthlySubscription', 'currentBalance', 'arrearsBalance']) {
+        expect(sent, money).not.toHaveProperty(money)
+      }
+      // The must-pass: the builder still sends the record it was given.
+      expect(sent).toMatchObject({ id: 41, membershipNumber: 'M0041', surname: 'Candidate' })
+    })
+
     it('the must-pass: an add that failed still says so, as a failure', async () => {
       server.use(http.put('*/api/members/:id', boom))
       const dialog = await addTheCandidate(setupUser())

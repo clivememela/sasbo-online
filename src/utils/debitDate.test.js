@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { actualDebitDate, debitDateSentence, lastBusinessDayOnOrBefore } from './debitDate'
+import { actualDebitDate, debitDateSentence, holidaySetFor, lastBusinessDayOnOrBefore } from './debitDate'
 
 /**
  * 04.3 — the actual debit date.
@@ -19,10 +19,11 @@ describe('lastBusinessDayOnOrBefore', () => {
     expect(lastBusinessDayOnOrBefore(new Date(2026, 7, 21)).getDate()).toBe(21)
   })
 
-  it('moves BACKWARDS off a weekend, never forwards', () => {
-    // Sunday 23 August 2026 -> Friday the 21st. Forwards would be Monday the 24th,
-    // which for a month-end debit day would push the collection into the next month
-    // and change which month the member has paid for.
+  it('moves BACKWARDS off a weekend, never forwards -- the month-end fallback it serves', () => {
+    // Sunday 23 August 2026 -> Friday the 21st. The rule only asks this helper when
+    // going forward would leave the month, so it must never step forwards itself: at a
+    // month end that would push the collection into the next month and change which
+    // month the member has paid for.
     expect(lastBusinessDayOnOrBefore(new Date(2026, 7, 23)).getDate()).toBe(21)
     // Saturday the 22nd, same answer.
     expect(lastBusinessDayOnOrBefore(new Date(2026, 7, 22)).getDate()).toBe(21)
@@ -60,9 +61,8 @@ describe('actualDebitDate', () => {
   })
 
   it('says whether public holidays were accounted for -- and by default they are not', () => {
-    // The fallback has to be VISIBLE, not assumed. No maintained holiday source is
-    // wired to this application, so an answer that did not say so would be
-    // overstating what it knows.
+    // The fallback has to be VISIBLE, not assumed. Without the run's calendar an
+    // answer that did not say so would be overstating what it knows.
     expect(actualDebitDate(21, AUG_2026).holidaysKnown).toBe(false)
     expect(actualDebitDate(21, AUG_2026, new Set(['2026-08-09'])).holidaysKnown).toBe(true)
   })
@@ -85,23 +85,26 @@ describe('actualDebitDate', () => {
   })
 })
 
-describe('🔴 A57 -- a non-business day moves BACKWARD, and forward only where backward would fall below the 20th', () => {
-  // The source of the rule: a SASBO "Not Provided For" re-debit letter (printed
-  // 11/09/26, planning/branches/acb/legacy/) tells the member that debits run on the
-  // 20th and that a Saturday, Sunday or public holiday moves the date FORWARD to the
-  // next weekday; the specification's 18 August worked example says the same. The
-  // rule here used to move backwards only, which put a Saturday 20th on Friday the
-  // 19th -- below the 20-31 window the debit day exists to respect.
+describe('🔴 A57 / Q33 -- a non-business day moves FORWARD, and backward only where forward would leave the month', () => {
+  // The source of the rule: SASBO's answer to question 33 (2026-09-21) -- "If a debit
+  // date is on the 25th and it is a Saturday it will move to the following business day
+  // which is the 27 ... we never go into the next month" -- and their July 2026 bureau
+  // file, which moved Saturday the 25th to Monday the 27th. It overrules the signed
+  // specification's backward-first reading, which this file ran until that answer.
 
-  it('🔴 a weekend INSIDE the window moves BACKWARD -- the 18 August rule: day 25, Saturday 25 July 2026, is Friday 24 July', () => {
-    // Spec, 18 Aug session (SASBO Membership System.txt:1862): "it must move backward to the most recent business day
-    // within the same month"; A.7 glossary (:3668) says the same. Forward is only the bottom-of-window exception.
-    // Found by the ACB arc (sasbo-online-8a): an always-forward rule differs from the spec on 56 of 288 cells in
-    // 2026-2027, and none of the spec's three examples tells the two apart.
-    expect(actualDebitDate(25, new Date(2026, 6, 1))).toMatchObject({ iso: '2026-07-24', day: 24, adjusted: true })
-    // 26 and 27 September 2026 are a weekend: both are Friday the 25th, not Monday the 28th.
-    expect(actualDebitDate(26, new Date(2026, 8, 1)).iso).toBe('2026-09-25')
-    expect(actualDebitDate(27, new Date(2026, 8, 1)).iso).toBe('2026-09-25')
+  it('🔴 a weekend INSIDE the window moves FORWARD -- SASBO\'s own example: day 25, Saturday 25 July 2026, is Monday 27 July', () => {
+    // The case that separates the two readings (W6). A backward-first rule says Friday the 24th, and agrees with this
+    // one on all three of the specification's examples -- they differ on 56 of 288 cells in 2026-2027.
+    expect(actualDebitDate(25, new Date(2026, 6, 1))).toMatchObject({ iso: '2026-07-27', day: 27, adjusted: true })
+    // 26 and 27 September 2026 are a weekend: both are Monday the 28th, not Friday the 25th.
+    expect(actualDebitDate(26, new Date(2026, 8, 1)).iso).toBe('2026-09-28')
+    expect(actualDebitDate(27, new Date(2026, 8, 1)).iso).toBe('2026-09-28')
+  })
+
+  it('🟡 the seam, provisional until SASBO\'s August 2026 file answers question 47: a Sunday 30th with Monday 31st free goes forward', () => {
+    // 30 August 2026 is a Sunday and the 31st a Monday: forward stays in the month, so the rule goes forward (W17).
+    // SASBO's sentence read literally ("the 30 or 31st ... moved back") would say Friday the 28th.
+    expect(actualDebitDate(30, new Date(2026, 7, 1)).iso).toBe('2026-08-31')
   })
 
   it('a Saturday 20th is debited on Monday the 22nd, never Friday the 19th', () => {
@@ -146,7 +149,7 @@ describe('debitDateSentence', () => {
     expect(sentence).toContain('Friday 27 February')
   })
 
-  it('carries the weekends-only caveat while no holiday source is wired', () => {
+  it('carries the weekends-only caveat when no calendar is supplied', () => {
     expect(debitDateSentence(31, new Date(2026, 1, 10)))
       .toContain('Weekends only — public holidays are not accounted for.')
   })
@@ -157,7 +160,53 @@ describe('debitDateSentence', () => {
       .not.toContain('Weekends only')
   })
 
-  it('stays plain when nothing was adjusted', () => {
-    expect(debitDateSentence(21, AUG_2026)).toBe('This member will be debited on Friday 21 August.')
+  it('🔴 carries the caveat on an UNMOVED date too -- a weekday can be a public holiday', () => {
+    // It used to stay plain here, which is the one case the caveat exists for: Heritage Day, Thursday
+    // 24 September 2026, read as certain while the run debited Friday the 25th.
+    expect(debitDateSentence(24, new Date(2026, 8, 22))).toBe(
+      'This member will be debited on Thursday 24 September.'
+      + ' Weekends only — public holidays are not accounted for.')
+  })
+
+  it('stays plain when nothing was adjusted and the calendar is known', () => {
+    expect(debitDateSentence(21, AUG_2026, new Set(['2026-08-09', '2026-08-10'])))
+      .toBe('This member will be debited on Friday 21 August.')
+  })
+
+  it('🔴 with the calendar, a weekday holiday moves like a weekend: day 24 in September 2026 is Friday the 25th', () => {
+    expect(debitDateSentence(24, new Date(2026, 8, 22), new Set(['2026-09-24']))).toBe(
+      'That day is not a business day, so this member will be debited on Friday 25 September.')
+  })
+
+  it('starts with a capital letter whichever reason leads it', () => {
+    // Saturday 26 September 2026 moves forward to Monday the 28th: the day was only moved,
+    // so "that day is not a business day" opens the sentence.
+    expect(debitDateSentence(26, new Date(2026, 8, 1))).toBe(
+      'That day is not a business day, so this member will be debited on Monday 28 September.'
+      + ' Weekends only — public holidays are not accounted for.')
+    // The twin: when the month is short, its name leads, as it always did.
+    expect(debitDateSentence(31, new Date(2026, 1, 10))).toMatch(/^February has no 31st, and that day/)
+  })
+})
+
+describe('holidaySetFor -- the run\'s calendar, as the set the sentence takes (D30)', () => {
+  const HERITAGE_DAY = { date: '2026-09-24', name: 'Heritage Day', source: 'STATUTORY' }
+  const calendar = (knownUntil) => ({ name: 'za-statutory', knownUntil, endingSoon: false, year: 2026, holidays: [HERITAGE_DAY] })
+
+  it('is the year\'s dates when the calendar reaches the end of the month', () => {
+    expect([...holidaySetFor(calendar('2027-12-31'), new Date(2026, 8, 22))]).toEqual(['2026-09-24'])
+    // The boundary: reaching the month's last day exactly is reaching it.
+    expect(holidaySetFor(calendar('2026-09-30'), new Date(2026, 8, 22)).size).toBe(1)
+  })
+
+  it('is EMPTY when the calendar stops before the month ends -- the run refuses that month (HOLIDAYS_NOT_KNOWN)', () => {
+    expect(holidaySetFor(calendar('2026-09-29'), new Date(2026, 8, 22)).size).toBe(0)
+  })
+
+  it('is EMPTY for anything that is not a calendar', () => {
+    // `[]` is what the page tests' GET wildcard answers; `none` is a database that holds no calendar.
+    for (const notACalendar of [[], null, undefined, { name: 'none', knownUntil: null, holidays: [] }]) {
+      expect(holidaySetFor(notACalendar, new Date(2026, 8, 22)).size).toBe(0)
+    }
   })
 })

@@ -10,10 +10,31 @@ import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
 
+/*
+ * 📉 THIS FILE PAGES THE REGISTER AT TEN ROWS, NOT A HUNDRED -- the cost is the reason, and nothing it pins needs more.
+ *
+ * Reaching page 3 at the real size takes 250 members, and every step then renders a hundred rows through `Table`
+ * while a MutationObserver records each node: 1.96 to 8.26s a test, measured alone on a lightly loaded box (2026-09-21),, and red in the automation arc's p17 and p19
+ * at the suite's 20s `testTimeout` once the box was busy. What this file pins -- the page derived during render, so
+ * no frame shows "No member matches" on the way to real rows; the must-pass that the watch can see that title; the
+ * clamp kept after the search clears -- is about deriving `page` from the filtered list, and holds at any page size.
+ * At ten rows, page 3 takes 25 members, and a test costs 0.48 to 2.72s on the same box -- the worst of them a seventh of the budget, not two fifths.
+ *
+ * The size is the page's own: `Members.jsx` reads `memberService.getPageSize()` once, at module load, so the mock
+ * replaces that one getter and nothing else -- the members still come over the network, through MSW. `vi.hoisted`
+ * because `vi.mock` is hoisted above this file's imports and constants, and its factory would otherwise read one
+ * uninitialised.
+ */
+const { PAGE_SIZE } = vi.hoisted(() => ({ PAGE_SIZE: 10 }))
+vi.mock('@/services/memberService.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, memberService: { ...actual.memberService, getPageSize: () => PAGE_SIZE } }
+})
+
 /**
  * 🔴 SEARCH FROM PAGE 3 AND THE REGISTER SAID "NO MEMBER MATCHES" -- FOR MEMBERS IT WAS ABOUT TO SHOW. `10.4`.
  *
- * The register pages at 100 rows. When the list shrinks, `page` has to come down with it, and it did -- through an
+ * The register pages at 100 rows (this file mocks it to 10 -- see above). When the list shrinks, `page` has to come down with it, and it did -- through an
  * effect (`setPage(p => Math.min(p, totalPages))`), which `react-hooks/set-state-in-effect` makes an error this
  * phase. The warning looked like a style complaint. It was describing a real frame:
  *
@@ -37,11 +58,10 @@ import { setupUser } from '../../test/user'
  * transition. Written against the code BEFORE the fix, so that it goes red for the real reason first.
  */
 
-const PAGE_SIZE = 100
 const NEEDLES = 5
 
-// 250 members, so page 3 exists; five of them share a surname nobody else has.
-const MEMBERS = Array.from({ length: 250 }, (_, i) => ({
+// 25 members at ten a page, so page 3 exists; five of them share a surname nobody else has.
+const MEMBERS = Array.from({ length: 2 * PAGE_SIZE + NEEDLES }, (_, i) => ({
   id: i + 1,
   membershipNumber: `M${String(i + 1).padStart(5, '0')}`,
   firstNames: 'Synthetic',
@@ -113,7 +133,7 @@ describe('the register, searched from a later page', () => {
     await screen.findByText('M00001')
     await user.click(screen.getByRole('button', { name: /Next/ }))
     await user.click(screen.getByRole('button', { name: /Next/ }))
-    // Page 3 is rows 201-250.
+    // Page 3 is the last five rows.
     expect(await screen.findByText(`M${String(2 * PAGE_SIZE + 1).padStart(5, '0')}`)).toBeInTheDocument()
     return view
   }

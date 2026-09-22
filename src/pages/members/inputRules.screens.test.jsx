@@ -119,6 +119,43 @@ describe('Capture Member', () => {
   })
 })
 
+describe('Capture Member · names start with a capital (SASBO, 18 Sep 2026)', () => {
+  const field = (text) => screen.getByLabelText(label(text))
+
+  it('🗣️ a name is given its capital as the field is LEFT, never under the caret', async () => {
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+    await screen.findByLabelText(/^First Name\(s\)/)
+
+    await user.type(field('First Name(s)'), 'zola thabo')
+    expect(field('First Name(s)'), 'nothing moves while it is being typed').toHaveValue('zola thabo')
+    await user.tab()
+    expect(field('First Name(s)')).toHaveValue('Zola Thabo')
+    expect(field('Initials'), 'the derived initials were capitals already').toHaveValue('ZT')
+
+    await user.type(field('Surname'), 'janse van rensburg')
+    await user.tab()
+    expect(field('Surname')).toHaveValue('Janse van Rensburg')
+  })
+
+  it('🔑 and what was typed with its own capitals is left exactly as typed', async () => {
+    // The automation suite's surnames are read back and cleaned up by exact match; a real name like McDonald is its
+    // own. Raising first letters is all the rule may do.
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+    await screen.findByLabelText(/^Surname/)
+
+    await user.type(field('Surname'), 'ZZ-AT-member-abq')
+    await user.tab()
+    expect(field('Surname')).toHaveValue('ZZ-AT-member-abq')
+
+    await user.clear(field('Surname'))
+    await user.type(field('Surname'), 'McDonald')
+    await user.tab()
+    expect(field('Surname')).toHaveValue('McDonald')
+  })
+})
+
 describe('Edit Member', () => {
   const ALPHA = {
     id: 7, membershipNumber: 'M0007', firstNames: 'Synthetic', surname: 'Alpha', initials: 'S',
@@ -166,5 +203,31 @@ describe('Edit Member', () => {
 
     expect(screen.queryByRole('dialog', { name: 'Save these changes?' })).not.toBeInTheDocument()
     await waitFor(() => expect(panel().getByLabelText(/^Home Tel/)).toHaveAttribute('aria-invalid', 'true'))
+  })
+
+  it('🗣️ a name is given its capital as the field is left -- the same rule as capture (SASBO, 18 Sep 2026)', async () => {
+    const user = setupUser()
+    await editAlpha(user)
+    const surname = await panel().findByLabelText(/^Surname/)
+    await user.clear(surname)
+    await user.type(surname, 'van der merwe')
+    expect(surname, 'nothing moves under the person typing').toHaveValue('van der merwe')
+
+    await user.tab()
+    expect(surname).toHaveValue('Van der Merwe')
+  })
+
+  it('the must-pass: leaving a name that already has its capital is not an edit', async () => {
+    // The record counts an edit by serialising the form against its baseline, so the rule must leave a proper name
+    // byte-for-byte alone -- a rule that trimmed, collapsed or re-cased anything would turn every focus-and-leave into
+    // "Save these changes?" for a change nobody made.
+    const user = setupUser()
+    await editAlpha(user)
+    await user.click(await panel().findByLabelText(/^Surname/))
+    await user.tab()
+
+    await user.click(screen.getByRole('button', { name: /^Save changes$/ }))
+    expect(await screen.findByText('Nothing to save')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Save these changes?' })).not.toBeInTheDocument()
   })
 })

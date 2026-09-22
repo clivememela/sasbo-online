@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw'
 import AcbDebits from './AcbDebits'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
+import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
 
 /**
@@ -34,6 +35,13 @@ const RECORD = {
   status: 'Active',
 }
 
+/** The search's row for the same member (`04.1`): masked, and no identity number. */
+const FOUND = {
+  content: [{ id: 7, membershipNumber: 'SYN-0007', title: 'Mr', initials: 'S', surname: 'Testperson',
+    bankName: 'Synthetic Bank', accountLastFour: '0001', debitDay: null, status: 'Active' }],
+  page: 0, size: 25, totalElements: 1, totalPages: 1,
+}
+
 async function openTheBankingDialog() {
   const user = setupUser()
   renderWithProviders(<AcbDebits />)
@@ -50,8 +58,9 @@ describe('AcbDebits, updating banking details', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     server.use(
-      http.get('*/api/members', () => HttpResponse.json([RECORD])),
+      http.post('*/api/acb/members/search', () => HttpResponse.json(FOUND)),
       http.get('*/api/members/:id', () => HttpResponse.json(RECORD)),
+      ...pageFixtures,
     )
   })
 
@@ -113,5 +122,71 @@ describe('AcbDebits, updating banking details', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByText('62000000002')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('AcbDebits, the debit day (Q42)', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    server.use(
+      http.post('*/api/acb/members/search', () => HttpResponse.json(FOUND)),
+      ...pageFixtures,
+    )
+  })
+
+  it('R4-2: the debit day is a choice of the window -- the 20th to the 31st, and nothing else', async () => {
+    server.use(http.get('*/api/members/:id', () => HttpResponse.json({ ...RECORD, debitDay: 25 })))
+    const { dialog } = await openTheBankingDialog()
+    const day = within(dialog).getByLabelText('Debit Day')
+    expect(day.tagName).toBe('SELECT')
+    expect(day).toHaveValue('25')
+    const offered = within(day).getAllByRole('option').map((o) => o.value).filter(Boolean)
+    expect(offered).toEqual(['20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31'])
+    expect(within(day).getByRole('option', { name: '31st' })).toBeInTheDocument()
+  })
+
+  it('R4-2: a day on record outside the window is shown and said, never silently replaced', async () => {
+    let sent
+    server.use(
+      http.get('*/api/members/:id', () => HttpResponse.json({ ...RECORD, debitDay: 5 })),
+      http.patch('*/api/members/:id/banking', async ({ request }) => {
+        sent = await request.json()
+        return HttpResponse.json({ ...RECORD, ...sent })
+      }),
+    )
+    const { user, dialog } = await openTheBankingDialog()
+    expect(within(dialog).getByText(/5th on record is outside the 20th to the 31st/)).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(sent).toBeDefined())
+    expect(sent.debitDay).toBe('5')
+  })
+
+  it('🔴 A67: when the server keeps another day than the one chosen, the page says so', async () => {
+    server.use(
+      http.get('*/api/members/:id', () => HttpResponse.json({ ...RECORD, debitDay: 25 })),
+      // What main's member service does today: the bank's day over the member's own.
+      http.patch('*/api/members/:id/banking', async ({ request }) =>
+        HttpResponse.json({ ...RECORD, ...(await request.json()), debitDay: 25 })),
+    )
+    const { user, dialog } = await openTheBankingDialog()
+    await user.selectOptions(within(dialog).getByLabelText('Debit Day'), '28')
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+
+    expect(await screen.findByText(/saved as the 25th, not the 28th chosen/)).toBeInTheDocument()
+  })
+
+  it('the must-pass: a day the server keeps as chosen says nothing more', async () => {
+    server.use(
+      http.get('*/api/members/:id', () => HttpResponse.json({ ...RECORD, debitDay: 25 })),
+      http.patch('*/api/members/:id/banking', async ({ request }) =>
+        HttpResponse.json({ ...RECORD, ...(await request.json()) })),
+    )
+    const { user, dialog } = await openTheBankingDialog()
+    await user.selectOptions(within(dialog).getByLabelText('Debit Day'), '28')
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByText('28th')).toBeInTheDocument()
+    expect(screen.queryByText(/not the .* chosen/)).not.toBeInTheDocument()
   })
 })

@@ -185,9 +185,16 @@ export function yearsBetween(from, to = today()) {
   return years;
 }
 
-/** Rands, always two decimals, always `en-ZA`. `null`/`undefined` render as the em dash. */
+/**
+ * Rands, always two decimals, always `en-ZA`. Anything that is not an amount renders as the em dash.
+ *
+ * 🔴 ONLY A NUMBER, OR A STRING THAT IS ONE, IS AN AMOUNT. `Number(null)`, `Number('')`, `Number('  ')`,
+ * `Number([])` and `Number(false)` are all 0, so the obvious `Number.isFinite(Number(value))` shows a member with
+ * no subscription as one who pays R 0,00 -- two different facts, and the second is the kind that reaches a finance
+ * report. `formatSubscriptionAmount` kept this rule for the capture form; it is the one formatter's now (00.2, F33).
+ */
 export function formatZar(value) {
-  if (value == null || value === '') return EMPTY;
+  if (typeof value === 'string' ? value.trim() === '' : typeof value !== 'number') return EMPTY;
   const number = Number(value);
   if (!Number.isFinite(number)) return EMPTY;
   return `R ${ZAR.format(number)}`;
@@ -221,6 +228,11 @@ export function compareDates(a, b) {
 /** Same calendar day? Tolerates null on either side, because callers hold optional dates. */
 export function sameDate(a, b) {
   return Boolean(a) && Boolean(b) && compareDates(a, b) === 0;
+}
+
+/** The same calendar MONTH -- year and month, whatever the day. Either missing is `false`, never a match. */
+export function sameMonth(a, b) {
+  return Boolean(a) && Boolean(b) && a.y === b.y && a.m === b.m;
 }
 
 /** 0 = Sunday. The CLDR first day for South Africa, and what the current app shows. */

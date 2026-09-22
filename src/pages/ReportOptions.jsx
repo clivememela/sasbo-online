@@ -4,7 +4,7 @@ import { Page } from '../components/common/Sheet.jsx';
 import PageTitle from '../components/common/PageTitle';
 
 const cards = [
-  { title: 'Organizer Report', icon: NotebookPen, href: '/reports/organizer-report', desc: 'Complete visit report' },
+  { title: 'Location Visit', icon: NotebookPen, href: '/reports/organizer-report', desc: 'Record a visit to a branch or department' },
   { title: 'Forms', icon: Form, href: '/reports/forms', desc: 'Complete Branch Form (Online/Offline), Membership/Non-Membership' },
   { title: 'Location Listing', icon: MapPinnedIcon, href: '/reports/locations', desc: 'Location Listings/Bulk Location Listings' },
 ];

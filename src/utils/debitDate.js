@@ -8,17 +8,23 @@
  * the only sentence this form can tell an administrator that they did not already
  * know, and the rule behind it exists nowhere in either repository.
  *
- * <h2>The rule (A57, as the signed specification states it)</h2>
- * A debit day that lands on a non-business day moves <b>BACKWARD</b> to the most recent business day in the same
- * month -- the 18 August session ("it must move backward to the most recent business day within the same month")
- * and the A.7 glossary. <b>Only when backward would fall below the 20th</b> does it move forward instead: the
- * session's own example (a Sunday 20th is processed on Monday the 21st) and SASBO's re-debit letter, which only
- * ever debits on the 20th. So the date never falls below the 20th and never leaves its month.
+ * <h2>The rule (A57, as SASBO answered question 33 on 2026-09-21)</h2>
+ * A debit day that lands on a non-business day moves <b>FORWARD</b> to the next business day in the same month
+ * -- "If a debit date is on the 25th and it is a Saturday it will move to the following business day which is
+ * the 27". <b>Only when forward would leave the month</b> does it move backward instead -- "We never go into the
+ * next month. If the debit date is on the 30 or 31st and that fall on a weekend it moved back to the available
+ * business day." So the date never falls below the 20th and never leaves its month. Their July 2026 bureau file
+ * did exactly this: nobody on Friday the 24th, 365 members on Monday the 27th. The server's DebitWindow runs the
+ * same rule, and each is held to one generated fixture, `src/test/debit-window.json` -- never to the other.
  *
- * 🔴 History, because it went wrong twice. The first rule moved backward ALWAYS, which put a Saturday 20th on
- * Friday the 19th, outside the window. The first correction over-reached and moved EVERY weekend forward, which
- * matched all three of the spec's examples and disagreed with its rule on 56 of 288 cells in 2026-2027 (day 25
- * in July 2026: Friday the 24th, not Monday the 27th). Found by the ACB arc; the test pins a mid-window weekend.
+ * 🔴 History, because it went wrong three times. The first rule moved backward ALWAYS, which put a Saturday 20th
+ * on Friday the 19th, outside the window. The first correction moved every weekend forward, backward only at
+ * month end -- the rule above. It was then turned round to the signed specification's reading (18 August session
+ * and A.7 glossary: backward first, forward only below the 20th), and SASBO overruled their own specification
+ * with the answer quoted above. The two readings agree on all three of the spec's examples and differ on 56 of
+ * 288 cells in 2026-2027 (day 25 in July 2026: Monday the 27th, not Friday the 24th); the tests pin a mid-window
+ * weekend. 🟡 One seam is SASBO's to settle (question 47): a Sunday 30th with Monday the 31st free goes forward
+ * here, and back if their sentence is read literally -- first live on 30 May 2027.
  *
  * <h2>🔴 IT MUST ITERATE, NOT STEP ONCE</h2>
  * Under the Public Holidays Act 36 of 1994, a public holiday falling on a Sunday
@@ -27,14 +33,18 @@
  * 9 August, so Monday 10 August is also a holiday. A one-step implementation is
  * correct for most of the year and wrong in the week somebody checks.
  *
- * <h2>⚠️ WEEKENDS-ONLY IS THE DOCUMENTED FALLBACK, AND IT SAYS SO ON SCREEN</h2>
- * No maintained public-holiday source is wired to this application. A hardcoded
- * table is explicitly ruled out — the set changes, and 2026 carries a one-off
+ * <h2>THE HOLIDAYS ARE THE RUN'S OWN CALENDAR, AND WITHOUT IT THE SENTENCE SAYS SO</h2>
+ * The run moves a debit off public holidays as well as weekends, from the table
+ * ACB's `01.8` made (D30), and `GET /api/acb/holidays` serves it: the screen passes
+ * that set in (`holidaySetFor`), so the sentence and the run give one date. A
+ * hardcoded table is still ruled out — the set changes, and 2026 carries a one-off
  * local-government-election holiday that no table written last year contains. So
- * this computes weekends only, `holidaysKnown` is `false`, and the caller renders
- * that qualification rather than presenting the date as certain. Passing a
- * maintained list later is the only change needed: the iteration already handles
- * consecutive non-business days, which is the part a holiday source would need.
+ * when the calendar cannot be read, or does not reach the month, this computes
+ * weekends only, `holidaysKnown` is `false`, and the sentence says so on EVERY date.
+ * 🔴 It used to say so only on a MOVED date, which presented the one case the
+ * caveat exists for as certain: an unmoved weekday that is a public holiday. Day 24
+ * read "Thursday 24 September" in Heritage Day's week while the run debited Friday
+ * the 25th (the presentation arc found it, 2026-09-21).
  */
 
 import { toWireDate } from '../lib/format.js'
@@ -98,22 +108,34 @@ export const actualDebitDate = (day, reference = new Date(), holidays = new Set(
   const clampedDay = Math.min(requested, monthEnd)
 
   const target = new Date(year, month, clampedDay)
-  // Backward, as the spec says; forward only where backward would leave the window (below the 20th, or the
-  // month). A57 -- see the rule above.
-  const backward = lastBusinessDayOnOrBefore(target, holidays)
-  const actual = backward.getMonth() === month && backward.getDate() >= 20
-    ? backward
-    : nextBusinessDayOnOrAfter(target, holidays)
+  // Forward, as SASBO answered; backward only where forward would leave the month. A57 / Q33 -- see the rule above.
+  const forward = nextBusinessDayOnOrAfter(target, holidays)
+  const actual = forward.getMonth() === month
+    ? forward
+    : lastBusinessDayOnOrBefore(target, holidays)
 
   return {
     iso: isoOf(actual),
     day: actual.getDate(),
     clamped: clampedDay !== requested,
     adjusted: actual.getDate() !== clampedDay,
-    // Honest by construction: no maintained holiday source is wired, so unless a
-    // caller supplies one this answer accounts for weekends only.
+    // Honest by construction: unless the caller supplies the calendar, this answer
+    // accounts for weekends only.
     holidaysKnown: holidays.size > 0,
   }
+}
+
+/**
+ * The set the functions above take, from `GET /api/acb/holidays` (D30): the year's
+ * dates when the calendar reaches the end of `reference`'s month, and EMPTY otherwise,
+ * so a month the run itself refuses (`HOLIDAYS_NOT_KNOWN`) is never presented as known.
+ * Anything that is not a calendar -- no answer, an empty list -- is empty too.
+ */
+export const holidaySetFor = (calendar, reference = new Date()) => {
+  const monthEnd = isoOf(new Date(reference.getFullYear(), reference.getMonth() + 1, 0))
+  const reaches = typeof calendar?.knownUntil === 'string' && calendar.knownUntil >= monthEnd
+  if (!reaches || !Array.isArray(calendar.holidays)) return new Set()
+  return new Set(calendar.holidays.map((holiday) => holiday.date))
 }
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -134,19 +156,23 @@ export const debitDateSentence = (day, reference = new Date(), holidays = new Se
   const date = new Date(`${result.iso}T00:00:00`)
   const written = `${WEEKDAYS[date.getDay()]} ${result.day} ${MONTHS[date.getMonth()]}`
 
+  // On every date, moved or not: without the calendar an unmoved weekday can still be a public holiday.
+  const caveat = result.holidaysKnown
+    ? ''
+    : ' Weekends only — public holidays are not accounted for.'
+
   if (!result.clamped && !result.adjusted) {
-    return `This member will be debited on ${written}.`
+    return `This member will be debited on ${written}.${caveat}`
   }
 
   const because = []
   if (result.clamped) because.push(`${MONTHS[date.getMonth()]} has no ${ordinal(Number(day))}`)
   if (result.adjusted) because.push('that day is not a business day')
 
-  const caveat = result.holidaysKnown
-    ? ''
-    : ' Weekends only — public holidays are not accounted for.'
-
-  return `${because.join(', and ')}, so this member will be debited on ${written}.${caveat}`
+  // A sentence starts with a capital whichever reason leads it -- "that day is not a
+  // business day" leads when the day was only moved.
+  const reason = because.join(', and ')
+  return `${reason[0].toUpperCase()}${reason.slice(1)}, so this member will be debited on ${written}.${caveat}`
 }
 
 const ordinal = (n) => {

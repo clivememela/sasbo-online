@@ -23,6 +23,8 @@ export const HEADING = `!!document.querySelector('main h1')`;
  */
 const TEXT = (s) => `document.body.innerText.toLowerCase().includes(${JSON.stringify(s.toLowerCase())})`;
 const STATE = (s) => `!!document.querySelector('[data-state="${s}"]')`;
+/** The Debits screen's search results, by the table's own caption: the unpaid table above has rows before any search. */
+const SEARCH_ROWS = `[...document.querySelectorAll('main table')].some((t) => t.querySelector('caption')?.textContent === 'Members matching the ACB search' && t.querySelectorAll('tr[data-row]').length > 1)`;
 const PANEL = '[data-testid="member-panel"]';
 const PANEL_OPEN = `!!document.querySelector('${PANEL}[data-open="true"] .mcard')`;
 export const ANY_DIALOG = `!!document.querySelector('[role="dialog"]')`;
@@ -302,10 +304,43 @@ export const SURFACES = [
   // ── ACB ───────────────────────────────────────────────────────────────────────────────────────
   { name: 'acb-edit-banking', route: '/admin/acb/debits', ready: `!!document.querySelector('main input')`,
     steps: [step('type a surname', typeInto('main input', 'Nkosi')),
-      step('search', clickByText('main button', '/^Search$/'), ROWS),
-      step('load a member', clickByText('main button', '/load banking details for/'), TEXT('Confirm Details')),
+      step('search', clickByText('main button', '/^Search$/'), SEARCH_ROWS),
+      step('load a member', clickByText('main button', '/load banking details for/'), TEXT('Edit Details')),
       step('Edit Details', clickByText('main button', '/^Edit Details$/'), dialogNamed('/^Update Banking Details$/'))],
     present: { DIALOG: dialogNamed('/^Update Banking Details$/') }, covers: ['pages/acb/AcbDebits.jsx#Modal@update banking'] },
+  // The Re-Debits screen (`04.1`): the stub's run 40 is the returned month, run 41 the next one.
+  { name: 'acb-debits-runs-failed', route: '/admin/acb/debits', intercept: { url: '*/api/acb/runs?*', mode: 'fail' },
+    ready: STATE('error'), present: { FAILED: STATE('error') }, covers: ['pages/acb/AcbDebits.jsx#DataState@runs'] },
+  { name: 'acb-permission', route: '/admin/acb/debits', ready: TEXT('Record permission'),
+    steps: [step('ask for the member\'s permission', clickByText('main button', '/^Record permission$/'),
+      dialogNamed('/^The member’s permission$/'))],
+    present: { DIALOG: dialogNamed('/^The member’s permission$/'), WHY: TEXT('who agreed, when and how') },
+    covers: ['pages/acb/AcbHeldOver.jsx#Modal@permission'] },
+  { name: 'acb-held-letter', route: '/admin/acb/debits', ready: TEXT('Mark handled'),
+    steps: [step('mark a held letter handled', clickByText('main button', '/^Mark handled$/'),
+      dialogNamed('/^Mark this letter handled$/'))],
+    present: { DIALOG: dialogNamed('/^Mark this letter handled$/') }, covers: ['pages/acb/AcbHeldLetters.jsx#Modal@held letter'] },
+  // A.C.B. -> Runs (`01.5`). The stub answers the list, a run, its sheets, a prepare and a cancel (`acbRunAnswer`).
+  { name: 'acb-runs', route: '/admin/acb/runs', ready: ROWS,
+    present: { TOTAL: TEXT('Control total'), OCTOBER: TEXT('October 2026') }, covers: [] },
+  { name: 'acb-run-prepare', route: '/admin/acb/runs', ready: ROWS,
+    steps: [step('prepare a month', clickByText('main button', '/^Prepare /'), dialogNamed('/^Prepare the .* run\\?$/'))],
+    present: { DIALOG: dialogNamed('/^Prepare the .* run\\?$/') }, covers: ['pages/acb/AcbRuns.jsx#ConfirmDialog@prepare'] },
+  // The polling pair: the stateful stub answers PREPARING twice, then PREPARED.
+  { name: 'acb-run-preparing', route: '/admin/acb/runs', ready: ROWS,
+    steps: [step('prepare a month', clickByText('main button', '/^Prepare /'), dialogNamed('/^Prepare the .* run\\?$/')),
+      step('confirm', clickByText(IN_DIALOG, '/^Prepare$/'), TEXT('is prepared:'))],
+    present: { PREPARED: TEXT('is prepared:') }, covers: [] },
+  { name: 'acb-run-open', route: '/admin/acb/runs', ready: ROWS,
+    steps: [step('open a run', clickByText('main button', '/^October 2026$/'), TEXT('Left out'))],
+    present: { RUN: TEXT('October 2026 run'), APPROVE_WHY: TEXT('open when administrators sign in') }, covers: [] },
+  { name: 'acb-run-failed', route: '/admin/acb/runs', ready: ROWS, intercept: { url: '*/api/acb/runs/41', mode: 'fail' },
+    steps: [step('open a run that will not load', clickByText('main button', '/^October 2026$/'), STATE('error'))],
+    present: { FAILED: STATE('error') }, covers: ['pages/acb/AcbRunPanel.jsx#DataState@run'] },
+  { name: 'acb-run-cancel', route: '/admin/acb/runs', ready: ROWS,
+    steps: [step('open a run', clickByText('main button', '/^October 2026$/'), TEXT('Cancel this run')),
+      step('cancel it', clickByText('main button', '/^Cancel this run$/'), dialogNamed('/^Cancel the .* run\\?$/'))],
+    present: { DIALOG: dialogNamed('/^Cancel the .* run\\?$/') }, covers: ['pages/acb/AcbRunPanel.jsx#ConfirmDialog@cancel'] },
 
   // ── reports and archives ──────────────────────────────────────────────────────────────────────
   { name: 'organiser-date', route: '/reports/organizer-report', ready: `!!document.querySelector('input[aria-haspopup="dialog"]')`,

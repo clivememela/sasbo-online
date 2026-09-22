@@ -114,7 +114,115 @@ const CEILINGS = {
   // over the 641.29 actual -- the same margin the header argues for, and no more, so the
   // next feature still meets a real ceiling. The design arc owns this number: the ACB arc
   // raises it again, by exactly its screen's bytes, when its Runs screen lands.
-  js: 650 * KB,
+  //
+  // 650 -> 666.58 on 2026-09-19, MEASURED, at ACB `01.5` -- by exactly the screen's bytes,
+  // as above. Both builds with the worktree's tracked `.env` (the production URL), so the
+  // pair compares like with like: 67ad286 647.96 -> the Runs screen 664.54 KiB, +16.58
+  // (under the empty-URL measurement env 67ad286 reads 646.13, so expect ~662.7 there).
+  // What spent it, chunk by chunk:
+  //   AcbRuns 0 -> 15,583 B    THE SCREEN: the runs list, preparing and its polling, the
+  //                            run's panel with its debits and exclusions sheets, and the
+  //                            run vocabulary. Lazy, like every route: nothing on the entry.
+  //   SelectInput 0 -> 1,475 B · options 0 -> 912 B   NEW SHARED CHUNKS, not new code: a
+  //                            second lazy route now imports the native select, so Rollup
+  //                            lifts it out of useReferenceData (-1,440) and SearchableSelect
+  //                            (-794) into chunks of their own.
+  //   index +824 · Acb +76     the route and the two A.C.B. menu entries.
+  //   Members +69 · Recruiters +69 · Subscriptions +69 · CaptureMember +74 · BankBranch +30
+  //   · Forms +30              Rollup's import stubs for the new shared chunks.
+  // No headroom added on top: the next feature meets a real ceiling, as the P9 entry argues.
+  //
+  // 666.58 -> 693.35 on 2026-09-21, MEASURED, after merging origin/main e70b675 into the ACB
+  // branch (the planning pack's F61: the 666.58 above was set over 67ad286, a base main has
+  // since left). Both builds from one install of e70b675's lock, the tracked `.env`:
+  //   main e70b675 ON ITS OWN   676.60 KiB -- 26.60 OVER its own 650 ceiling. Not ACB's bytes:
+  //                            8c6b675's welcome-letter preview and confirmation, e70b675's
+  //                            MemberPanel, and the lock's react 19.3 / react-router 7.18.4 /
+  //                            rollup 4.63.4. The design arc owns that number and was told
+  //                            the same day; it is carried here, as measured, so that this
+  //                            branch's ceiling measures ACB's own bytes and nothing else.
+  //   the ACB branch            693.35 KiB, +16.75 over main, chunk by chunk as 01.5 found it:
+  //                            AcbRuns 0 -> 15,775 B · SelectInput 0 -> 1,475 · options 0 -> 912
+  //                            · useReferenceData -1,440 · SearchableSelect -794 · index +824
+  //                            · Acb +76 · Members, Recruiters, Subscriptions +69 each
+  //                            · CaptureMember +57 (+74 before the flip: debitDate.js's
+  //                            forward-first rule is 17 B shorter) · BankBranch, Forms +30 each.
+  // Still no headroom on top.
+  //
+  // 693.35 -> 687.33 on 2026-09-21, MEASURED, after merging origin/main 3a3cc3c (design's RF and
+  // the panel width) into the ACB branch. Both builds from one install of the same lock, the
+  // tracked `.env`, in C:\tmp\acb-client:
+  //   main 3a3cc3c ON ITS OWN   670.27 KiB -- still over its own 650, and still the design arc's
+  //                            number; RF took 6.33 KiB off e70b675's 676.60.
+  //   the ACB branch (e3285a3)  687.33 KiB, +17.06 over main, chunk by chunk:
+  //                            AcbRuns 0 -> 15,742 B · SelectInput 0 -> 1,475 · options 0 -> 912
+  //                            · useReferenceData -1,440 · SearchableSelect -794 · index +873
+  //                            · circle-alert 0 -> 251 and useFocusOn -214 (Rollup re-splitting a
+  //                            shared icon and hook once the ACB route imports them)
+  //                            · CaptureMember +131 (the flip, and the debit-date sentence's
+  //                            capital letter) · Members +109 · Recruiters +104 · Acb +76
+  //                            · Subscriptions +64 · Auth +40 · AcbDebits +35 · RecruitmentChannel +35
+  //                            · Forms, BankBranch +30 each · AddressAutocomplete +5 · DialogNotice +2.
+  // The ceiling comes DOWN, to the measurement: carrying e70b675's 676.60 would have left 6 KiB of
+  // slack nobody earned. It is 687.34, not 687.33, because the measurement is 703,827 B -- 687.331
+  // KiB -- and a ceiling written to the hundredth must round UP or it refuses the build it was
+  // measured from (it did, by one byte). Still no headroom on top.
+  //
+  // 687.34 -> 708.23 on 2026-09-21, MEASURED, three builds from one install in C:\tmp\acb-client,
+  // the tracked `.env`: e3285a3 703,827 B (the 687.33 above, reproduced to the byte) -> 650ea61
+  // 707,242 B -> the 04.1 tree 725,224 B. The remote gate had already refused 650ea61 at 690.67.
+  //   e3285a3 -> 650ea61, +3,415 B   AcbRuns +3,197 (01.8's calendar notice, 01.9's rate note, 02.7's
+  //                                  made-on and make-by, 02.8's decline notes) · Acb +213 (04.2's
+  //                                  honest rows) · DataState +5.
+  //   650ea61 -> 04.1, +17,982 B     AcbDebits 8,338 -> 22,678 (the Re-Debits screen: the unpaids and
+  //                                  their decisions, the held-over permissions, the held letters,
+  //                                  the server-side search) · acbPaging 0 -> 8,409 and AcbRuns -4,819
+  //                                  (the paging hook and pager, moved out of the Runs panel to be
+  //                                  shared) · index +52.
+  // 725,224 B is 708.227 KiB, so 708.23. Still no headroom on top.
+  //
+  // 708.23 -> 708.70 on 2026-09-21, MEASURED ON THE GATE'S RUNNER: the box had 574 MB free (commit
+  // 42.5 of 46.5 GB), no room for a vite build beside the other sessions' work. A throwaway commit printed
+  // every chunk's bytes from the CI build, runs 35666314519 and 35666314630. The method checked first:
+  //   3e86cba (00.2) 725,059 B, 165 under the 04.1 tree, and its 69 unchanged chunks byte-identical to the
+  //                  local build above; the five that moved are exactly 00.2's files: CaptureMember -159
+  //                  · Recruiters -103 · Members +63 · format +43 · AcbDebits -9.
+  //   accdfd1 (Capture's holiday sentence) 725,706 B, +647 over 3e86cba, chunk by chunk:
+  //                  acbRunService 0 -> 2,671 and acbPaging -2,637 (Rollup gives the service a chunk of its
+  //                  own once Capture imports it) · CaptureMember +487 (the calendar read, the caveat on
+  //                  every unknown date) · index +44 · AcbDebits, AcbRuns +41 each.
+  // 725,706 B is 708.697 KiB, so 708.70. Still no headroom on top.
+  //
+  // 650 -> 680 on 2026-09-21, MEASURED, at the design arc's close (670.22 KiB on the lockfile's own
+  // packages). The SAME code measured 641.31 on React 19.2.6: `8c6b675` (Clive, 2026-09-21) regenerated the lockfile --
+  // `package.json` untouched, 86 packages refreshed within their ranges -- and React came with it, 19.2.6 -> 19.3.0.
+  // What spent it, chunk by chunk (the lockfile's packages against 19.2.6's):
+  //   index         298.45 -> 327.13  +28.68  the entry chunk, where react-dom lives: its production client is
+  //                                           523.5 KiB at 19.2.6 and 610.5 at 19.3.0
+  //   index.modern   34.96 ->  35.74   +0.78
+  //   Modal          40.85 ->  40.31   -0.54
+  //   every other chunk within 200 B, 69 chunks both sides.
+  // Over the wire: +8.5 KiB gzipped (+7.2 brotli) on the first load, cached after. The suite and the E2E pass on 19.3,
+  // and 19.2.6 against 19.3.0 rendered 350/350 pixel-identical. Kept on the owner's word (2026-09-21): the cost is
+  // small, and rolling React back alone would fight a refresh of 86 packages. Checked before raising, as the header
+  // asks: nothing from src/test/ is imported by the product, and no test library is in the built bundle. 1.4% of
+  // headroom, as the last raise had; the ACB arc still raises it by exactly its own bytes.
+  //
+  // 680 -> 718.43 on 2026-09-21, MEASURED, at the merge of client main f96e723 (design/12) into the ACB branch:
+  // main's own ceiling raised by exactly ACB's bytes, as the paragraph above asks, so main keeps its 1.4% and
+  // ACB brings none of its own. On the gate's runner, the method of 708.70's paragraph (run 35667059993):
+  //   main f96e723 ON ITS OWN   686,361 B (670.274 KiB -- the 670.27 measured locally at 3a3cc3c, to the
+  //                            hundredth: design/12 changed a test and this script, not the product)
+  //   the ACB tree              725,706 B -- accdfd1's product, byte for byte, for the same reason
+  //   ACB's own bytes           +39,345 B = 38.423 KiB, chunk by chunk: AcbDebits 8,303 -> 22,710 · AcbRuns
+  //                            0 -> 14,161 · acbPaging 0 -> 5,772 · acbRunService 0 -> 2,671 · SelectInput
+  //                            0 -> 1,475 · options 0 -> 912 · index +969 · CaptureMember +459 · Acb +289
+  //                            · circle-alert 0 -> 251 · Members +172 · Subscriptions +64 · format +43
+  //                            · Auth +40 · RecruitmentChannel +35 · BankBranch, Forms +30 each
+  //                            · AddressAutocomplete, DataState +5 each · DialogNotice +2 · Recruiters +1
+  //                            · SearchableSelect -794 · useReferenceData -1,440 · useFocusOn -214.
+  // 680 + 38.423 = 718.423, so 718.43 (rounded UP, as 687.34's paragraph explains).
+  js: 718.43 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before

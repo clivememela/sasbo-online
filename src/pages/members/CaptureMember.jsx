@@ -1,9 +1,8 @@
-import { useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import WelcomeLetter from "../../components/members/WelcomeLetter";
 import { recruiterService } from "@/services/recruiterService.js";
 import { recruitmentChannelService } from "@/services/recruitmentChannelService.js";
-import { locationService } from "@/services/locationService.js";
 import { jobGradeService } from "@/services/jobGradeService.js";
 import { bankService } from "@/services/bankService.js";
 import PageTitle from "../../components/common/PageTitle";
@@ -18,13 +17,16 @@ import {
     DEBIT_DAY_EARLIEST, DEBIT_DAY_LATEST, isDebitDayInRange,
     PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL
 } from "@/config/memberConstants.js";
-import { toWireDate, today } from "@/lib/format.js";
-import { sanitiseField, validateField } from "@/utils/inputRules.js";
+import { formatZar, toWireDate, today } from "@/lib/format.js";
+import { finishField, sanitiseField, validateField } from "@/utils/inputRules.js";
 import { subscriptionsService } from "@/services/subscriptionsService.js";
-import { findSubscriptionForBank, formatSubscriptionAmount, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
+import { findSubscriptionForBank, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
 import { branchCodeOf, branchNamesForBank, findBranchRecord, formatBranchAddress } from "@/utils/bankBranches.js";
 import { DERIVATION, derivationNote, derivationStateOf } from "@/utils/derivation.js";
-import { debitDateSentence } from "@/utils/debitDate.js";
+import { channelHasNoRecruiter, recruitedArea, recruitersFor } from "@/utils/recruitment.js";
+import { debitDateSentence, holidaySetFor } from "@/utils/debitDate.js";
+import { acbRunService } from "@/services/acbRunService.js";
+import reportError from "@/lib/reportError.js";
 import { nearMisses, resolveToOption } from "@/utils/jobGradeMatch.js";
 import { nameKey } from "@/utils/nameKey.js";
 import { fieldValue } from "@/lib/fieldValue.js";
@@ -71,8 +73,9 @@ const REFERENCE_LOADERS = {
     // 03.8 -- HOW the member was recruited. A reference table that was seeded, served and administered
     // with no member ever pointing at it, because no screen had the field.
     'recruitment channels': () => recruitmentChannelService.getAll(),
-    // 03.3 -- the AREAS, for "Area Recruited". A different list from the recruiters, and that IS the fix.
-    areas: () => locationService.getAllAreas(),
+    // 🗣️ NO AREAS LIST ANY MORE (SASBO, 18 Sep 2026: "area recruited should not be selection based"). The
+    // area is the recruiter's own demarcation letter, read off the recruiter list above -- see
+    // `utils/recruitment.js`. `/api/areas` was the bank branches' suburbs, a different kind of area.
     'bank branches': () => bankService.getBankListing(),
     banks: () => bankService.getBankNames(),
     subscriptions: () => subscriptionsService.getAll(),
@@ -112,9 +115,10 @@ export default function CaptureMember() {
         paymentType: "Debit Order",
         debitDay: "20",
         bankAddress: "",
-        // The three the stakeholder asked for, under the names MemberDto declares.
+        // Who recruited the member, under the names MemberDto declares. 🗣️ `areaRecruited` is NOT captured any
+        // more (SASBO, 18 Sep 2026): the area follows from the recruiter, so it is shown, not posted -- a key no
+        // control sets is a key nobody can see being written (`capturePayload.test.jsx`).
         recruitedHow: "",
-        areaRecruited: "",
         recruitmentRep: "",
 
         /* 🗑️ SIXTEEN KEYS WERE HERE, AND EVERY CAPTURE HAS BEEN POSTING THEM (03.1, 03.2).
@@ -168,8 +172,22 @@ export default function CaptureMember() {
     }, [form.bankName, subscriptionRows]);
     const reps = refs.data.recruiters;
     const channels = refs.data['recruitment channels'];
-    const areas = refs.data.areas;
     const bankListing = refs.data['bank branches'];
+
+    /**
+     * 🗣️ THE RECRUITMENT CHANNEL, AS SASBO GAVE IT ON 18 SEP 2026 (`utils/recruitment.js`): the type first; Website
+     * and EORO need no recruiter and no area; RO offers the organisers; and the area is READ OFF the recruiter, never
+     * chosen. Derived during render, like the subscription above, so there is no second copy of it to go stale.
+     */
+    const recruiterListState = refs.loading ? "loading" : refs.failed.includes("recruiters") ? "failed" : "ready";
+    const offeredRecruiters = recruitersFor(form.recruitedHow, reps);
+    const recruitedAreaShown = recruitedArea({
+        channel: form.recruitedHow,
+        recruiterName: form.recruitmentRep,
+        recruiters: reps,
+        listState: recruiterListState,
+        noRecruiterNote: "Follows from the recruiter: choose one and their area fills in.",
+    });
     const bankNames = refs.data.banks;
 
     const tabsWithErrors = useMemo(() => {
@@ -246,13 +264,23 @@ export default function CaptureMember() {
     /**
      * 04.3 -- the one thing this screen can say that no other screen can: the DATE, not the day.
      *
-     * The rule is the signed spec's, and A57 corrected it: back to the last business day, forward only where
-     * back would fall out of the 20th-to-31st window. The sentence carries its own issue, because no
-     * maintained public-holiday source is wired to this application and presenting the date as certain would
+     * The rule is SASBO's answer to question 33 (A57): forward to the next business day, back only where
+     * forward would leave the month (`utils/debitDate.js`). The business days are the run's own -- weekends,
+     * and the public holidays of its calendar (D30), read once below. A calendar that cannot be read leaves
+     * the sentence on weekends only, and the sentence says so: presenting that date as certain would
      * overstate it.
      */
+    const [holidays, setHolidays] = useState(() => new Set());
+    useEffect(() => {
+        let left = false;
+        const now = new Date();
+        acbRunService.holidayCalendar(now.getFullYear())
+            .then((calendar) => { if (!left) setHolidays(holidaySetFor(calendar, now)); })
+            .catch((err) => reportError("CaptureMember.loadHolidays", err));
+        return () => { left = true; };
+    }, []);
     const debitDateHint = form.paymentType === PAYMENT_TYPE_DEBIT_ORDER
-        ? debitDateSentence(form.debitDay)
+        ? debitDateSentence(form.debitDay, new Date(), holidays)
         : null;
 
     // An event from a text field, or a bare value from a select: `fieldValue` reads either (RF -- the selects
@@ -279,6 +307,16 @@ export default function CaptureMember() {
                 // Judged against the bank actually CHOSEN: the searchable control passes through an empty bank while
                 // the administrator clears it to pick another, and that moment must not drop a branch the next bank offers.
                 if (value && prev.branch && !branchOptionsFor(value).includes(prev.branch)) updatedForm.branch = "";
+            }
+
+            // A different recruiter TYPE offers different recruiters (SASBO, 18 Sep 2026): the chosen one goes only if
+            // the new type does not offer them -- all of them for Website and EORO, which offer nobody. The bank's rule
+            // above, for the same reasons: a stale choice the screen no longer lists is wrong AND looks deliberate (and
+            // `SearchableSelect` shows a value its list lacks as a blank box); and it is judged against a type actually
+            // CHOSEN, because clearing the field to pick another passes through '' and must not drop the recruiter.
+            if (field === "recruitedHow" && value && value !== prev.recruitedHow && prev.recruitmentRep) {
+                const offered = recruitersFor(value, reps).some((row) => nameKey(row?.name) === nameKey(prev.recruitmentRep));
+                if (!offered) updatedForm.recruitmentRep = "";
             }
 
             /**
@@ -346,6 +384,17 @@ export default function CaptureMember() {
             const error = validateEmail(value);
             if (error) setFieldErrors((prev) => ({ ...prev, [field]: error }));
         }
+    };
+
+    /**
+     * 🗣️ A NAME STARTS WITH A CAPITAL (SASBO, 18 Sep 2026) -- tidied as the field is LEFT, where the change can be seen,
+     * by the rule both member screens share (`finishField`, utils/inputRules.js). Only first letters are ever raised.
+     */
+    const handleBlur = (field) => () => {
+        setForm((prev) => {
+            const finished = finishField(field, prev[field]);
+            return finished === prev[field] ? prev : { ...prev, [field]: finished };
+        });
     };
 
     const validateFormBeforeSave = () => {
@@ -582,9 +631,9 @@ export default function CaptureMember() {
                         {activeTab === "personal" && (
                             <>
                                 <Field label="Title" value={form.title} onChange={handleChange("title")} options={titleOptions} />
-                                <Field label="Initials" value={form.initials} onChange={handleChange("initials")} error={fieldErrors.initials} />
-                                <Field label="First Name(s)" value={form.firstNames} onChange={handleChange("firstNames")} error={fieldErrors.firstNames} required />
-                                <Field label="Surname" value={form.surname} onChange={handleChange("surname")} error={fieldErrors.surname} required />
+                                <Field label="Initials" value={form.initials} onChange={handleChange("initials")} onBlur={handleBlur("initials")} error={fieldErrors.initials} />
+                                <Field label="First Name(s)" value={form.firstNames} onChange={handleChange("firstNames")} onBlur={handleBlur("firstNames")} error={fieldErrors.firstNames} required />
+                                <Field label="Surname" value={form.surname} onChange={handleChange("surname")} onBlur={handleBlur("surname")} error={fieldErrors.surname} required />
                                 <Field label="Identity Type" value={form.identityType} onChange={handleChange("identityType")} options={identityTypeOptions} error={fieldErrors.identityType} required />
                                 <Field
                                     kind={form.identityType === IDENTITY_TYPE_PASSPORT ? "reference" : "identifier"}
@@ -625,7 +674,7 @@ export default function CaptureMember() {
                                 <Field label="Date Joined" value={form.joinDate} onChange={handleChange("joinDate")} type="date" disabled />
                                 <Field label="Status" value={form.status} onChange={handleChange("status")} options={statusOptions} disabled />
                                 <SectionTitle title="Sasbo Subscription" />
-                                <Field label="Monthly Subscription" value={formatSubscriptionAmount(subscriptionAmount)} onChange={handleChange("monthlySubscription")} disabled note="*reviewed annually through business discussions *" />
+                                <Field label="Monthly Subscription" value={subscriptionAmount == null ? '' : formatZar(subscriptionAmount)} onChange={handleChange("monthlySubscription")} disabled note="*reviewed annually through business discussions *" />
                                 <Field label="Frequency" value={form.subscriptionFrequency} onChange={handleChange("subscriptionFrequency")} options={frequencyOptions} disabled />
                             </>
                         )}
@@ -666,7 +715,8 @@ export default function CaptureMember() {
                             <>
                                 {/* The stakeholder, 2026-09-09, on exactly what this tab captures: "1. How the member
                                     was recruited. 2. The area where the member was recruited. 3. Who recruited the
-                                    member, where applicable." Those three, in that order, and nothing else.
+                                    member, where applicable." Those three and nothing else -- re-ordered by SASBO on
+                                    18 Sep 2026 to type, recruiter, area, because the area now follows the recruiter.
 
                                     🗣️ S6, SETTLED BY THE OWNER the same day. The older spec asks for a tab called
                                     "Recruiter Type"; the stakeholder calls the tab "Recruitment Channel", twice, on
@@ -676,21 +726,40 @@ export default function CaptureMember() {
                                     renamed to satisfy a checker: the reconciliation was put to the owner. */}
                                 <Field label="Recruiter Type" value={form.recruitedHow} onChange={handleChange("recruitedHow")} {...refs.field('recruitment channels')} options={nameList(channels)} searchable />
 
-                                {/* 🔑 R2 / RE-3 -- A CHANGE OF MEANING, NOT A RENAME. This was "Area's Recruiter", fed
-                                    from the list of recruiter PEOPLE, so it captured a person under an area-shaped
-                                    name. Three documents ask for an AREA (28 Aug, §11, RE-3). Relabeling alone would
-                                    have left the screen collecting the wrong KIND of thing behind a corrected word --
-                                    worse than obviously wrong, because nothing about it would ever look wrong again.
+                                {/* 🗣️ SASBO, 18 Sep 2026 -- THE TYPE DECIDES THE REST, and the order is theirs: type,
+                                    then the recruiter's name, then the area that follows from that recruiter.
 
-                                    ⛔ And it is deliberately NOT pre-filled from the bank's area. The area a member
-                                    WORKS in is usually where they were recruited, and "usually" is a correlation, not
-                                    a lookup (S1). This field records a historical fact; a plausible unverified default
-                                    is the hardest kind to detect later. */}
-                                <Field label="Area Recruited" value={form.areaRecruited} onChange={handleChange("areaRecruited")} {...refs.field('areas')} options={nameList(areas)} searchable />
+                                    "If I choose website, everything else must fall away": Website and EORO bring a
+                                    member in with no recruiter, so neither field is offered -- and the screen says why,
+                                    as it does for Payroll Deduction's bank details, rather than leaving a gap.
 
-                                {/* "where applicable" is the stakeholder's own qualifier, so this one is optional by
-                                    instruction rather than by omission. */}
-                                <Field label="Recruiter" value={form.recruitmentRep} onChange={handleChange("recruitmentRep")} {...refs.field('recruiters')} options={nameList(reps)} searchable note="Where applicable" />
+                                    🔑 THE AREA IS READ OFF THE RECRUITER, NEVER CHOSEN ("area recruited should not be
+                                    selection based"). It is the organiser's demarcation letter, which the recruiter list
+                                    has carried all along; the list this field used to offer was the bank branches'
+                                    suburbs -- where a member works, a different kind of area (R2/RE-3's lesson again:
+                                    the right KIND of thing, not just the right word). It is posted nowhere: the member
+                                    keeps their recruiter, and the area follows from them. */}
+                                {channelHasNoRecruiter(form.recruitedHow) ? (
+                                    <p className="md:col-span-2 rounded-lg border border-line-strong bg-surface-2 p-3 text-sm text-ink-muted">
+                                        No recruiter or area is recorded for a member who joined through {form.recruitedHow}.
+                                    </p>
+                                ) : (
+                                    <>
+                                        {/* "where applicable" is the stakeholder's own qualifier, so this one is optional
+                                            by instruction rather than by omission. */}
+                                        <Field
+                                            label="Recruiter"
+                                            value={form.recruitmentRep}
+                                            onChange={handleChange("recruitmentRep")}
+                                            {...refs.field('recruiters')}
+                                            options={nameList(offeredRecruiters)}
+                                            searchable
+                                            disabled={!form.recruitedHow}
+                                            note={form.recruitedHow ? "Where applicable" : "Choose the recruiter type first."}
+                                        />
+                                        <Field label="Area Recruited" value={recruitedAreaShown.text} disabled note={recruitedAreaShown.note} />
+                                    </>
+                                )}
 
                                 {/* 🗑️ ELECTED RECRUITER + ELECTION DATE + POSITION/STRUCTURE WERE HERE -- removed
                                     (03.1/S5, R3-OBS-2a). The spec moves an election to Edit Member: it happens to an
@@ -788,7 +857,7 @@ function EmailFields({ form, setForm, handleChange, fieldErrors }) {
     );
 }
 
-function Field({ label, value, onChange, className = "", options = null, type = "text",
+function Field({ label, value, onChange, onBlur, className = "", options = null, type = "text",
                    error = null, disabled = false, searchable = false, note = null, kind, required = false,
                    loading = false, emptyLabel, loadError = null, onRetryLoad, allowCustom = false }) {
 
@@ -843,5 +912,6 @@ function Field({ label, value, onChange, className = "", options = null, type = 
         );
     }
 
-    return <TextInput {...shared} kind={kind || "text"} />;
+    // `onBlur` on the typed branch only: the pickers above own their blur (it is how a searchable one commits).
+    return <TextInput {...shared} kind={kind || "text"} onBlur={onBlur} />;
 }
