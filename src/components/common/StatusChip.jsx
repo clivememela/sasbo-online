@@ -25,10 +25,13 @@ const STATUS_TOKENS = {
   Suspended: { chip: 'bg-status-suspended-bg text-status-suspended', dot: 'bg-status-suspended-dot' },
   Resigned: { chip: 'bg-status-resigned-bg text-status-resigned', dot: 'bg-status-resigned-dot' },
   Retired: { chip: 'bg-status-retired-bg text-status-retired', dot: 'bg-status-retired-dot' },
+  // ACB 03.5: three unpaid presentations cancel a membership (SUBS_IN_ARREARS). It is drawn as the other two
+  // cancelled statuses are -- the same tokens, so the same measured contrast -- and the word says which.
+  Terminated: { chip: 'bg-status-retired-bg text-status-retired', dot: 'bg-status-retired-dot' },
 };
 
 /** The statuses card.html strikes through in the register: nothing disappears, it cancels. */
-export const CANCELLED_STATUSES = Object.freeze(['Resigned', 'Retired']);
+export const CANCELLED_STATUSES = Object.freeze(['Resigned', 'Retired', 'Terminated']);
 
 const BY_LOWER_CASE = new Map(
   Object.entries(STATUS_TOKENS).map(([status, classes]) => [status.toLowerCase(), classes]),

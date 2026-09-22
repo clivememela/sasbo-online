@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import Sheet from '../../components/common/Sheet.jsx';
 import DialogNotice from '../../components/common/DialogNotice.jsx';
 import Table from '../../components/table/Table.jsx';
@@ -66,6 +66,7 @@ export default function AcbUnpaids({ run, onBanking }) {
 function UnpaidList({ run, reason, onBanking }) {
   const read = useCallback((page, size) => acbRunService.unpaids(run.id, reason, page, size), [run.id, reason]);
   const { data, state, goTo, retry } = usePagedRead(read, { size: PAGE_SIZE, label: 'AcbUnpaids.read' });
+  const suspendWhy = useId();
 
   // The administrator's choice per line, before it is confirmed; and the server's answer per line, after.
   const [chosen, setChosen] = useState({});
@@ -147,6 +148,13 @@ function UnpaidList({ run, reason, onBanking }) {
         <span className="font-medium text-ink">
           {DECISION_LABEL[line.decision] ?? line.decision}
           <span className="ml-2 text-xs font-normal text-ink-muted">recorded{line.permissionNote ? ' · permission on record' : ''}</span>
+          {/* 03.5: the decision is recorded; moving the member to Suspended waits for sign-in (B1), as Approve does. */}
+          {line.decision === 'SUSPEND' && (
+            <Button className="ml-3" disabled aria-describedby={suspendWhy}
+              aria-label={`Suspend ${nameOf(line)} as a member`}>
+              Suspend member
+            </Button>
+          )}
         </span>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
@@ -203,6 +211,11 @@ function UnpaidList({ run, reason, onBanking }) {
         dense
       />
       <PagerFor data={data} state={state} goTo={goTo} noun="unpaids" size={PAGE_SIZE} />
+      {rows.some((line) => line.decision === 'SUSPEND') && (
+        <p id={suspendWhy} className="border-t border-line px-6 py-3 text-sm text-ink-muted">
+          Moving a member decided Suspend to the Suspended status opens when administrators sign in to this system.
+        </p>
+      )}
     </>
   );
 }

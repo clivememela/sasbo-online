@@ -93,6 +93,17 @@ export const acbRunService = {
         })),
 
     /** The re-debits run `id` holds over for want of the member's permission (D32), a page at a time. */
+    /**
+     * The termination report (03.5): the members at two unpaid presentations or more in the last thirteen months,
+     * a page at a time, those the rule would terminate first -- with the month counting began and what the report
+     * cannot see of the old system. Read-only: terminating waits for sign-in (B1).
+     */
+    terminationReport: (page = 0, size = 50) =>
+        requestJson((signal) => fetch(apiUrl(`/api/acb/termination-report?${pageQuery(page, size)}`), {
+            credentials: 'include',
+            signal,
+        })),
+
     heldOver: (id, page = 0, size = 50) =>
         requestJson((signal) => fetch(apiUrl(`/api/acb/runs/${id}/held-over?${pageQuery(page, size)}`), {
             credentials: 'include',

@@ -62,6 +62,21 @@ const rowOf = async (surname) => {
 }
 
 describe('the unpaids of the latest returned run', () => {
+  it('03.5 an unpaid decided Suspend shows Suspend member -- refused until sign-in, and saying so', async () => {
+    server.use(http.get('*/api/acb/runs/:id/unpaids', () => HttpResponse.json(pageOf([
+      unpaid(),
+      unpaid({ id: 4, memberId: 8, membershipNumber: 'SYN-0008', surname: 'Sampleton', unpaidCode: '4',
+        unpaidReason: 'PAYMENT_STOPPED', decision: 'SUSPEND', suggestedDecision: null }),
+    ]))))
+    renderWithProviders(<AcbDebits />)
+
+    const suspend = within(await rowOf('Sampleton')).getByRole('button', { name: /^Suspend .*Sampleton as a member$/ })
+    expect(suspend).toBeDisabled()
+    expect(suspend).toHaveAccessibleDescription(/opens when administrators sign in to this system/)
+    // The must-pass twin: an undecided unpaid has no such button.
+    expect(within(await rowOf('Testperson')).queryByRole('button', { name: /as a member/ })).toBeNull()
+  })
+
   it('lists every unpaid with its reason, code and letter -- the run named', async () => {
     renderWithProviders(<AcbDebits />)
     expect(await screen.findByRole('heading', { name: 'Unpaid debits — September 2026' })).toBeInTheDocument()

@@ -21,6 +21,7 @@ import { ACCOUNT_TYPE_OPTIONS } from '../../config/memberConstants.js';
 import AcbUnpaids from './AcbUnpaids.jsx';
 import AcbHeldOver from './AcbHeldOver.jsx';
 import AcbHeldLetters from './AcbHeldLetters.jsx';
+import AcbTerminationReport from './AcbTerminationReport.jsx';
 import { PagerFor } from './acbPaging.jsx';
 import { DEBIT_DAYS, asPage, debitDayReplaced, debitsRuns, maskedAccount, ordinal } from './acbRunRules.js';
 
@@ -371,6 +372,8 @@ export default function AcbDebits() {
 
                 {runsState === 'ready' && runs.next && <AcbHeldOver run={runs.next} />}
                 {runsState === 'ready' && runs.returned && <AcbHeldLetters run={runs.returned} />}
+                {/* 03.5: who three unpaids would terminate -- read from every sent month, not from one run. */}
+                <AcbTerminationReport />
 
                 {/* The member search -- for a member outside the unpaid list. card.html's criteria row. */}
                 <div className="mt-8">

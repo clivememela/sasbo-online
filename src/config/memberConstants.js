@@ -24,7 +24,7 @@ export const PAYMENT_TYPE_OPTIONS = [PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYR
  * `vocabulary.parity.test.js` holds this list to that one. The member record stores exactly these words.
  */
 export const ACCOUNT_TYPE_OPTIONS = ['Cheque', 'Savings', 'Transmission'];
-export const STATUS_OPTIONS = ['Active', 'Pending', 'Suspended', 'Resigned', 'Retired'];
+export const STATUS_OPTIONS = ['Active', 'Pending', 'Suspended', 'Resigned', 'Retired', 'Terminated'];
 /**
  * 🔴 A7: the passport rule compared against "Passport" while the only option is "Passport Number", so
  * "Date of Birth is required for a passport" never once ran, on either screen. Named once, here, and
