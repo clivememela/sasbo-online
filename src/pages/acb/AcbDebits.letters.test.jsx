@@ -19,9 +19,10 @@ const pageOf = (content, size = 50) => ({ content, page: 0, size, totalElements:
 
 const RUN = { id: 40, actionMonth: '2026-09', status: 'RETURNED', version: 3 }
 
+// The server's AcbHeldLetterDto: a held letter is QUEUED, and every one carries its status (EH-E).
 const letter = (overrides) => ({
   letterId: 21, lineId: 3, memberId: 7, membershipNumber: 'SYN-0007', surname: 'Testperson', template: 'RE_DEBIT',
-  reason: 'NO_EMAIL', canSend: true, ...overrides,
+  status: 'QUEUED', reason: 'NO_EMAIL', canSend: true, ...overrides,
 })
 
 let letterReads
