@@ -123,7 +123,7 @@ export const acbRunService = {
             signal,
         })),
 
-    /** The run's letters held for want of an address it could go to (Q46), a page at a time. */
+    /** The run's letters that could not go -- held for want of an address, or a send that failed (Q46, EH-E). */
     heldLetters: (id, page = 0, size = 50) =>
         requestJson((signal) => fetch(apiUrl(`/api/acb/runs/${id}/letters/held?${pageQuery(page, size)}`), {
             credentials: 'include',

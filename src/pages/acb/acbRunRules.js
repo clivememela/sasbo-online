@@ -121,6 +121,18 @@ export const HELD_REASON_LABEL = Object.freeze({
 });
 
 /**
+ * Why a letter that could not go did not go (Q46, EH-E): a held letter's reason, or -- for a send that FAILED -- what
+ * its failure's class means to an administrator. The class itself stays the server's; the screen never shows a
+ * message, which could carry the address.
+ */
+export const couldNotGoBecause = (letter) => {
+  if (letter.status !== 'FAILED') return HELD_REASON_LABEL[letter.reason] ?? letter.reason;
+  if (letter.reason === 'LETTER_CHANGED_SINCE_RENDERED') return 'Not sent — the member’s details changed after it was written';
+  if (letter.reason?.startsWith('LETTER_NOT_RENDERABLE')) return 'Not sent — the letter could not be written';
+  return 'Sending failed';
+};
+
+/**
  * The debit days a member may have: any day from the 20th to the 31st, the member's own -- no bank
  * dictates it (Q42, 2026-09-21).
  */

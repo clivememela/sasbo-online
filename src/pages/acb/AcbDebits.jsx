@@ -34,7 +34,7 @@ const DAY_OPTIONS = DEBIT_DAYS.map((day) => ({ value: String(day), label: ordina
  *
  * The newest run whose file went to the bank leads: its unpaids, EVERY one, each with its decision
  * (`AcbUnpaids`); then the next run's second re-debits held over for the member's permission
- * (`AcbHeldOver`, D32) and the run's letters held for want of an address (`AcbHeldLetters`, Q46). The
+ * (`AcbHeldOver`, D32) and the run's letters that could not go (`AcbHeldLetters`, Q46, EH-E). The
  * member's banking sheet and *Edit Details* stay -- for the *Invalid Account Number* and *Account
  * Closed* unpaids, and for any member found by the search.
  *

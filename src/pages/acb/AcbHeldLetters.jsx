@@ -8,7 +8,7 @@ import reportError from '../../lib/reportError.js';
 import { acbRefusalOf, acbRunService } from '../../services/acbRunService.js';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import { PagerFor, usePagedRead } from './acbPaging.jsx';
-import { HELD_REASON_LABEL, LETTER_TEMPLATE_LABEL, REFUSAL, monthLabel } from './acbRunRules.js';
+import { LETTER_TEMPLATE_LABEL, REFUSAL, couldNotGoBecause, monthLabel } from './acbRunRules.js';
 
 const PAGE_SIZE = 50;
 
@@ -16,9 +16,9 @@ const PAGE_SIZE = 50;
 export const HANDLED_NOTE_LIMIT = 300;
 
 /**
- * The run's HELD letters as a worklist (Q46, `04.1`): letters that could not go, for want of an address
- * they could go to. Each is SENT once the member has one, or MARKED HANDLED with a note of how it was dealt
- * with -- *"no post any longer so someone needs to deal with it"*. Both are writes started from a dialog,
+ * The run's letters that could not go, as a worklist (Q46, `04.1`, EH-E): HELD for want of an address they could
+ * go to, or a send that FAILED. Each is SENT once it can go -- again, after a failure -- or MARKED HANDLED with a
+ * note of how it was dealt with -- *"no post any longer so someone needs to deal with it"*. Both are writes started from a dialog,
  * and both keep the P9 rules: the failure is said INSIDE the dialog, nothing closes it mid-write, and an
  * answer that never came is never repeated -- the dialog stops offering the write and the list is read
  * again (R4-5).
@@ -70,7 +70,7 @@ export default function AcbHeldLetters({ run }) {
       setNotice({
         tone: 'ok',
         message: action === 'send'
-          ? `${letter.surname}’s letter was sent.`
+          ? `${letter.surname}’s letter was sent${letter.status === 'FAILED' ? ' again' : ''}.`
           : `${letter.surname}’s letter is marked as dealt with by hand. It leaves the list and is never sent.`,
       });
       retry();
@@ -112,15 +112,14 @@ export default function AcbHeldLetters({ run }) {
     },
     { key: 'template', header: 'Letter', priority: 'essential',
       cell: (letter) => LETTER_TEMPLATE_LABEL[letter.template] ?? letter.template },
-    { key: 'reason', header: 'Held because', priority: 'secondary',
-      cell: (letter) => HELD_REASON_LABEL[letter.reason] ?? letter.reason },
+    { key: 'reason', header: 'Held because', priority: 'secondary', cell: couldNotGoBecause },
     {
       key: 'actions', header: 'Deal with it', priority: 'essential',
       cell: (letter) => (
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => start(letter, 'send')} disabled={!letter.canSend}
-            aria-label={`Send ${letter.surname || 'the member'}’s letter`}>
-            Send
+            aria-label={`Send ${letter.surname || 'the member'}’s letter${letter.status === 'FAILED' ? ' again' : ''}`}>
+            {letter.status === 'FAILED' ? 'Send again' : 'Send'}
           </Button>
           {!letter.canSend && <span className="text-xs text-ink-muted">No address yet</span>}
           <Button variant="ghost" onClick={() => start(letter, 'handled')}
@@ -134,13 +133,14 @@ export default function AcbHeldLetters({ run }) {
 
   const letter = open?.letter;
   const sending = open?.action === 'send';
+  const again = letter?.status === 'FAILED';
   return (
     <Sheet className="mt-6" aria-labelledby="acb-held-letters-heading">
       <div className="border-b border-line px-6 py-4">
         <h2 id="acb-held-letters-heading" className="text-base font-semibold text-ink">Letters held — {month}</h2>
         <p className="mt-0.5 text-sm text-ink-muted">
-          Letters that could not go, for want of an address. Send one once the member has an address, or mark it
-          handled and say how.
+          Letters that could not go — for want of an address, or because sending failed. Send one once it can go, or
+          mark it handled and say how.
         </p>
       </div>
       {notice && (
@@ -149,7 +149,7 @@ export default function AcbHeldLetters({ run }) {
         </div>
       )}
       <Table
-        caption="Letters held for want of an address"
+        caption="Letters that could not go"
         columns={columns}
         rows={data.content}
         rowKey="letterId"
@@ -165,7 +165,7 @@ export default function AcbHeldLetters({ run }) {
       <Modal
         open={open != null}
         onOpenChange={(next) => { if (!next) close(); }}
-        title={sending ? 'Send this letter?' : 'Mark this letter handled'}
+        title={sending ? (again ? 'Send this letter again?' : 'Send this letter?') : 'Mark this letter handled'}
         description={letter ? `${LETTER_TEMPLATE_LABEL[letter.template] ?? letter.template} letter to ${letter.surname}.` : undefined}
         size="md"
         busy={saving}
@@ -177,7 +177,7 @@ export default function AcbHeldLetters({ run }) {
             {!unconfirmed && (
               <Button variant="primary" onClick={write} loading={saving} disabled={Boolean(why)}
                 aria-describedby={why ? 'acb-handled-why' : undefined}>
-                {sending ? 'Send' : 'Mark handled'}
+                {sending ? (again ? 'Send again' : 'Send') : 'Mark handled'}
               </Button>
             )}
           </>
