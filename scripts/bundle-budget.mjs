@@ -240,7 +240,11 @@ const CEILINGS = {
   // that failed on the run's worklist, said as such, with Send again. The completion's 734,244 B (run 35673323129)
   // against ff9df5e's 734,781 B (run 35717409196): +537 B, chunk by chunk -- acbPaging +374 (the worklist) ·
   // AcbDebits +163. ACB's bytes: 43,648 + 537 = 44,185 B = 43.149 KiB. 680 + 43.149 = 723.149, so 723.15.
-  js: 723.15 * KB,
+  //
+  // 723.15 -> 723.16 on 2026-09-22, MEASURED ON THE GATE'S RUNNER: SNAPSHOT_INCOMPLETE's label made general (it
+  // covers the account type since 00.5) -- 79240a9 builds 734,790 B, +9 B over ff9df5e, all of it acbPaging (run
+  // 35722286575). ACB's bytes: 44,185 + 9 = 44,194 B = 43.158 KiB. 680 + 43.158 = 723.158, so 723.16.
+  js: 723.16 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
