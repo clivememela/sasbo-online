@@ -18,7 +18,8 @@ import { DEFECTS, disabled, pin } from '../test/knownDefects'
  *
  * THE BASE URL IS STUBBED, NEVER INHERITED.
  * `api.js` reads `import.meta.env.VITE_API_BASE_URL` at module load, and
- * `client/.env` is COMMITTED and sets it to the deployed backend (register C7).
+ * `client/.env` is COMMITTED and sets it: to the deployed backend until 2026-09-22
+ * (register C7), to `http://localhost:8080` since.
  * A first draft of this file inherited that value and asserted against
  * `sasbo.example` -- sixteen failures whose message was about SSRF and whose
  * cause was ambient configuration. Every case below therefore stubs the

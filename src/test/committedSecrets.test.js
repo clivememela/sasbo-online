@@ -5,20 +5,21 @@ import { FLOORS, assertNonVacuousScan } from './assertNonVacuousScan'
 import {
   ALLOWLIST,
   PATH_EXCLUSIONS,
+  findingsIn,
   isExcluded,
   scanForSecrets,
   trackedFiles,
 } from './committedSecrets.js'
-import { DEFECTS, disabled, pin } from './knownDefects'
 
 /**
- * NO NEW SECRET GETS COMMITTED TO THIS REPOSITORY.
+ * NO SECRET IS COMMITTED TO THIS REPOSITORY.
  *
- * This repository already contains one -- a live Google API key in `.env`,
- * register row B2 -- so the guard lands with that file named on an allowlist
- * and fails on anything else. Naming it is the point: excluding it quietly
- * would make this guard read GREEN over a key that is on every clone of this
- * repository right now.
+ * The guard landed with one file on an allowlist: `.env`, holding a live
+ * Google API key, register row B2 -- named rather than excluded, because
+ * excluding it quietly would have made this guard read GREEN over a key on
+ * every clone. Since 2026-09-22 (local only) the tracked `.env` holds no key,
+ * the allowlist is empty, and the test B2 kept skipped runs. The key is still
+ * in HISTORY, live until its owner rotates it; see `ALLOWLIST`.
  */
 describe('committed secrets', () => {
   const tracked = trackedFiles(REPO_ROOT)
@@ -74,39 +75,30 @@ describe('committed secrets', () => {
   })
 
   describe('the allowlist', () => {
-    it('has exactly one entry, and it is the one this arc knows about', () => {
-      // A second entry appearing later is a review conversation, not a quiet
-      // edit. That is why this asserts the count and not merely the contents.
+    it('is empty', () => {
+      // An entry appearing later is a review conversation, not a quiet edit.
+      // Its one entry, `.env` for B2, went on 2026-09-22 when the key left the
+      // tracked file. A new one carries its register ROW, as that one did.
       expect(
         ALLOWLIST.map((entry) => entry.path),
-        'Someone has allowlisted another file. That is a decision about a real secret in ' +
+        'Someone has allowlisted a file. That is a decision about a real secret in ' +
           'a real repository, and it needs a register row and a reviewer -- not a commit.',
-      ).toEqual(['.env'])
-
-      // The entry carries the register ROW, not a retyped copy of its prose.
-      expect(ALLOWLIST[0].defect).toBe(DEFECTS.B2)
+      ).toEqual([])
     })
   })
 
   /**
-   * B2, through the register rather than beside it.
+   * B2's tree half, closed 2026-09-22 (local only).
    *
-   * The skipped test says what SHOULD be true; the pin asserts it is not, so
-   * the allowlist cannot outlive the problem it documents. The day the key is
-   * rotated and the file untracked, the pin reddens and names the row.
+   * This was a skipped test written to the correct behaviour, beside a pin of
+   * the wrong one. The key left the tracked `.env` -- the change the pin was
+   * written to redden on -- so the pin is deleted and the test runs. The row's
+   * other half, the key in history until its owner rotates it, no test of the
+   * tree can hold.
    */
   describe('the committed Google API key', () => {
-    it.skip(disabled(DEFECTS.B2, 'the tracked .env holds no key'), () => {
+    it('is gone from the tracked .env', () => {
       expect(findings.filter((finding) => finding.path === '.env')).toEqual([])
-    })
-
-    it(pin(DEFECTS.B2, 'the tracked .env still holds a key'), () => {
-      expect(
-        findings.some((finding) => finding.path === '.env'),
-        'No secret found in .env any more. If the key has been rotated and the file ' +
-          'untracked, DELETE the B2 allowlist entry and close the register row -- an ' +
-          'allowlist entry for a file that is now clean is a hole nobody is watching.',
-      ).toBe(true)
     })
   })
 
@@ -128,8 +120,18 @@ describe('committed secrets', () => {
     // A guard that prints the key it found copies that key into CI logs, test
     // reports and issue trackers -- a second disclosure, caused by the tool
     // meant to prevent the first.
-    for (const finding of findings) {
+    //
+    // 🔑 ON A FIXTURE, BECAUSE THE TREE IS CLEAN. Until 2026-09-22 B2's key gave
+    // this a real finding to inspect; with none left, a loop over the
+    // repository's findings would pass by inspecting nothing. The key-shaped
+    // value is assembled at run time, so this file holds none for the scan to find.
+    const key = `AIza${'FIXTURE'.padEnd(35, '0')}`
+    const reported = findingsIn('.env', `# local\nVITE_GOOGLE_API_KEY=${key}\n`)
+
+    expect(reported.map((finding) => finding.at)).toEqual(['.env:2'])
+    for (const finding of [...reported, ...findings]) {
       expect(Object.keys(finding).sort()).toEqual(['at', 'line', 'path', 'signature'])
+      expect(JSON.stringify(finding)).not.toContain(key)
     }
   })
 })

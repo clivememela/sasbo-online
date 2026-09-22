@@ -1,8 +1,8 @@
 # CI for the SASBO Online client: the gate on every pull request and on every push to `main`.
 #
-# ADVISORY. This workflow deploys nothing and references no secret: Vercel's own git integration still
-# ships `main` exactly as before. A deploy job is added later, in its own pull request, and only runs on
-# `main` after `gate` is green.
+# ADVISORY. This workflow deploys nothing and references no secret, and nothing else deploys the client either:
+# since 2026-09-22 the project runs locally, having left the incumbent developer's Vercel and Render. A deploy
+# job, when there is a host again, comes in its own pull request and only runs on `main` after `gate` is green.
 #
 # The commands are the repository's own (`npm ci`, `npm run lint`, `npm test`, `npm run build`,
 # `npm run budget`): the pipeline runs exactly what a developer runs.
@@ -38,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: false # the read-only token stays out of .git/config while dependencies' scripts run
+          persist-credentials: false # the token is persisted nowhere a later step's code could read it
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc # the repo's pin, not a second one
@@ -60,15 +60,12 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
-      # vercel.json is read by nobody but Vercel, so a stray comma would otherwise surface at deploy, after the gate.
-      - name: vercel.json parses
-        run: jq -e . vercel.json >/dev/null
       # `npm test` runs Vitest through scripts/suite-floor.mjs (asserting BOTH the exit code and the JUnit total
       # against a floor), then scripts/contract-witness.mjs. The Vitest config supplies its own VITE_* env.
       - name: Test
         run: npm test
-      # The build proves the build and feeds `budget`. Its output never ships — Vercel builds what ships — and
-      # it is not uploaded: it bakes the tracked .env's values.
+      # The build proves the build and feeds `budget`. Its output ships nowhere and is not uploaded: it bakes
+      # the tracked .env's values.
       - name: Build
         run: npm run build
       - name: Bundle budget

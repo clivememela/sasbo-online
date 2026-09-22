@@ -323,23 +323,17 @@ export const DEFECTS = {
       'rather than deleted because this arc asserts defects and does not fix them.',
   ),
 
-  B2: define(
-    'B2',
-    'a live Google API key is committed to this repository',
-    'client/.env is TRACKED and holds a real Google API key. The file is listed in ' +
-      '.gitignore, which does nothing: git ignores .gitignore for a path it already ' +
-      'tracks. The key is therefore on every clone, every fork and every backup, and ' +
-      'deleting the file would not remove it from history -- only rotating the key ' +
-      'revokes it. The committed-secret guard names this file on an allowlist rather ' +
-      'than excluding it, so it stays visible in the output of every run.',
-  ),
-
 }
 
 // A37 and A38 are RETIRED, 2026-09-17, by the capture-member re-port: memberService.normalizeMember
 // unfolds the server's delimited list fields for every consumer, and the Structures tab no longer
 // renders either list (stakeholder shape, 2026-09-17). Proved in Members.structures.test.jsx (a
 // string-shaped record opens, reads and edits) and memberService.normalize.test.js.
+
+// B2 is RETIRED from this file, 2026-09-22 (local only): the incumbent developer's Google key left the tracked
+// .env with his Vercel and Render, its pin was deleted and its test runs live in committedSecrets.test.js, with the
+// allowlist empty. The key is still in history and live until its owner rotates it -- the register's half, which no
+// test of the tree can hold.
 
 DEFECTS.A29 = define(
   'A29',

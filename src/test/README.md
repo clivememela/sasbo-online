@@ -103,8 +103,9 @@ actual.
 
 ## Part 5 — Two traps this suite already fell into
 
-**`client/.env` is committed** and points `VITE_API_BASE_URL` at the deployed
-backend. Tests inherited it silently: `api.test.js` first asserted against it
+**`client/.env` is committed**, and until 2026-09-22 it pointed
+`VITE_API_BASE_URL` at the deployed backend (it names `http://localhost:8080`
+now). Tests inherited it silently: `api.test.js` first asserted against it
 by accident, and — worse — the files running **without a DOM** *depended* on
 it, because Node's `fetch` refuses a relative URL. Moving `.env` aside failed
 **72 tests**. A fresh clone has the file, since it is tracked, so this would
@@ -175,7 +176,7 @@ npm test
 | :-- | :-- |
 | `apiContract.test.js` | a path this browser calls that the server does not serve. Two are known and named on `KNOWN_MISSING` — `/api/districts` (**A1**) and `/api/debounce` (**A2**) — and that list is asserted **exactly**, so an endpoint that starts working reddens too |
 | `vocabulary.parity.test.js` | a string constant that has drifted, and an error envelope the browser parses by the wrong keys. The `*.parity.test.js` name is its own category: a drift guard should read as one |
-| `committedSecrets.test.js` | key-shaped material in a **tracked** file. One allowlist entry — `.env`, row **B2** — kept visible rather than excluded |
+| `committedSecrets.test.js` | key-shaped material in a **tracked** file. The allowlist is **empty**: its one entry, `.env` for row **B2**, went on 2026-09-22 when the key left the tracked file (it stays in history until its owner rotates it) |
 
 ### `scripts/contract-witness.mjs` — the runtime counterpart
 
