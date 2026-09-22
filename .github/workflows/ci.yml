@@ -57,7 +57,7 @@ jobs:
             || { echo "::error::No SHA-pinned uses: line found at all — the check is broken, not the file."; exit 1; }
 
       - name: Install (npm ci)
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Lint
         run: npm run lint
       # vercel.json is read by nobody but Vercel, so a stray comma would otherwise surface at deploy, after the gate.
