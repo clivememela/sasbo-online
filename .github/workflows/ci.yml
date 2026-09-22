@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 # The clock is STATED, never inherited: a hosted runner is UTC, and these tests have only ever run in South
-# African time. Neither suite pins a zone of its own.
+# African time. The suite pins no zone of its own.
 env:
   TZ: Africa/Johannesburg
 
@@ -34,7 +34,7 @@ jobs:
   gate:
     name: gate
     runs-on: ubuntu-24.04
-    timeout-minutes: 15 # the suite is ~40 s at 4 workers locally; 15 min here means something hung
+    timeout-minutes: 15 # measured on the runner: 2.4-3.8 min for the whole job; 15 min here means something hung
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
