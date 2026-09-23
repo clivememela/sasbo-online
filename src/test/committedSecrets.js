@@ -2,8 +2,6 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFECTS } from './knownDefects.js'
-
 /**
  * Key-shaped material in files that are COMMITTED.
  *
@@ -54,16 +52,20 @@ export const PATH_EXCLUSIONS = [
 /**
  * Files allowed to contain a real secret, each with its register row.
  *
- * 🔴 EXACTLY ONE ENTRY, and it is not a way of passing the guard -- it is a way
- * of keeping a live key VISIBLE. Excluding `.env` silently would make this
- * guard read green over a Google API key that is committed to this repository
- * today. Listed, it stays in the output of every run, and the entry gets
- * deleted -- reddening the guard -- the day the key is rotated.
+ * ✅ EMPTY SINCE 2026-09-22 (local only). Its one entry was `.env`, row B2: a
+ * live Google API key -- the incumbent developer's -- committed to this
+ * repository and kept VISIBLE here rather than excluded. The project left his
+ * Vercel and Render that day and his key left the tracked `.env` with them, so
+ * the entry went, and a key-shaped string in any tracked file now fails.
  *
- * Same discipline as KNOWN_MISSING: asserted exactly, so a fixed problem cannot
- * sit on the list pretending to still be broken.
+ * ⚠️ WHAT THAT DOES NOT FIX: the key is still in this repository's HISTORY, and
+ * it is live until its owner rotates it -- deleting a line revokes nothing.
+ * That half of B2 belongs to the register; no test of the tree can hold it.
+ *
+ * Same discipline as KNOWN_MISSING: asserted exactly, so a new entry is a
+ * review conversation rather than a quiet edit.
  */
-export const ALLOWLIST = [{ path: '.env', defect: DEFECTS.B2 }]
+export const ALLOWLIST = []
 
 /** Shapes that are a secret regardless of entropy. */
 const SIGNATURES = [
@@ -119,10 +121,10 @@ export function trackedFiles(repoRoot, ...pathspec) {
  * green the moment someone moved the file aside.
  *
  * That is not hypothetical here. The CI-readiness proof runs the whole suite
- * with `.env` and `.env.local` moved aside -- and `.env` is the one file on
- * this guard's allowlist. Reading only the working tree would have made the
- * B2 pin redden during the very proof that is supposed to show the suite needs
- * no local environment.
+ * with `.env` and `.env.local` moved aside -- and `.env` was the one file on
+ * this guard's allowlist until 2026-09-22. Reading only the working tree would
+ * have made the B2 pin redden during the very proof that is supposed to show
+ * the suite needs no local environment.
  */
 function readTrackedContents(repoRoot, path) {
   const full = join(repoRoot, path)
@@ -144,6 +146,30 @@ function readTrackedContents(repoRoot, path) {
 }
 
 /**
+ * The secret signatures in one file's text, as `{ path, signature, line, at }`.
+ *
+ * Split out of `scanForSecrets` so the report's shape can be checked on a
+ * fixture: a clean repository has no finding to check it on.
+ */
+export function findingsIn(path, contents) {
+  const findings = []
+
+  contents.split('\n').forEach((line, index) => {
+    for (const { name, pattern } of SIGNATURES) {
+      const match = pattern.exec(line)
+      if (!match) continue
+
+      const value = (match[0].split(/[:=]/).pop() ?? '').replace(/["'\s]/g, '')
+      if (OBVIOUS_PLACEHOLDERS.test(value)) continue
+
+      findings.push({ path, signature: name, line: index + 1, at: `${path}:${index + 1}` })
+    }
+  })
+
+  return findings
+}
+
+/**
  * Every committed file whose contents match a secret signature.
  *
  * Returns `{ path, signature, line }` -- never the matched text. A guard that
@@ -160,17 +186,7 @@ export function scanForSecrets(repoRoot) {
     const contents = readTrackedContents(repoRoot, path)
     if (contents === null || contents.includes('\0')) continue
 
-    contents.split('\n').forEach((line, index) => {
-      for (const { name, pattern } of SIGNATURES) {
-        const match = pattern.exec(line)
-        if (!match) continue
-
-        const value = (match[0].split(/[:=]/).pop() ?? '').replace(/["'\s]/g, '')
-        if (OBVIOUS_PLACEHOLDERS.test(value)) continue
-
-        findings.push({ path, signature: name, line: index + 1, at: `${path}:${index + 1}` })
-      }
-    })
+    findings.push(...findingsIn(path, contents))
   }
 
   return findings

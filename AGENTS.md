@@ -206,22 +206,17 @@ Notes on page patterns:
 | `.env`             | Local development env vars (VITE_API_BASE_URL) |
 | `vite.config.js`   | Frontend build & dev server config             |
 | `eslint.config.js` | Linting rules                                  |
-| `render.yaml`      | Render.com deployment config (static site)     |
 
-## Deployment Pipeline
+## Deployment
 
-### Render Static Site Deployment
-```yaml
-# render.yaml
-build command: npm ci && npm run build
-publish directory: dist
-environment:
-  - VITE_API_BASE_URL: https://sasbo-online-backend.onrender.com
-```
+None for now. Since 2026-09-22 the project runs locally: it left the incumbent developer's Vercel and Render,
+so there is no `vercel.json` or `render.yaml` here, and nothing deploys `main`.
 
-- **Build**: `npm ci && npm run build` → outputs to `dist/`
-- **Publish**: Render serves static files from `dist/`
-- **API**: Frontend connects to backend via `VITE_API_BASE_URL` env var
+- **Run**: `npm run dev` serves the client on `http://localhost:5173`, the one origin the backend's CORS
+  policy allows.
+- **API**: the tracked `.env` points `VITE_API_BASE_URL` at `http://localhost:8080`, the backend's default port.
+- **Maps**: `VITE_GOOGLE_API_KEY` is not tracked; a developer's own key goes in `.env.local`. Without one,
+  `AddressAutocomplete` offers no suggestions and still takes a typed address.
 
 ## Common Workflows
 

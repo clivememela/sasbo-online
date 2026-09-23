@@ -126,32 +126,18 @@ To simplify local configuration, `.env` files have been added to both projects. 
    - **Terminal:** Run `export $(cat .env | xargs)` before running `./gradlew bootRun`.
    - **Manual:** Copy the values into your IDE's "Environment Variables" section in the Run Configuration.
 
-## Deploy with Render (Database + Backend + Frontend)
+## Deployment
 
-1. **Create PostgreSQL database on Render**
-   - In Render dashboard: `New +` → `PostgreSQL`.
-   - Save the internal connection string from Render (use this as `spring.datasource.url` in backend).
+None, for now. Since 2026-09-22 the project runs locally: it left the incumbent developer's Vercel and Render,
+so this repository carries no `vercel.json` or `render.yaml`. `npm run dev` serves the client on
+`http://localhost:5173`, the one origin the backend's CORS policy allows, and the tracked `.env` points
+`VITE_API_BASE_URL` at the backend on `http://localhost:8080` (`./gradlew bootRun` in the server repository).
 
-2. **Deploy backend web service (`sasbo-online-backend`)**
-   - Create a new `Web Service` from backend repository.
-   - Runtime: `Java`
-   - Build command: `./gradlew build`
-   - Start command: `./gradlew bootRun`
-   - Environment variables (minimum):
-     - `SPRING_DATASOURCE_URL` = Render PostgreSQL internal URL
-     - `SPRING_DATASOURCE_USERNAME` = Render PostgreSQL user
-     - `SPRING_DATASOURCE_PASSWORD` = Render PostgreSQL password
-     - `SERVER_PORT` = `10000`
-   - Ensure backend accepts frontend origin via CORS (set your Render frontend URL in backend CORS config).
+Address suggestions need a Google Maps browser key of your own, in `.env.local` (git-ignored):
 
-3. **Deploy frontend static site (`sasbo-online`)**
-   - This repo includes `render.yaml` for static deployment.
-   - Create a new `Static Site` from this repository.
-   - Build command: `npm ci && npm run build`
-   - Publish directory: `dist`
-   - Environment variable:
-     - `VITE_API_BASE_URL` = your backend Render URL (for example `https://sasbo-online-backend.onrender.com`)
+```
+VITE_GOOGLE_API_KEY=<your key>
+```
 
-4. **Post-deployment checks**
-   - Open frontend URL and verify member/bank/branch API calls succeed.
-   - Test creating a member from UI and confirm record persists in Render PostgreSQL.
+Without one, the address fields offer no suggestions and still take a typed address. Restrict the key to your
+referrers and to the Places API in the Google Cloud console: it ships in the browser bundle by design.
