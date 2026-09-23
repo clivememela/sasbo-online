@@ -83,4 +83,34 @@ describe('the test harness', () => {
       localStorage.setItem('leak-probe', 'b')
     })
   })
+
+  /**
+   * 🔴 THE SUITE'S ENVIRONMENT IS PINNED, AND THIS IS WHAT NOTICES IF IT STOPS BEING.
+   *
+   * `vite.config.js` sets `test.env` to two literals so that no test result depends on
+   * the machine it runs on, on a file that ought not to be committed, or on a live key.
+   * That pin is one line of configuration, it looks inert, and removing it breaks the
+   * suite in a way that reads as a hundred unrelated failures.
+   *
+   * It is not hypothetical. Upstream `d87a854` (2026-09-22) replaced those two literals
+   * with `process.env.VITE_API_BASE_URL` and `process.env.VITE_GOOGLE_API_KEY` -- the
+   * variables are unset on a runner, so every service test built its URLs from
+   * `undefined`, and **107 of the 263 cases in `services.errorContract.test.js` failed**
+   * on that repository's own run (35762991802). Nothing in the message said "environment".
+   *
+   * 🔑 SO THIS ASSERTS THE FACT, NOT THE FILE. A scan of `vite.config.js` would go green
+   * on a rename or a different spelling of the same mistake; asking the running suite what
+   * `import.meta.env` actually holds cannot. Both values are named exactly, so an ambient
+   * value -- `undefined`, a developer's `.env.local`, or a deployed URL -- fails here
+   * first, by name, before it can fail somewhere that sounds like a service bug.
+   */
+  describe('the environment this suite runs in', () => {
+    it('is the pinned fake origin, never the machine or the tracked .env', () => {
+      expect(import.meta.env.VITE_API_BASE_URL).toBe('http://api.test.invalid')
+    })
+
+    it('carries no Maps key, so nothing here can reach Google or bill anyone', () => {
+      expect(import.meta.env.VITE_GOOGLE_API_KEY).toBe('')
+    })
+  })
 })
