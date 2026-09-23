@@ -56,8 +56,12 @@ jobs:
           grep -qE 'uses:[[:space:]]*[^@[:space:]]+@[0-9a-f]{40}' .github/workflows/*.yml \
             || { echo "::error::No SHA-pinned uses: line found at all — the check is broken, not the file."; exit 1; }
 
+      # --ignore-scripts: no dependency's install script runs on this runner. Only 3 of the lockfile's 523 packages
+      # carry one: esbuild (its binary arrives as an optional platform package anyway), fsevents (macOS only, never
+      # installed here) and msw (copies a service worker the Node-mode tests do not use). The whole gate was run green
+      # without them before this line changed.
       - name: Install (npm ci)
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Lint
         run: npm run lint
       # `npm test` runs Vitest through scripts/suite-floor.mjs (asserting BOTH the exit code and the JUnit total
