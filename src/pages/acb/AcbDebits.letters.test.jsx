@@ -19,9 +19,10 @@ const pageOf = (content, size = 50) => ({ content, page: 0, size, totalElements:
 
 const RUN = { id: 40, actionMonth: '2026-09', status: 'RETURNED', version: 3 }
 
+// The server's AcbHeldLetterDto: a held letter is QUEUED, and every one carries its status (EH-E).
 const letter = (overrides) => ({
   letterId: 21, lineId: 3, memberId: 7, membershipNumber: 'SYN-0007', surname: 'Testperson', template: 'RE_DEBIT',
-  reason: 'NO_EMAIL', canSend: true, ...overrides,
+  status: 'QUEUED', reason: 'NO_EMAIL', canSend: true, ...overrides,
 })
 
 let letterReads
@@ -55,9 +56,47 @@ beforeEach(() => {
 })
 
 const rowOf = async (surname) => {
-  const table = await screen.findByRole('table', { name: 'Letters held for want of an address' })
+  const table = await screen.findByRole('table', { name: 'Letters that could not go' })
   return (await within(table).findByText(new RegExp(surname))).closest('tr')
 }
+
+describe('EH-E, R3-7: a send that failed', () => {
+  beforeEach(() => {
+    server.use(http.get('*/api/acb/runs/:id/letters/held', () => {
+      letterReads += 1
+      return HttpResponse.json(pageOf([
+        letter({ letterId: 31, surname: 'Failperson', status: 'FAILED', reason: 'MailSendException' }),
+        letter({ letterId: 32, lineId: 5, memberId: 9, membershipNumber: 'SYN-0009', surname: 'Changedperson',
+          status: 'FAILED', reason: 'LETTER_CHANGED_SINCE_RENDERED' }),
+        letter({ letterId: 21, status: 'QUEUED' }),
+      ]))
+    }))
+  })
+
+  it('is listed with why it did not go -- never a message -- and offers Send again', async () => {
+    renderWithProviders(<AcbDebits />)
+    const failed = await rowOf('Failperson')
+    expect(within(failed).getByText('Sending failed')).toBeInTheDocument()
+    expect(within(failed).queryByText(/MailSendException/)).not.toBeInTheDocument()
+    expect(within(failed).getByRole('button', { name: 'Send Failperson’s letter again' })).toHaveTextContent('Send again')
+    expect(within(await rowOf('Changedperson')).getByText(/details changed after it was written/)).toBeInTheDocument()
+    // The must-pass: a held letter beside it is still a plain Send.
+    expect(within(await rowOf('Testperson')).getByRole('button', { name: 'Send Testperson’s letter' })).toHaveTextContent(/^Send$/)
+  })
+
+  it('asks before sending it again -- and the sign-in it waits for is said inside the dialog (B1)', async () => {
+    server.use(http.post('*/api/acb/runs/:id/letters/:letterId/send', () => HttpResponse.json({
+      status: 403, code: 'IDENTITY_REQUIRED', details: {},
+      message: 'Sending a letter to a member waits until administrators sign in to this system. Nothing has been sent.',
+    }, { status: 403 })))
+    const user = setupUser()
+    renderWithProviders(<AcbDebits />)
+    await user.click(within(await rowOf('Failperson')).getByRole('button', { name: /again$/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Send this letter again?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Send again' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/The letter was not sent .*sign in/)
+  })
+})
 
 describe('R4-5: the held letters', () => {
   it('lists each held letter; one with no address yet cannot be sent, and says so', async () => {

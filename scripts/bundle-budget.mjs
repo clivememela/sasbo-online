@@ -222,7 +222,29 @@ const CEILINGS = {
   //                            · AddressAutocomplete, DataState +5 each · DialogNotice +2 · Recruiters +1
   //                            · SearchableSelect -794 · useReferenceData -1,440 · useFocusOn -214.
   // 680 + 38.423 = 718.423, so 718.43 (rounded UP, as 687.34's paragraph explains).
-  js: 718.43 * KB,
+  //
+  // 718.43 -> 722.63 on 2026-09-22, MEASURED ON THE GATE'S RUNNER, for ACB's completion (00.5 the account type,
+  // 03.5 the termination report and the member's Terminated status): main's 680 plus ACB's bytes and nothing
+  // else, as the paragraph above does. Two throwaway builds, the method of 708.70's paragraph:
+  //   main 3dddaac ON ITS OWN   729,941 B (712.833 KiB -- quick wins' +4.136 over f96e723 spent design's
+  //                            headroom, not ACB's, and is not ACB's to raise; run 35673286333)
+  //   the completion (34da403)  734,244 B, +4,303 B over it, chunk by chunk (run 35673323129): AcbDebits
+  //                            +3,451 (the termination report, the banking dialog's type, the unpaids'
+  //                            disabled Suspend) · memberConstants
+  //                            0 -> 3,173 and bankBranches -3,116 (Rollup gives the constants a chunk of their
+  //                            own once AcbDebits imports ACCOUNT_TYPE_OPTIONS: +57 net) · CaptureMember +308
+  //                            · Members +225 · acbRunService +114 · StatusChip +102 · index +46.
+  // ACB's bytes: 39,345 + 4,303 = 43,648 B = 42.625 KiB. 680 + 42.625 = 722.625, so 722.63 (rounded UP).
+  //
+  // 722.63 -> 723.15 on 2026-09-22, MEASURED ON THE GATE'S RUNNER, for 03.3's failed-send rule (EH-E, R3-7): a send
+  // that failed on the run's worklist, said as such, with Send again. The completion's 734,244 B (run 35673323129)
+  // against ff9df5e's 734,781 B (run 35717409196): +537 B, chunk by chunk -- acbPaging +374 (the worklist) ·
+  // AcbDebits +163. ACB's bytes: 43,648 + 537 = 44,185 B = 43.149 KiB. 680 + 43.149 = 723.149, so 723.15.
+  //
+  // 723.15 -> 723.16 on 2026-09-22, MEASURED ON THE GATE'S RUNNER: SNAPSHOT_INCOMPLETE's label made general (it
+  // covers the account type since 00.5) -- 79240a9 builds 734,790 B, +9 B over ff9df5e, all of it acbPaging (run
+  // 35722286575). ACB's bytes: 44,185 + 9 = 44,194 B = 43.158 KiB. 680 + 43.158 = 723.158, so 723.16.
+  js: 723.16 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before

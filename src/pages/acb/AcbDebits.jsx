@@ -17,9 +17,11 @@ import useFocusOn from '../../hooks/useFocusOn.js';
 import DialogNotice, { PageNotice } from '../../components/common/DialogNotice.jsx';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import { formatZar } from '../../lib/format.js';
+import { ACCOUNT_TYPE_OPTIONS } from '../../config/memberConstants.js';
 import AcbUnpaids from './AcbUnpaids.jsx';
 import AcbHeldOver from './AcbHeldOver.jsx';
 import AcbHeldLetters from './AcbHeldLetters.jsx';
+import AcbTerminationReport from './AcbTerminationReport.jsx';
 import { PagerFor } from './acbPaging.jsx';
 import { DEBIT_DAYS, asPage, debitDayReplaced, debitsRuns, maskedAccount, ordinal } from './acbRunRules.js';
 
@@ -32,7 +34,7 @@ const DAY_OPTIONS = DEBIT_DAYS.map((day) => ({ value: String(day), label: ordina
  *
  * The newest run whose file went to the bank leads: its unpaids, EVERY one, each with its decision
  * (`AcbUnpaids`); then the next run's second re-debits held over for the member's permission
- * (`AcbHeldOver`, D32) and the run's letters held for want of an address (`AcbHeldLetters`, Q46). The
+ * (`AcbHeldOver`, D32) and the run's letters that could not go (`AcbHeldLetters`, Q46, EH-E). The
  * member's banking sheet and *Edit Details* stay -- for the *Invalid Account Number* and *Account
  * Closed* unpaids, and for any member found by the search.
  *
@@ -149,6 +151,7 @@ export default function AcbDebits() {
             bankName: selectedMember.bankName || "",
             branch: selectedMember.branch || "",
             bankAccountNumber: selectedMember.bankAccountNumber || "",
+            accountType: selectedMember.accountType || "",
             ibtNo: selectedMember.ibtNo || "",
             bankAddress: selectedMember.bankAddress || "",
             workBankAddress: selectedMember.workBankAddress || "",
@@ -339,6 +342,14 @@ export default function AcbDebits() {
                                 <TextInput label="Bank" value={bankForm.bankName} onChange={handleBankChange('bankName')} />
                                 <TextInput label="Branch" value={bankForm.branch} onChange={handleBankChange('branch')} />
                                 <TextInput label="Account Number" value={bankForm.bankAccountNumber} onChange={handleBankChange('bankAccountNumber')} />
+                                {/* 00.5: the file prints it on every debit, so a debit order saved here must carry one -- the server says so if not. */}
+                                <SelectInput
+                                    label="Account Type"
+                                    value={bankForm.accountType}
+                                    onChange={(value) => setBankForm(f => ({ ...f, accountType: value }))}
+                                    options={ACCOUNT_TYPE_OPTIONS}
+                                    placeholder="No account type"
+                                />
                                 <TextInput label="IBT No." value={bankForm.ibtNo} onChange={handleBankChange('ibtNo')} />
                                 <TextInput label="Payment Type" value={bankForm.paymentType} onChange={handleBankChange('paymentType')} />
                                 {/* Q42: any day from the 20th to the 31st, the member's own -- a choice, not a text box. */}
@@ -361,6 +372,8 @@ export default function AcbDebits() {
 
                 {runsState === 'ready' && runs.next && <AcbHeldOver run={runs.next} />}
                 {runsState === 'ready' && runs.returned && <AcbHeldLetters run={runs.returned} />}
+                {/* 03.5: who three unpaids would terminate -- read from every sent month, not from one run. */}
+                <AcbTerminationReport />
 
                 {/* The member search -- for a member outside the unpaid list. card.html's criteria row. */}
                 <div className="mt-8">

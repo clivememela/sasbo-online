@@ -30,7 +30,7 @@ import { setupUser } from '../../test/user'
  *
  * ⚖️ CLEARED WITH THE AUTOMATION ARC BEFORE LANDING (sasbo-online-ed, 2026-09-17), because
  * `pages/MemberCapturePage.js` records posted defaults and their `captureCatalogue.spec.js` holds a closed
- * list of the removed tabs' fields. Their measurement: the suite asserts the READ-BACK of the 21 fields its
+ * list of the removed tabs' fields. Their measurement: the suite asserts the READ-BACK of the 22 fields its
  * one live round-trip scenario types, none of the sixteen is one of them, nine already map to catalogue
  * rows on removed tabs and seven are in the catalogue nowhere. No window needed, and the twelve-label
  * guard does not move.
@@ -47,7 +47,7 @@ const REMOVED = [
 ]
 
 /**
- * The 21 the automation suite's live round-trip scenario types and reads back. Named here because this
+ * The 22 the automation suite's live round-trip scenario types and reads back (00.5 added Account Type). Named here because this
  * test is the one that could break them: it is the ONLY place that asserts the payload as a closed set, so
  * it is where a field would be lost without anybody noticing until a containerised run.
  */
@@ -55,7 +55,7 @@ const AUTOMATION_ROUND_TRIP = [
   'title', 'firstNames', 'initials', 'surname', 'identityType', 'identityNumber', 'race',
   'personalEmail', 'workEmail', 'phone', 'workTel', 'homeTel', 'address',
   'employeeNumber', 'employmentType', 'bankName', 'branch', 'paymentType',
-  'bankAccountNumber', 'debitDay', 'ibtNo',
+  'bankAccountNumber', 'accountType', 'debitDay', 'ibtNo',
 ]
 
 let posted
@@ -138,7 +138,7 @@ describe('what a capture actually sends', () => {
     const missing = AUTOMATION_ROUND_TRIP.filter((key) => !Object.hasOwn(posted, key))
     expect(
       missing,
-      'The automation suite re-reads GET /api/members and compares these 21 fields against what its ' +
+      'The automation suite re-reads GET /api/members and compares these 22 fields against what its ' +
         'scenario typed. A key missing here fails a containerised run nobody is watching from this repo.',
     ).toEqual([])
   })

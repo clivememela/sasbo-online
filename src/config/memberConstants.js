@@ -18,7 +18,13 @@ export const PAYMENT_TYPE_DEBIT_ORDER = 'Debit Order';
 export const PAYMENT_TYPE_PAYROLL = 'Payroll Deduction';
 export const PAYMENT_TYPE_PAYROLL_LEGACY = 'Payroll';
 export const PAYMENT_TYPE_OPTIONS = [PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL];
-export const STATUS_OPTIONS = ['Active', 'Pending', 'Suspended', 'Resigned', 'Retired'];
+/**
+ * ACB 00.5: the type of the account a debit order draws on -- the bureau file prints its digit on every debit (Q16).
+ * The names are the server's `AccountType`, published as `accountTypes` in `src/test/api-vocabulary.json`, and
+ * `vocabulary.parity.test.js` holds this list to that one. The member record stores exactly these words.
+ */
+export const ACCOUNT_TYPE_OPTIONS = ['Cheque', 'Savings', 'Transmission'];
+export const STATUS_OPTIONS = ['Active', 'Pending', 'Suspended', 'Resigned', 'Retired', 'Terminated'];
 /**
  * 🔴 A7: the passport rule compared against "Passport" while the only option is "Passport Number", so
  * "Date of Birth is required for a passport" never once ran, on either screen. Named once, here, and
@@ -141,6 +147,7 @@ export const MEMBER_FIELD_LABEL_MAP = {
   jobGrade: 'Job Grade',
   bankName: 'Bank Where Member Is Employed',
   bankAccountNumber: 'Bank Account Number',
+  accountType: 'Account Type',
   branch: 'Bank Branch Where Member Works',
   ibtNo: 'IBT No.',
   paymentType: 'Payment Type',

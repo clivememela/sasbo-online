@@ -44,7 +44,9 @@ export const EXCLUSION_LABEL = Object.freeze({
   NO_SUBSCRIPTION_ROW: 'SASBO does not collect at this bank',
   DAY_OUT_OF_WINDOW: 'Debit day outside the 20th to the 31st',
   ACCOUNT_SHAPE_INVALID: 'Account number cannot go in the file',
-  SNAPSHOT_INCOMPLETE: 'Membership number or surname missing',
+  // General on purpose: the server files a missing membership number, a missing surname and -- since 00.5 -- a
+  // missing or unknown account type all under this reason, and the row's detail says which.
+  SNAPSHOT_INCOMPLETE: 'A detail the file needs is missing or invalid',
 });
 
 /** Why the bank declined a file, from the server's short list (D29, SD3-H). */
@@ -99,6 +101,15 @@ export const DECISION_LABEL = Object.freeze({
 });
 
 /** Where an unpaid's letter is. `QUEUED` is a letter that is waiting -- for an address, or for the send. */
+/** A letter's statuses -- the server's `letterStatuses`, named once so no screen spells one twice. */
+export const LETTER_STATUS = Object.freeze({
+  QUEUED: 'QUEUED',
+  RENDERED: 'RENDERED',
+  SENT: 'SENT',
+  FAILED: 'FAILED',
+  HANDLED: 'HANDLED',
+});
+
 export const LETTER_STATUS_LABEL = Object.freeze({
   QUEUED: 'Held',
   RENDERED: 'Waiting to send',
@@ -119,6 +130,18 @@ export const HELD_REASON_LABEL = Object.freeze({
   NO_EMAIL: 'No email address on record',
   INVALID_ADDRESS: 'The address on record cannot be used',
 });
+
+/**
+ * Why a letter that could not go did not go (Q46, EH-E): a held letter's reason, or -- for a send that FAILED -- what
+ * its failure's class means to an administrator. The class itself stays the server's; the screen never shows a
+ * message, which could carry the address.
+ */
+export const couldNotGoBecause = (letter) => {
+  if (letter.status !== LETTER_STATUS.FAILED) return HELD_REASON_LABEL[letter.reason] ?? letter.reason;
+  if (letter.reason === 'LETTER_CHANGED_SINCE_RENDERED') return 'Not sent — the member’s details changed after it was written';
+  if (letter.reason?.startsWith('LETTER_NOT_RENDERABLE')) return 'Not sent — the letter could not be written';
+  return 'Sending failed';
+};
 
 /**
  * The debit days a member may have: any day from the 20th to the 31st, the member's own -- no bank

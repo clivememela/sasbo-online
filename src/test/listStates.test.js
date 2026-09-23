@@ -72,9 +72,13 @@ const HANDLES_FAILURE = /\.catch\s*\(|\bcatch\s*\(|\.then\s*\([^)]*,\s*(?:\(|fun
  * guard exists to catch (`A27`: a fact about the SERVER stated as a fact about the DATA), and the canary
  * below is a page that does precisely that. The hooks are named, not pattern-matched: a new hook that
  * handles failure has to be added here deliberately, which is a decision somebody makes once.
+ *
+ * ➕ `usePagedRead` (ACB 03.5, decided here): the A.C.B. sheets page through it, it catches every read and
+ * answers `state === 'error'`, and the sheet says so through the `Table` it renders -- whose `error` is the
+ * failure shown. `AcbHeldOver` passed until now only on an unrelated `catch` in its permission save.
  */
-const DELEGATES_FAILURE = /useReferenceData\s*\(|useAsyncOptions\s*\(/
-const SHOWS_FAILURE = /<DataState\b|<LoadFailureFrame\b/
+const DELEGATES_FAILURE = /useReferenceData\s*\(|useAsyncOptions\s*\(|usePagedRead\s*\(/
+const SHOWS_FAILURE = /<DataState\b|<LoadFailureFrame\b|<Table\b[^>]*?\berror=/
 const handlesFailure = (code) =>
   HANDLES_FAILURE.test(code) || (DELEGATES_FAILURE.test(code) && SHOWS_FAILURE.test(code))
 
@@ -100,6 +104,10 @@ describe('every page that fetches can say the fetch failed', () => {
     expect(handlesFailure('<DataState state="error" />')).toBe(false)
     // The original shape still passes on its own.
     expect(handlesFailure('service.get().catch(() => setError(true))')).toBe(true)
+    // ➕ 03.5: a sheet paged through `usePagedRead` whose table is given the failure is handled...
+    expect(handlesFailure("const { state } = usePagedRead(read)\n<Table rows={rows}\n  error={state === 'error' ? 'Could not load.' : null} />")).toBe(true)
+    // ...and the same sheet whose table is never told is NOT.
+    expect(handlesFailure('const { state } = usePagedRead(read)\n<Table rows={rows} loading={false} />')).toBe(false)
   })
 
   it('finds no page whose only outcome is data', () => {

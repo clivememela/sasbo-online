@@ -20,6 +20,7 @@ import {
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, IDENTITY_TYPE_PASSPORT,
     DEBIT_DAY_OPTIONS, PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
+    ACCOUNT_TYPE_OPTIONS,
 } from "@/config/memberConstants.js";
 import {
     validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID
@@ -179,6 +180,7 @@ const FIELD_TO_TAB_MAP = {
     branch: "employment",
     paymentType: "employment",
     bankAccountNumber: "employment",
+    accountType: "employment",
     debitDay: "employment"
 };
 
@@ -269,6 +271,7 @@ const RECORD_FIELD_LABELS = {
     employmentType: "Employment Type",
     branch: "Bank Branch",
     debitDay: "Debit Day",
+    accountType: "Account Type",
     bankAddress: "Bank Work Address",
     status: "Account Membership Status",
     isShopSteward: "Shop Steward",
@@ -785,6 +788,7 @@ export default function Members() {
             }
             if (field === "paymentType" && value !== "Debit Order") {
                 delete newErrors.bankAccountNumber;
+                delete newErrors.accountType;
                 delete newErrors.bankName;
                 delete newErrors.branch;
             }
@@ -1706,6 +1710,9 @@ export default function Members() {
                                     {editForm.paymentType === "Debit Order" && (
                                         <>
                                             <Detail label="Bank Account Number" value={editForm.bankAccountNumber} isEditing={isEditing} error={fieldErrors.bankAccountNumber} required onChange={handleEditChange("bankAccountNumber")} kind="identifier" />
+                                            {/* 00.5 -- never required here: every member captured before it has none, and an edit of their
+                                                phone number must not be refused for it (R-ROB-I). The run names them instead. */}
+                                            <Detail label="Account Type" value={editForm.accountType} isEditing={isEditing} options={ACCOUNT_TYPE_OPTIONS} onChange={handleEditChange("accountType")} />
                                             <Detail
                                                 label="Debit Day"
                                                 value={editForm.debitDay}

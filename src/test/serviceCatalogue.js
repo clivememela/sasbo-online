@@ -68,6 +68,7 @@ const ARGS = {
   'acbRunService.unpaids': ['7', null, 0, 50],
   'acbRunService.decide': ['7', '3', 'RE_PRESENT'],
   'acbRunService.heldOver': ['7', 0, 50],
+  'acbRunService.terminationReport': [0, 50],
   'acbRunService.permit': ['7', '3', 'Synthetic permission note'],
   'acbRunService.heldLetters': ['7', 0, 50],
   'acbRunService.markHandled': ['7', '21', 'Synthetic handled note'],
