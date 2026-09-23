@@ -48,7 +48,29 @@ let cleanup = () => {}
 
 if (hasDom) {
   await import('@testing-library/jest-dom/vitest')
-  ;({ cleanup } = await import('@testing-library/react'))
+  const testingLibrary = await import('@testing-library/react')
+  cleanup = testingLibrary.cleanup
+
+  // -------------------------------------------------------------------------
+  // ONE wait policy for every findBy* and waitFor -- chosen here, not inherited
+  // -------------------------------------------------------------------------
+  // 🔴 THIS SUITE HAD TWO TIMEOUT POLICIES AND HAD CHOSEN ONE. A test body gets
+  // `testTimeout` 20 000 ms (vite.config.js); every `findBy*` and `waitFor`
+  // inside it got Testing Library's default of 1 000 ms, which nobody here
+  // picked. Measured 2026-09-21 on this box, one file, ONE worker, twice in a
+  // row: errorBoundaryRoutes' "a rail link leaves the failed page behind"
+  // passed at 1 618 ms and failed at 2 291 ms -- its message arriving after the
+  // 1 s ceiling, both times. The design arc measured that site at 657-1 782 ms
+  // and shell.drawer's heading at 355-1 307 ms. A ceiling inside the spread of
+  // ordinary render times is a coin flip, not an assertion.
+  //
+  // 5 000 ms, and the reasoning is the bound rather than the number: it clears
+  // the slowest render measured here by more than twice, and it stays a quarter
+  // of the test timeout, so a genuinely missing element still fails with
+  // Testing Library's own message long before the test is killed. The design
+  // arc's per-site fixes (e7e92ef, dcf72e0) and two explicit `{ timeout: 5000 }`
+  // sites already chose the same; this makes it the suite's one policy.
+  testingLibrary.configure({ asyncUtilTimeout: 5_000 })
 }
 
 // ---------------------------------------------------------------------------
