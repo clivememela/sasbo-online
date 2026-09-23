@@ -11,7 +11,12 @@ node_modules
 dist
 dist-ssr
 *.local
-.env
+# `.env` is NOT here on purpose. It is TRACKED, and it is meant to be: it carries this project's local
+# default, VITE_API_BASE_URL=http://localhost:8080, so a fresh clone runs against a local backend without
+# anyone configuring anything. A rule here could not have changed that either -- git applies no ignore rule
+# to a path it already tracks -- and the line that used to sit here read as protection while a live Google
+# key sat in that same tracked file for months (register B2). Secrets and personal overrides go in
+# `.env.local`, which `*.local` above covers and which is never committed.
 .env.production
 .env.development
 
