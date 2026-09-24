@@ -1,13 +1,13 @@
-import { useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import {useEffect, useRef} from 'react';
+import {createPortal} from 'react-dom';
+import {X} from 'lucide-react';
 
-import { cn } from '../../lib/utils';
-import { formatDateLong } from '../../lib/format';
-import { personName } from '../../lib/names.js';
+import {cn} from '@/lib/utils.js';
+import {formatDateLong} from '@/lib/format.js';
+import {personName} from '@/lib/names.js';
 import Button from '../form/Button';
 import MembershipCard from './MembershipCard';
-import { PANEL_SLOT_ID } from '../shellIds';
+import {PANEL_SLOT_ID} from '../shellIds';
 
 /**
  * THE RECORD PANEL — the third column, and the thing the contract was written around.
@@ -50,22 +50,20 @@ import { PANEL_SLOT_ID } from '../shellIds';
 const ARRIVAL_MS = 900;
 
 /**
- * 📐 **THE DOCKED WIDTH -- ONE RULE FOR BOTH ITS USERS.** The column and the body it clips are held at the same width,
- * which is what makes the collapse a slide rather than a reflow (see the body below); two copies of it drift the day
- * one is edited.
- *
- * 🗣️ **THE FLOOR IS 424px, NOT 360** -- the owner, 2026-09-21: the panel *"may be a little too thin -- maybe we can
- * widen it a bit"*. On his own screen, a 1280x661 CSS viewport, it was 410px: 32vw, because a 360px floor never binds
- * at `xl`. 424px is the widest it can be there and cost the register NOTHING. The register shares the row and reflows
- * off its own width (the `register` container, index.css), and at 1280 with a record open it turns into the phone's
- * stacked rows past a 429px panel -- measured in Chromium with this app's thin scrollbar reserved (10px in Chrome).
- * Nothing else moves: 32vw passes 424px at 1325px, and the ceiling stays 448px because at 1440 the register keeps its
- * Bank column only up to a 449px panel.
- *
  * ⚠️ A panel much wider than this on a laptop is a trade, not a number -- the register stacking while a record is open,
  * or the 256px rail giving some of itself back. Both are the owner's to choose.
+ *
+ * 📐 WIDENED AGAIN TO FIT THE RECORD'S TAB STRIP IN A SINGLE ROW (2026-09-24). The five sections
+ * (Personal · Employment · Membership · Recruitment · Structures) now flow left-to-right in one row instead of the
+ * old 3-column composition. At 13px with `px-[9px]` they measure ~420px, and the scroller's `px-6` takes another
+ * 48px, so the strip needs ~468px of panel before it fits on one line -- past the old 448px ceiling, where it wrapped.
+ * The floor is now 472px and the ceiling 496px.
+ *
+ * ⚠️ THIS IS THE SAME TRADE, AND IT NOW BITES AT 1440. The register keeps its Bank column only up to a ~449px panel,
+ * so a 490px panel at 1440 (34vw) drops Bank while a record is open. Fitting the tabs in one row and keeping the
+ * register's widest ladder cannot both hold at 1440; the single-row strip was the instruction, so the panel won.
  */
-const DOCKED_WIDTH = 'xl:w-[clamp(424px,32vw,448px)]';
+const DOCKED_WIDTH = 'xl:w-[clamp(472px,34vw,496px)]';
 
 /**
  * @param {{
@@ -77,100 +75,100 @@ const DOCKED_WIDTH = 'xl:w-[clamp(424px,32vw,448px)]';
  *   remarks?: string,
  * }} props
  */
-export default function MemberPanel({ member, open, onClose, children, footer }) {
-  const scrollRef = useRef(null);
-  const asideRef = useRef(null);
-  const headingRef = useRef(null);
-  const returnFocusRef = useRef(null);
-  const memberKey = member?.id ?? member?.membershipNumber ?? null;
+export default function MemberPanel({member, open, onClose, children, footer}) {
+    const scrollRef = useRef(null);
+    const asideRef = useRef(null);
+    const headingRef = useRef(null);
+    const returnFocusRef = useRef(null);
+    const memberKey = member?.id ?? member?.membershipNumber ?? null;
 
-  /*
-   * The arrival plays when the MEMBER changes, and the record scrolls back to the top.
-   *
-   * Without the scroll reset, opening a second member from halfway down the first one's
-   * record drops you into the middle of a stranger's employment details -- the panel is a
-   * sticky column, so nothing else resets it. Without the key, every keystroke in the edit
-   * form would re-land the card.
-   *
-   * The class is set on the element rather than held in state, exactly as the mock's
-   * `arrive()` does it: the animation is a fact about this DOM node for 900ms, and a
-   * re-render in that window must neither restart it nor be caused by it.
-   */
-  useEffect(() => {
-    if (memberKey === null) return undefined;
-    // `scrollTop`, not `scrollTo()`: the property exists on every element in every
-    // environment this renders in, and the method does not (jsdom has no `scrollTo`).
-    if (scrollRef.current) scrollRef.current.scrollTop = 0;
-    const aside = asideRef.current;
-    if (!aside) return undefined;
-    aside.classList.remove('panel-arriving');
-    void aside.offsetWidth;
-    aside.classList.add('panel-arriving');
-    const timer = setTimeout(() => aside.classList.remove('panel-arriving'), ARRIVAL_MS);
-    return () => {
-      clearTimeout(timer);
-      aside.classList.remove('panel-arriving');
-    };
-  }, [memberKey]);
+    /*
+     * The arrival plays when the MEMBER changes, and the record scrolls back to the top.
+     *
+     * Without the scroll reset, opening a second member from halfway down the first one's
+     * record drops you into the middle of a stranger's employment details -- the panel is a
+     * sticky column, so nothing else resets it. Without the key, every keystroke in the edit
+     * form would re-land the card.
+     *
+     * The class is set on the element rather than held in state, exactly as the mock's
+     * `arrive()` does it: the animation is a fact about this DOM node for 900ms, and a
+     * re-render in that window must neither restart it nor be caused by it.
+     */
+    useEffect(() => {
+        if (memberKey === null) return undefined;
+        // `scrollTop`, not `scrollTo()`: the property exists on every element in every
+        // environment this renders in, and the method does not (jsdom has no `scrollTo`).
+        if (scrollRef.current) scrollRef.current.scrollTop = 0;
+        const aside = asideRef.current;
+        if (!aside) return undefined;
+        aside.classList.remove('panel-arriving');
+        void aside.offsetWidth;
+        aside.classList.add('panel-arriving');
+        const timer = setTimeout(() => aside.classList.remove('panel-arriving'), ARRIVAL_MS);
+        return () => {
+            clearTimeout(timer);
+            aside.classList.remove('panel-arriving');
+        };
+    }, [memberKey]);
 
-  /*
-   * 🔴 OPENING A RECORD MOVED NO FOCUS, AND CLOSING IT DROPPED FOCUS TO THE PAGE (`06.5`, the `06.3` critique, F-P55).
-   * A keyboard user who chose a member stayed on the row, with the record they asked for somewhere to the right; a
-   * screen reader was told nothing had opened; and closing it lost their place in a register of thousands. Focus goes
-   * to the record's heading when a member arrives, and back to whatever held it when the record closes.
-   *
-   * The scrim below is marked `aria-hidden` and taken out of the tab order for the same reason: it was a second
-   * "Close member details" button for a keyboard and a screen reader, beside the real one in the record's head.
-   * `preventScroll`, because the record is a column already in view. The aside's role and name are untouched -- the
-   * automation arc finds the record as the complementary region "Member details".
-   */
-  useEffect(() => {
-    if (!open || memberKey === null) return;
-    const active = document.activeElement;
-    if (active && active !== document.body && !asideRef.current?.contains(active)) returnFocusRef.current = active;
-    headingRef.current?.focus({ preventScroll: true });
-  }, [open, memberKey]);
+    /*
+     * 🔴 OPENING A RECORD MOVED NO FOCUS, AND CLOSING IT DROPPED FOCUS TO THE PAGE (`06.5`, the `06.3` critique, F-P55).
+     * A keyboard user who chose a member stayed on the row, with the record they asked for somewhere to the right; a
+     * screen reader was told nothing had opened; and closing it lost their place in a register of thousands. Focus goes
+     * to the record's heading when a member arrives, and back to whatever held it when the record closes.
+     *
+     * The scrim below is marked `aria-hidden` and taken out of the tab order for the same reason: it was a second
+     * "Close member details" button for a keyboard and a screen reader, beside the real one in the record's head.
+     * `preventScroll`, because the record is a column already in view. The aside's role and name are untouched -- the
+     * automation arc finds the record as the complementary region "Member details".
+     */
+    useEffect(() => {
+        if (!open || memberKey === null) return;
+        const active = document.activeElement;
+        if (active && active !== document.body && !asideRef.current?.contains(active)) returnFocusRef.current = active;
+        headingRef.current?.focus({preventScroll: true});
+    }, [open, memberKey]);
 
-  useEffect(() => {
-    if (open) return;
-    const target = returnFocusRef.current;
-    returnFocusRef.current = null;
-    if (target?.isConnected) target.focus({ preventScroll: true });
-  }, [open]);
+    useEffect(() => {
+        if (open) return;
+        const target = returnFocusRef.current;
+        returnFocusRef.current = null;
+        if (target?.isConnected) target.focus({preventScroll: true});
+    }, [open]);
 
-  const updated = member?.dateLastChanged ?? member?.updatedAt ?? null;
-  const meta = member
-    ? [
-        member.branch,
-        member.employeeNumber && (
-          <span key="emp">
+    const updated = member?.dateLastChanged ?? member?.updatedAt ?? null;
+    const meta = member
+        ? [
+            member.branch,
+            member.employeeNumber && (
+                <span key="emp">
             Employee no. <span className="font-medium tabular-nums text-ink">{member.employeeNumber}</span>
           </span>
-        ),
-        member.joinDate && `joined ${formatDateLong(member.joinDate)}`,
-      ].filter(Boolean)
-    : [];
+            ),
+            member.joinDate && `joined ${formatDateLong(member.joinDate)}`,
+        ].filter(Boolean)
+        : [];
 
-  const panel = (
-    <>
-      {/* The scrim exists ONLY below the docking edge. Docked, the panel is a column of the
+    const panel = (
+        <>
+            {/* The scrim exists ONLY below the docking edge. Docked, the panel is a column of the
           page and a scrim over the register would be a lie about what is interactive. */}
-      {member && (
-        <button
-          type="button"
-          aria-label="Close member details"
-          aria-hidden="true"
-          tabIndex={-1}
-          onClick={onClose}
-          className={cn(
-            'fixed inset-0 z-30 bg-ink/25 transition-opacity duration-(--duration-panel) ease-(--ease-out) xl:hidden',
-            'motion-reduce:transition-none',
-            open ? 'opacity-100' : 'pointer-events-none opacity-0',
-          )}
-        />
-      )}
+            {member && (
+                <button
+                    type="button"
+                    aria-label="Close member details"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                    onClick={onClose}
+                    className={cn(
+                        'fixed inset-0 z-30 bg-ink/25 transition-opacity duration-(--duration-panel) ease-(--ease-out) xl:hidden',
+                        'motion-reduce:transition-none',
+                        open ? 'opacity-100' : 'pointer-events-none opacity-0',
+                    )}
+                />
+            )}
 
-      {/* 🔴 THE COLUMN CLOSES WHEN THERE IS NOTHING IN IT -- the owner, 2026-09-10, looking at
+            {/* 🔴 THE COLUMN CLOSES WHEN THERE IS NOTHING IN IT -- the owner, 2026-09-10, looking at
           a screenshot of the empty slot: *"Is it not better to rather close that right hand
           bar instead of showing an empty card slot?"*
 
@@ -186,31 +184,34 @@ export default function MemberPanel({ member, open, onClose, children, footer })
           reflow of the register underneath it is the kind of jump this design does not make.
           `overflow-hidden` clips the content during the slide -- safe here because `DateField`
           portals its calendar, and the panel's own scroller already clips anything else. */}
-      <aside
-        ref={asideRef}
-        aria-label={open ? 'Member details' : undefined}
-        aria-hidden={open ? undefined : 'true'}
-        data-testid="member-panel"
-        data-open={open ? 'true' : undefined}
-        className={cn(
-          'flex min-w-0 flex-col border-line bg-surface',
-          // ── docked: a real third column, and no column at all when it is empty ──
-          'xl:sticky xl:top-0 xl:h-dvh xl:shrink-0 xl:overflow-hidden xl:shadow-none',
-          'xl:transition-[width] xl:duration-(--duration-panel) xl:ease-(--ease-out)',
-          open ? `${DOCKED_WIDTH} xl:border-l` : 'xl:w-0 xl:border-l-0',
-          // ── drawer: everything below xl. It SLIDES now rather than being switched off:
-          //    `hidden` cut the drawer out of the layout on the same frame the record was
-          //    cleared, so the phone's close was the one movement in the application with no
-          //    motion at all. It is out of the layout again as soon as there is no record.
-          'max-xl:fixed max-xl:inset-y-0 max-xl:right-0 max-xl:z-40 max-xl:w-[min(448px,100vw)]',
-          'max-xl:border-l max-xl:shadow-(--shadow-2)',
-          'max-xl:transition-transform max-xl:duration-(--duration-panel) max-xl:ease-(--ease-out)',
-          open ? 'max-xl:translate-x-0' : 'max-xl:translate-x-full',
-          !member && 'max-xl:hidden',
-          'motion-reduce:transition-none',
-        )}
-      >
-        {/* 🔴 THE RECORD LEAVES WITH THE COLUMN. Rendered on `open`, it was cleared on the
+            <aside
+                ref={asideRef}
+                aria-label={open ? 'Member details' : undefined}
+                aria-hidden={open ? undefined : 'true'}
+                data-testid="member-panel"
+                data-open={open ? 'true' : undefined}
+                className={cn(
+                    'flex min-w-0 flex-col border-line bg-surface',
+                    // ── docked: a real third column, and no column at all when it is empty ──
+                    'xl:sticky xl:top-0 xl:h-dvh xl:shrink-0 xl:overflow-hidden xl:shadow-none',
+                    'xl:transition-[width] xl:duration-(--duration-panel) xl:ease-(--ease-out)',
+                    open ? `${DOCKED_WIDTH} xl:border-l` : 'xl:w-0 xl:border-l-0',
+                    // ── drawer: everything below xl. It SLIDES now rather than being switched off:
+                    //    `hidden` cut the drawer out of the layout on the same frame the record was
+                    //    cleared, so the phone's close was the one movement in the application with no
+                    //    motion at all. It is out of the layout again as soon as there is no record.
+                    //    📐 496px, MATCHING THE DOCKED CEILING (`DOCKED_WIDTH`), so the record's single-row
+                    //    tab strip fits here exactly as it does in the column; `min(…,100vw)` still gives a
+                    //    phone narrower than that a full-width drawer.
+                    'max-xl:fixed max-xl:inset-y-0 max-xl:right-0 max-xl:z-40 max-xl:w-[min(496px,100vw)]',
+                    'max-xl:border-l max-xl:shadow-(--shadow-2)',
+                    'max-xl:transition-transform max-xl:duration-(--duration-panel) max-xl:ease-(--ease-out)',
+                    open ? 'max-xl:translate-x-0' : 'max-xl:translate-x-full',
+                    !member && 'max-xl:hidden',
+                    'motion-reduce:transition-none',
+                )}
+            >
+                {/* 🔴 THE RECORD LEAVES WITH THE COLUMN. Rendered on `open`, it was cleared on the
             same frame the collapse began, so a 380px animation played over an empty white
             box -- the panel did not slide away, it emptied and then shrank. It renders on
             `member` instead, and `Members.jsx` holds the member for exactly this long.
@@ -219,74 +220,75 @@ export default function MemberPanel({ member, open, onClose, children, footer })
             of a box whose width is animating, so every line of the record re-wraps sixty
             times a second on the way out. Held at the column's own width and clipped by the
             aside, it travels instead of reflowing. */}
-        {member && (
-          <div
-            className={cn(
-              'flex h-full min-h-0 flex-col max-xl:w-full',
-              DOCKED_WIDTH,
-              'transition-opacity duration-(--duration-panel) ease-(--ease-out) motion-reduce:transition-none',
-              open ? 'opacity-100' : 'opacity-0',
-            )}
-          >
-            <div ref={scrollRef} className="scroll-quiet min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-3.5">
-              <div className="mb-3 flex h-9 items-center justify-between">
-                <p
-                  ref={headingRef}
-                  tabIndex={-1}
-                  className="rounded-sm text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
-                >
-                  Member record
-                </p>
-                <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close member details">
-                  <X size={18} strokeWidth={1.75} aria-hidden="true" />
-                </Button>
-              </div>
+                {member && (
+                    <div
+                        className={cn(
+                            'flex h-full min-h-0 flex-col max-xl:w-full',
+                            DOCKED_WIDTH,
+                            'transition-opacity duration-(--duration-panel) ease-(--ease-out) motion-reduce:transition-none',
+                            open ? 'opacity-100' : 'opacity-0',
+                        )}
+                    >
+                        <div ref={scrollRef} className="scroll-quiet min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-3.5">
+                            <div className="mb-3 flex h-9 items-center justify-between">
+                                <p
+                                    ref={headingRef}
+                                    tabIndex={-1}
+                                    className="rounded-sm text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                                >
+                                    Member record
+                                </p>
+                                <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close member details">
+                                    <X size={18} strokeWidth={1.75} aria-hidden="true"/>
+                                </Button>
+                            </div>
 
-              {member && (
-                <MembershipCard
-                  name={personName(member) || '—'}
-                  membershipNumber={member.membershipNumber}
-                  status={member.status}
-                  since={member.joinDate}
-                  employer={member.bankName}
-                />
-              )}
+                            {member && (
+                                <MembershipCard
+                                    name={personName(member) || '—'}
+                                    membershipNumber={member.membershipNumber}
+                                    status={member.status}
+                                    since={member.joinDate}
+                                    employer={member.bankName}
+                                />
+                            )}
 
-              {meta.length > 0 && (
-                // 🔴 EACH FRAGMENT IS UNBREAKABLE, and the line breaks BETWEEN them. In a
-                // 400px column this used to wrap wherever the words ran out, so the record
-                // opened with "joined 04 Jan" on one line and "2022" alone on the next --
-                // a date cut in half under the member's own card. `text-pretty` only moved
-                // the break by a word; a branch name, an employee number and a date are each
-                // one fact, and a fact does not wrap in the middle.
-                <p className="record-rise mx-0.5 mt-3.5 text-sm text-ink-muted">
-                  {meta.map((part, index) => (
-                    <span key={index}>
+                            {meta.length > 0 && (
+                                // 🔴 EACH FRAGMENT IS UNBREAKABLE, and the line breaks BETWEEN them. In a
+                                // 400px column this used to wrap wherever the words ran out, so the record
+                                // opened with "joined 04 Jan" on one line and "2022" alone on the next --
+                                // a date cut in half under the member's own card. `text-pretty` only moved
+                                // the break by a word; a branch name, an employee number and a date are each
+                                // one fact, and a fact does not wrap in the middle.
+                                <p className="record-rise mx-0.5 mt-3.5 text-sm text-ink-muted">
+                                    {meta.map((part, index) => (
+                                        <span key={index}>
                       {index > 0 && ' · '}
-                      <span className="whitespace-nowrap">{part}</span>
+                                            <span className="whitespace-nowrap">{part}</span>
                     </span>
-                  ))}
-                </p>
-              )}
+                                    ))}
+                                </p>
+                            )}
 
-              {children}
-            </div>
+                            {children}
+                        </div>
 
-            <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface px-6 py-3">
-              {/* The comp's foot says when the record last changed. With no date to say, it says
+                        <footer
+                            className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface px-6 py-3">
+                            {/* The comp's foot says when the record last changed. With no date to say, it says
                   nothing: its old fallback repeated the membership number already stamped on the
                   card a few inches above (`06.3`). */}
-              <p className="text-[12.5px] text-ink-muted">
-                {updated ? `Updated ${formatDateLong(updated)}` : ''}
-              </p>
-              {footer && <div className="flex flex-wrap items-center gap-2">{footer}</div>}
-            </footer>
-          </div>
-        )}
-      </aside>
-    </>
-  );
+                            <p className="text-[12.5px] text-ink-muted">
+                                {updated ? `Updated ${formatDateLong(updated)}` : ''}
+                            </p>
+                            {footer && <div className="flex flex-wrap items-center gap-2">{footer}</div>}
+                        </footer>
+                    </div>
+                )}
+            </aside>
+        </>
+    );
 
-  const slot = typeof document !== 'undefined' ? document.getElementById(PANEL_SLOT_ID) : null;
-  return slot ? createPortal(panel, slot) : panel;
+    const slot = typeof document !== 'undefined' ? document.getElementById(PANEL_SLOT_ID) : null;
+    return slot ? createPortal(panel, slot) : panel;
 }

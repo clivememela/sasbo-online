@@ -75,7 +75,7 @@ export const findBranchRecord = (bankListing, bankName, branch) => {
 };
 
 /**
- * The branch's code — the source for "IBT No." (E4, 04.2).
+ * The branch's code — the source for "IBT Number" (E4, 04.2).
  *
  * 🔑 The spec asks for the IBT number to be "auto-generated according to the
  * selected branch", and it is not a generation at all: the branch record already

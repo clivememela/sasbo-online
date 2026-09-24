@@ -1,43 +1,58 @@
-import { useEffect, useRef, useState, useMemo } from "react";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import {useEffect, useMemo, useRef, useState} from "react";
+import {AlertCircle, CheckCircle2} from "lucide-react";
 import WelcomeLetter from "../../components/members/WelcomeLetter";
-import { recruiterService } from "@/services/recruiterService.js";
-import { recruitmentChannelService } from "@/services/recruitmentChannelService.js";
-import { jobGradeService } from "@/services/jobGradeService.js";
-import { bankService } from "@/services/bankService.js";
+import {recruiterService} from "@/services/recruiterService.js";
+import {recruitmentChannelService} from "@/services/recruitmentChannelService.js";
+import {jobGradeService} from "@/services/jobGradeService.js";
+import {bankService} from "@/services/bankService.js";
 import PageTitle from "../../components/common/PageTitle";
-import { Page } from "../../components/common/Sheet.jsx";
+import {Page} from "../../components/common/Sheet.jsx";
+import {Button, DateField, SearchableSelect, SelectInput, TextInput,} from "../../components/form";
 import {
-    Button, DateField, SearchableSelect, SelectInput, TextInput,
-} from "../../components/form";
-import {
-    FREQUENCY_OPTIONS, TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
-    STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, MEMBER_TABS,
-    BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS, IDENTITY_TYPE_PASSPORT,
-    DEBIT_DAY_EARLIEST, DEBIT_DAY_LATEST, isDebitDayInRange,
-    PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL
+    BRANCH_OPTIONS,
+    DEBIT_DAY_EARLIEST,
+    DEBIT_DAY_LATEST,
+    DEBIT_DAY_OPTIONS,
+    EMPLOYMENT_TYPE_OPTIONS,
+    FREQUENCY_OPTIONS,
+    GENDER_OPTIONS,
+    IDENTITY_TYPE_OPTIONS,
+    IDENTITY_TYPE_PASSPORT,
+    isDebitDayInRange,
+    MEMBER_TABS,
+    PAYMENT_TYPE_DEBIT_ORDER,
+    PAYMENT_TYPE_OPTIONS,
+    PAYMENT_TYPE_PAYROLL,
+    RACE_OPTIONS,
+    STATUS_OPTIONS,
+    TITLE_OPTIONS
 } from "@/config/memberConstants.js";
-import { formatZar, toWireDate, today } from "@/lib/format.js";
-import { finishField, sanitiseField, validateField } from "@/utils/inputRules.js";
-import { subscriptionsService } from "@/services/subscriptionsService.js";
-import { findSubscriptionForBank, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
-import { branchCodeOf, branchNamesForBank, findBranchRecord, formatBranchAddress } from "@/utils/bankBranches.js";
-import { DERIVATION, derivationNote, derivationStateOf } from "@/utils/derivation.js";
-import { channelHasNoRecruiter, recruitedArea, recruitersFor } from "@/utils/recruitment.js";
-import { debitDateSentence, holidaySetFor } from "@/utils/debitDate.js";
-import { acbRunService } from "@/services/acbRunService.js";
+import {formatZar, today, toWireDate} from "@/lib/format.js";
+import {finishField, sanitiseField, validateField} from "@/utils/inputRules.js";
+import {subscriptionsService} from "@/services/subscriptionsService.js";
+import {findSubscriptionForBank, sasboSubscriptionAmount} from "@/utils/bankSubscription.js";
+import {branchCodeOf, branchNamesForBank, findBranchRecord, formatBranchAddress} from "@/utils/bankBranches.js";
+import {DERIVATION, derivationNote, derivationStateOf} from "@/utils/derivation.js";
+import {channelHasNoRecruiter, recruitedArea, recruitersFor} from "@/utils/recruitment.js";
+import {debitDateSentence, holidaySetFor} from "@/utils/debitDate.js";
+import {acbRunService} from "@/services/acbRunService.js";
 import reportError from "@/lib/reportError.js";
-import { nearMisses, resolveToOption } from "@/utils/jobGradeMatch.js";
-import { nameKey } from "@/utils/nameKey.js";
-import { fieldValue } from "@/lib/fieldValue.js";
-import { validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID,
-    formatDate } from "@/utils/validateSAID.js";
+import {nearMisses, resolveToOption} from "@/utils/jobGradeMatch.js";
+import {nameKey} from "@/utils/nameKey.js";
+import {fieldValue} from "@/lib/fieldValue.js";
+import {
+    extractDateOfBirthFromSAID,
+    extractGenderFromSAID,
+    formatDate,
+    validateEmail,
+    validateSAID
+} from "@/utils/validateSAID.js";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState";
 import useReferenceData from "../../hooks/useReferenceData.js";
 import useAsyncOptions from "../../hooks/useAsyncOptions.js";
 import useFocusOn from "../../hooks/useFocusOn.js";
-import { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
+import {closeOn, ConfirmDialog} from "../../components/overlay/Modal.jsx";
 
 const FIELD_TO_TAB_MAP = {
     title: "personal",
@@ -335,12 +350,11 @@ export default function CaptureMember() {
             }
 
             if (field === "firstNames" && !initialsTyped.current) {
-                const autoInitials = value
+                updatedForm.initials = value
                     .trim()
                     .split(/\s+/)
                     .map(name => name.charAt(0).toUpperCase())
                     .join("");
-                updatedForm.initials = autoInitials;
             }
 
             return updatedForm;
@@ -704,7 +718,7 @@ export default function CaptureMember() {
                                         Bank account details are not required for {PAYMENT_TYPE_PAYROLL}. Debit day is handled by payroll.
                                     </p>
                                 )}
-                                <Field label="IBT No." kind="identifier" value={form.ibtNo} onChange={handleChange("ibtNo")} error={fieldErrors.ibtNo}
+                                <Field label="IBT Number" kind="identifier" value={form.ibtNo} onChange={handleChange("ibtNo")} error={fieldErrors.ibtNo}
                                        note={branchDerivationNote(ibtNoState, "the branch's code")} />
                                 <AddressAutocomplete label="Bank Address" value={form.bankAddress} onChange={handleChange("bankAddress")} placeholder="Start typing a bank address..." className="md:col-span-2"
                                        hint={branchDerivationNote(bankAddressState, "the branch's address")} />

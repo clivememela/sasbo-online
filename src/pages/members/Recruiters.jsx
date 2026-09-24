@@ -8,20 +8,20 @@ import { TextInput, SearchableSelect, SelectInput, Button, PositionTreeSelect, D
 import Table from '../../components/table/Table.jsx';
 import StatusChip from '../../components/common/StatusChip.jsx';
 import Modal, { ConfirmDialog, closeOn } from '../../components/overlay/Modal.jsx';
-import { memberService } from '../../services/memberService.js';
-import { recruiterService } from '../../services/recruiterService.js';
-import { recruitmentChannelService } from '../../services/recruitmentChannelService.js';
-import { bankService } from '../../services/bankService.js';
-import { locationService } from '../../services/locationService.js';
-import { validateEmail } from '../../utils/validateSAID.js';
+import { memberService } from '@/services/memberService.js';
+import { recruiterService } from '@/services/recruiterService.js';
+import { recruitmentChannelService } from '@/services/recruitmentChannelService.js';
+import { bankService } from '@/services/bankService.js';
+import { locationService } from '@/services/locationService.js';
+import { validateEmail } from '@/utils/validateSAID.js';
 import DataState from '../../components/common/DataState.jsx';
 import DialogNotice, { PageNotice } from '../../components/common/DialogNotice.jsx';
 import useReferenceData from '../../hooks/useReferenceData.js';
 import reportError from '../../lib/reportError.js';
-import { cn } from '../../lib/utils';
-import { formalName } from '../../lib/names.js';
-import { formatDate, formatZar } from '../../lib/format.js';
-import { writeFailure } from '../../services/parseApiError.js';
+import { cn } from '@/lib/utils.js';
+import { formalName } from '@/lib/names.js';
+import { formatDate, formatZar } from '@/lib/format.js';
+import { writeFailure } from '@/services/parseApiError.js';
 import useFocusOn from '../../hooks/useFocusOn.js';
 
 const PAGE_SIZE = 20;
@@ -1309,7 +1309,7 @@ export function Recruiters() {
                                     <DRow label="Bank" value={selectedMember.bankName} />
                                     <DRow label="Branch" value={selectedMember.branch} />
                                     <DRow label="Account Number" value={selectedMember.bankAccountNumber} />
-                                    <DRow label="IBT No." value={selectedMember.ibtNo} />
+                                    <DRow label="IBT Number" value={selectedMember.ibtNo} />
                                     <DRow label="Payment Type" value={selectedMember.paymentType} />
                                     <DRow label="Work Address" value={selectedMember.workBankAddress} />
                                 </Section>

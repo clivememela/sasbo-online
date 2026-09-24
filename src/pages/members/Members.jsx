@@ -104,13 +104,13 @@ const FILTER_FIELDS = [
  *
  * 📐 `label` is what the strip SHOWS -- short, because the docked panel is a 400px column and
  * the full phrases are 762px of tabs (the owner, 2026-09-10). `full` is the tab's accessible
- * NAME, so a screen reader and the automation suite (`openModalTab('Employment & Bank')`)
+ * NAME, so a screen reader and the automation suite (`openModalTab('Employment')`)
  * still address each tab by the phrase that names it. The visible word is always contained in
  * the full phrase, which is what WCAG 2.5.3 asks of a label that differs from its name.
  */
 const RECORD_TABS = [
     { id: "personal", label: "Personal", full: "Personal Information" },
-    { id: "employment", label: "Employment", full: "Employment & Bank" },
+    { id: "employment", label: "Employment", full: "Employment" },
     { id: "membership", label: "Membership", full: "Membership & Subscriptions" },
     { id: "representatives", label: "Recruitment", full: "Recruitment Channel" },
     { id: "structures", label: "Structures", full: "Sasbo Structures" },
@@ -125,38 +125,6 @@ const amountOnFile = (value) => {
     const shown = formatZar(value);
     return shown === EMPTY ? notOnFile(null) : shown;
 };
-
-/*
- * 🗣️ WHERE EACH OF THE FIVE SECTIONS SITS IN THE RECORD'S TAB STRIP -- the owner's
- * arrangement, settled over three rounds on 2026-09-10:
- *
- *     Personal                      Membership
- *                  Employment
- *     Recruitment                    Structures
- *
- * ① Three columns, so the sections line up under each other whatever the width. Left to
- *    `flex-wrap` the strip broke 4+1 on a 448px panel and 3+2 on the owner's own window,
- *    because the split was whatever the labels happened to measure.
- * ② The last section takes the THIRD column, not the second -- *"so that there's a gap in
- *    the middle between Recruitment and Structures."*
- * ③ That leaves the middle column holding one tab where the outer two hold two, so it spans
- *    both rows and centres in them -- *"right in the center, relative to all the other panel
- *    tabs."*
- * ④ And the strip is SYMMETRICAL about its own centre line: the left column reads from the
- *    left edge, the right column to the right edge, and the middle one is centred.
- *
- * It applies only at five sections -- a sixth would fill a 3x2 grid with nothing left to
- * balance, so any other count falls back to the plain left-aligned flow.
- */
-const TAB_PLACE = TABS.length === 5
-  ? [
-      'justify-self-start',
-      'row-span-2 justify-self-center self-center',
-      'justify-self-end',
-      'justify-self-start',
-      'col-start-3 justify-self-end',
-    ]
-  : [];
 
 const FIELD_TO_TAB_MAP = {
     title: "personal",
@@ -1574,29 +1542,13 @@ export default function Members() {
                             </div>
                         )}
 
-                        {/* card.css `.tabs`: a wrapping strip under a hairline, the current
-                            section underlined in the brand's teal.
-
-                            ⚠️ NOT `role="tab"`, AND THAT IS DELIBERATE. It looks like a tab
-                            strip and the first draft said so — but the ARIA tabs pattern is
-                            a CONTRACT: arrow keys move between tabs, one tab stop covers the
-                            set, and each tab owns a `tabpanel`. Declaring the role without
-                            implementing the keyboard behaviour tells a screen-reader user
-                            "tab 3 of 5" and then does nothing when they press the arrow key,
-                            which is worse than a plain group of buttons — those simply work.
-                            `aria-current` says which section is showing without promising
-                            anything that is not here.
-
-                            ⏳ The full pattern needs roving focus, and a shared
-                            `useRovingFocus` is already on RF's list precisely because this
-                            application has three places that want it. */}
-                        {/* 🔑 IT WRAPS. IT DOES NOT SCROLL — AND THE MOCK SETTLED THAT.
-                            Short labels at the mock's own 13px fit a three-column composition
-                            in the docked `clamp(424px, 32vw, 448px)` panel. The rule sits on
-                            the wrapper so it runs under the whole block. */}
+                        {/* 🔑 A SINGLE ROW, LEFT TO RIGHT — the same strip the capture form
+                            uses (`flex flex-wrap -mb-px`). The short labels at the mock's own
+                            13px flow in one row and wrap only if the docked panel is narrower
+                            than the five of them together. */}
                         <div className="no-print mt-4 border-b border-line">
-                            <div className="grid grid-cols-3 gap-x-0.5">
-                                {TABS.map((tab, index) => (
+                            <div className="flex flex-wrap -mb-px">
+                                {TABS.map((tab) => (
                                     <button
                                         key={tab.id}
                                         type="button"
@@ -1605,7 +1557,6 @@ export default function Members() {
                                         className={cn(
                                             // card.css:358 -- 13px, not 14: a quiet index of the record, not a second row of headings.
                                             "touch-target inline-flex items-center gap-1 whitespace-nowrap px-[9px] pb-[11px] pt-[9px] text-[13px] font-medium",
-                                            TAB_PLACE[index],
                                             "transition-[color,box-shadow] duration-(--duration-instant) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
                                             activeTab === tab.id
                                                 ? "font-semibold text-brand-ink shadow-[inset_0_-2px_0_var(--color-brand)]"
@@ -1716,7 +1667,7 @@ export default function Members() {
                                             />
                                         </>
                                     )}
-                                    <Detail label="IBT No." value={editForm.ibtNo} isEditing={isEditing} onChange={handleEditChange("ibtNo")} kind="identifier" error={fieldErrors.ibtNo} />
+                                    <Detail label="IBT Number" value={editForm.ibtNo} isEditing={isEditing} onChange={handleEditChange("ibtNo")} kind="identifier" error={fieldErrors.ibtNo} />
                                     <div className="col-span-full">
                                         {isEditing ? (
                                             <AddressAutocomplete label="Bank Work Address" value={editForm.bankAddress} onChange={handleEditChange("bankAddress")} placeholder="Search coordinates..." />

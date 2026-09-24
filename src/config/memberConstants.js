@@ -85,7 +85,7 @@ export const REP_OPTIONS = [
  */
 export const MEMBER_TABS = [
   { id: 'personal', label: 'Personal Information' },
-  { id: 'employment', label: 'Employment & Bank' },
+  { id: 'employment', label: 'Employment' },
   { id: 'representatives', label: 'Recruitment Channel' },
   { id: 'membership', label: 'Membership & Subscriptions' },
   // { id: 'history', label: 'History & Remarks' },
@@ -142,7 +142,7 @@ export const MEMBER_FIELD_LABEL_MAP = {
   bankName: 'Bank Where Member Is Employed',
   bankAccountNumber: 'Bank Account Number',
   branch: 'Bank Branch Where Member Works',
-  ibtNo: 'IBT No.',
+  ibtNo: 'IBT Number',
   paymentType: 'Payment Type',
   debitDay: 'Day to be debited',
   bankAddress: 'Bank Address',
