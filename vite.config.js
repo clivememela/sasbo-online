@@ -34,6 +34,11 @@ if (isVitest) {
 export default defineConfig({
   plugins: [react(), tailwindcss()],
 
+  build: {
+    sourcemap: false,  // Disable source maps (saves ~100MB memory)
+    minify: 'terser',
+  },
+
   // `@/` -> `src/`. Added by 03.1 because shadcn's generated components import
   // through it, and because the alternative -- `../../../components/ui/x` from a
   // page three directories deep -- is how imports quietly stop being moved.
