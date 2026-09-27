@@ -1,10 +1,10 @@
-# Vercel Environment Variable Setup
+# Vercel Environment Variable Setup (Frontend)
 
 ## Problem
-The frontend is timing out because it cannot reach the backend. This is because the Vercel deployment doesn't have the correct backend URL configured.
+The frontend is timing out because it cannot reach the backend. This is because the Vercel deployment doesn't have the correct backend URL configured for each environment.
 
 **Current state:**
-- ✅ Backend deployed to Render: `https://sasbo-online-backend-latest.onrender.com`
+- ✅ Backend deployed to Render (multiple environments)
 - ❌ Frontend on Vercel doesn't know about it
 - ❌ Frontend defaults to `localhost:8080` (which doesn't exist on Vercel)
 
@@ -12,7 +12,7 @@ The frontend is timing out because it cannot reach the backend. This is because 
 
 ---
 
-## Solution: Add Environment Variable to Vercel
+## Solution: Add Environment Variables to Vercel
 
 ### Step 1: Go to Vercel Dashboard
 Open **https://vercel.com/dashboard** and log in
@@ -30,78 +30,176 @@ In the left sidebar, click **Environment Variables**
 
 ![Step 4](./docs/vercel-step-4-env-vars.png)
 
-### Step 5: Add New Environment Variable
-Click the **Add New** button (top right)
+### Step 5: Add Environment Variables
 
-![Step 5](./docs/vercel-step-5-add-new.png)
+You need to add **2 variables × 3 environments = 6 total entries** in Vercel.
 
-### Step 6: Fill in the Variable
-Enter the following information:
+---
 
-**Name:**
+## Environment Variables by Environment
+
+### DEVELOPMENT
+Used when running locally with `npm run dev`
+
+| Name | Value |
+|------|-------|
+| `VITE_API_BASE_URL` | `http://localhost:8080` |
+| `VITE_GOOGLE_API_KEY` | (your key) |
+
+**Steps:**
+1. Click **Add New**
+2. Name: `VITE_API_BASE_URL`
+3. Value: `http://localhost:8080`
+4. Environments: **Development** only
+5. Click **Save**
+
+Then add `VITE_GOOGLE_API_KEY`:
+1. Click **Add New**
+2. Name: `VITE_GOOGLE_API_KEY`
+3. Value: (your Google API key)
+4. Environments: **Development** only
+5. Click **Save**
+
+---
+
+### PREPROD / PREVIEW
+Used for preview deployments on Vercel (feature branches, PRs, staging environment)
+
+| Name | Value |
+|------|-------|
+| `VITE_API_BASE_URL` | `https://sasbo-online-backend-preprod.onrender.com` |
+| `VITE_GOOGLE_API_KEY` | (your key) |
+
+**Steps:**
+1. Click **Add New**
+2. Name: `VITE_API_BASE_URL`
+3. Value: `https://sasbo-online-backend-preprod.onrender.com`
+4. Environments: **Preview** only
+5. Click **Save**
+
+Then add `VITE_GOOGLE_API_KEY`:
+1. Click **Add New**
+2. Name: `VITE_GOOGLE_API_KEY`
+3. Value: (your Google API key)
+4. Environments: **Preview** only
+5. Click **Save**
+
+---
+
+### PRODUCTION
+Used for the live production deployment
+
+| Name | Value |
+|------|-------|
+| `VITE_API_BASE_URL` | `https://sasbo-online-backend-prod.onrender.com` |
+| `VITE_GOOGLE_API_KEY` | (your key) |
+
+**Steps:**
+1. Click **Add New**
+2. Name: `VITE_API_BASE_URL`
+3. Value: `https://sasbo-online-backend-prod.onrender.com`
+4. Environments: **Production** only
+5. Click **Save**
+
+Then add `VITE_GOOGLE_API_KEY`:
+1. Click **Add New**
+2. Name: `VITE_GOOGLE_API_KEY`
+3. Value: (your Google API key)
+4. Environments: **Production** only
+5. Click **Save**
+
+---
+
+## Quick Reference Table
+
+| Variable | Development | Preprod/Preview | Production |
+|----------|-------------|-----------------|------------|
+| `VITE_API_BASE_URL` | `http://localhost:8080` | `https://sasbo-online-backend-preprod.onrender.com` | `https://sasbo-online-backend-prod.onrender.com` |
+| `VITE_GOOGLE_API_KEY` | (your key) | (your key) | (your key) |
+
+---
+
+## Step-by-Step in Vercel Dashboard
+
+### For Each Variable:
+
+1. Go to **Settings → Environment Variables**
+2. Click **Add New**
+3. Enter **Name** (e.g., `VITE_API_BASE_URL`)
+4. Enter **Value** (from table above)
+5. Select **Environments** (Development, Preview, or Production)
+6. Click **Save**
+
+![Example](./docs/vercel-add-env-var.png)
+
+### Full List to Add:
+
 ```
-VITE_API_BASE_URL
+# Development Environment
+VITE_API_BASE_URL=http://localhost:8080
+VITE_GOOGLE_API_KEY=[your-key]
+
+# Preprod/Preview Environment
+VITE_API_BASE_URL=https://sasbo-online-backend-preprod.onrender.com
+VITE_GOOGLE_API_KEY=[your-key]
+
+# Production Environment
+VITE_API_BASE_URL=https://sasbo-online-backend-prod.onrender.com
+VITE_GOOGLE_API_KEY=[your-key]
 ```
 
-**Value:**
-```
-https://sasbo-online-backend-latest.onrender.com
-```
+---
 
-**Environments:** Select all three:
-- ✅ Production
-- ✅ Preview  
-- ✅ Development
+## After Adding All Variables
 
-![Step 6](./docs/vercel-step-6-fill-in.png)
+### Redeploy Each Environment
 
-### Step 7: Save
-Click **Save**
-
-![Step 7](./docs/vercel-step-7-save.png)
-
-You should see it appear in the list:
-```
-VITE_API_BASE_URL (Production, Preview, Development)
-https://sasbo-online-backend-latest.onrender.com
-```
-
-### Step 8: Redeploy
-1. Go to **Deployments** tab (top menu)
-2. Find the most recent deployment
-3. Click the three dots (`...`) menu on the right
-4. Click **Redeploy**
-
-![Step 8](./docs/vercel-step-8-redeploy.png)
-
-Vercel will redeploy with the new environment variable.
+1. Go to **Deployments** tab
+2. For each environment (development, preprod/preview, production):
+   - Find the latest deployment
+   - Click three dots (`...`)
+   - Click **Redeploy**
 
 ---
 
 ## Verification
 
 ### Expected Result
-After redeployment completes (1-2 minutes):
+After redeployment completes:
 - ✅ No more timeout errors in browser console
 - ✅ Reference data loads (banks, bank branches)
 - ✅ Members list loads
 - ✅ ACB Runs section loads
 
-### How to Verify
-1. Open the Vercel frontend URL
-2. Open DevTools → Console
-3. Look for timeout errors
+### How to Verify by Environment
 
-**Before fix:**
-```
-[sasbo] {context: 'reference:banks', kind: 'timeout', retryable: true}
-[sasbo] {context: 'reference:bank branches', kind: 'timeout', retryable: true}
-[sasbo] {context: 'Members.loadMembers', kind: 'timeout', retryable: true}
+**Development (Local):**
+```bash
+npm run dev
+# Open http://localhost:5173
+# Check console - no timeout errors
+# Should connect to localhost:8080 backend
 ```
 
-**After fix:**
+**Preprod/Preview (Vercel Feature Branch):**
+```bash
+# Push to a feature branch
+git push origin feature-branch
+
+# Vercel auto-deploys to preview URL
+# Open the preview URL from Vercel
+# Check console - no timeout errors
+# Should connect to preprod backend
 ```
-(No timeout errors)
+
+**Production (Vercel Main Branch):**
+```bash
+# Push to main
+git push origin main
+
+# Vercel auto-deploys to production URL
+# Check console - no timeout errors
+# Should connect to production backend
 ```
 
 ---
@@ -113,54 +211,61 @@ After redeployment completes (1-2 minutes):
 2. Click **Clear Cache**
 3. Redeploy again
 
-### Verify Backend is Running
-Test the backend directly:
+### Verify Backend URLs are Running
+Test each backend:
 ```bash
-curl https://sasbo-online-backend-latest.onrender.com/api/banks
+# Preprod backend
+curl https://sasbo-online-backend-preprod.onrender.com/api/banks
+
+# Production backend
+curl https://sasbo-online-backend-prod.onrender.com/api/banks
 ```
 
-Should return a list of banks (HTTP 200).
+Both should return HTTP 200 with bank list.
 
 ### Check Build Logs
 1. Go to **Deployments**
-2. Click on the failed/current deployment
+2. Click on the deployment
 3. Scroll down to see build logs for errors
 
 ---
 
-## Environment Variables Reference
+## Why Multiple Environments?
 
-| Name | Value | Applied To |
-|------|-------|-----------|
-| `VITE_API_BASE_URL` | `https://sasbo-online-backend-latest.onrender.com` | Production, Preview, Development |
-| `VITE_GOOGLE_API_KEY` | (already set) | Production, Preview, Development |
+| Environment | Use Case | Branch | Backend | Audience |
+|------------|----------|--------|---------|----------|
+| **Development** | Local machine | N/A | Localhost | Developer |
+| **Preprod/Preview** | Feature branches, testing | Feature branches | Preprod backend | QA, Testing |
+| **Production** | Live users | main branch | Production backend | End users |
+
+Different environments connect to different backends which may have different data, performance tuning, or features.
 
 ---
 
-## Why This Matters
+## Environment Configuration Files
 
-**Local development (.env file):**
-- Your local `.env` file points to `http://localhost:8080`
-- Works fine when running `npm run dev` locally
+Local configuration files (not committed to Vercel):
 
-**Vercel deployment:**
-- Vercel doesn't read `.env` files (security reason — they're in `.gitignore`)
-- Vercel reads from Dashboard → Environment Variables
-- Frontend code reads: `import.meta.env.VITE_API_BASE_URL`
-- This gets the value from Vercel's environment, not from `.env`
+**`.env` (Development)**
+```
+VITE_API_BASE_URL=http://localhost:8080
+VITE_GOOGLE_API_KEY=[your-key]
+```
 
-**Without the environment variable set:**
-- Vite has no value to use
-- Falls back to default behavior
-- Tries to reach `localhost:8080`
-- Times out (no local backend)
+**`.env.development`**
+```
+VITE_API_BASE_URL=http://localhost:8080
+VITE_GOOGLE_API_KEY=[your-key]
+```
 
-**With the environment variable set:**
-- Frontend correctly points to `https://sasbo-online-backend-latest.onrender.com`
-- API calls succeed ✅
+**`.env.production`**
+```
+VITE_API_BASE_URL=https://sasbo-online-backend-prod.onrender.com
+VITE_GOOGLE_API_KEY=[your-key]
+```
 
 ---
 
 ## Contact
 
-If you encounter issues or need clarification, contact the backend team. The backend is running and responding correctly at `https://sasbo-online-backend-latest.onrender.com/api/banks`.
+If you encounter issues or need clarification, contact the backend team. All backends (preprod and production) should be running and responding correctly.
