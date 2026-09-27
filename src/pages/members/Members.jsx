@@ -1602,7 +1602,7 @@ export default function Members() {
                                     <Detail label="Surname" value={editForm.surname} isEditing={isEditing} onChange={handleEditChange("surname")} onBlur={handleEditBlur("surname")} error={fieldErrors.surname} required kind="name" />
                                     <Detail label="Identity Type" value={editForm.identityType} isEditing={isEditing} options={idTypeOptions} onChange={handleEditChange("identityType")} error={fieldErrors.identityType} required />
                                     <Detail
-                                        label={editForm.identityType || "Identity Number"}
+                                        label={editForm.identityType === IDENTITY_TYPE_PASSPORT ? "Passport Number" : (editForm.identityType || "Identity Number")}
                                         value={editForm.identityNumber}
                                         isEditing={isEditing}
                                         onChange={handleEditChange("identityNumber")}
@@ -1647,13 +1647,33 @@ export default function Members() {
 
                             {activeTab === "employment" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
-                                    <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="reference" />
                                     <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} {...refs.field('banks')} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
-                                    <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
-                                    <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGrade} onChange={handleEditChange("jobGrade")} disabled={!editForm.bankName} loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
                                     <Detail label="Bank Branch" value={editForm.branch} isEditing={isEditing} options={branchOptions} error={fieldErrors.branch} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("branch")} />
-                                    <Detail label="Payment Type" value={editForm.paymentType} isEditing={isEditing} options={paymentTypeOptions} onChange={handleEditChange("paymentType")} />
+                                    <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="reference" />
+                                    <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGrade} onChange={handleEditChange("jobGrade")} disabled={!editForm.bankName} loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
+                                    <Detail label="IBT Number" value={editForm.ibtNo} isEditing={isEditing} onChange={handleEditChange("ibtNo")} kind="identifier" error={fieldErrors.ibtNo} />
+                                    <div className="col-span-full">
+                                        {isEditing ? (
+                                            <AddressAutocomplete label="Bank Work Address" value={editForm.bankAddress} onChange={handleEditChange("bankAddress")} placeholder="Search coordinates..." />
+                                        ) : (
+                                            <Detail label="Bank Address" value={selectedMember.bankAddress} isEditing={false} />
+                                        )}
+                                    </div>
+                                    <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
+                                </div>
+                            )}
 
+                            {activeTab === "membership" && (
+                                <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
+                                    <Detail label="Date Joined Sasbo" value={recordDate(selectedMember.joinDate)} isEditing={false} />
+                                    <Detail label="Account Membership Status" value={editForm.status} isEditing={isEditing} options={statusOptions} onChange={handleEditChange("status")} />
+                                    <h4 className="col-span-full mt-1.5 border-t border-line pt-[18px] text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Sasbo Subscription Fee Details</h4>
+                                    {/* 🔴 A MEMBER WITH NO SUBSCRIPTION ON FILE WAS SHOWN R182.77, MONTHLY (`06.4`) -- two invented
+                                        facts about their money, printed as if the record held them. The absence is said instead. */}
+                                    <Detail label="Monthly Subscription (ZAR)" value={amountOnFile(selectedMember.monthlySubscription)} isEditing={false} />
+                                    <Detail label="Billing Frequency" value={notOnFile(selectedMember.subscriptionFrequency)} isEditing={false} />
+                                    <h4 className="col-span-full mt-1.5 border-t border-line pt-[18px] text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Banking Details</h4>
+                                    <Detail label="Payment Type" value={editForm.paymentType} isEditing={isEditing} options={paymentTypeOptions} onChange={handleEditChange("paymentType")} />
                                     {editForm.paymentType === "Debit Order" && (
                                         <>
                                             <Detail label="Bank Account Number" value={editForm.bankAccountNumber} isEditing={isEditing} error={fieldErrors.bankAccountNumber} required onChange={handleEditChange("bankAccountNumber")} kind="identifier" />
@@ -1667,26 +1687,11 @@ export default function Members() {
                                             />
                                         </>
                                     )}
-                                    <Detail label="IBT Number" value={editForm.ibtNo} isEditing={isEditing} onChange={handleEditChange("ibtNo")} kind="identifier" error={fieldErrors.ibtNo} />
-                                    <div className="col-span-full">
-                                        {isEditing ? (
-                                            <AddressAutocomplete label="Bank Work Address" value={editForm.bankAddress} onChange={handleEditChange("bankAddress")} placeholder="Search coordinates..." />
-                                        ) : (
-                                            <Detail label="Bank Address" value={selectedMember.bankAddress} isEditing={false} />
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === "membership" && (
-                                <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
-                                    <Detail label="Date Joined Sasbo" value={recordDate(selectedMember.joinDate)} isEditing={false} />
-                                    <Detail label="Account Membership Status" value={editForm.status} isEditing={isEditing} options={statusOptions} onChange={handleEditChange("status")} />
-                                    <h4 className="col-span-full mt-1.5 border-t border-line pt-[18px] text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Sasbo Subscription Fee Details</h4>
-                                    {/* 🔴 A MEMBER WITH NO SUBSCRIPTION ON FILE WAS SHOWN R182.77, MONTHLY (`06.4`) -- two invented
-                                        facts about their money, printed as if the record held them. The absence is said instead. */}
-                                    <Detail label="Monthly Subscription (ZAR)" value={amountOnFile(selectedMember.monthlySubscription)} isEditing={false} />
-                                    <Detail label="Billing Frequency" value={notOnFile(selectedMember.subscriptionFrequency)} isEditing={false} />
+                                    {editForm.paymentType === PAYMENT_TYPE_PAYROLL && (
+                                        <p className="col-span-2 rounded-lg border border-line-strong bg-surface-2 p-3 text-sm text-ink-muted">
+                                            Bank account details are not required for {PAYMENT_TYPE_PAYROLL}. Debit day is handled by payroll.
+                                        </p>
+                                    )}
                                 </div>
                             )}
 

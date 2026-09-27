@@ -73,9 +73,10 @@ const FIELD_TO_TAB_MAP = {
     jobGrade: "employment",
     bankName: "employment",
     branch: "employment",
-    paymentType: "employment",
-    bankAccountNumber: "employment",
-    debitDay: "employment",
+    bankAddress: "employment",
+    paymentType: "membership",
+    bankAccountNumber: "membership",
+    debitDay: "membership",
 };
 
 /** The names out of a reference table of `{id, name}` rows -- [] until the list has arrived. */
@@ -651,7 +652,7 @@ export default function CaptureMember() {
                                 <Field label="Identity Type" value={form.identityType} onChange={handleChange("identityType")} options={identityTypeOptions} error={fieldErrors.identityType} required />
                                 <Field
                                     kind={form.identityType === IDENTITY_TYPE_PASSPORT ? "reference" : "identifier"}
-                                    label={form.identityType || "Identity Number"}
+                                    label={form.identityType === IDENTITY_TYPE_PASSPORT ? "Passport Number" : (form.identityType || "Identity Number")}
                                     note={form.identityType ? null : "Choose an identity type first."}
                                     value={form.identityNumber}
                                     onChange={handleChange("identityNumber")}
@@ -661,12 +662,13 @@ export default function CaptureMember() {
                                 />
                                 <Field
                                     label="Date of Birth"
-                                    value={form.identityType === "I.D. Number" ? formatDate(form.dateOfBirth) : form.dateOfBirth}
+                                    value={form.dateOfBirth ? (form.identityType === "I.D. Number" ? formatDate(form.dateOfBirth) : form.dateOfBirth) : ""}
                                     onChange={handleChange("dateOfBirth")}
                                     type={form.identityType === "I.D. Number" ? "text" : "date"}
                                     disabled={form.identityType === "I.D. Number"}
                                     error={fieldErrors.dateOfBirth}
                                     required={form.identityType === IDENTITY_TYPE_PASSPORT}
+                                    placeholder={form.identityType === "I.D. Number" ? "dd.mm/yyyy" : ""}
                                 />
                                 <Field
                                     label="Gender"
@@ -690,23 +692,8 @@ export default function CaptureMember() {
                                 <SectionTitle title="Sasbo Subscription" />
                                 <Field label="Monthly Subscription" value={subscriptionAmount == null ? '' : formatZar(subscriptionAmount)} onChange={handleChange("monthlySubscription")} disabled note="*reviewed annually through business discussions *" />
                                 <Field label="Frequency" value={form.subscriptionFrequency} onChange={handleChange("subscriptionFrequency")} options={frequencyOptions} disabled />
-                            </>
-                        )}
-                        {activeTab === "employment" && (
-                            <>
-                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} {...refs.field('banks')} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
-                                <Field label="Employee Number" kind="reference" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
-                                <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
-                                {/* 🔑 02.5 / CM-37 -- LIST FIRST, TYPING ALLOWED. The seeded list is per-bank and
-                                    incomplete (SASBO's own data carries grades no bank row has), so a list-only
-                                    field means a member who cannot be captured at all. The server is built for
-                                    it: `jobGradeMatching` in `api-vocabulary.json` publishes the normalization
-                                    and `MemberDto.jobGradeOutcome` reports MATCHED / CAPTURED / CLEARED.
-                                    `allowCustom` is the design arc's prop, on their instruction and their shape. */}
-                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGrades.loading} emptyLabel="No job grades available" loadError={jobGrades.error} onRetryLoad={jobGrades.refetch} searchable allowCustom note={jobGradeNote} />
-                                <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={branchOptionsFor(form.bankName)} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable disabled={!form.bankName} note={form.bankName ? null : "Choose the bank first."} />
+                                <SectionTitle title="Banking Details" />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
-
                                 {form.paymentType === "Debit Order" && (
                                     <>
                                         <Field label="Bank Account Number" kind="identifier" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} error={fieldErrors.bankAccountNumber} required />
@@ -718,10 +705,19 @@ export default function CaptureMember() {
                                         Bank account details are not required for {PAYMENT_TYPE_PAYROLL}. Debit day is handled by payroll.
                                     </p>
                                 )}
+                            </>
+                        )}
+                        {activeTab === "employment" && (
+                            <>
+                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} {...refs.field('banks')} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
+                                <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={branchOptionsFor(form.bankName)} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable disabled={!form.bankName} note={form.bankName ? null : "Choose the bank first."} />
+                                <Field label="Employee Number" kind="reference" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
+                                <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGrades.loading} emptyLabel="No job grades available" loadError={jobGrades.error} onRetryLoad={jobGrades.refetch} searchable allowCustom note={jobGradeNote} />
                                 <Field label="IBT Number" kind="identifier" value={form.ibtNo} onChange={handleChange("ibtNo")} error={fieldErrors.ibtNo}
                                        note={branchDerivationNote(ibtNoState, "the branch's code")} />
                                 <AddressAutocomplete label="Bank Address" value={form.bankAddress} onChange={handleChange("bankAddress")} placeholder="Start typing a bank address..." className="md:col-span-2"
                                        hint={branchDerivationNote(bankAddressState, "the branch's address")} />
+                                <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
                             </>
                         )}
 

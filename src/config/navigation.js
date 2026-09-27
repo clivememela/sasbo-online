@@ -179,8 +179,8 @@ export const navItems = [
         // add and edit have been live all along. Mirrors `Maintenance.jsx`'s cards.
         subItems: [
           {
-            title: 'Edit Member',
-            icon: UserRoundPen,
+            title: 'Members',
+            icon: Users,
             href: '/members',
             desc: 'Find a member and edit their record'
           },
