@@ -58,10 +58,15 @@ function workplacesSearched(asked = []) {
 
 const boom = () => HttpResponse.json({ status: 503, error: 'Service Unavailable' }, { status: 503 })
 
-/** The golden lists, then the catch-all: msw answers with the first handler that matches. */
-function answerTheLists(...more) {
+/**
+ * The catch-all, the golden lists over it, and a test's own answers over those. Three `use` calls, because msw answers
+ * with the FIRST handler that matches and each call prepends: handlers written after the golden ones in the same call
+ * would never be reached.
+ */
+function answerTheLists(...own) {
   server.use(...pageFixtures)
-  server.use(monthEndAnswer('GET /api/reference/status'), monthEndAnswer('GET /api/reference/employers'), ...more)
+  server.use(monthEndAnswer('GET /api/reference/status'), monthEndAnswer('GET /api/reference/employers'))
+  if (own.length) server.use(...own)
 }
 
 async function chooseEmployer(user, name) {

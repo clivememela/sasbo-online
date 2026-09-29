@@ -42,9 +42,11 @@ export const EMPLOYMENT_TYPE_OPTIONS = ['Permanent', 'Contract'];
 // from the API at runtime and fall back to this array only when necessary.
 export const JOB_GRADE_OPTIONS = [];
 export const MANAGER_OPTIONS = ['MGR-001'];
-export const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, '0'));
-export const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
-export const YEAR_OPTIONS = Array.from({ length: 21 }, (_, i) => (new Date().getFullYear() - 10 + i).toString());
+// ⚖️ `@__PURE__` (month end 01.3): no screen reads these three, and a bundler must keep an `Array.from(…, fn)` it cannot
+// prove harmless -- so all three shipped, computed, on every load. Marked, they go wherever nothing imports them.
+export const DAY_OPTIONS = /* @__PURE__ */ Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+export const MONTH_OPTIONS = /* @__PURE__ */ Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+export const YEAR_OPTIONS = /* @__PURE__ */ Array.from({ length: 21 }, (_, i) => (new Date().getFullYear() - 10 + i).toString());
 
 export const BEC_STRUCTURE_OPTIONS = ['Shop Stewart', 'Branch Executive Committee'];
 

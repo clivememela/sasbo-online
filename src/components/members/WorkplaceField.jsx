@@ -143,7 +143,7 @@ export default function WorkplaceField({
             />
           </div>
           {rows.length > 0 && (
-            <ul className="divide-y divide-line rounded-lg border border-line">
+            <ul className="grid gap-0.5 rounded-lg border border-line p-2">
               {rows.map((row) => (
                 <li key={row.id}>
                   <button
@@ -152,7 +152,7 @@ export default function WorkplaceField({
                       setTerm('');
                       choice.choose(row);
                     }}
-                    className="touch-size flex w-full flex-wrap items-center justify-between gap-x-3 px-3 py-2 text-left hover-hover:hover:bg-brand-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+                    className="touch-size flex w-full flex-wrap items-center justify-between gap-x-3 rounded-md px-3 py-2 text-left hover-hover:hover:bg-brand-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
                   >
                     <span className="font-medium">{row.name}</span>
                     <span className="text-xs text-ink-muted tabular-nums">R/A {row.raNumber} · Area {row.area || '—'}</span>

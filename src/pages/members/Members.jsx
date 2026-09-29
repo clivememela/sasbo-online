@@ -521,13 +521,24 @@ export default function Members() {
     const branchOptions = branchOptionsFor(editForm.bankName);
 
     /*
+     * A NEW BANK, AND WHAT GOES WITH THE OLD ONE -- one rule, whether a person chose it (`handleEditChange`) or accepted
+     * the Workplace control's offer (01.3). Main's intent (e56dbe4), in the one place it can be told apart from a record
+     * loading: a grade belongs to a bank, so choosing a DIFFERENT bank clears it; and a branch the new bank does not
+     * offer goes with the old bank -- the fourteen names stay for every bank. A branch chosen in the same step stays.
+     */
+    const settleBank = useCallback((prev, next) => {
+        if (next.bankName === prev.bankName) return next;
+        const settled = { ...next, jobGrade: "" };
+        if (next.bankName && prev.branch && next.branch === prev.branch
+            && !branchOptionsFor(next.bankName).includes(prev.branch)) settled.branch = "";
+        return settled;
+    }, [branchOptionsFor]);
+
+    /*
      * 🏢 THE MEMBER'S WORKPLACE (month end 01.3), on the Employment tab: read from the answer for this one member, which
      * alone carries the area and the committee (`useMemberWorkplace`), and changed while editing with capture's control
      * and capture's rule (`useWorkplaceChoice`). SASBO's lists are asked for when the tab first shows the control --
      * to edit, or to say where a workplace on record came from -- and kept for the visit (MD69).
-     *
-     * The offer fills a field through the same rule a person's change of bank does (`handleEditChange`): a grade
-     * belongs to a bank, and a branch the new bank does not offer goes with the old one.
      */
     const workplaceSource = useWorkplaceSource(activeTab === "employment" && (isEditing || selectedMember?.workplaceId != null));
     const workplace = useWorkplaceChoice({
@@ -537,12 +548,7 @@ export default function Members() {
         banks: bankOptions,
         branchesFor: branchOptionsFor,
         named: true,
-        settle: (prev, next) => next.bankName === prev.bankName ? next : {
-            ...next,
-            jobGrade: "",
-            ...(next.bankName && prev.branch && next.branch === prev.branch
-                && !branchOptionsFor(next.bankName).includes(prev.branch) && { branch: "" }),
-        },
+        settle: settleBank,
     });
     const memberWorkplace = useMemberWorkplace(selectedMember, activeTab === "employment" && !workplace.workplace);
     const genderOptions = GENDER_OPTIONS;
@@ -717,15 +723,10 @@ export default function Members() {
         const value = sanitiseField(field, rawValue, { identityType: editForm.identityType });
 
         setEditForm((prev) => {
-            const next = { ...prev, [field]: value };
+            let next = { ...prev, [field]: value };
 
-            // Main's intent (e56dbe4), in the one place it can be told apart from a record
-            // loading: a grade belongs to a bank, so choosing a DIFFERENT bank clears it.
-            if (field === "bankName" && value !== prev.bankName) {
-                next.jobGrade = "";
-                // A branch the new bank does not offer goes with the old bank; the fourteen names stay for every bank.
-                if (value && prev.branch && !branchOptionsFor(value).includes(prev.branch)) next.branch = "";
-            }
+            // A grade belongs to a bank, and so may a branch -- `settleBank`, the rule the workplace's offer shares.
+            if (field === "bankName") next = settleBank(prev, next);
 
             // R4-F1: derived until typed -- see `initialsTyped`.
             if (field === "firstNames" && !initialsTyped.current) {
@@ -770,7 +771,7 @@ export default function Members() {
             }
             return newErrors;
         });
-    }, [editForm.identityType, branchOptionsFor]);
+    }, [editForm.identityType, settleBank]);
 
     const validateEditForm = () => {
         const errors = {};
