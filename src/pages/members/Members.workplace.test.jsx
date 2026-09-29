@@ -152,7 +152,9 @@ describe('the record -- the member\'s workplace, changed', () => {
 
     await user.click(screen.getByRole('button', { name: /^Save changes$/ }))
     const dialog = await screen.findByRole('dialog', { name: 'Save these changes?' })
-    expect(within(dialog).getByText('Workplace: INVENTED HARBOUR → INVENTED HEAD OFFICE')).toBeInTheDocument()
+    // Changed by its id, read by its name and R/A number: two of SASBO's workplaces may share a name.
+    expect(within(dialog).getByText('Workplace: INVENTED HARBOUR (R/A 900003) → INVENTED HEAD OFFICE (R/A 900002)'))
+      .toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
     await waitFor(() => expect(saved).toBeDefined())
@@ -161,6 +163,28 @@ describe('the record -- the member\'s workplace, changed', () => {
     expect(saved).not.toHaveProperty('workplace')
     expect(saved.bankName).toBe('Invented Insurer')
     expect(saved.branch).toBe('Rosebank')
+  })
+
+  it('🔴 a workplace that shares its name with the one on record is still a change -- the id decides, not the name', async () => {
+    // An invented twin: another workplace called INVENTED HEAD OFFICE, at another R/A number.
+    const twin = { ...HEAD_OFFICE, id: 99, raNumber: 900099 }
+    server.use(
+      http.get('*/api/members', () => HttpResponse.json([
+        { ...AT_HARBOUR, workplaceId: twin.id, workplaceName: twin.name, workplaceRaNumber: twin.raNumber },
+      ])),
+      http.get('*/api/members/:id', () => HttpResponse.json({ ...AT_HARBOUR, workplaceId: twin.id, workplace: twin })),
+    )
+    const user = setupUser()
+    await editAndChooseHeadOffice(user)
+
+    await user.click(screen.getByRole('button', { name: /^Save changes$/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Save these changes?' })
+    expect(within(dialog).getByText('Workplace: INVENTED HEAD OFFICE (R/A 900099) → INVENTED HEAD OFFICE (R/A 900002)'))
+      .toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(saved).toBeDefined())
+    expect(saved.workplaceId).toBe(HEAD_OFFICE.id)
   })
 
   it('the must-pass: an edit that leaves the workplace alone does not name it -- so no switch can refuse it', async () => {

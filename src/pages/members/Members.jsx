@@ -224,9 +224,9 @@ const RECORD_FIELD_LABELS = {
     isCosatu: "COSATU Member",
     isCosatuLocal: "COSATU Local structure",
     isCosatuRegional: "COSATU Regional structure",
-    // 01.3: a changed workplace is listed by its NAME -- "Workplace: INVENTED HARBOUR → INVENTED HEAD OFFICE" -- never by
-    // the id the save sends, and once, not three times for its three scalars.
-    workplaceName: "Workplace",
+    // 01.3: a workplace is CHANGED when its id is -- two of SASBO's workplaces may share a name -- and is listed by its
+    // name and R/A number (`readable`), once, not three times for its three scalars.
+    workplaceId: "Workplace",
     /* 🗑️ ELEVEN STRUCTURES LABELS WERE HERE -- the election date, the BEC committee, recruiter, structure-representative
        and executive answers, and the COSATU local, region and positions -- reclaimed in month end 01.3 for the bundle's
        ceiling. Since 2026-09-17 the Structures tab asks Shop Steward, BEC and COSATU only, so no edit can change one of
@@ -235,7 +235,7 @@ const RECORD_FIELD_LABELS = {
 };
 
 /** Never listed: identifiers, and a name the form derives from a field that is listed (the committee's id). */
-const UNLISTED_KEYS = new Set(["id", "membershipNumber", "memberId", "becCommitteeName", "workplaceId", "workplaceRaNumber"]);
+const UNLISTED_KEYS = new Set(["id", "membershipNumber", "memberId", "becCommitteeName", "workplaceName", "workplaceRaNumber"]);
 
 /**
  * A stored yes/no as a person reads it. `null` is its own answer on the read side -- Shop Steward
@@ -267,7 +267,9 @@ const recordDate = (value) => (value ? formatDate(value) : "");
 const DATE_KEYS = new Set(["dateOfBirth", "joinDate", "electionDate"]);
 
 /** A value as a person reads it. */
-const readable = (key, value) => {
+const readable = (key, value, record) => {
+    // 01.3: a workplace is read by its name and R/A number, never by the id the save sends.
+    if (key === "workplaceId") return value == null ? "No workplace on record" : `${record.workplaceName} (R/A ${record.workplaceRaNumber})`;
     const shown = comparable(key, value);
     if (typeof shown === "boolean") return shown ? "Yes" : "No";
     // R3-F1: a LocalDate arrives as [y, m, d], and `comparable` joins an array with commas -- so an untouched date
@@ -283,7 +285,7 @@ const fieldLabel = (key) =>
 const getChangedFields = (draft, original) => Object.keys(draft)
     .filter((key) => !UNLISTED_KEYS.has(key))
     .filter((key) => comparable(key, draft[key]) !== comparable(key, original[key]))
-    .map((key) => `${fieldLabel(key)}: ${readable(key, original[key])} → ${readable(key, draft[key])}`);
+    .map((key) => `${fieldLabel(key)}: ${readable(key, original[key], original)} → ${readable(key, draft[key], draft)}`);
 
 
 /**
