@@ -1,8 +1,8 @@
-// ⚠️ ONLY THE FOUR ICONS THIS PAGE ACTUALLY RENDERS. Ten more were imported here and used
+// ⚠️ ONLY THE ICONS THIS PAGE ACTUALLY RENDERS. Ten more were imported here and used
 // nowhere but inside the commented-out card blocks below -- so a grep for each name found two
 // hits and concluded it was live, while eslint (which reads code, not comments) called all ten
 // dead. eslint was right. Anyone restoring one of those cards restores its icon import with it.
-import { Landmark, LucideCopyCheck, LucideMails, UserRoundPen } from "lucide-react";
+import { Building2, Landmark, LucideCopyCheck, LucideMails, UserRoundPen } from "lucide-react";
 import { NavigationList } from '../../components/common/NavigationCard.jsx';
 import { Page } from '../../components/common/Sheet.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
@@ -60,6 +60,14 @@ const maintenance_cards = [
         icon: LucideMails,
         href: '/admin/maintenance/subscriptions',
         desc: 'Maintain Subscription Table'
+    },
+    /* Month end `01.5` (MD61): SASBO's workplaces, a page at a time. The rail's Maintenance says the same, in
+       `navigation.js`, and `Maintenance.test.jsx` holds the two together (MR-ROB-37). */
+    {
+        title: 'Workplaces',
+        icon: Building2,
+        href: '/admin/maintenance/workplaces',
+        desc: 'Find a workplace by its name or R/A number'
     },
     /*{
         title: 'Recruiters',
