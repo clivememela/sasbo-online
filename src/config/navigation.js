@@ -202,6 +202,14 @@ export const navItems = [
             href: '/admin/maintenance/subscriptions',
             desc: 'Maintain Subscription Table',
           },
+          // Month end `01.5` (MD61): SASBO's workplaces. Written twice, here and as `Maintenance.jsx`'s card, and
+          // `Maintenance.test.jsx` holds the two together (MR-ROB-37).
+          {
+            title: 'Workplaces',
+            icon: Building2,
+            href: '/admin/maintenance/workplaces',
+            desc: 'Find a workplace by its name or R/A number',
+          },
         ],
       },
       // { title: "BankBranch", icon: Landmark, color: 'text-red-600 dark:text-red-400'},
