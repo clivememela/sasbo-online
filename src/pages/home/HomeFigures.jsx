@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import Criteria, { CRITERION } from '../../components/common/Criteria.jsx';
+import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
 import Sheet from '../../components/common/Sheet.jsx';
 import SelectInput from '../../components/form/SelectInput.jsx';
 import FigureStrip from '../../components/members/FigureStrip.jsx';
@@ -11,7 +11,7 @@ import {
 } from '../../config/monthEnd.js';
 import { formatInt, formatPercent } from '../../lib/format.js';
 import reportError from '../../lib/reportError.js';
-import { referenceService } from '../../services/referenceService.js';
+import { getAreas, getRegions } from '../../services/referenceService.js';
 import { summaryService } from '../../services/summaryService.js';
 
 /**
@@ -73,6 +73,9 @@ const stripOf = (answer) => {
 
 const count = (key) => (row) => row.figures && formatInt(row.figures[key]);
 const NUMBER = { align: 'right', className: 'tabular-nums' };
+// The words a figure's cell may hold -- "fewer than five", "complement out of date" -- wrap on a phone rather than
+// widen the sheet past it; a figure itself never breaks, its spaces being no-break ones (`format.js`).
+const WORDS = { ...NUMBER, nowrap: false };
 
 /**
  * The sheet's columns. 🔴 RULE C: a row of one to four members at a named employer, table code or workplace comes
@@ -83,6 +86,8 @@ const columnsFor = (by) => [
   {
     key: 'label',
     header: SUMMARY_GROUPING[by],
+    // A long employer's name takes a second line on a phone rather than pushing Members off the screen.
+    nowrap: false,
     cell: (row) => (row.total ? <strong>{row.label}</strong> : (
       <>{row.label}{row.core && <span className="text-xs text-ink-muted"> · core</span>}</>
     )),
@@ -91,7 +96,7 @@ const columnsFor = (by) => [
   {
     key: 'paying',
     header: 'Members',
-    ...NUMBER,
+    ...WORDS,
     cell: (row) => (row.figures ? formatInt(row.figures.paying)
       : <span className="text-ink-muted">{row.withheld ? 'withheld' : 'fewer than five'}</span>),
   },
@@ -101,7 +106,7 @@ const columnsFor = (by) => [
   {
     key: 'penetration',
     header: 'Penetration',
-    ...NUMBER,
+    ...WORDS,
     cell: (row) => row.figures && (
       <>
         {formatPercent(row.figures.penetration)}
@@ -151,7 +156,7 @@ export default function HomeFigures() {
   const askPlaces = () => {
     if (placesAsked.current) return;
     placesAsked.current = true;
-    Promise.all([referenceService.getRegions(), referenceService.getAreas()])
+    Promise.all([getRegions(), getAreas()])
       .then(([regions, areas]) => setPlaces({ options: placeOptions(listRows(regions) ?? [], listRows(areas) ?? []) }))
       .catch((error) => {
         reportError('HomeFigures.places', error);
@@ -166,7 +171,6 @@ export default function HomeFigures() {
   const empty = view === 'ready' && !totals.onRecord && !totals.joined && !totals.left;
   const shown = view === 'ready' || view === 'partial';
   const rows = view === 'ready' && !empty ? [...answer.rows, { key: '~TOTAL', label: 'Total', figures: totals, total: true }] : [];
-  const where = answer?.area ? `, area ${answer.area}` : answer?.region ? `, ${answer.region} region` : '';
 
   return (
     <section aria-label="SASBO's figures" data-figures={empty ? 'empty' : view} className="mt-6">
@@ -176,7 +180,7 @@ export default function HomeFigures() {
         state={view === 'loading' ? 'loading' : view === 'error' ? 'error' : 'ready'}
       />
       {note(view === 'partial'
-        && `These are the figures for ${monthLabel(answer.month)}${where}, as read at `
+        && `These are the figures for ${monthLabel(answer.month)}, as read at `
         + `${readAt.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}. `
         + 'The figures asked for since could not be loaded.')}
       {note(shown && answer.seededMembers > 0
@@ -185,7 +189,7 @@ export default function HomeFigures() {
 
       <Criteria className="mt-4" label="Which figures">
         <SelectInput
-          className={CRITERION}
+          className={CRITERION_WIDE}
           label="Month"
           value={ask.month || serverMonth}
           options={serverMonth ? monthsTo(serverMonth) : []}
@@ -205,7 +209,7 @@ export default function HomeFigures() {
           onChange={(place) => change({ place })}
         />
         <SelectInput
-          className={CRITERION}
+          className={CRITERION_WIDE}
           label="Grouped by"
           value={ask.by}
           options={GROUPINGS}

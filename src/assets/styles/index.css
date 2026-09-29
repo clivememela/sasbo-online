@@ -858,6 +858,11 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
    (`06.3`, measured). Two on a phone, flush to the page's gutter. */
 .figure-strip { container: figures / inline-size; }
 .figure-strip > dl { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+/* 🔑 EACH FIGURE IS THREE ROWS OF THE STRIP'S OWN GRID -- label, value, second line -- so a label that takes two lines
+   moves every value in its row down with it (month end 02.3: "Members on record" is wider than a sixth of a desk
+   beside the rail). Without it one value sat a line below its neighbours, and a ledger's figures are read ACROSS. */
+.figure-strip > dl { grid-template-rows: repeat(3, auto); }
+.figure-strip > dl > div { grid-row: span 3; grid-template-rows: subgrid; }
 @container figures (max-width: 660px) {
   .figure-strip > dl { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .figure-strip > dl > div { border-right-width: 0; }

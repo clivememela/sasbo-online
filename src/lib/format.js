@@ -214,7 +214,7 @@ export function formatInt(value) {
  * space before the sign does not break, so a figure never wraps away from its unit.
  */
 export function formatPercent(fraction) {
-  return typeof fraction === 'number' && Number.isFinite(fraction) ? `${ZAR.format(fraction * 100)} %` : EMPTY;
+  return typeof fraction === 'number' && Number.isFinite(fraction) ? `${ZAR.format(fraction * 100)}\u00a0%` : EMPTY;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

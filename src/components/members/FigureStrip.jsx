@@ -140,7 +140,10 @@ export default function FigureStrip({ figures, label = 'Register summary', state
               index < shown.length - 1 && 'border-r border-line',
             )}
           >
-            <dt className="flex items-center gap-[7px] whitespace-nowrap text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+            {/* A label longer than its column takes a second line rather than crossing the hairline beside it: the
+                first screen's six share a desk's width with the rail, and "Members on record" is wider than a sixth.
+                Every label sits on its value (`self-end`), so the strip's rows read level (index.css, the subgrid). */}
+            <dt className="flex items-center gap-[7px] self-end text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
               {figure.dot && <i className={cn('size-[7px] rounded-full', figure.dot)} aria-hidden="true" />}
               {figure.label}
             </dt>

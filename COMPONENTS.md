@@ -1574,7 +1574,9 @@ utility classes cannot resize it. `Table`'s skeleton took the same fix for its s
 📐 The columns are the stylesheet's — one equal column per figure, then three, then two — answering
 **the strip's own width** (**The Container Rule**), which is why the component is a wrapper plus a list.
 Measured at 1280×661 with scrollbars shown: six columns of 160 px in one row at full width, 3 + 3 at
-534 px with a record docked, no label overflowing.
+534 px with a record docked, no label overflowing. **Each figure is three rows of the strip's own grid** (a
+subgrid: label, value, second line), and a label wider than its column takes a second line and sits on its value —
+so the first screen's *Members on record* beside the rail moves its whole row down with it, and the values stay level.
 
 **Held by.** `src/components/members/FigureStrip.test.jsx` — the three cases above, with the genuinely
 empty register as the must-pass, plus the six-figure arrangement and a caller that passes no month
