@@ -4,7 +4,9 @@ import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Cri
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import Pager from '../../components/common/Pager.jsx';
 import Table from '../../components/table/Table.jsx';
-import { Button, SelectInput, TextInput } from '../../components/form';
+import Button from '../../components/form/Button.jsx';
+import SelectInput from '../../components/form/SelectInput.jsx';
+import TextInput from '../../components/form/TextInput.jsx';
 import { useDebounce } from '../../hooks/useDebounce.js';
 import reportError from '../../lib/reportError.js';
 import { EMPTY, formatInt } from '../../lib/format.js';
