@@ -396,22 +396,27 @@ describe('the workplaces\' screen -- the search (MR-PERF-12)', () => {
     expect(screen.getByText('INVENTED WORKPLACE 1')).toBeInTheDocument()
     await listsLoaded()
 
-    await user.type(searchBox(), 'IN')
-    await pause()
-    expect(held.IN, 'the first question was never asked').toBeDefined()
-    await user.type(searchBox(), 'V')
-    await pause()
-    expect(held.INV, 'the newer question was never asked').toBeDefined()
+    // Three questions out at once, the newest last.
+    for (const next of ['IN', 'V', 'E']) {
+      await user.type(searchBox(), next)
+      await pause()
+    }
+    expect(Object.keys(held).sort(), 'a question was never asked').toEqual(['', 'IN', 'INV', 'INVE'])
 
-    // The OLDER answer arrives while the newer question is still out: it must not paint.
+    // An OLDER answer that lands while the newest is still out must not paint...
     await act(async () => held.IN.resolve(body([workplace(3, { name: 'INVENTED STALE' })])))
     expect(screen.queryByText('INVENTED STALE')).toBeNull()
     expect(screen.getByText('Loading workplaces…')).toBeInTheDocument()
 
-    // The must-pass: the newer answer does.
-    await act(async () => held.INV.resolve(body([workplace(4, { name: 'INVENTED FRESH' })])))
+    // ...the must-pass: the newest answer does...
+    await act(async () => held.INVE.resolve(body([workplace(4, { name: 'INVENTED FRESH' })])))
     expect(screen.getByText('INVENTED FRESH')).toBeInTheDocument()
-    expect(screen.queryByText('INVENTED STALE')).toBeNull()
+
+    // ...and an older answer landing AFTER it neither paints nor takes it away.
+    await act(async () => held.INV.resolve(body([workplace(5, { name: 'INVENTED LATE' })])))
+    expect(screen.queryByText('INVENTED LATE')).toBeNull()
+    expect(screen.getByText('INVENTED FRESH')).toBeInTheDocument()
+    expect(screen.queryByText('Loading workplaces…')).toBeNull()
   })
 
   it('takes a hundred characters and no more: the server refuses a longer term (MR-SEC-22)', async () => {
