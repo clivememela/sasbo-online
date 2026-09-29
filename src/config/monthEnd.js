@@ -11,6 +11,8 @@
 export const MONTH_END_REFUSAL = Object.freeze({
   REQUEST_MALFORMED: 'REQUEST_MALFORMED',
   WORKPLACE_PAGE_INVALID: 'WORKPLACE_PAGE_INVALID',
+  // A save naming a workplace that is not on record here (01.3) -- said at the Workplace field, the form kept as typed.
+  WORKPLACE_UNKNOWN: 'WORKPLACE_UNKNOWN',
   // A change of status (03.1): the member moved since the screen read it -- re-read, and say so; the member is gone;
   // the code chosen left SASBO's list since the dialog loaded it -- load the list again.
   STATUS_CHANGED_SINCE: 'STATUS_CHANGED_SINCE',

@@ -33,7 +33,7 @@ const TONE = {
  * the application's type -- in both themes. The words are the template's, including its sign-off, so the preview
  * says what the member will receive.
  */
-export default function WelcomeLetter({ open, onClose, member, onSuccess }) {
+export default function WelcomeLetter({ open, onClose, member, onSuccess, onFailed }) {
     const [sendState, setSendState] = useState('idle'); // idle | sending | done | error
     const [errorMessage, setErrorMessage] = useState('');
     // What the server said happened to the letter, and the member as it saved them -- a retry sends for THAT record.
@@ -126,6 +126,9 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess }) {
             .catch((err) => {
                 setErrorMessage(err?.message || 'The member was not saved. Please try again.');
                 setSendState('error');
+                // Said here, in the dialog it happened in -- and handed back, so a refusal of one of the form's own
+                // fields (01.3's WORKPLACE_UNKNOWN) is also said at that field when the dialog closes.
+                onFailed?.(err);
             });
     };
 

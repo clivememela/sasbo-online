@@ -112,11 +112,14 @@ describe('what a capture actually sends', () => {
 
     // Everything the form legitimately holds, plus the two the save adds itself. 🗣️ No `areaRecruited` since
     // 18 Sep 2026: SASBO asked for the area to be read off the recruiter, so no control sets it and nothing posts it.
+    // 🏢 `workplaceId` since month end 01.3 (BR46), in the commit that added its control, the Workplace field: the one
+    // way a save names a workplace. Always sent, `null` until one is chosen -- which the server reads as no workplace.
     const expected = [
       ...AUTOMATION_ROUND_TRIP,
       'dateOfBirth', 'gender', 'preferredEmail', 'joinDate', 'status',
       'subscriptionFrequency', 'jobGrade', 'bankAddress',
       'recruitedHow', 'recruitmentRep',
+      'workplaceId',
       'monthlySubscription',
     ].sort()
 

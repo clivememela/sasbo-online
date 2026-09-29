@@ -38,6 +38,10 @@ import useReferenceData from "../../hooks/useReferenceData.js";
 import useAsyncOptions from "../../hooks/useAsyncOptions.js";
 import useFocusOn from "../../hooks/useFocusOn.js";
 import { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
+import WorkplaceField from "../../components/members/WorkplaceField.jsx";
+import useWorkplaceSource from "../../hooks/useWorkplaceSource.js";
+import useWorkplaceChoice from "../../hooks/useWorkplaceChoice.js";
+import { MONTH_END_REFUSAL } from "@/config/monthEnd.js";
 
 const FIELD_TO_TAB_MAP = {
     title: "personal",
@@ -62,6 +66,7 @@ const FIELD_TO_TAB_MAP = {
     bankAccountNumber: "employment",
     accountType: "employment",
     debitDay: "employment",
+    workplaceId: "employment",
 };
 
 /** The names out of a reference table of `{id, name}` rows -- [] until the list has arrived. */
@@ -122,6 +127,10 @@ export default function CaptureMember() {
         // control sets is a key nobody can see being written (`capturePayload.test.jsx`).
         recruitedHow: "",
         recruitmentRep: "",
+        // 🏢 Month end 01.3: the member's workplace, BY ITS ID -- the one way a save names one (BR66), and the one key the
+        // closed payload gained with its control (BR46, `capturePayload.test.jsx`). `null` until one is chosen, which the
+        // server reads exactly as it reads no key at all: no workplace. The row itself is `useWorkplaceChoice`'s.
+        workplaceId: null,
 
         /* 🗑️ SIXTEEN KEYS WERE HERE, AND EVERY CAPTURE HAS BEEN POSTING THEM (03.1, 03.2).
          *
@@ -264,6 +273,56 @@ export default function CaptureMember() {
     });
 
     /**
+     * A NEW BANK OR BRANCH, AND WHAT FOLLOWS FROM IT -- one rule, whether a person chose it or accepted the Workplace
+     * control's offer to fill it (01.3). `next` is the form with the new value(s); what it returns is the form to hold.
+     *
+     * A different bank: its grades and its branches are different ones. The grade always goes; the branch goes only if
+     * the new bank's list does not offer it (the fourteen names are offered for every bank) -- and it is judged against
+     * the bank actually CHOSEN: the searchable control passes through an empty bank while the administrator clears it to
+     * pick another, and that moment must not drop a branch the next bank offers. A branch chosen in the same step stays.
+     *
+     * E4 + E6: the branch record already holds the IBT number and the address. Derived HERE, where the branch changes,
+     * rather than in an effect -- an effect that writes the form from the form is the shape that overwrites people
+     * mid-keystroke, and this needs no second render to be correct. A blank bank or an unknown branch resolves to
+     * `null`, and both helpers answer "" for it: a stale address from the branch previously chosen is worse than an
+     * empty one, because it is wrong AND it looks deliberate.
+     */
+    const settleBank = (prev, next) => {
+        const changedBank = next.bankName !== prev.bankName;
+        const dropsBranch = changedBank && next.bankName && prev.branch && next.branch === prev.branch
+            && !branchOptionsFor(next.bankName).includes(prev.branch);
+        const settled = {
+            ...next,
+            ...(changedBank && { jobGrade: "" }),
+            ...(dropsBranch && { branch: "" }),
+        };
+        const record = findBranchRecord(bankListing, settled.bankName, settled.branch);
+        return {
+            ...settled,
+            ...(!ibtNoTyped && { ibtNo: branchCodeOf(record) }),
+            ...(!bankAddressTyped && { bankAddress: formatBranchAddress(record) }),
+        };
+    };
+
+    /**
+     * 🏢 THE MEMBER'S WORKPLACE (month end 01.3). SASBO's employers and the status of their workplaces are asked for when
+     * the Employment tab first opens and kept for the visit (MD69); the chosen row and the offer to fill the two bank
+     * fields are `useWorkplaceChoice`'s, the rule the record shares.
+     */
+    const workplaceSource = useWorkplaceSource(activeTab === "employment");
+    const workplace = useWorkplaceChoice({
+        form, setForm, setFieldErrors, banks: bankNames, branchesFor: branchOptionsFor, settle: settleBank,
+    });
+
+    // A save the server refused for its workplace (WORKPLACE_UNKNOWN) is said at the Workplace field, in the server's
+    // words, and everything typed is kept. The dialog that sent it says so too; this is what is left when it closes.
+    const refusedWorkplace = (error) => {
+        if (error?.body?.code !== MONTH_END_REFUSAL.WORKPLACE_UNKNOWN) return;
+        setFieldErrors((prev) => ({ ...prev, workplaceId: error.message }));
+        setActiveTab("employment");
+    };
+
+    /**
      * 04.3 -- the one thing this screen can say that no other screen can: the DATE, not the day.
      *
      * The rule is SASBO's answer to question 33 (A57): forward to the next business day, back only where
@@ -301,15 +360,7 @@ export default function CaptureMember() {
 
         setForm((prev) => {
             let updatedForm = { ...prev, [field]: value };
-
-            // A different bank: its grades and its branches are different ones. The grade always goes; the branch goes
-            // only if the new bank's list does not offer it (the fourteen names are offered for every bank).
-            if (field === "bankName" && value !== prev.bankName) {
-                updatedForm.jobGrade = "";
-                // Judged against the bank actually CHOSEN: the searchable control passes through an empty bank while
-                // the administrator clears it to pick another, and that moment must not drop a branch the next bank offers.
-                if (value && prev.branch && !branchOptionsFor(value).includes(prev.branch)) updatedForm.branch = "";
-            }
+            if (field === "bankName" || field === "branch") updatedForm = settleBank(prev, updatedForm);
 
             // A different recruiter TYPE offers different recruiters (SASBO, 18 Sep 2026): the chosen one goes only if
             // the new type does not offer them -- all of them for Website and EORO, which offer nobody. The bank's rule
@@ -319,21 +370,6 @@ export default function CaptureMember() {
             if (field === "recruitedHow" && value && value !== prev.recruitedHow && prev.recruitmentRep) {
                 const offered = recruitersFor(value, reps).some((row) => nameKey(row?.name) === nameKey(prev.recruitmentRep));
                 if (!offered) updatedForm.recruitmentRep = "";
-            }
-
-            /**
-             * E4 + E6: the branch record already holds the IBT number and the address. Derived HERE, where the
-             * branch changes, rather than in an effect -- an effect that writes the form from the form is the
-             * shape that overwrites people mid-keystroke, and this needs no second render to be correct.
-             *
-             * A blank bank or an unknown branch resolves to `null`, and both helpers answer "" for it. That is
-             * deliberate: a stale address from the branch previously chosen is worse than an empty one, because
-             * it is wrong AND it looks deliberate.
-             */
-            if (field === "bankName" || field === "branch") {
-                const record = findBranchRecord(bankListing, updatedForm.bankName, updatedForm.branch);
-                if (!ibtNoTyped) updatedForm.ibtNo = branchCodeOf(record);
-                if (!bankAddressTyped) updatedForm.bankAddress = formatBranchAddress(record);
             }
 
             if (field === "firstNames" && !initialsTyped.current) {
@@ -484,6 +520,7 @@ export default function CaptureMember() {
         initialsTyped.current = false;
         setForm(JSON.parse(pristineForm));
         setFieldErrors({});
+        workplace.reset();
     };
 
     const handleCancel = () => {
@@ -548,6 +585,7 @@ export default function CaptureMember() {
             onClose={() => setWelcomeMember(null)}
             member={welcomeMember}
             onSuccess={handleCaptureSuccess}
+            onFailed={refusedWorkplace}
         />
         <Page>
             <PageTitle
@@ -685,7 +723,20 @@ export default function CaptureMember() {
                         )}
                         {activeTab === "employment" && (
                             <>
-                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} {...refs.field('banks')} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable />
+                                {/* 🏢 01.3 -- ABOVE the fields that stay. It never writes Bank Where Employed or Bank Branch by
+                                    itself: it offers, where the names agree, and the notes under the two say what it filled. */}
+                                <WorkplaceField
+                                    className="md:col-span-2"
+                                    source={workplaceSource}
+                                    current={workplace.workplace && { workplace: workplace.workplace }}
+                                    onChoose={workplace.choose}
+                                    onRemove={() => workplace.choose(null)}
+                                    fill={workplace.fill}
+                                    onFill={workplace.accept}
+                                    onDecline={workplace.decline}
+                                    error={fieldErrors.workplaceId}
+                                />
+                                <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} {...refs.field('banks')} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable note={workplace.note("bankName")} />
                                 <Field label="Employee Number" kind="reference" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />
                                 {/* 🔑 02.5 / CM-37 -- LIST FIRST, TYPING ALLOWED. The seeded list is per-bank and
@@ -695,7 +746,7 @@ export default function CaptureMember() {
                                     and `MemberDto.jobGradeOutcome` reports MATCHED / CAPTURED / CLEARED.
                                     `allowCustom` is the design arc's prop, on their instruction and their shape. */}
                                 <Field label="Job Grade" value={form.jobGrade} onChange={handleChange("jobGrade")} options={jobGradeOptions} disabled={!form.bankName} loading={jobGrades.loading} emptyLabel="No job grades available" loadError={jobGrades.error} onRetryLoad={jobGrades.refetch} searchable allowCustom note={jobGradeNote} />
-                                <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={branchOptionsFor(form.bankName)} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable disabled={!form.bankName} note={form.bankName ? null : "Choose the bank first."} />
+                                <Field label="Bank Branch" value={form.branch} onChange={handleChange("branch")} options={branchOptionsFor(form.bankName)} error={fieldErrors.branch} required={form.paymentType === "Debit Order"} searchable disabled={!form.bankName} note={workplace.note("branch") || (form.bankName ? null : "Choose the bank first.")} />
                                 <Field label="Payment Type" value={form.paymentType} onChange={handleChange("paymentType")} options={PAYMENT_TYPE_OPTIONS} />
 
                                 {form.paymentType === "Debit Order" && (
