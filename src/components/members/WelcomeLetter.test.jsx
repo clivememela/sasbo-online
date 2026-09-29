@@ -28,6 +28,8 @@ import { deferred } from '../../test/deferred'
 const sent = (status = 200) => http.post('*/api/members/:id/send-welcome', () => new HttpResponse(null, { status }))
 /** A JSON answer: what the dialog's old read could accept -- so A51's cases reach "sent" on either side of A50's fix. */
 const sentWithBody = () => http.post('*/api/members/:id/send-welcome', () => HttpResponse.json({}))
+/** Whether this server emails the letter at all (A64) -- asked once, when the dialog mounts. */
+const emailing = (answer) => http.get('*/api/members/metadata/welcome-letter', () => HttpResponse.json(answer))
 
 const person = (id, extra = {}) => ({
   id, title: 'Ms', firstNames: 'Thandi', surname: `Synthetic${id}`, personalEmail: `member${id}@example.test`,
@@ -50,6 +52,8 @@ function TwoCaptures() {
 describe('the welcome letter dialog', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
+    // Where mail is configured -- the cases below were written for it. A64's own cases say otherwise where they need to.
+    server.use(emailing({ emailEnabled: true }))
   })
 
   describe('A50 — a sent letter is reported as sent', () => {
@@ -127,17 +131,18 @@ describe('the welcome letter dialog', () => {
     })
   })
 
-  describe('A56 — a letter with nowhere to go is not offered', () => {
-    // The server refuses it (400, "No email address is available for this member.", pinned in server 93c11d9), so the
-    // defect is only the offer: "emailed as an attachment to —" beside an enabled Send.
-    it('a member with no email address: Send is not offered, and the dialog says why', () => {
+  describe('A56 — a letter with nowhere to go is never promised', () => {
+    // A56's defect was the PROMISE: "emailed as an attachment to —" beside an enabled Send. Its first fix disabled Send
+    // -- which, since Send is also the save, left a member with no address uncapturable (A64). The promise stays gone;
+    // the button stays usable, and saving them is what it does.
+    it('a member with no email address: the dialog says no letter will go, and Send still saves them', () => {
       renderWithProviders(
         <WelcomeLetter open onClose={() => {}} member={person(101, { personalEmail: '', workEmail: '' })} />,
       )
 
       const dialog = screen.getByRole('dialog')
-      expect(within(dialog).getByRole('button', { name: /send welcome letter/i })).toBeDisabled()
-      expect(within(dialog).getByText(/no email address/i)).toBeInTheDocument()
+      expect(within(dialog).getByRole('button', { name: /send welcome letter/i })).toBeEnabled()
+      expect(within(dialog).getByText(/no email address, so no letter will be sent/i)).toBeInTheDocument()
       expect(dialog).not.toHaveTextContent(/attachment to\s*—/)
     })
 
@@ -149,6 +154,129 @@ describe('the welcome letter dialog', () => {
       const dialog = screen.getByRole('dialog')
       expect(within(dialog).getByRole('button', { name: /send welcome letter/i })).toBeEnabled()
       expect(within(dialog).getByText('work101@example.test')).toBeInTheDocument()
+    })
+  })
+
+  describe('🔴 A64 — capturing a member never waits on the letter', () => {
+    /*
+     * The dialog as Capture Member uses it: a member with NO id yet, so Send is the capture itself --
+     * `POST /api/members?sendWelcome=true`. The server saves first and says what happened to the letter
+     * (`welcomeLetter`); each outcome is driven here, with the case that must not produce it beside it.
+     */
+    const newcomer = (extra = {}) => ({
+      title: 'Ms', firstNames: 'Thandi', surname: 'Newcomer', personalEmail: 'newcomer@example.test',
+      preferredEmail: 'personal', identityNumber: '9001010000080', status: 'Active', ...extra,
+    })
+
+    /** The capture, answered as the fixed server answers it: the saved member, numbered, with the letter's outcome. */
+    function capturing(welcomeLetter) {
+      const calls = { captures: [], sends: [] }
+      server.use(
+        http.post('*/api/members', async ({ request }) => {
+          calls.captures.push(new URL(request.url).search)
+          const body = await request.json()
+          const answer = { id: 7, membershipNumber: 'M-100007', ...body }
+          if (welcomeLetter !== undefined) answer.welcomeLetter = welcomeLetter
+          return HttpResponse.json(answer)
+        }),
+        http.post('*/api/members/:id/send-welcome', ({ params }) => {
+          calls.sends.push(params.id)
+          return new HttpResponse(null, { status: 200 })
+        }),
+      )
+      return calls
+    }
+
+    it('with emailing off, the dialog says so BEFORE Send, and Send saves the member: Member Saved', async () => {
+      server.use(emailing({ emailEnabled: false }))
+      const calls = capturing('EMAIL_OFF')
+      const onSuccess = vi.fn()
+      const user = setupUser()
+      renderWithProviders(<WelcomeLetter open onClose={() => {}} member={newcomer()} onSuccess={onSuccess} />)
+
+      expect(await screen.findByText(/emailing is not switched on yet, so this letter will not be sent/i)).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /send welcome letter/i }))
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Member Saved')
+      expect(screen.getByText(/the member is saved\. emailing is not switched on yet/i)).toBeInTheDocument()
+      expect(screen.queryByText(/welcome letter sent/i)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /send welcome letter/i }), 'nothing to send where email is off').not.toBeInTheDocument()
+      expect(calls.captures).toEqual(['?sendWelcome=true'])
+      expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }))
+    })
+
+    it('a member with no email address is saved, and the dialog says no letter went: NO_ADDRESS', async () => {
+      const calls = capturing('NO_ADDRESS')
+      const user = setupUser()
+      renderWithProviders(<WelcomeLetter open onClose={() => {}} member={newcomer({ personalEmail: '', workEmail: '' })} />)
+
+      await user.click(screen.getByRole('button', { name: /send welcome letter/i }))
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Member Saved')
+      expect(screen.getByText(/they have no email address, so no letter was sent/i)).toBeInTheDocument()
+      expect(calls.captures).toHaveLength(1)
+    })
+
+    it('a letter that failed leaves the member saved, and "try again" sends for THAT member without capturing twice', async () => {
+      const calls = capturing('FAILED')
+      const user = setupUser()
+      renderWithProviders(<WelcomeLetter open onClose={() => {}} member={newcomer()} />)
+
+      await user.click(screen.getByRole('button', { name: /send welcome letter/i }))
+      expect(await screen.findByRole('status')).toHaveTextContent('Member Saved')
+      expect(screen.getByText(/could not be emailed\. try sending it again/i)).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: /send welcome letter/i }))
+
+      expect(await screen.findByText('Welcome Letter Sent')).toBeInTheDocument()
+      expect(calls.sends, 'the retry must send for the member the capture saved').toEqual(['7'])
+      expect(calls.captures, 'the retry captured the member a second time').toHaveLength(1)
+    })
+
+    it('must-pass: where the letter WAS emailed, it is Welcome Letter Sent -- and the saved number is on the letter', async () => {
+      capturing('SENT')
+      const user = setupUser()
+      renderWithProviders(<WelcomeLetter open onClose={() => {}} member={newcomer()} />)
+
+      expect(await screen.findByText(/will be emailed as an attachment to/i)).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /send welcome letter/i }))
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Welcome Letter Sent')
+      expect(screen.getByText(/the letter was emailed as an attachment to/i)).toBeInTheDocument()
+      expect(screen.getByText('M-100007'), 'the number the server gave the member').toBeInTheDocument()
+      expect(screen.queryByText(/no membership number/i)).not.toBeInTheDocument()
+    })
+
+    it('a server from before the fix answers with no outcome, and for it a 200 meant the letter was sent', async () => {
+      capturing(undefined)
+      const user = setupUser()
+      renderWithProviders(<WelcomeLetter open onClose={() => {}} member={newcomer()} />)
+
+      await user.click(screen.getByRole('button', { name: /send welcome letter/i }))
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Welcome Letter Sent')
+    })
+
+    it('until the server says whether it emails -- or when it cannot -- the dialog promises nothing either way', async () => {
+      // `emailingFrom` holds the mapping (a non-boolean answer is unknown); this holds what unknown SAYS.
+      server.use(emailing([]))
+      renderWithProviders(<WelcomeLetter open onClose={() => {}} member={newcomer()} />)
+
+      expect(await screen.findByText(/where emailing is switched on/i)).toBeInTheDocument()
+      expect(screen.queryByText(/will be emailed as an attachment/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/will not be sent/i)).not.toBeInTheDocument()
+    })
+
+    it('must-pass: a capture the server REFUSED is not "saved" -- it is an alert, and Send is offered again', async () => {
+      server.use(http.post('*/api/members', () => HttpResponse.json({ message: 'Identity number already on record' }, { status: 409 })))
+      const user = setupUser()
+      renderWithProviders(<WelcomeLetter open onClose={() => {}} member={newcomer()} />)
+
+      await user.click(screen.getByRole('button', { name: /send welcome letter/i }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/already on record/i)
+      expect(screen.queryByText('Member Saved')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /send welcome letter/i })).toBeEnabled()
     })
   })
 

@@ -30,3 +30,15 @@ describe('memberService.sendWelcomeLetter', () => {
     await expect(memberService.sendWelcomeLetter(9001)).rejects.toMatchObject({ status: 503 })
   })
 })
+
+describe('memberService.getWelcomeLetterMetadata (A64)', () => {
+  it('reads whether this server emails the letter, from its own route', async () => {
+    server.use(http.get('*/api/members/metadata/welcome-letter', () => HttpResponse.json({ emailEnabled: false })))
+    await expect(memberService.getWelcomeLetterMetadata()).resolves.toEqual({ emailEnabled: false })
+  })
+
+  it('must-pass: a failure rejects, so the dialog can say it does not know', async () => {
+    server.use(http.get('*/api/members/metadata/welcome-letter', () => new HttpResponse(null, { status: 500 })))
+    await expect(memberService.getWelcomeLetterMetadata()).rejects.toMatchObject({ status: 500 })
+  })
+})
