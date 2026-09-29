@@ -67,7 +67,6 @@ const LISTS = {
   area: referenceService.getAreas,
   committee: referenceService.getCommittees,
 };
-const LIST_NAMES = { employer: 'employers', area: 'areas', committee: 'committees' };
 
 const areaLabel = (row) => (row.region ? `${row.letter} · ${row.region}` : row.letter);
 const committeeLabel = (row) => (row.name ? `${row.code} · ${row.name}` : row.code);
@@ -175,10 +174,11 @@ export default function Workplaces() {
   };
 
   // Where the criteria's lists were read from, and whether SASBO has confirmed them (MD28) -- a line for each answer.
+  // A list's name is its criterion's, made plural: employers, areas, committees.
   const provenance = {};
   for (const name of Object.keys(LISTS)) {
     const line = listProvenance(lists[name]?.list);
-    if (line) provenance[line] = [...(provenance[line] ?? []), LIST_NAMES[name]];
+    if (line) provenance[line] = [...(provenance[line] ?? []), `${name}s`];
   }
 
   return (
