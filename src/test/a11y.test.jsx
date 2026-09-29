@@ -6,14 +6,19 @@ import { http, HttpResponse } from 'msw'
 import MembersPage from '../pages/members/Members'
 import CaptureMember from '../pages/members/CaptureMember'
 import BankListing from '../pages/bank_branch/BankListing'
+import Home from '../pages/Home'
+// The first screen's figures are a lazy chunk; in the registry before the scan, so it waits on the page, not on the box.
+import '../pages/home/HomeFigures.jsx'
 import { renderWithProviders } from './renderWithProviders'
 import { expectNoA11yViolations } from './assertions'
 import { server } from './msw/server'
+import { monthEndAnswer } from './msw/monthEndExamples'
 import { smokeHandlers } from './msw/smokeLayer'
 import { pageFixtures } from './msw/pageFixtures'
 
 /**
- * THE ACCESSIBILITY GATE, on the three surfaces this phase names.
+ * THE ACCESSIBILITY GATE, on the surfaces named below -- the three this phase named, and the first screen since
+ * month end's `02.3` (MR-ROB-37).
  *
  * WHAT IS DELIBERATELY OFF, AND WHY SAYING SO IS BETTER THAN PRETENDING
  * `color-contrast` is disabled, in `expectNoA11yViolations` rather than here,
@@ -89,6 +94,21 @@ describe('accessibility', () => {
     )
     const { container } = renderWithProviders(<BankListing />)
     await waitFor(() => expect(container.querySelectorAll('*').length).toBeGreaterThan(5))
+    await expectNoA11yViolations(container)
+  })
+
+  it('the first screen has no violations, with its figures, their sheet and the menu rows (02.3, MR-ROB-37)', async () => {
+    // The server's own golden answer (MD48): a sheet with rows, a total and the marks the screen draws on them.
+    server.use(monthEndAnswer('GET /api/members/summary'))
+    const { container } = renderWithProviders(<Home />)
+    await screen.findByText('INVENTED GROUP CORE')
+    await expectNoA11yViolations(container)
+  })
+
+  it('the first screen has no violations while its figures are not available -- the shared fixture\'s empty array', async () => {
+    // The state every other test of this screen sees: the strip's "not available" and the sheet's sentence.
+    const { container } = renderWithProviders(<Home />)
+    await screen.findByText('The figures are not available from this server yet.')
     await expectNoA11yViolations(container)
   })
 })

@@ -237,8 +237,54 @@ const acbRunAnswer = (req, path) => {
   return reply(200, acbRuns.find((r) => r.id === id) ?? acbRuns[0]);
 };
 
+/*
+ * The first screen's figures (month end `02.3`), `GET /api/members/summary`.
+ *
+ * 🔴 A LONGER KEY THAN `/api/members`, AND IT HAS TO BE ONE. Matching is by prefix, so without it the summary was
+ * answered with the list of members -- an array, which the screen rightly shows as *not available*, and a sweep would
+ * have photographed the error state as the first screen. Invented groups and invented numbers, drawn as the sheet is
+ * (screens.md §0.1): nine groups, three of them core, one row under five and the row withheld beside it, a penetration
+ * above a hundred, members with no workplace last, and the totals the sum of every row -- the hidden ones included,
+ * as the server's are. It answers the same whatever is asked: it measures the screen, not the grouping.
+ */
+const summaryFigures = (onRecord, suspended, joined, left, complement) => {
+  const paying = onRecord - suspended;
+  return {
+    onRecord, suspended, paying, joined, left, reinstated: 0, opening: onRecord - joined + left, unexplained: 0,
+    joinedYearToDate: joined * 9, leftYearToDate: left * 9, complement,
+    penetration: complement ? Math.round((paying / complement) * 10000) / 10000 : null,
+    complementOutOfDate: Boolean(complement) && paying > complement,
+  };
+};
+const summaryRow = (label, core, figures, hidden) => ({
+  key: label, label, core, fewerThanFive: hidden === 'fewerThanFive', withheld: hidden === 'withheld',
+  figures: summaryFigures(...figures),
+});
+const summaryRows = [
+  summaryRow('INVENTED GROUP NORTH', true, [912, 31, 18, 7, 1410]),
+  summaryRow('INVENTED GROUP SOUTH', true, [744, 22, 12, 5, 1180]),
+  summaryRow('INVENTED GROUP EAST', true, [503, 17, 9, 4, 820]),
+  summaryRow('INVENTED GROUP WEST', false, [311, 9, 6, 2, 560]),
+  summaryRow('INVENTED GROUP CENTRAL', false, [208, 8, 3, 3, 390]),
+  summaryRow('INVENTED GROUP COAST', false, [97, 4, 2, 1, 150]),
+  summaryRow('INVENTED GROUP HARBOUR', false, [41, 1, 1, 0, 36]),
+  summaryRow('INVENTED GROUP VALLEY', false, [3, 0, 0, 0, 20], 'fewerThanFive'),
+  summaryRow('INVENTED GROUP RIDGE', false, [12, 1, 0, 1, 30], 'withheld'),
+  { ...summaryRow('No workplace on record', null, [18, 0, 1, 0, null]), key: '~NO_WORKPLACE' },
+];
+const summed = (key) => summaryRows.reduce((sum, row) => sum + (row.figures[key] ?? 0), 0);
+const memberSummary = {
+  month: '2026-09', monthFromTheServer: true, by: 'group', area: null, region: null, workplacesServed: 'ALL',
+  groupedAsAt: '2026-09-29',
+  totals: summaryFigures(summed('onRecord'), summed('suspended'), summed('joined'), summed('left'), summed('complement')),
+  rows: summaryRows.map((row) => (row.fewerThanFive || row.withheld ? { ...row, figures: null } : row)),
+  unplaced: { statuses: [{ status: 'Inactive', members: 3 }], noWorkplace: 18, noTableCode: 0 },
+  seededMembers: 0, membersFrom: null, leaversFrom: null,
+};
+
 const API = {
   '/api/members': members,
+  '/api/members/summary': memberSummary,
   // The runs list; one run and its sheets are answered per shape by `acbRunAnswer`.
   '/api/acb/runs': acbPage(acbRuns, 12),
   // The Debits screen's member search (`04.1`) -- a POST, answered by `acbRunAnswer` first; the key is what

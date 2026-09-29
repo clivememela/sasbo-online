@@ -10,6 +10,7 @@
  * Rollup cannot prove it for a table built from another's members (`MEMBER_STATUS_KIND`), so without the mark a screen
  * importing one word of this file shipped tables it never reads.
  */
+import { formatInt } from '../lib/format.js';
 
 /**
  * A save naming a workplace that is not on record here (01.3) -- said at the Workplace field, the form kept as typed.
@@ -144,3 +145,85 @@ export const emptyReasonSentence = (reason) => LIST_EMPTY_REASON[reason] ?? reas
  */
 export const listRows = (answer) =>
   answer && typeof answer === 'object' && !Array.isArray(answer) && Array.isArray(answer.rows) ? answer.rows : null;
+
+/* ── The figures (02.2, 02.3) ────────────────────────────────────────────────────────────────────── */
+
+/**
+ * What the figures are grouped by: the server's six, in its order (`summaryGroupings`), each as a person reads it --
+ * which is also how the sheet's first column is headed. Held to the server's list by `monthEnd.test.js`.
+ */
+export const SUMMARY_GROUPING = /* @__PURE__ */ Object.freeze({
+  group: 'Employer group',
+  employer: 'Employer',
+  tableCode: 'Table code',
+  area: 'Area',
+  region: 'Region',
+  committee: 'Committee',
+});
+
+/** `2026-09` as a person writes it -- `September 2026`; anything else is passed through. */
+export const monthLabel = (yearMonth) => {
+  const match = /^(\d{4})-(\d{2})$/.exec(yearMonth ?? '');
+  return match ? `${MONTHS[Number(match[2]) - 1]} ${match[1]}` : yearMonth ?? '';
+};
+
+/**
+ * The months the figures may be asked for: the SERVER'S month and the twelve before it, newest first (MD55) --
+ * counted back from what the server answered, never from the browser's clock.
+ */
+export const monthsTo = (yearMonth) => {
+  const [year, month] = yearMonth.split('-').map(Number);
+  return Array.from({ length: 13 }, (_, back) => {
+    const index = year * 12 + month - 1 - back;
+    const value = `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`;
+    return { value, label: monthLabel(value) };
+  });
+};
+
+/**
+ * The summary's answer -- or `null` where it is not the shape the server's is (MV-36): no month, no totals, no rows.
+ * The server answers at least one row in every grouping, *No workplace on record*, so an answer with none is not one.
+ * The shared test fixture answers every read with `[]`, and a screen shows that as *not available*, never a crash.
+ */
+export const summaryOf = (answer) =>
+  answer && typeof answer.month === 'string' && answer.totals && Array.isArray(answer.rows) && answer.rows.length
+    ? answer
+    : null;
+
+/**
+ * The Area control's choices (MD35): all of SASBO, a region, or an area -- `region:NORTH`, `area:A` -- from SASBO's
+ * lists as the reference routes answer them.
+ */
+export const placeOptions = (regions, areas) => [
+  { value: '', label: 'All areas' },
+  ...regions.map((region) => ({ value: `region:${region.code}`, label: `${region.name} region` })),
+  ...areas.map((area) => ({ value: `area:${area.letter}`, label: `Area ${area.letter}` })),
+];
+
+/** The request's part for a place chosen: `{ region: 'NORTH' }`, `{ area: 'A' }`, or nothing for all areas. */
+export const placeQuery = (place) => {
+  const [kind, code] = place.split(':');
+  return code ? { [kind]: code } : {};
+};
+
+/** Why the figures are not grouped where the switch does not say *all* (MD62): one line beneath the sheet. */
+export const UNGROUPED_BECAUSE = /* @__PURE__ */ Object.freeze({
+  [WORKPLACES_SERVED.NONE]: "SASBO's workplaces are not loaded on this demonstration yet.",
+  [WORKPLACES_SERVED.NAMES]: "SASBO's staff numbers are not loaded on this demonstration yet, so the figures are not grouped.",
+});
+
+const membersHave = (count) => `${formatInt(count)} member${count === 1 ? ' has' : 's have'}`;
+
+/**
+ * What the figures could not place, in one line (ME-17) -- a status nobody knows, by its value; no workplace; a
+ * workplace with no table code -- or `''` when there is nothing to say.
+ */
+export const unplacedSentence = (unplaced) => {
+  const statuses = unplaced?.statuses ?? [];
+  const unknown = statuses.reduce((sum, row) => sum + row.members, 0);
+  return [
+    unknown && `${membersHave(unknown)} a status this system does not know: ${statuses.map((row) => `"${row.status}"`).join(', ')}`,
+    unplaced?.noWorkplace && `${membersHave(unplaced.noWorkplace)} no workplace on record`,
+    unplaced?.noTableCode && `${membersHave(unplaced.noTableCode)} a workplace with no table code`,
+  ].filter(Boolean).join(' · ');
+};

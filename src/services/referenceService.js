@@ -12,42 +12,49 @@ import { requestJson } from './parseApiError';
  * Every method goes through `requestJson`, the one error path (conventions §16). A list is asked for when the control
  * that shows it is opened, and kept for the visit -- never at first paint (MD69).
  *
- * ⚖️ Two of the nine are ALSO named exports, and the object below holds those same two functions: a screen that imports
- * just them ships just them, where importing the object ships all nine -- a bundler cannot drop an object's unused
- * methods, and the bundle's ceiling is not raised to fit a change (month end 01.3's Workplace control needs these two).
+ * 🔑 EACH READ IS ALSO ITS OWN NAMED EXPORT, so a screen that needs two lists ships two reads and not nine: an object
+ * literal's unused methods are never shaken out of a bundle, and the bundle's ceiling is not raised to fit a change.
+ * The first screen (`02.3`) reads only the areas and the regions; the member's Workplace control (`01.3`) only the
+ * employers and the status. `referenceService` is the same reads, gathered, for everything that iterates the service
+ * layer -- the object holds these very functions, never copies of them.
  */
+export const getRegions = () =>
+  requestJson((signal) => fetch(apiUrl('/api/reference/regions'), { credentials: 'include', signal }));
+
+export const getAreas = () =>
+  requestJson((signal) => fetch(apiUrl('/api/reference/areas'), { credentials: 'include', signal }));
+
+export const getEmployerGroups = () =>
+  requestJson((signal) => fetch(apiUrl('/api/reference/employer-groups'), { credentials: 'include', signal }));
 
 /** SASBO's employers (01.1): `{ list, printedOn, confirmedOn, reason, rows: [{ id, name, group, core, tableCodes }] }`. */
 export const getEmployers = () =>
   requestJson((signal) => fetch(apiUrl('/api/reference/employers'), { credentials: 'include', signal }));
+
+export const getTableCodes = () =>
+  requestJson((signal) => fetch(apiUrl('/api/reference/table-codes'), { credentials: 'include', signal }));
+
+export const getCommitteeProvinces = () =>
+  requestJson((signal) => fetch(apiUrl('/api/reference/committee-provinces'), { credentials: 'include', signal }));
+
+export const getCommittees = () =>
+  requestJson((signal) => fetch(apiUrl('/api/reference/committees'), { credentials: 'include', signal }));
+
+export const getSuspensionCodes = () =>
+  requestJson((signal) => fetch(apiUrl('/api/reference/suspension-codes'), { credentials: 'include', signal }));
 
 /** How many rows each list holds here, and why none where none is (ME-18, ME-19) -- the workplaces' among them. */
 export const getStatus = () =>
   requestJson((signal) => fetch(apiUrl('/api/reference/status'), { credentials: 'include', signal }));
 
 export const referenceService = {
-  getRegions: () =>
-    requestJson((signal) => fetch(apiUrl('/api/reference/regions'), { credentials: 'include', signal })),
-
-  getAreas: () =>
-    requestJson((signal) => fetch(apiUrl('/api/reference/areas'), { credentials: 'include', signal })),
-
-  getEmployerGroups: () =>
-    requestJson((signal) => fetch(apiUrl('/api/reference/employer-groups'), { credentials: 'include', signal })),
-
+  getRegions,
+  getAreas,
+  getEmployerGroups,
   getEmployers,
-
-  getTableCodes: () =>
-    requestJson((signal) => fetch(apiUrl('/api/reference/table-codes'), { credentials: 'include', signal })),
-
-  getCommitteeProvinces: () =>
-    requestJson((signal) => fetch(apiUrl('/api/reference/committee-provinces'), { credentials: 'include', signal })),
-
-  getCommittees: () =>
-    requestJson((signal) => fetch(apiUrl('/api/reference/committees'), { credentials: 'include', signal })),
-
-  getSuspensionCodes: () =>
-    requestJson((signal) => fetch(apiUrl('/api/reference/suspension-codes'), { credentials: 'include', signal })),
-
+  getTableCodes,
+  getCommitteeProvinces,
+  getCommittees,
+  getSuspensionCodes,
   getStatus,
 };
