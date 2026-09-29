@@ -66,7 +66,7 @@ describe('what a person reads', () => {
 })
 
 describe('a status, its kind, and the reason a change into it carries (03.1, 03.2)', () => {
-  it('the six statuses and their kinds are the server's, in its order', () => {
+  it('the six statuses and their kinds are the server\'s, in its order', () => {
     expect(Object.entries(MEMBER_STATUS_KIND).map(([name, kind]) => ({ name, kind }))).toEqual(monthEnd.memberStatuses)
   })
 
@@ -74,7 +74,7 @@ describe('a status, its kind, and the reason a change into it carries (03.1, 03.
     expect([...new Set(monthEnd.memberStatuses.map((s) => s.kind))].sort()).toEqual(Object.values(STATUS_KIND).sort())
   })
 
-  it('every reason a screen sends is one the server knows -- and none is ACB's or capture's', () => {
+  it('every reason a screen sends is one the server knows -- and none is ACB\'s or capture\'s', () => {
     expect(monthEnd.statusReasons).toEqual(expect.arrayContaining(Object.values(STATUS_REASON)))
     for (const theirs of ['SUBS_IN_ARREARS', 'UNPAID_SUSPENDED', 'CAPTURED']) {
       expect(monthEnd.statusReasons).toContain(theirs)
@@ -93,7 +93,7 @@ describe('a status, its kind, and the reason a change into it carries (03.1, 03.
   })
 })
 
-describe('SASBO's codes as a person chooses one (RC7: the number, never the row's id)', () => {
+describe('SASBO\'s codes as a person chooses one (RC7: the number, never the row\'s id)', () => {
   it('every numbered deletion code the server publishes is offered by its number, the reasons under code 2 beneath it', () => {
     const options = deletionCodeOptions(monthEnd.deletionCodes)
     const numbered = monthEnd.deletionCodes.filter((row) => Number.isInteger(row.code))
