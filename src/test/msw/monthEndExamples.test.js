@@ -12,9 +12,10 @@ const MONTH_END_ROUTE = /^GET (\/api\/reference\/.+|\/api\/workplaces)$/
 
 describe('month end\'s golden answers', () => {
   it('answer every month-end route in the committed API surface', () => {
-    const routes = committedSurface().split('\n').filter((line) => MONTH_END_ROUTE.test(line.trim()))
+    // committedSurface() is the surface's lines, already trimmed and without the blank ones.
+    const routes = committedSurface().filter((line) => MONTH_END_ROUTE.test(line))
     expect(routes.length).toBeGreaterThan(5)
-    expect(Object.keys(monthEndExamples.answers).sort()).toEqual(expect.arrayContaining(routes.map((r) => r.trim())))
+    expect(Object.keys(monthEndExamples.answers).sort()).toEqual(expect.arrayContaining(routes))
   })
 
   it('hold an envelope for every refusal code the server publishes, each with its code and status', () => {
