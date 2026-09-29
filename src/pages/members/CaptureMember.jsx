@@ -15,7 +15,8 @@ import {
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS, MEMBER_TABS,
     BRANCH_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DEBIT_DAY_OPTIONS, IDENTITY_TYPE_PASSPORT,
     DEBIT_DAY_EARLIEST, DEBIT_DAY_LATEST, isDebitDayInRange,
-    PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL, ACCOUNT_TYPE_OPTIONS
+    PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL, ACCOUNT_TYPE_OPTIONS,
+    MEMBER_FIELD_TABS as FIELD_TO_TAB_MAP,
 } from "@/config/memberConstants.js";
 import { formatZar, toWireDate, today } from "@/lib/format.js";
 import { finishField, sanitiseField, validateField } from "@/utils/inputRules.js";
@@ -41,33 +42,7 @@ import { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
 import WorkplaceField from "../../components/members/WorkplaceField.jsx";
 import useWorkplaceSource from "../../hooks/useWorkplaceSource.js";
 import useWorkplaceChoice from "../../hooks/useWorkplaceChoice.js";
-import { MONTH_END_REFUSAL } from "@/config/monthEnd.js";
-
-const FIELD_TO_TAB_MAP = {
-    title: "personal",
-    initials: "personal",
-    firstNames: "personal",
-    surname: "personal",
-    identityType: "personal",
-    identityNumber: "personal",
-    dateOfBirth: "personal",
-    personalEmail: "personal",
-    workEmail: "personal",
-    phone: "personal",
-    workTel: "personal",
-    homeTel: "personal",
-    employeeNumber: "employment",
-    ibtNo: "employment",
-    employmentType: "employment",
-    jobGrade: "employment",
-    bankName: "employment",
-    branch: "employment",
-    paymentType: "employment",
-    bankAccountNumber: "employment",
-    accountType: "employment",
-    debitDay: "employment",
-    workplaceId: "employment",
-};
+import { WORKPLACE_UNKNOWN } from "@/config/monthEnd.js";
 
 /** The names out of a reference table of `{id, name}` rows -- [] until the list has arrived. */
 const nameList = (rows) => (Array.isArray(rows) ? rows : []).map((row) => row?.name).filter(Boolean);
@@ -288,20 +263,16 @@ export default function CaptureMember() {
      * empty one, because it is wrong AND it looks deliberate.
      */
     const settleBank = (prev, next) => {
-        const changedBank = next.bankName !== prev.bankName;
-        const dropsBranch = changedBank && next.bankName && prev.branch && next.branch === prev.branch
-            && !branchOptionsFor(next.bankName).includes(prev.branch);
-        const settled = {
-            ...next,
-            ...(changedBank && { jobGrade: "" }),
-            ...(dropsBranch && { branch: "" }),
-        };
+        const settled = { ...next };
+        if (settled.bankName !== prev.bankName) {
+            settled.jobGrade = "";
+            if (settled.bankName && prev.branch && settled.branch === prev.branch
+                && !branchOptionsFor(settled.bankName).includes(prev.branch)) settled.branch = "";
+        }
         const record = findBranchRecord(bankListing, settled.bankName, settled.branch);
-        return {
-            ...settled,
-            ...(!ibtNoTyped && { ibtNo: branchCodeOf(record) }),
-            ...(!bankAddressTyped && { bankAddress: formatBranchAddress(record) }),
-        };
+        if (!ibtNoTyped) settled.ibtNo = branchCodeOf(record);
+        if (!bankAddressTyped) settled.bankAddress = formatBranchAddress(record);
+        return settled;
     };
 
     /**
@@ -317,7 +288,7 @@ export default function CaptureMember() {
     // A save the server refused for its workplace (WORKPLACE_UNKNOWN) is said at the Workplace field, in the server's
     // words, and everything typed is kept. The dialog that sent it says so too; this is what is left when it closes.
     const refusedWorkplace = (error) => {
-        if (error?.body?.code !== MONTH_END_REFUSAL.WORKPLACE_UNKNOWN) return;
+        if (error?.body?.code !== WORKPLACE_UNKNOWN) return;
         setFieldErrors((prev) => ({ ...prev, workplaceId: error.message }));
         setActiveTab("employment");
     };
@@ -725,17 +696,7 @@ export default function CaptureMember() {
                             <>
                                 {/* 🏢 01.3 -- ABOVE the fields that stay. It never writes Bank Where Employed or Bank Branch by
                                     itself: it offers, where the names agree, and the notes under the two say what it filled. */}
-                                <WorkplaceField
-                                    className="md:col-span-2"
-                                    source={workplaceSource}
-                                    current={workplace.workplace && { workplace: workplace.workplace }}
-                                    onChoose={workplace.choose}
-                                    onRemove={() => workplace.choose(null)}
-                                    fill={workplace.fill}
-                                    onFill={workplace.accept}
-                                    onDecline={workplace.decline}
-                                    error={fieldErrors.workplaceId}
-                                />
+                                <WorkplaceField className="md:col-span-2" source={workplaceSource} choice={workplace} removable error={fieldErrors.workplaceId} />
                                 <Field label="Bank Where Employed" value={form.bankName} onChange={handleChange("bankName")} {...refs.field('banks')} options={bankNames} error={fieldErrors.bankName} required={form.paymentType === "Debit Order"} searchable note={workplace.note("bankName")} />
                                 <Field label="Employee Number" kind="reference" value={form.employeeNumber} onChange={handleChange("employeeNumber")} />
                                 <Field label="Employment Type" value={form.employmentType} onChange={handleChange("employmentType")} options={EMPLOYMENT_TYPE_OPTIONS} />

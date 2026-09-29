@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 
-import reportError from '../../lib/reportError';
-import { cn } from '../../lib/utils';
+import useAsyncOptions from '../../hooks/useAsyncOptions';
 import { workplaceService } from '../../services/workplaceService';
 import { Button, SearchableSelect, TextInput } from '../form';
 import LoadFailureFrame from '../form/LoadFailureFrame';
-import { FILLABLE, NOT_AVAILABLE, WORKPLACE_SEARCH, notHere, workplaceResults } from '../../utils/workplaces';
+import { FILLABLE, WORKPLACE_SEARCH, answerFailed, workplaceResults } from '../../utils/workplaces';
 
 /** card.css `.field__label`: the small capitals every label on these screens wears. */
 const LABEL = 'text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted';
@@ -16,11 +15,12 @@ const SAID = 'text-sm text-ink-muted';
  *
  * The employer is chosen from SASBO's list, then the workplace is found BY THE SERVER, by its name or its R/A number
  * (MR-PERF-12): nothing is asked below the second character, one question goes after a pause in typing, and an answer
- * that arrives after a newer question is DROPPED -- each question's effect is cleaned up when the next one is typed,
- * and only an answer stamped with the current question is shown. It is never a list of 5,507.
+ * that arrives after a newer question is DROPPED -- `useAsyncOptions` asks, and a question the typing has moved past
+ * is superseded, its answer thrown away however late it lands. It is never a list of 5,507.
  *
  * Choosing one shows its R/A number, area and committee -- read-only, with where they came from (MD28) -- and hands the
- * row to the page, which holds only its id (the save names a workplace by `workplaceId` and nothing else, BR66).
+ * row to the page's `useWorkplaceChoice`, whose form holds only its id: a save names a workplace by `workplaceId` and
+ * nothing else (BR66).
  *
  * THE OFFER is the page's to compute (`workplaceFill`, `utils/workplaces.js`) and this control's to ask: *Fill "Bank
  * Where Employed" and "Bank Branch" from this workplace?* Never done silently; declining leaves both as they are.
@@ -29,20 +29,20 @@ const SAID = 'text-sm text-ink-muted';
  * with the sentence that says why, never an empty control; failed -- with Try again, never "none". A member with no
  * workplace is a value, said as one: *No workplace on record*.
  *
- * @param {object}   [source]   `useWorkplaceSource`'s answer. Without one the control only SHOWS (the record, read).
- * @param {object}   [current]  what to show as the member's workplace: `{ workplace }` · `{ none }` · `{ loading }` ·
- *                              `{ why }` · `{ error, retry }` -- or nothing, before a capture has chosen one
- * @param {Function} [onChoose] `(workplace) => void`, when a found workplace is chosen
- * @param {Function} [onRemove] `() => void` -- capture only, where no workplace is a member's to have yet
- * @param {object}   [fill]     the fields the offer would fill, `{ bankName?, branch? }`, with `onFill` and `onDecline`
- * @param {string}   [error]    the save's refusal of the workplace (WORKPLACE_UNKNOWN), in the server's words
+ * @param {object}  [source]    `useWorkplaceSource`'s answer. Without one the control only SHOWS (the record, read).
+ * @param {object}  choice      `useWorkplaceChoice`'s answer: the chosen row, the offer, and what to do with either
+ * @param {object}  [current]   the member's workplace as the record reads it: `{ workplace }` · `{ none }` ·
+ *                              `{ loading }` · `{ why }` · `{ failure, retry }`, and `from`, its list's provenance.
+ *                              Capture shows the row it chose.
+ * @param {boolean} [removable] capture only, where no workplace is a member's to have yet
+ * @param {string}  [error]     the save's refusal of the workplace (WORKPLACE_UNKNOWN), in the server's words
  */
-export default function WorkplaceField({ source, current, onChoose, onRemove, fill = {}, onFill, onDecline, error, className }) {
+export default function WorkplaceField({
+  source, choice, current = choice.workplace && { workplace: choice.workplace }, removable, error, className = '',
+}) {
   const [employer, setEmployer] = useState('');
   const [term, setTerm] = useState('');
   const [settled, setSettled] = useState(null);
-  const [attempt, setAttempt] = useState(0);
-  const [answer, setAnswer] = useState(null);
 
   const search = term.trim();
   const question = employer && search.length >= WORKPLACE_SEARCH.from ? JSON.stringify([employer, search]) : null;
@@ -55,70 +55,50 @@ export default function WorkplaceField({ source, current, onChoose, onRemove, fi
   }, [question]);
 
   // What is being asked NOW -- nothing while the typing has moved past the last question that settled.
-  const asked = question && settled === question ? `${question}${attempt}` : null;
-
-  useEffect(() => {
-    if (!asked) return undefined;
-    let left = false;
-    const [wanted, text] = JSON.parse(question);
-    workplaceService.getWorkplaces({ employer: wanted, search: text, page: 0, size: WORKPLACE_SEARCH.size })
-      .then((page) => {
-        if (!left) setAnswer({ asked, ...workplaceResults(page) });
-      })
-      .catch((failure) => {
-        if (left) return;
-        if (!notHere(failure)) reportError('workplaces.search', failure);
-        setAnswer({ asked, ...(notHere(failure) ? { why: NOT_AVAILABLE.NOT_HERE } : { failure }) });
-      });
-    // 🔑 THE TICKET: a newer question cleans this one up, and its answer -- however late -- is dropped.
-    return () => {
-      left = true;
-    };
-  }, [asked, question]);
-
-  const found = answer?.asked === asked ? answer : null;
-  const rows = found?.page?.content ?? [];
-  const total = found?.page?.totalElements ?? rows.length;
-  const said = !asked || found?.failure ? ''
-    : !found ? 'Searching…'
-      : found.why ? `Not available. ${found.why}`
-        : !total ? `No workplace matches “${search}”.`
-          : total > rows.length ? `${total} found — the first ${rows.length} are shown. Type more to narrow them.`
-            : `${total} found.`;
+  const asked = question && settled === question ? question : null;
+  const found = useAsyncOptions(() => {
+    const [wanted, text] = JSON.parse(asked);
+    return workplaceService.getWorkplaces({ employer: wanted, search: text, page: 0, size: WORKPLACE_SEARCH.size })
+      .then((page) => [workplaceResults(page)], answerFailed('workplaces.search'));
+  }, [asked], { enabled: Boolean(asked) });
+  const answer = asked && !found.loading ? found.options[0] : null;
+  const rows = answer?.page?.content ?? [];
+  const total = answer?.page?.totalElements;
+  const said = !asked || answer?.failure ? ''
+    : !answer ? 'Searching…'
+      : answer.why ? `Not available. ${answer.why}`
+        : total ? `${total} found${total > rows.length ? ` — the first ${rows.length} are shown. Type more to narrow them` : ''}.`
+          : `No workplace matches “${search}”.`;
 
   const workplace = current?.workplace;
-  const offered = Object.keys(fill);
-  const Group = source ? 'fieldset' : 'div';
-  const Title = source ? 'legend' : 'p';
+  const offered = source ? Object.keys(choice.fill) : [];
 
   return (
-    <Group className={cn('grid min-w-0 gap-y-3.5', className)}>
-      <Title className={LABEL}>Workplace</Title>
+    <fieldset className={`grid min-w-0 gap-y-3.5 ${className}`}>
+      <legend className={LABEL}>Workplace</legend>
 
       {workplace ? (
+        /* card.html's `.panel__meta` -- one ruled line of what the workplace is, as the result rows read, and where it
+           came from beneath it. Read-only: nothing here can be typed into. */
         <div className="grid gap-1.5 border-y border-line py-3">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-base font-medium text-ink">{workplace.name}</p>
-            {onRemove && <Button variant="ghost" size="sm" onClick={onRemove} aria-label={`Remove ${workplace.name}`}>Remove</Button>}
+            <p className="text-base font-medium">{workplace.name}</p>
+            {removable && (
+              <Button variant="ghost" size="sm" onClick={() => choice.choose(null)} aria-label={`Remove ${workplace.name}`}>
+                Remove
+              </Button>
+            )}
           </div>
-          <dl className="grid grid-cols-3 gap-3 max-sm:grid-cols-1">
-            {[
-              ['R/A number', workplace.raNumber],
-              ['Area', workplace.area],
-              ['Committee', [workplace.committee, workplace.committeeName].filter(Boolean).join(' · ')],
-            ].map(([name, value]) => (
-              <div key={name} className="min-w-0">
-                <dt className={LABEL}>{name}</dt>
-                <dd className="text-base font-medium text-ink tabular-nums [overflow-wrap:anywhere]">{value || '—'}</dd>
-              </div>
-            ))}
-          </dl>
+          <p className="text-sm text-ink-muted tabular-nums">
+            {`R/A ${workplace.raNumber} · Area ${workplace.area || '—'} · Committee ${
+              [workplace.committee, workplace.committeeName].filter(Boolean).join(', ') || '—'}`}
+          </p>
           <p className="text-xs text-ink-muted">From SASBO’s list of workplaces. {source?.workplacesFrom ?? current.from}</p>
         </div>
       ) : current?.failure ? (
         <LoadFailureFrame failed label="The member’s workplace" loadError={current.failure} onRetryLoad={current.retry} />
       ) : current && (
-        <p className={current.none ? 'text-base font-medium text-ink' : SAID} role={current.none ? undefined : 'status'}>
+        <p className={current.none ? 'font-medium' : SAID} role={current.none ? undefined : 'status'}>
           {current.none ? 'No workplace on record' : current.why ? `Not available. ${current.why}` : 'Loading…'}
         </p>
       )}
@@ -128,17 +108,17 @@ export default function WorkplaceField({ source, current, onChoose, onRemove, fi
       {offered.length > 0 && (
         <div className="rounded-lg border border-line-strong bg-surface-2 p-3 text-sm text-ink-muted">
           <p className="font-medium text-ink">Fill {offered.map((key) => `"${FILLABLE[key]}"`).join(' and ')} from this workplace?</p>
-          <p>{offered.map((key) => fill[key]).join(' · ')}</p>
+          <p>{offered.map((key) => choice.fill[key]).join(' · ')}</p>
           <div className="mt-2 flex gap-2">
-            <Button variant="primary" size="sm" onClick={onFill}>Fill</Button>
-            <Button size="sm" onClick={onDecline}>No thanks</Button>
+            <Button variant="primary" size="sm" onClick={choice.accept}>Fill</Button>
+            <Button size="sm" onClick={choice.decline}>No thanks</Button>
           </div>
         </div>
       )}
 
-      {source && (source.state === 'failed' ? (
-        <LoadFailureFrame failed label="SASBO’s workplaces" loadError={source.error} onRetryLoad={source.retry} />
-      ) : source.state === 'unavailable' ? (
+      {source && (source.failure ? (
+        <LoadFailureFrame failed label="SASBO’s workplaces" loadError={source.failure} onRetryLoad={source.retry} />
+      ) : source.why ? (
         <p className={SAID} role="status">Not available. {source.why}</p>
       ) : (
         <>
@@ -150,7 +130,7 @@ export default function WorkplaceField({ source, current, onChoose, onRemove, fi
               optionLabel="name"
               value={employer}
               onChange={setEmployer}
-              loading={source.state === 'loading'}
+              loading={source.loading}
               hint={source.employersFrom}
             />
             <TextInput
@@ -170,9 +150,9 @@ export default function WorkplaceField({ source, current, onChoose, onRemove, fi
                     type="button"
                     onClick={() => {
                       setTerm('');
-                      onChoose?.(row);
+                      choice.choose(row);
                     }}
-                    className="touch-size flex w-full flex-wrap items-center justify-between gap-x-3 px-3 py-2 text-left text-ink hover-hover:hover:bg-brand-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+                    className="touch-size flex w-full flex-wrap items-center justify-between gap-x-3 px-3 py-2 text-left hover-hover:hover:bg-brand-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
                   >
                     <span className="font-medium">{row.name}</span>
                     <span className="text-xs text-ink-muted tabular-nums">R/A {row.raNumber} · Area {row.area || '—'}</span>
@@ -181,17 +161,17 @@ export default function WorkplaceField({ source, current, onChoose, onRemove, fi
               ))}
             </ul>
           )}
-          {found?.failure && (
+          {answer?.failure && (
             <LoadFailureFrame
               failed
               label={`The workplaces for “${search}”`}
-              loadError={found.failure}
-              onRetryLoad={() => setAttempt((n) => n + 1)}
+              loadError={answer.failure}
+              onRetryLoad={found.refetch}
             />
           )}
           <p className="text-xs text-ink-muted" role="status">{said}</p>
         </>
       ))}
-    </Group>
+    </fieldset>
   );
 }

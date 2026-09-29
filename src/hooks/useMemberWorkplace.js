@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-
-import reportError from '../lib/reportError';
 import { memberService } from '../services/memberService';
-import { NOT_AVAILABLE, memberWorkplace, notHere } from '../utils/workplaces';
+import { NOT_AVAILABLE, answerFailed, memberWorkplace } from '../utils/workplaces';
+import useAsyncOptions from './useAsyncOptions';
 
 /**
  * THE MEMBER'S WORKPLACE ON THE RECORD -- its lineage, which only the answer for ONE member carries (`01.3`).
@@ -18,37 +16,18 @@ import { NOT_AVAILABLE, memberWorkplace, notHere } from '../utils/workplaces';
  *   an id                        -- asked for: `{ loading }`, then `{ workplace }` · `{ none }` · `{ why }` (a 404,
  *                                   or an answer of the wrong shape) · `{ failure, retry }`.
  *
- * An answer counts only for the member, workplace and attempt it was asked for; one that lands after the record moved
- * on is dropped.
+ * `useAsyncOptions` sequences it: an answer for a member the record has moved on from is dropped.
  */
 export default function useMemberWorkplace(member, open) {
   const id = member?.id;
   const workplaceId = member?.workplaceId;
-  const said = member && 'workplaceId' in member;
-  const [attempt, setAttempt] = useState(0);
-  const [answer, setAnswer] = useState(null);
-  const asked = open && said && workplaceId != null ? `${id}:${workplaceId}:${attempt}` : null;
-
-  useEffect(() => {
-    if (!asked) return undefined;
-    let left = false;
-    memberService.getMemberById(id)
-      .then((one) => {
-        if (!left) setAnswer({ asked, ...memberWorkplace(one) });
-      })
-      .catch((failure) => {
-        if (left) return;
-        if (!notHere(failure)) reportError('workplaces.member', failure);
-        setAnswer({ asked, ...(notHere(failure) ? { why: NOT_AVAILABLE.NOT_HERE } : { failure }) });
-      });
-    return () => {
-      left = true;
-    };
-  }, [asked, id]);
-
-  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  const read = useAsyncOptions(
+    () => memberService.getMemberById(id).then((one) => [memberWorkplace(one)], answerFailed('workplaces.member')),
+    [id, workplaceId],
+    { enabled: Boolean(open) && workplaceId != null },
+  );
   if (!member) return null;
-  if (!said) return { why: NOT_AVAILABLE.NOT_HERE };
+  if (!('workplaceId' in member)) return { why: NOT_AVAILABLE.NOT_HERE };
   if (workplaceId == null) return { none: true };
-  return answer?.asked === asked ? { ...answer, retry } : { loading: true };
+  return read.loading ? { loading: true } : { ...(read.error ? { failure: read.error } : read.options[0]), retry: read.refetch };
 }

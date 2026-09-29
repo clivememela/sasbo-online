@@ -20,7 +20,7 @@ import {
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, IDENTITY_TYPE_PASSPORT,
     DEBIT_DAY_OPTIONS, PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
-    ACCOUNT_TYPE_OPTIONS,
+    ACCOUNT_TYPE_OPTIONS, MEMBER_FIELD_TABS as FIELD_TO_TAB_MAP,
 } from "@/config/memberConstants.js";
 import {
     validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID
@@ -48,7 +48,7 @@ import WorkplaceField from "../../components/members/WorkplaceField.jsx";
 import useWorkplaceSource from "../../hooks/useWorkplaceSource.js";
 import useWorkplaceChoice from "../../hooks/useWorkplaceChoice.js";
 import useMemberWorkplace from "../../hooks/useMemberWorkplace.js";
-import { MONTH_END_REFUSAL } from "@/config/monthEnd.js";
+import { WORKPLACE_UNKNOWN } from "@/config/monthEnd.js";
 
 
 const PAGE_SIZE = memberService.getPageSize();
@@ -164,32 +164,6 @@ const TAB_PLACE = TABS.length === 5
     ]
   : [];
 
-const FIELD_TO_TAB_MAP = {
-    title: "personal",
-    initials: "personal",
-    firstNames: "personal",
-    surname: "personal",
-    identityType: "personal",
-    identityNumber: "personal",
-    dateOfBirth: "personal",
-    personalEmail: "personal",
-    workEmail: "personal",
-    phone: "personal",
-    workTel: "personal",
-    homeTel: "personal",
-    employeeNumber: "employment",
-    ibtNo: "employment",
-    employmentType: "employment",
-    jobGrade: "employment",
-    bankName: "employment",
-    branch: "employment",
-    paymentType: "employment",
-    bankAccountNumber: "employment",
-    accountType: "employment",
-    debitDay: "employment",
-    workplaceId: "employment",
-};
-
 /*
  * 🗑️ FORTY-FOUR INVENTED "BEC BRANCHES" WERE HERE (`SASBO_BEC_BRANCHES`), AND NOTHING COULD REACH THEM -- reclaimed in
  * month end 01.3, to pay for the Workplace control inside the bundle's ceiling rather than by raising it.
@@ -246,24 +220,18 @@ const RECORD_FIELD_LABELS = {
     bankAddress: "Bank Work Address",
     status: "Account Membership Status",
     isShopSteward: "Shop Steward",
-    shopStewardElectionDate: "Shop Steward Election Date",
     isBec: "BEC Member",
-    becCommitteeId: "BEC Committee",
-    isBecRecruiter: "BEC Recruiter",
-    becRecruiterRole: "BEC Recruiter Role",
-    isBecStructureRep: "BEC Structure Representative",
-    becStructures: "BEC Structures Represented",
-    isBecExecutive: "BEC Executive",
-    becExecutivePosition: "BEC Executive Position",
     isCosatu: "COSATU Member",
     isCosatuLocal: "COSATU Local structure",
     isCosatuRegional: "COSATU Regional structure",
-    cosatuLocal: "COSATU Local",
-    cosatuRegion: "Region within Local",
-    cosatuPositions: "COSATU Positions",
     // 01.3: a changed workplace is listed by its NAME -- "Workplace: INVENTED HARBOUR → INVENTED HEAD OFFICE" -- never by
     // the id the save sends, and once, not three times for its three scalars.
     workplaceName: "Workplace",
+    /* 🗑️ ELEVEN STRUCTURES LABELS WERE HERE -- the election date, the BEC committee, recruiter, structure-representative
+       and executive answers, and the COSATU local, region and positions -- reclaimed in month end 01.3 for the bundle's
+       ceiling. Since 2026-09-17 the Structures tab asks Shop Steward, BEC and COSATU only, so no edit can change one of
+       those fields, `getChangedFields` never lists one, and these names were never read (nor `readable()`'s list
+       branch for two of them). Held by `Members.structures.test.jsx`, which asserts none of them is on the tab. */
 };
 
 /** Never listed: identifiers, and a name the form derives from a field that is listed (the committee's id). */
@@ -302,7 +270,6 @@ const DATE_KEYS = new Set(["dateOfBirth", "joinDate", "electionDate"]);
 const readable = (key, value) => {
     const shown = comparable(key, value);
     if (typeof shown === "boolean") return shown ? "Yes" : "No";
-    if (key === "becStructures" || key === "cosatuPositions") return shown ? String(shown).split(",").join(", ") : "none";
     // R3-F1: a LocalDate arrives as [y, m, d], and `comparable` joins an array with commas -- so an untouched date
     // read "1988,6,15", and a changed one "1988,6,15 → 1988-06-15". Dates are NAMED, never sniffed: a value that
     // merely looks like one is not one, and the record holds exactly these three.
@@ -569,6 +536,7 @@ export default function Members() {
         setFieldErrors,
         banks: bankOptions,
         branchesFor: branchOptionsFor,
+        named: true,
         settle: (prev, next) => next.bankName === prev.bankName ? next : {
             ...next,
             jobGrade: "",
@@ -924,7 +892,7 @@ export default function Members() {
                 setPendingSave(null);
                 // 01.3: a workplace that is not on record here is said AT the Workplace field, in the server's words, and
                 // the edit is kept exactly as typed so another can be chosen.
-                const refusal = error?.body?.code === MONTH_END_REFUSAL.WORKPLACE_UNKNOWN && error.message;
+                const refusal = error?.body?.code === WORKPLACE_UNKNOWN && error.message;
                 if (refusal) {
                     setFieldErrors({ workplaceId: refusal });
                     setActiveTab("employment");
@@ -1723,17 +1691,11 @@ export default function Members() {
                                     <WorkplaceField
                                         className="col-span-full"
                                         source={isEditing ? workplaceSource : undefined}
+                                        choice={workplace}
                                         current={{
                                             ...(workplace.workplace ? { workplace: workplace.workplace } : memberWorkplace),
                                             from: workplaceSource.workplacesFrom,
                                         }}
-                                        onChoose={(row) => {
-                                            workplace.choose(row);
-                                            setEditForm((prev) => ({ ...prev, workplaceName: row.name, workplaceRaNumber: row.raNumber }));
-                                        }}
-                                        fill={isEditing ? workplace.fill : undefined}
-                                        onFill={workplace.accept}
-                                        onDecline={workplace.decline}
                                         error={fieldErrors.workplaceId}
                                     />
                                     <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="reference" />

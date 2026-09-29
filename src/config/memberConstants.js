@@ -98,6 +98,37 @@ export const MEMBER_TABS = [
 ];
 
 /**
+ * THE TAB EACH FIELD IS ON, for both member screens: where a save that failed on a field sends the administrator, and
+ * which tab is marked as holding an error. Capture and the record each carried an identical copy until month end 01.3,
+ * which needed `workplaceId` in both -- one list now, so the two cannot disagree about where a field lives.
+ */
+export const MEMBER_FIELD_TABS = {
+  title: 'personal',
+  initials: 'personal',
+  firstNames: 'personal',
+  surname: 'personal',
+  identityType: 'personal',
+  identityNumber: 'personal',
+  dateOfBirth: 'personal',
+  personalEmail: 'personal',
+  workEmail: 'personal',
+  phone: 'personal',
+  workTel: 'personal',
+  homeTel: 'personal',
+  employeeNumber: 'employment',
+  ibtNo: 'employment',
+  employmentType: 'employment',
+  jobGrade: 'employment',
+  bankName: 'employment',
+  branch: 'employment',
+  paymentType: 'employment',
+  bankAccountNumber: 'employment',
+  accountType: 'employment',
+  debitDay: 'employment',
+  workplaceId: 'employment',
+};
+
+/**
  * 🔴 E9a/E9b/A32: the form offered three days -- 20, 25 and 31 -- while the signed spec and the
  * server both take the whole 20th-to-31st range (`DebitDay.EARLIEST` = 20, `DebitDay.LATEST` = 31,
  * and `isValid` accepts everything between). Thirteen of the fifteen banks' own ACB days fall
