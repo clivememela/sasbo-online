@@ -39,6 +39,10 @@ const DATE_PICKER_OPEN = `!!document.querySelector('[aria-haspopup="dialog"][ari
   return r.width > 0 && r.height > 0 && r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
 })`;
 const BANNER = (offline, copy) => `!!document.querySelector('[data-testid="offline-banner"][data-offline="${offline}"]') && ${TEXT(copy)}`;
+/** The first screen's figures in one of their five states (`HomeFigures.jsx`'s `data-figures`). */
+const FIGURES = (state) => `!!document.querySelector('[data-figures="${state}"]')`;
+/** The first screen's menu rows -- a row of the page, not the rail's entry for the same area. */
+const MENU_ROWS = `!!document.querySelector('main a[href="/members"]')`;
 const EXPANDED = (scope) => `!!document.querySelector(${JSON.stringify(`${scope} [aria-expanded="true"]`)})`;
 
 /* ── drivers used here only ─────────────────────────────────────────────────────────────────────── */
@@ -395,6 +399,23 @@ export const SURFACES = [
   { name: 'forms-empty', route: '/reports/forms', ready: HEADING,
     steps: [step('filter to nothing', typeIntoLabelled('main', '/^Random access number/', '000000000'), STATE('empty'))],
     present: { EMPTY: STATE('empty') }, covers: ['pages/forms/Forms.jsx#DataState@empty'] },
+
+  // ── the first screen's figures (month end `02.3`, MR-ROB-37) ──────────────────────────────────
+  // The strip and the sheet above the menu rows, from `serve-dist.mjs`'s invented summary. Each state is reached the
+  // way a person meets it, and every one of them keeps the menu rows: they never wait on the figures (MD69).
+  { name: 'home-figures', route: '/home', ready: FIGURES('ready'),
+    present: { STRIP: TEXT('Paying members'), SHEET: TEXT('No workplace on record'), RULE_C: TEXT('fewer than five'),
+      OVER_A_HUNDRED: TEXT('complement out of date'), MENU: MENU_ROWS } },
+  { name: 'home-figures-loading', route: '/home', intercept: { url: '*/api/members/summary*', mode: 'hang' },
+    ready: FIGURES('loading'), present: { LOADING: `!!document.querySelector('[data-figures="loading"] dl[aria-busy="true"]')`, MENU: MENU_ROWS } },
+  { name: 'home-figures-error', route: '/home', intercept: { url: '*/api/members/summary*', mode: 'fail' },
+    ready: FIGURES('error'), present: { ERROR: STATE('error'), MENU: MENU_ROWS } },
+  // The shared fixture's shape, `[]`: what an answer of the wrong shape looks like to a person (MV-36).
+  { name: 'home-figures-not-available', route: '/home', intercept: { url: '*/api/members/summary*', mode: 'empty' },
+    ready: TEXT('The figures are not available from this server yet.'), present: { ERROR: FIGURES('error'), MENU: MENU_ROWS } },
+  // A figures chunk that will not load is held by the page's own boundary: one line, and the menu rows beneath it.
+  { name: 'home-figures-chunk-failed', route: '/home', intercept: { url: '*/assets/HomeFigures-*.js', mode: 'fail' },
+    ready: TEXT('The figures could not be shown.'), present: { MENU: MENU_ROWS } },
 
   // ── the shell ─────────────────────────────────────────────────────────────────────────────────
   { name: 'shell-drawer', route: '/home', widths: [390], ready: HEADING,

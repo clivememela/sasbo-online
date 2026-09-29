@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
+import { READ_CEILING_MS, SLOW_NOTICE_MS } from '../services/parseApiError'
 import { committedVocabulary } from '../test/apiContractScan'
+import { monthEndBody } from '../test/msw/monthEndExamples'
 import {
-  LIST_EMPTY_REASON, MEMBER_STATUS_KIND, MONTH_END_REFUSAL, STATUS_KIND, STATUS_REASON, WORKPLACES_SERVED, dayLabel,
-  deletionCodeOptions, emptyReasonSentence, listProvenance, listRows, reasonFor, statusKind, suspensionCodeOptions,
+  LIST_EMPTY_REASON, MEMBER_STATUS_KIND, MONTH_END_REFUSAL, STATUS_KIND, STATUS_REASON, SUMMARY_GROUPING,
+  UNGROUPED_BECAUSE, WORKPLACES_SERVED, dayLabel, deletionCodeOptions, emptyReasonSentence, listProvenance, listRows,
+  monthLabel, monthsTo, placeOptions, placeQuery, reasonFor, statusKind, summaryOf, suspensionCodeOptions,
+  unplacedSentence,
 } from './monthEnd'
 
 /**
@@ -108,5 +112,76 @@ describe('SASBO\'s codes as a person chooses one (RC7: the number, never the row
   it('every suspension code the server publishes is offered by its number', () => {
     expect(suspensionCodeOptions(monthEnd.suspensionCodes).map((o) => o.code))
       .toEqual(monthEnd.suspensionCodes.map((row) => row.code))
+  })
+})
+
+describe('the figures (02.2, 02.3)', () => {
+  it('the six groupings a person may choose are the server\'s, in its order (MD31)', () => {
+    expect(Object.keys(SUMMARY_GROUPING)).toEqual(monthEnd.summaryGroupings)
+  })
+
+  it('ME-15: the server gives up on a figure before the browser says it is slow -- and long before the browser gives up', () => {
+    // Four seconds, published by the server; five and ten are the browser's own (conventions §16). A person is told by
+    // the server, in its sentence, before the browser would say "taking longer than expected".
+    const serverGivesUpMs = monthEnd.summaryTimeoutSeconds * 1000
+    expect(serverGivesUpMs).toBeGreaterThan(0)
+    expect(serverGivesUpMs).toBeLessThan(SLOW_NOTICE_MS)
+    expect(serverGivesUpMs).toBeLessThan(READ_CEILING_MS)
+  })
+
+  it('the switch\'s words that group nothing each have their line; ALL has none', () => {
+    expect(Object.keys(UNGROUPED_BECAUSE).sort()).toEqual([WORKPLACES_SERVED.NAMES, WORKPLACES_SERVED.NONE].sort())
+    expect(UNGROUPED_BECAUSE[WORKPLACES_SERVED.NONE]).toBe("SASBO's workplaces are not loaded on this demonstration yet.")
+    expect(UNGROUPED_BECAUSE[WORKPLACES_SERVED.ALL]).toBeUndefined()
+  })
+
+  it('a month as a person writes it', () => {
+    expect(monthLabel('2026-09')).toBe('September 2026')
+    expect(monthLabel('2026-9')).toBe('2026-9')
+    expect(monthLabel(undefined)).toBe('')
+  })
+
+  it('MD55: the months offered are the server\'s and the twelve before it, counted back across a year', () => {
+    const months = monthsTo('2026-01')
+    expect(months).toHaveLength(13)
+    expect(months[0]).toEqual({ value: '2026-01', label: 'January 2026' })
+    expect(months[1]).toEqual({ value: '2025-12', label: 'December 2025' })
+    expect(months.at(-1)).toEqual({ value: '2025-01', label: 'January 2025' })
+  })
+
+  it('MV-36: the golden answer is a summary; an answer of the wrong shape is not -- never an empty one', () => {
+    const golden = monthEndBody('GET /api/members/summary')
+    expect(summaryOf(golden)).toBe(golden)
+    for (const wrong of [[], null, undefined, {}, 'summary', { ...golden, rows: [] }, { ...golden, rows: undefined },
+      { ...golden, totals: null }, { ...golden, month: 202609 }]) {
+      expect(summaryOf(wrong)).toBeNull()
+    }
+  })
+
+  it('MD35: all of SASBO, a region or an area -- and the request\'s part for each', () => {
+    const options = placeOptions([{ code: 'NORTH', name: 'NORTH' }], [{ letter: 'A', region: 'NORTH' }])
+    expect(options).toEqual([
+      { value: '', label: 'All areas' },
+      { value: 'region:NORTH', label: 'NORTH region' },
+      { value: 'area:A', label: 'Area A' },
+    ])
+    expect(placeQuery('')).toEqual({})
+    expect(placeQuery('region:NORTH')).toEqual({ region: 'NORTH' })
+    expect(placeQuery('area:A')).toEqual({ area: 'A' })
+  })
+
+  it('ME-17: what the figures could not place is said in one line, by the value a status holds', () => {
+    expect(unplacedSentence({ statuses: [{ status: 'Inactive', members: 3 }], noWorkplace: 12, noTableCode: 1 })).toBe(
+      '3 members have a status this system does not know: "Inactive" · 12 members have no workplace on record'
+        + ' · 1 member has a workplace with no table code',
+    )
+    expect(unplacedSentence({ statuses: [{ status: 'Inactive', members: 1 }, { status: 'Gone', members: 1 }] }))
+      .toBe('2 members have a status this system does not know: "Inactive", "Gone"')
+  })
+
+  it('the must-pass: nothing unplaced says nothing', () => {
+    expect(unplacedSentence(monthEndBody('GET /api/members/summary').unplaced)).toBe('1 member has no workplace on record')
+    expect(unplacedSentence({ statuses: [], noWorkplace: 0, noTableCode: 0 })).toBe('')
+    expect(unplacedSentence(undefined)).toBe('')
   })
 })

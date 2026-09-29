@@ -208,6 +208,15 @@ export function formatInt(value) {
   return COUNT.format(number);
 }
 
+/**
+ * A fraction as a percentage, two decimals, `en-ZA` -- `0.6337` is `63,37 %`, and `1.042` is `104,20 %`, shown as it
+ * is. Only a number is a fraction: `null` -- no staff complement on record -- is the em dash, never `0,00 %`. The
+ * space before the sign does not break, so a figure never wraps away from its unit.
+ */
+export function formatPercent(fraction) {
+  return typeof fraction === 'number' && Number.isFinite(fraction) ? `${ZAR.format(fraction * 100)} %` : EMPTY;
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
    CALENDAR ARITHMETIC — added by `03.3` for the date field.
 

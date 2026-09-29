@@ -9,6 +9,7 @@ import { recruiterService } from '../services/recruiterService'
 import { recruitmentChannelService } from '../services/recruitmentChannelService'
 import { referenceService } from '../services/referenceService'
 import { subscriptionsService } from '../services/subscriptionsService'
+import { summaryService } from '../services/summaryService'
 import { workplaceService } from '../services/workplaceService'
 import * as api from '../services/api'
 
@@ -36,6 +37,7 @@ export const SERVICE_MODULES = [
   { name: 'recruitmentChannelService', module: recruitmentChannelService },
   { name: 'referenceService', module: referenceService },
   { name: 'subscriptionsService', module: subscriptionsService },
+  { name: 'summaryService', module: summaryService },
   { name: 'workplaceService', module: workplaceService },
 ]
 
@@ -83,6 +85,7 @@ const ARGS = {
   'memberStatusService.changeStatus': ['7', {
     toStatus: 'Resigned', expectedStatus: 'Active', reason: 'DELETION_CODE', deletionCode: 2,
   }],
+  'summaryService.getSummary': [{ month: '2026-09', by: 'employer' }],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS
