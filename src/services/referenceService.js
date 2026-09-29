@@ -11,7 +11,20 @@ import { requestJson } from './parseApiError';
  *
  * Every method goes through `requestJson`, the one error path (conventions §16). A list is asked for when the control
  * that shows it is opened, and kept for the visit -- never at first paint (MD69).
+ *
+ * ⚖️ Two of the nine are ALSO named exports, and the object below holds those same two functions: a screen that imports
+ * just them ships just them, where importing the object ships all nine -- a bundler cannot drop an object's unused
+ * methods, and the bundle's ceiling is not raised to fit a change (month end 01.3's Workplace control needs these two).
  */
+
+/** SASBO's employers (01.1): `{ list, printedOn, confirmedOn, reason, rows: [{ id, name, group, core, tableCodes }] }`. */
+export const getEmployers = () =>
+  requestJson((signal) => fetch(apiUrl('/api/reference/employers'), { credentials: 'include', signal }));
+
+/** How many rows each list holds here, and why none where none is (ME-18, ME-19) -- the workplaces' among them. */
+export const getStatus = () =>
+  requestJson((signal) => fetch(apiUrl('/api/reference/status'), { credentials: 'include', signal }));
+
 export const referenceService = {
   getRegions: () =>
     requestJson((signal) => fetch(apiUrl('/api/reference/regions'), { credentials: 'include', signal })),
@@ -22,8 +35,7 @@ export const referenceService = {
   getEmployerGroups: () =>
     requestJson((signal) => fetch(apiUrl('/api/reference/employer-groups'), { credentials: 'include', signal })),
 
-  getEmployers: () =>
-    requestJson((signal) => fetch(apiUrl('/api/reference/employers'), { credentials: 'include', signal })),
+  getEmployers,
 
   getTableCodes: () =>
     requestJson((signal) => fetch(apiUrl('/api/reference/table-codes'), { credentials: 'include', signal })),
@@ -37,7 +49,5 @@ export const referenceService = {
   getSuspensionCodes: () =>
     requestJson((signal) => fetch(apiUrl('/api/reference/suspension-codes'), { credentials: 'include', signal })),
 
-  /** How many rows each list holds here, and why none where none is (ME-18, ME-19). */
-  getStatus: () =>
-    requestJson((signal) => fetch(apiUrl('/api/reference/status'), { credentials: 'include', signal })),
+  getStatus,
 };

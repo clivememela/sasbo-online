@@ -20,7 +20,7 @@ import {
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, IDENTITY_TYPE_PASSPORT,
     DEBIT_DAY_OPTIONS, PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
-    ACCOUNT_TYPE_OPTIONS,
+    ACCOUNT_TYPE_OPTIONS, MEMBER_FIELD_TABS as FIELD_TO_TAB_MAP,
 } from "@/config/memberConstants.js";
 import {
     validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID
@@ -44,6 +44,11 @@ import { branchNamesForBank } from "@/utils/bankBranches.js";
 import { cn } from "@/lib/utils.js";
 import { formalName, personName } from "@/lib/names.js";
 import { fieldValue } from "@/lib/fieldValue.js";
+import WorkplaceField from "../../components/members/WorkplaceField.jsx";
+import useWorkplaceSource from "../../hooks/useWorkplaceSource.js";
+import useWorkplaceChoice from "../../hooks/useWorkplaceChoice.js";
+import useMemberWorkplace from "../../hooks/useMemberWorkplace.js";
+import { WORKPLACE_UNKNOWN } from "@/config/monthEnd.js";
 
 
 const PAGE_SIZE = memberService.getPageSize();
@@ -159,77 +164,17 @@ const TAB_PLACE = TABS.length === 5
     ]
   : [];
 
-const FIELD_TO_TAB_MAP = {
-    title: "personal",
-    initials: "personal",
-    firstNames: "personal",
-    surname: "personal",
-    identityType: "personal",
-    identityNumber: "personal",
-    dateOfBirth: "personal",
-    personalEmail: "personal",
-    workEmail: "personal",
-    phone: "personal",
-    workTel: "personal",
-    homeTel: "personal",
-    employeeNumber: "employment",
-    ibtNo: "employment",
-    employmentType: "employment",
-    jobGrade: "employment",
-    bankName: "employment",
-    branch: "employment",
-    paymentType: "employment",
-    bankAccountNumber: "employment",
-    accountType: "employment",
-    debitDay: "employment"
-};
-
-export const SASBO_BEC_BRANCHES = [
-    { id: "bec-01", name: "Tshwane CBD Regional Branch", region: "Gauteng North" },
-    { id: "bec-02", name: "Centurion Financial Hub Committee", region: "Gauteng North" },
-    { id: "bec-03", name: "Pretoria East Banking Cluster", region: "Gauteng North" },
-    { id: "bec-04", name: "Hatfield & Menlyn Corporate Branch", region: "Gauteng North" },
-    { id: "bec-05", name: "Soshanguve & Garankuwa Local Committee", region: "Gauteng North" },
-    { id: "bec-06", name: "Johannesburg Central Regional Branch", region: "Gauteng South" },
-    { id: "bec-07", name: "Braamfontein & Parktown Hub", region: "Gauteng South" },
-    { id: "bec-08", name: "Rosebank Financial Cluster", region: "Gauteng South" },
-    { id: "bec-09", name: "Sandton Central Banking Hub", region: "Gauteng South" },
-    { id: "bec-10", name: "Soweto Local Branches Committee", region: "Gauteng South" },
-    { id: "bec-11", name: "Ekurhuleni East Regional Branch", region: "Gauteng East" },
-    { id: "bec-12", name: "Kempton Park & OR Tambo Cluster", region: "Gauteng East" },
-    { id: "bec-13", name: "West Rand & Krugersdorp Committee", region: "Gauteng West" },
-    { id: "bec-14", name: "Vaal Triangle & Vereeniging Branch", region: "Gauteng South" },
-    { id: "bec-15", name: "Cape Town CBD Regional Branch", region: "Western Cape" },
-    { id: "bec-16", name: "Bellville & Tyger Valley Corporate Hub", region: "Western Cape" },
-    { id: "bec-17", name: "Century City Banking Cluster", region: "Western Cape" },
-    { id: "bec-18", name: "Southern Suburbs Local Committee", region: "Western Cape" },
-    { id: "bec-19", name: "Boland & Winelands Regional Branch", region: "Western Cape" },
-    { id: "bec-20", name: "Garden Route & George Branch", region: "Western Cape" },
-    { id: "bec-21", name: "Durban Central Regional Branch", region: "KwaZulu-Natal" },
-    { id: "bec-22", name: "Umhlanga Financial Ridge Committee", region: "KwaZulu-Natal" },
-    { id: "bec-23", name: "Westville Corporate Hub Cluster", region: "KwaZulu-Natal" },
-    { id: "bec-24", name: "Pietermaritzburg & Midlands Branch", region: "KwaZulu-Natal" },
-    { id: "bec-25", name: "KZN North Coast & Richards Bay Committee", region: "KwaZulu-Natal" },
-    { id: "bec-26", name: "KZN South Coast Local Branch", region: "KwaZulu-Natal" },
-    { id: "bec-27", name: "Gqeberha (Port Elizabeth) Regional Branch", region: "Eastern Cape" },
-    { id: "bec-28", name: "East London Central Branch", region: "Eastern Cape" },
-    { id: "bec-29", name: "Karoo & Inland Local Committee", region: "Eastern Cape" },
-    { id: "bec-30", name: "Mthatha Regional Committee", region: "Eastern Cape" },
-    { id: "bec-31", name: "Bloemfontein Central Regional Branch", region: "Free State" },
-    { id: "bec-32", name: "Welkom & Goldfields Committee", region: "Free State" },
-    { id: "bec-33", name: "Kimberley & Northern Cape West Branch", region: "Northern Cape" },
-    { id: "bec-34", name: "Upington Local Hub Committee", region: "Northern Cape" },
-    { id: "bec-35", name: "Mbombela (Nelspruit) Regional Branch", region: "Mpumalanga" },
-    { id: "bec-36", name: "Emalahleni (Witbank) Mining & Finance Cluster", region: "Mpumalanga" },
-    { id: "bec-37", name: "Secunda & Highveld Local Committee", region: "Mpumalanga" },
-    { id: "bec-38", name: "Polokwane Central Regional Branch", region: "Limpopo" },
-    { id: "bec-39", name: "Thohoyandou & Vhembe Hub Committee", region: "Limpopo" },
-    { id: "bec-40", name: "Tzaneen & Mopani Local Committee", region: "Limpopo" },
-    { id: "bec-41", name: "Rustenburg Mining Belt Committee", region: "North West" },
-    { id: "bec-42", name: "Potchefstroom & Klerksdorp Cluster", region: "North West" },
-    { id: "bec-43", name: "South African Reserve Bank (SARB) Dedicated Branch", region: "Corporate National" },
-    { id: "bec-44", name: "BankservAfrica & Financial Infrastructure Committee", region: "Corporate National" }
-];
+/*
+ * 🗑️ FORTY-FOUR INVENTED "BEC BRANCHES" WERE HERE (`SASBO_BEC_BRANCHES`), AND NOTHING COULD REACH THEM -- reclaimed in
+ * month end 01.3, to pay for the Workplace control inside the bundle's ceiling rather than by raising it.
+ *
+ * Their one reader was `readable()`, naming a changed `becCommitteeId` in the save confirmation. No control on the record
+ * sets that field any more (the Structures tab asks Shop Steward, BEC and COSATU only, since 2026-09-17), so an edit can
+ * never change it, `getChangedFields` never lists it, and the list was never read. Nothing imported the export. And it
+ * was not SASBO's: made-up committees and regions, which the real structure -- SASBO's areas, regions and committees --
+ * now replaces as data (month end 01.1). Measured: 3,394 bytes of the minified screen. If a committee ever is edited
+ * here again, `readable()` prints what the record holds, as it does for every field without a vocabulary.
+ */
 
 /**
  * The stored value, folded onto the name the form offers.
@@ -275,25 +220,22 @@ const RECORD_FIELD_LABELS = {
     bankAddress: "Bank Work Address",
     status: "Account Membership Status",
     isShopSteward: "Shop Steward",
-    shopStewardElectionDate: "Shop Steward Election Date",
     isBec: "BEC Member",
-    becCommitteeId: "BEC Committee",
-    isBecRecruiter: "BEC Recruiter",
-    becRecruiterRole: "BEC Recruiter Role",
-    isBecStructureRep: "BEC Structure Representative",
-    becStructures: "BEC Structures Represented",
-    isBecExecutive: "BEC Executive",
-    becExecutivePosition: "BEC Executive Position",
     isCosatu: "COSATU Member",
     isCosatuLocal: "COSATU Local structure",
     isCosatuRegional: "COSATU Regional structure",
-    cosatuLocal: "COSATU Local",
-    cosatuRegion: "Region within Local",
-    cosatuPositions: "COSATU Positions",
+    // 01.3: a workplace is CHANGED when its id is -- two of SASBO's workplaces may share a name -- and is listed by its
+    // name and R/A number (`readable`), once, not three times for its three scalars.
+    workplaceId: "Workplace",
+    /* 🗑️ ELEVEN STRUCTURES LABELS WERE HERE -- the election date, the BEC committee, recruiter, structure-representative
+       and executive answers, and the COSATU local, region and positions -- reclaimed in month end 01.3 for the bundle's
+       ceiling. Since 2026-09-17 the Structures tab asks Shop Steward, BEC and COSATU only, so no edit can change one of
+       those fields, `getChangedFields` never lists one, and these names were never read (nor `readable()`'s list
+       branch for two of them). Held by `Members.structures.test.jsx`, which asserts none of them is on the tab. */
 };
 
 /** Never listed: identifiers, and a name the form derives from a field that is listed (the committee's id). */
-const UNLISTED_KEYS = new Set(["id", "membershipNumber", "memberId", "becCommitteeName"]);
+const UNLISTED_KEYS = new Set(["id", "membershipNumber", "memberId", "becCommitteeName", "workplaceName", "workplaceRaNumber"]);
 
 /**
  * A stored yes/no as a person reads it. `null` is its own answer on the read side -- Shop Steward
@@ -325,11 +267,11 @@ const recordDate = (value) => (value ? formatDate(value) : "");
 const DATE_KEYS = new Set(["dateOfBirth", "joinDate", "electionDate"]);
 
 /** A value as a person reads it. */
-const readable = (key, value) => {
+const readable = (key, value, record) => {
+    // 01.3: a workplace is read by its name and R/A number, never by the id the save sends.
+    if (key === "workplaceId") return value == null ? "No workplace on record" : `${record.workplaceName} (R/A ${record.workplaceRaNumber})`;
     const shown = comparable(key, value);
     if (typeof shown === "boolean") return shown ? "Yes" : "No";
-    if (key === "becCommitteeId") return SASBO_BEC_BRANCHES.find((branch) => branch.id === shown)?.name ?? (shown || "—");
-    if (key === "becStructures" || key === "cosatuPositions") return shown ? String(shown).split(",").join(", ") : "none";
     // R3-F1: a LocalDate arrives as [y, m, d], and `comparable` joins an array with commas -- so an untouched date
     // read "1988,6,15", and a changed one "1988,6,15 → 1988-06-15". Dates are NAMED, never sniffed: a value that
     // merely looks like one is not one, and the record holds exactly these three.
@@ -343,7 +285,7 @@ const fieldLabel = (key) =>
 const getChangedFields = (draft, original) => Object.keys(draft)
     .filter((key) => !UNLISTED_KEYS.has(key))
     .filter((key) => comparable(key, draft[key]) !== comparable(key, original[key]))
-    .map((key) => `${fieldLabel(key)}: ${readable(key, original[key])} → ${readable(key, draft[key])}`);
+    .map((key) => `${fieldLabel(key)}: ${readable(key, original[key], original)} → ${readable(key, draft[key], draft)}`);
 
 
 /**
@@ -579,6 +521,38 @@ export default function Members() {
         [bankListing],
     );
     const branchOptions = branchOptionsFor(editForm.bankName);
+
+    /*
+     * A NEW BANK, AND WHAT GOES WITH THE OLD ONE -- one rule, whether a person chose it (`handleEditChange`) or accepted
+     * the Workplace control's offer (01.3). Main's intent (e56dbe4), in the one place it can be told apart from a record
+     * loading: a grade belongs to a bank, so choosing a DIFFERENT bank clears it; and a branch the new bank does not
+     * offer goes with the old bank -- the fourteen names stay for every bank. A branch chosen in the same step stays.
+     */
+    const settleBank = useCallback((prev, next) => {
+        if (next.bankName === prev.bankName) return next;
+        const settled = { ...next, jobGrade: "" };
+        if (next.bankName && prev.branch && next.branch === prev.branch
+            && !branchOptionsFor(next.bankName).includes(prev.branch)) settled.branch = "";
+        return settled;
+    }, [branchOptionsFor]);
+
+    /*
+     * 🏢 THE MEMBER'S WORKPLACE (month end 01.3), on the Employment tab: read from the answer for this one member, which
+     * alone carries the area and the committee (`useMemberWorkplace`), and changed while editing with capture's control
+     * and capture's rule (`useWorkplaceChoice`). SASBO's lists are asked for when the tab first shows the control --
+     * to edit, or to say where a workplace on record came from -- and kept for the visit (MD69).
+     */
+    const workplaceSource = useWorkplaceSource(activeTab === "employment" && (isEditing || selectedMember?.workplaceId != null));
+    const workplace = useWorkplaceChoice({
+        form: editForm,
+        setForm: setEditForm,
+        setFieldErrors,
+        banks: bankOptions,
+        branchesFor: branchOptionsFor,
+        named: true,
+        settle: settleBank,
+    });
+    const memberWorkplace = useMemberWorkplace(selectedMember, activeTab === "employment" && !workplace.workplace);
     const genderOptions = GENDER_OPTIONS;
     /*
      * ✅ A25's SECOND CLAUSE, `06.1b` -- the other of the two callers. Same reasoning as the
@@ -720,6 +694,8 @@ export default function Members() {
         }
         const start = { ...selectedMember, paymentType: normalizePaymentType(selectedMember?.paymentType) };
         initialsTyped.current = false;
+        // Nothing in a new edit was filled by a workplace -- a mark left from another member's edit must not follow.
+        workplace.reset();
         setEditForm(start);
         setEditBaseline(JSON.stringify(start));
         setFieldErrors({});
@@ -749,15 +725,10 @@ export default function Members() {
         const value = sanitiseField(field, rawValue, { identityType: editForm.identityType });
 
         setEditForm((prev) => {
-            const next = { ...prev, [field]: value };
+            let next = { ...prev, [field]: value };
 
-            // Main's intent (e56dbe4), in the one place it can be told apart from a record
-            // loading: a grade belongs to a bank, so choosing a DIFFERENT bank clears it.
-            if (field === "bankName" && value !== prev.bankName) {
-                next.jobGrade = "";
-                // A branch the new bank does not offer goes with the old bank; the fourteen names stay for every bank.
-                if (value && prev.branch && !branchOptionsFor(value).includes(prev.branch)) next.branch = "";
-            }
+            // A grade belongs to a bank, and so may a branch -- `settleBank`, the rule the workplace's offer shares.
+            if (field === "bankName") next = settleBank(prev, next);
 
             // R4-F1: derived until typed -- see `initialsTyped`.
             if (field === "firstNames" && !initialsTyped.current) {
@@ -802,7 +773,7 @@ export default function Members() {
             }
             return newErrors;
         });
-    }, [editForm.identityType, branchOptionsFor]);
+    }, [editForm.identityType, settleBank]);
 
     const validateEditForm = () => {
         const errors = {};
@@ -902,7 +873,18 @@ export default function Members() {
         // has a `try` of its own, so a third path added later would otherwise leave the record busy for ever.
         try {
             try {
-                await memberService.updateMember(editForm);
+                /*
+                 * 🏢 01.3: THE SAVE NAMES A WORKPLACE BY ITS ID, AND ONLY WHEN THIS EDIT CHANGED IT. A save that names none
+                 * leaves the member's workplace as it was (MD58), so an edit of a telephone number cannot be refused over a
+                 * workplace nobody touched -- say, where the deployment's switch was set back since the register loaded.
+                 * The two scalars the list carries are answers, not inputs, and are not sent back.
+                 */
+                await memberService.updateMember({
+                    ...editForm,
+                    workplaceName: undefined,
+                    workplaceRaNumber: undefined,
+                    workplaceId: editForm.workplaceId === selectedMember.workplaceId ? undefined : editForm.workplaceId,
+                });
             } catch (error) {
                 reportError("Members.save", error);
                 // 06.1 owns the shared error CONTRACT; what this wave owes the screen is that
@@ -911,6 +893,13 @@ export default function Members() {
                 // 🔴 R3-F2: "Nothing was written" only after a refusal. A timeout, a lost connection or a 5xx may have saved
                 // the change, and a clerk told otherwise redoes it.
                 setPendingSave(null);
+                // 01.3: a workplace that is not on record here is said AT the Workplace field, in the server's words, and
+                // the edit is kept exactly as typed so another can be chosen.
+                const refusal = error?.body?.code === WORKPLACE_UNKNOWN && error.message;
+                if (refusal) {
+                    setFieldErrors({ workplaceId: refusal });
+                    setActiveTab("employment");
+                }
                 setSaveNotice(writeMayHaveLanded(error)
                     ? {
                         kind: "unconfirmed",
@@ -918,7 +907,7 @@ export default function Members() {
                     }
                     : {
                         kind: "failed",
-                        messages: ["We could not save these changes. Nothing was written — please try again."],
+                        messages: [refusal || "We could not save these changes. Nothing was written — please try again."],
                     });
                 return;
             }
@@ -1700,11 +1689,23 @@ export default function Members() {
 
                             {activeTab === "employment" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
+                                    {/* 🏢 01.3 -- read, the member's workplace and its lineage; editing, capture's control. It
+                                        offers to fill the two bank fields below and never writes them itself. */}
+                                    <WorkplaceField
+                                        className="col-span-full"
+                                        source={isEditing ? workplaceSource : undefined}
+                                        choice={workplace}
+                                        current={{
+                                            ...(workplace.workplace ? { workplace: workplace.workplace } : memberWorkplace),
+                                            from: workplaceSource.workplacesFrom,
+                                        }}
+                                        error={fieldErrors.workplaceId}
+                                    />
                                     <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="reference" />
-                                    <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} {...refs.field('banks')} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
+                                    <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} {...refs.field('banks')} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} note={isEditing && workplace.note("bankName")} />
                                     <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
                                     <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGrade} onChange={handleEditChange("jobGrade")} disabled={!editForm.bankName} loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
-                                    <Detail label="Bank Branch" value={editForm.branch} isEditing={isEditing} options={branchOptions} error={fieldErrors.branch} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("branch")} />
+                                    <Detail label="Bank Branch" value={editForm.branch} isEditing={isEditing} options={branchOptions} error={fieldErrors.branch} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("branch")} note={isEditing && workplace.note("branch")} />
                                     <Detail label="Payment Type" value={editForm.paymentType} isEditing={isEditing} options={paymentTypeOptions} onChange={handleEditChange("paymentType")} />
 
                                     {editForm.paymentType === "Debit Order" && (
@@ -1937,6 +1938,7 @@ function Detail({ label, value, isEditing, onChange, onBlur, className = "", opt
                 options={options}
                 placeholder="Select..."
                 error={error || undefined}
+                hint={note || undefined}
                 disabled={disabled}
                 required={required}
                 loadError={loadError}

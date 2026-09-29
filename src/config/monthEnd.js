@@ -5,12 +5,24 @@
  *
  * THE SENTENCE A PERSON READS ON A REFUSAL IS THE SERVER'S `message` (ME-13). The browser keeps only the codes it
  * branches on, and shows a code it has never heard of as the server wrote it.
+ *
+ * ⚖️ Every frozen table is marked `@__PURE__` (01.3): freezing a fresh object has no effect a bundler must keep, but
+ * Rollup cannot prove it for a table built from another's members (`MEMBER_STATUS_KIND`), so without the mark a screen
+ * importing one word of this file shipped tables it never reads.
  */
 
+/**
+ * A save naming a workplace that is not on record here (01.3) -- said at the Workplace field, the form kept as typed.
+ * A constant of its own as well as a member of the table below, so the two member screens that branch on it import
+ * one word rather than the table (the bundle's ceiling); `monthEnd.test.js` holds the table to the server's list.
+ */
+export const WORKPLACE_UNKNOWN = 'WORKPLACE_UNKNOWN';
+
 /** The refusal codes the screens branch on (ME-13) -- each one the server publishes. */
-export const MONTH_END_REFUSAL = Object.freeze({
+export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   REQUEST_MALFORMED: 'REQUEST_MALFORMED',
   WORKPLACE_PAGE_INVALID: 'WORKPLACE_PAGE_INVALID',
+  WORKPLACE_UNKNOWN,
   // A change of status (03.1): the member moved since the screen read it -- re-read, and say so; the member is gone;
   // the code chosen left SASBO's list since the dialog loaded it -- load the list again.
   STATUS_CHANGED_SINCE: 'STATUS_CHANGED_SINCE',
@@ -23,14 +35,14 @@ export const MONTH_END_REFUSAL = Object.freeze({
  * What a status IS (03.2): leaving, suspended, or neither. **A figure reads a status's kind, never its spelling** --
  * no status is renamed before SASBO's table, and a figure that counted by spelling would break the day one is.
  */
-export const STATUS_KIND = Object.freeze({
+export const STATUS_KIND = /* @__PURE__ */ Object.freeze({
   LEAVING: 'LEAVING',
   SUSPENDED: 'SUSPENDED',
   NEITHER: 'NEITHER',
 });
 
 /** The six statuses and the kind of each, in the server's order (`memberStatuses`). */
-export const MEMBER_STATUS_KIND = Object.freeze({
+export const MEMBER_STATUS_KIND = /* @__PURE__ */ Object.freeze({
   Active: STATUS_KIND.NEITHER,
   Pending: STATUS_KIND.NEITHER,
   Suspended: STATUS_KIND.SUSPENDED,
@@ -43,7 +55,7 @@ export const MEMBER_STATUS_KIND = Object.freeze({
 export const statusKind = (status) => MEMBER_STATUS_KIND[status] ?? null;
 
 /** The reasons a person's change of status carries (03.1). ACB's two, and capture's, are never sent from a screen. */
-export const STATUS_REASON = Object.freeze({
+export const STATUS_REASON = /* @__PURE__ */ Object.freeze({
   DELETION_CODE: 'DELETION_CODE',
   SUSPENSION_CODE: 'SUSPENSION_CODE',
   REINSTATED: 'REINSTATED',
@@ -87,7 +99,7 @@ export const suspensionCodeOptions = (rows) => rows
  * Why one of SASBO's lists -- or the workplaces -- has nothing to show here (ME-19): one sentence for each of the
  * server's four words, so that a screen says why instead of showing an empty control.
  */
-export const LIST_EMPTY_REASON = Object.freeze({
+export const LIST_EMPTY_REASON = /* @__PURE__ */ Object.freeze({
   NOT_CONFIRMED: 'Not confirmed by SASBO yet.',
   NOT_LOADED: 'Not loaded on this demonstration yet.',
   FAILED: 'Could not be loaded.',
@@ -95,7 +107,7 @@ export const LIST_EMPTY_REASON = Object.freeze({
 });
 
 /** What the deployment's switch says of SASBO's workplaces (MD62). */
-export const WORKPLACES_SERVED = Object.freeze({
+export const WORKPLACES_SERVED = /* @__PURE__ */ Object.freeze({
   NONE: 'NONE',
   NAMES: 'NAMES',
   ALL: 'ALL',
