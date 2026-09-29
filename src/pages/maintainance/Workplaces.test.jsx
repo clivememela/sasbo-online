@@ -84,7 +84,8 @@ describe('the workplaces\' screen -- the four states', () => {
 
   it('loading: it says so while the page is asked -- no rows, and no count of anything yet', async () => {
     const held = deferred()
-    server.use(answering(() => held.promise))
+    // A response of its own for every question: a body is read once, so one held Response cannot answer two.
+    server.use(answering(() => held.promise.then(golden)))
     try {
       renderWithProviders(<Workplaces />)
       expect(await screen.findByText('Loading workplaces…')).toBeInTheDocument()
@@ -93,7 +94,7 @@ describe('the workplaces\' screen -- the four states', () => {
       expect(screen.queryByText(/on record/)).toBeNull()
       expect(screen.queryByText(/No workplace/)).toBeNull()
     } finally {
-      held.resolve(golden())
+      held.resolve()
     }
     // The must-pass: once the answer lands, the rows replace it.
     expect(await screen.findByText('INVENTED HARBOUR')).toBeInTheDocument()
@@ -295,7 +296,8 @@ describe('the workplaces\' screen -- SASBO\'s lists behind the criteria', () => 
       return HttpResponse.json(monthEndBody(`GET /api/reference/${params.list}`))
     }))
     const held = deferred()
-    server.use(answering(() => held.promise))
+    // A response of its own for every question -- the filter below asks a second time, after the release.
+    server.use(answering(() => held.promise.then(golden)))
     const user = setupUser()
     try {
       renderWithProviders(<Workplaces />)
@@ -303,7 +305,7 @@ describe('the workplaces\' screen -- SASBO\'s lists behind the criteria', () => 
       // The first paint is one request: the page's.
       expect(lists).toEqual([])
     } finally {
-      held.resolve(golden())
+      held.resolve()
     }
     await listsLoaded()
     expect([...lists].sort()).toEqual(['areas', 'committees', 'employers'])
