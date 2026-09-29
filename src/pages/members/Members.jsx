@@ -49,6 +49,7 @@ import useWorkplaceSource from "../../hooks/useWorkplaceSource.js";
 import useWorkplaceChoice from "../../hooks/useWorkplaceChoice.js";
 import useMemberWorkplace from "../../hooks/useMemberWorkplace.js";
 import { WORKPLACE_UNKNOWN } from "@/config/monthEnd.js";
+import ChangeStatus from "../../components/members/ChangeStatus.jsx";
 
 
 const PAGE_SIZE = memberService.getPageSize();
@@ -218,7 +219,8 @@ const RECORD_FIELD_LABELS = {
     debitDay: "Debit Day",
     accountType: "Account Type",
     bankAddress: "Bank Work Address",
-    status: "Account Membership Status",
+    // 🗑️ `status` WAS LABELLED HERE, reclaimed in month end 03.3: a status is changed through *Change status* and never
+    // edited, so no edit can change it and `getChangedFields` never lists it (`Members.changeStatus.test.jsx`).
     isShopSteward: "Shop Steward",
     isBec: "BEC Member",
     isCosatu: "COSATU Member",
@@ -367,7 +369,6 @@ export default function Members() {
     // serialises to it. Compared whole, so a field the member record never carried still counts once it is typed in.
     const [editBaseline, setEditBaseline] = useState(null);
     const [activeTab, setActiveTab] = useState("personal");
-    const [showSavedNotification, setShowSavedNotification] = useState(false);
     const [fieldErrors, setFieldErrors] = useState({});
     const [membersList, setMembersList] = useState([]);
 
@@ -445,8 +446,22 @@ export default function Members() {
         setActiveTab(next);
     };
 
-    /* The name the toast says, captured at the save so it survives the panel closing. */
-    const [savedName, setSavedName] = useState("");
+    /*
+     * card.css `.toast`: what a write did, low and centred, gone in 2.6s -- the record's save, and since month end 03.3 a
+     * change of status. The sentence is captured when it is said, so it survives the panel closing, and a toast's timer
+     * clears only its own sentence, never one said after it.
+     */
+    const [toast, setToast] = useState("");
+    const say = useCallback((sentence) => {
+        setToast(sentence);
+        window.setTimeout(() => setToast((shown) => (shown === sentence ? "" : shown)), 2600);
+    }, []);
+
+    /*
+     * 🔁 CHANGE STATUS (month end 03.3) -- the record's one way to move a status, a dialog of its own; the edit form only
+     * shows it. `changingStatus` is whether the dialog is open.
+     */
+    const [changingStatus, setChangingStatus] = useState(false);
 
     /*
      * 🖨️ WHICH OF THE TWO THINGS ON THIS SCREEN IS BEING PRINTED.
@@ -492,6 +507,31 @@ export default function Members() {
         setListState("loading");
         loadMembers();
     }, [loadMembers]);
+
+    /**
+     * 🔁 THE RECORD'S OWN RELOAD (month end 03.3): the answer for this one member replaces the record and its row in the
+     * register -- after a change of status, and before the *Change status* dialog says anything of a change whose answer
+     * never came (ME-3). Resolves with the member as they now stand, or `null` where the read failed or answered with
+     * someone else; the record then shows `status`, when the caller knows one -- the change's own answer, or its refusal's
+     * `currentStatus`.
+     *
+     * The workplace's lineage the answer for one member carries is the Employment tab's own read (`useMemberWorkplace`)
+     * and never an input, so it is kept off the record: a later edit's save does not send it back.
+     */
+    const rereadMember = useCallback((id, status) => memberService.getMemberById(id).then(
+        (one) => (one?.id === id ? { ...one, workplace: undefined } : null),
+        (error) => {
+            reportError("Members.reread", error);
+            return null;
+        },
+    ).then((fresh) => {
+        const now = fresh ?? (status ? { status } : null);
+        if (now) {
+            setSelectedMember((member) => (member?.id === id ? { ...member, ...now } : member));
+            setMembersList((rows) => rows.map((row) => (row.id === id ? { ...row, ...now } : row)));
+        }
+        return fresh;
+    }), []);
 
     // The two reference lists are `useReferenceData`'s now; this owns the register alone.
     useEffect(() => {
@@ -878,9 +918,15 @@ export default function Members() {
                  * leaves the member's workplace as it was (MD58), so an edit of a telephone number cannot be refused over a
                  * workplace nobody touched -- say, where the deployment's switch was set back since the register loaded.
                  * The two scalars the list carries are answers, not inputs, and are not sent back.
+                 *
+                 * 🔁 03.3: AND IT NEVER NAMES THE STATUS. A status is changed through *Change status*, with SASBO's code
+                 * for it; here it is only shown. A save that names none leaves it as it is on the server, so an edit of a
+                 * telephone number can neither put back a status somebody changed since the record was read, nor be
+                 * refused over one nobody touched once the `PUT` stops changing status (03.4).
                  */
                 await memberService.updateMember({
                     ...editForm,
+                    status: undefined,
                     workplaceName: undefined,
                     workplaceRaNumber: undefined,
                     workplaceId: editForm.workplaceId === selectedMember.workplaceId ? undefined : editForm.workplaceId,
@@ -918,9 +964,8 @@ export default function Members() {
             setSelectedMember({ ...editForm });
             setEditBaseline(null);
             setIsEditing(false);
-            setSavedName(personName(editForm));
-            setShowSavedNotification(true);
-            window.setTimeout(() => setShowSavedNotification(false), 2600);
+            const savedName = personName(editForm);
+            say(savedName ? `${savedName}’s record saved` : "Changes saved");
             try {
                 const refreshed = await memberService.getMembers();
                 setMembersList(memberRows(refreshed));
@@ -1487,12 +1532,12 @@ export default function Members() {
                 `<output>` NOT `<div role="status">`: its implicit role IS `status`, so the
                 live region is native semantics rather than a generic box wearing an ARIA hat --
                 consistent across every device and screen reader. */}
-            {showSavedNotification && (
+            {toast && (
                 <output
                     className="kind-in fixed bottom-[84px] left-1/2 z-50 flex -translate-x-1/2 items-center gap-2.5 rounded-[10px] bg-ink px-3.5 py-2.5 text-[13.5px] font-medium text-bg shadow-(--shadow-2)"
                 >
                     <CircleCheck size={16} strokeWidth={2} aria-hidden="true" className="text-brand" />
-                    <span>{savedName ? `${savedName}’s record saved` : "Changes saved"}</span>
+                    <span>{toast}</span>
                 </output>
             )}
 
@@ -1738,7 +1783,24 @@ export default function Members() {
                             {activeTab === "membership" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
                                     <Detail label="Date Joined Sasbo" value={recordDate(selectedMember.joinDate)} isEditing={false} />
-                                    <Detail label="Account Membership Status" value={editForm.status} isEditing={isEditing} options={statusOptions} onChange={handleEditChange("status")} />
+                                    {/* 🔁 03.3: A STATUS IS CHANGED, NEVER EDITED -- with SASBO's code for it, through
+                                        *Change status*, and the change is kept. Shown here as the card shows it, and
+                                        read-only while editing too, where the note says the way to change it. */}
+                                    <Detail
+                                        label="Account Membership Status"
+                                        value={(
+                                            <span className="flex flex-wrap items-center justify-between gap-2">
+                                                <StatusChip status={editForm.status} />
+                                                {!isEditing && (
+                                                    <Button size="sm" className="no-print" onClick={() => setChangingStatus(true)}>
+                                                        Change status
+                                                    </Button>
+                                                )}
+                                            </span>
+                                        )}
+                                        isEditing={false}
+                                        note={isEditing ? "Changed with Change status, once this edit is saved or cancelled." : null}
+                                    />
                                     <h4 className="col-span-full mt-1.5 border-t border-line pt-[18px] text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Sasbo Subscription Fee Details</h4>
                                     {/* 🔴 A MEMBER WITH NO SUBSCRIPTION ON FILE WAS SHOWN R182.77, MONTHLY (`06.4`) -- two invented
                                         facts about their money, printed as if the record held them. The absence is said instead. */}
@@ -1885,6 +1947,18 @@ export default function Members() {
                 confirmLabel="Discard changes"
                 cancelLabel="Keep editing"
                 onConfirm={discardAndLeave}
+            />
+
+            {/* 🔁 03.3: the record read again before a word is said, and what happened said as the save's is. */}
+            <ChangeStatus
+                member={selectedMember}
+                open={changingStatus}
+                onOpenChange={closeOn(() => setChangingStatus(false))}
+                reread={rereadMember}
+                onDone={(sentence) => {
+                    setChangingStatus(false);
+                    say(sentence);
+                }}
             />
         </div>
     );

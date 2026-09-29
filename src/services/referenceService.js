@@ -12,9 +12,10 @@ import { requestJson } from './parseApiError';
  * Every method goes through `requestJson`, the one error path (conventions §16). A list is asked for when the control
  * that shows it is opened, and kept for the visit -- never at first paint (MD69).
  *
- * ⚖️ Two of the nine are ALSO named exports, and the object below holds those same two functions: a screen that imports
- * just them ships just them, where importing the object ships all nine -- a bundler cannot drop an object's unused
- * methods, and the bundle's ceiling is not raised to fit a change (month end 01.3's Workplace control needs these two).
+ * ⚖️ Four of the ten are ALSO named exports, and the object below holds those same four functions: a screen that imports
+ * just them ships just them, where importing the object ships all ten -- a bundler cannot drop an object's unused
+ * methods, and the bundle's ceiling is not raised to fit a change (month end 01.3's Workplace control needs the first
+ * two, 03.3's Change status dialog the last two).
  */
 
 /** SASBO's employers (01.1): `{ list, printedOn, confirmedOn, reason, rows: [{ id, name, group, core, tableCodes }] }`. */
@@ -24,6 +25,17 @@ export const getEmployers = () =>
 /** How many rows each list holds here, and why none where none is (ME-18, ME-19) -- the workplaces' among them. */
 export const getStatus = () =>
   requestJson((signal) => fetch(apiUrl('/api/reference/status'), { credentials: 'include', signal }));
+
+/**
+ * SASBO's deletion codes BY THEIR NUMBERS (03.3): `{ …, rows: [{ code, name, under }] }` -- each numbered code in order,
+ * then the reasons SASBO keeps under it (`code: null`, `under: 2`). A change sends the number, never a row's id (RC7).
+ */
+export const getDeletionCodes = () =>
+  requestJson((signal) => fetch(apiUrl('/api/reference/deletion-codes'), { credentials: 'include', signal }));
+
+/** SASBO's suspension codes (01.1): `{ …, rows: [{ code, name }] }`. */
+export const getSuspensionCodes = () =>
+  requestJson((signal) => fetch(apiUrl('/api/reference/suspension-codes'), { credentials: 'include', signal }));
 
 export const referenceService = {
   getRegions: () =>
@@ -46,8 +58,9 @@ export const referenceService = {
   getCommittees: () =>
     requestJson((signal) => fetch(apiUrl('/api/reference/committees'), { credentials: 'include', signal })),
 
-  getSuspensionCodes: () =>
-    requestJson((signal) => fetch(apiUrl('/api/reference/suspension-codes'), { credentials: 'include', signal })),
+  getDeletionCodes,
+
+  getSuspensionCodes,
 
   getStatus,
 };

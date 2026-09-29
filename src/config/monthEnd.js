@@ -18,17 +18,26 @@
  */
 export const WORKPLACE_UNKNOWN = 'WORKPLACE_UNKNOWN';
 
+/**
+ * The four refusals of a change of status (03.1) that the *Change status* dialog branches on (03.3) -- constants of their
+ * own as well as members of the table below, for `WORKPLACE_UNKNOWN`'s reason: the dialog imports four words, not the
+ * table. The member moved since the screen read it -- re-read, and say so; the member is gone; the code chosen left
+ * SASBO's list since the dialog loaded it -- say so at the field, and load the list again.
+ */
+export const STATUS_CHANGED_SINCE = 'STATUS_CHANGED_SINCE';
+export const MEMBER_NOT_FOUND = 'MEMBER_NOT_FOUND';
+export const DELETION_CODE_UNKNOWN = 'DELETION_CODE_UNKNOWN';
+export const SUSPENSION_CODE_UNKNOWN = 'SUSPENSION_CODE_UNKNOWN';
+
 /** The refusal codes the screens branch on (ME-13) -- each one the server publishes. */
 export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   REQUEST_MALFORMED: 'REQUEST_MALFORMED',
   WORKPLACE_PAGE_INVALID: 'WORKPLACE_PAGE_INVALID',
   WORKPLACE_UNKNOWN,
-  // A change of status (03.1): the member moved since the screen read it -- re-read, and say so; the member is gone;
-  // the code chosen left SASBO's list since the dialog loaded it -- load the list again.
-  STATUS_CHANGED_SINCE: 'STATUS_CHANGED_SINCE',
-  MEMBER_NOT_FOUND: 'MEMBER_NOT_FOUND',
-  DELETION_CODE_UNKNOWN: 'DELETION_CODE_UNKNOWN',
-  SUSPENSION_CODE_UNKNOWN: 'SUSPENSION_CODE_UNKNOWN',
+  STATUS_CHANGED_SINCE,
+  MEMBER_NOT_FOUND,
+  DELETION_CODE_UNKNOWN,
+  SUSPENSION_CODE_UNKNOWN,
 });
 
 /**
