@@ -193,6 +193,17 @@ const acbFound = members.slice(0, 25).map((m, i) => ({
   id: m.id, membershipNumber: m.membershipNumber, title: m.title, initials: m.initials, surname: m.surname,
   bankName: m.bankName, accountLastFour: String(1000 + i * 37).slice(-4), debitDay: 20 + (i % 12), status: m.status,
 }));
+/*
+ * The termination report (`03.5`), `GET /api/acb/termination-report`: two members the rule terminates -- one already
+ * Terminated, so the report shows the status instead of the action -- and two one away, the longest surname among
+ * them. Nobody is terminated by reading it, and the action stays refused until sign-in (B1).
+ */
+const acbTermination = [members[0], members[7], members[2], members[3]].map((m, i) => ({
+  memberId: m.id, membershipNumber: m.membershipNumber, surname: m.surname,
+  unpaidCount: i < 2 ? 3 : 2, terminate: i < 2, twelveMonthTotal: i < 2 ? 3 : 2,
+  unpaidMonths: i < 2 ? ['2026-07', '2026-08', '2026-09'] : ['2026-08', '2026-09'],
+  openingUnpaids: i === 1 ? 1 : 0, status: i === 0 ? 'Terminated' : 'Active',
+}));
 let acbPreparedReads = 0;
 
 /** The A.C.B. run shapes a prefix match cannot answer; `false` when the path is not one of them. */
@@ -380,6 +391,11 @@ const API = {
   // The Debits screen's member search (`04.1`) -- a POST, answered by `acbRunAnswer` first; the key is what
   // `stubDrift` reads, so the path is covered by name rather than by accident.
   '/api/acb/members/search': { content: acbFound, page: 0, size: 25, totalElements: 57, totalPages: 3 },
+  '/api/acb/termination-report': {
+    countingFrom: '2026-07',
+    blindness: 'Counted from the first month this system sent a file.',
+    members: acbPage(acbTermination, 50),
+  },
   // The dated rates the Runs screen reads (Q43): V41's one row, and no January notice in September.
   '/api/acb/rates': {
     rates: [{ effectiveFrom: '2026-01-01', amount: 174, source: 'From January -- confirmed by SASBO 2026-09-21 (Q43)' }],
@@ -430,6 +446,10 @@ const API = {
   // `/api/structures`, which nothing calls, so both lists were being answered by `/api/members`
   // -- see `stubDrift` below.
   '/api/members/userRoles': [{ id: 1, name: 'Lead Recruiter' }, { id: 2, name: 'Standard Recruiter' }],
+  // Whether this server emails a captured member their welcome letter (A64) -- asked before Send, and answered by
+  // `/api/members` (a list) until it had a key of its own. Yes, so Send goes through `send-welcome` below as it did
+  // before A64, and the sent state stays measurable.
+  '/api/members/metadata/welcome-letter': { emailEnabled: true },
   '/api/members/structures/tree': [{ id: 1, name: 'INC / IC', parentId: null, children: [] }],
   '/api/provinces': ['Gauteng', 'Western Cape', 'KwaZulu-Natal'].map((name, i) => ({ id: i + 1, name })),
   '/api/areas': ['Gauteng South', 'Western Cape'].map((name, i) => ({ id: i + 1, name })),
