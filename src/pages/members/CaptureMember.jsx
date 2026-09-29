@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useRef, useState} from "react";
 import {AlertCircle, CheckCircle2} from "lucide-react";
-import WelcomeLetter from "../../components/members/WelcomeLetter";
+import ApproveAndSendWelcomeLetter from "../../components/members/ApproveAndSendWelcomeLetter";
 import {recruiterService} from "@/services/recruiterService.js";
 import {recruitmentChannelService} from "@/services/recruitmentChannelService.js";
 import {jobGradeService} from "@/services/jobGradeService.js";
@@ -553,7 +553,7 @@ export default function CaptureMember() {
 
     return (
         <>
-        <WelcomeLetter
+        <ApproveAndSendWelcomeLetter
             open={!!welcomeMember}
             onClose={() => setWelcomeMember(null)}
             member={welcomeMember}
@@ -668,7 +668,7 @@ export default function CaptureMember() {
                                     disabled={form.identityType === "I.D. Number"}
                                     error={fieldErrors.dateOfBirth}
                                     required={form.identityType === IDENTITY_TYPE_PASSPORT}
-                                    placeholder={form.identityType === "I.D. Number" ? "dd.mm/yyyy" : ""}
+                                    placeholder={form.identityType === "I.D. Number" ? "dd/mm/yyyy" : ""}
                                 />
                                 <Field
                                     label="Gender"
