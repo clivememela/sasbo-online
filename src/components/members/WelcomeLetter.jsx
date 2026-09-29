@@ -4,14 +4,29 @@ import Modal, { ModalClose, closeOn } from '../overlay/Modal';
 import Button from '../form/Button';
 import { memberService } from '@/services/memberService.js';
 import { formatDate } from '@/utils/validateSAID.js';
+import useWelcomeLetterEmail from '@/hooks/useWelcomeLetterEmail.js';
+import { LETTER_OUTCOMES, UNKNOWN_OUTCOME, outcomeOf } from './welcomeLetterOutcome.js';
+
+/** The notice tones the dialog uses: the world's status colours, as the membership-number notice already had them. */
+const TONE = {
+    pending: 'border-status-pending-dot bg-status-pending-bg text-status-pending',
+    warning: 'border-status-suspended-dot bg-status-suspended-bg text-status-suspended',
+};
 
 /**
- * Shown after a member is successfully captured.
+ * Opened by Capture Member's Save: the letter the member will receive, and the button that captures them.
  *
  * Renders the Sasbo Welcome Letter content with all member fields filled in,
- * matching the placeholders in the .docx template. The "Send Welcome Letter"
- * button triggers the backend to email the filled .docx to the member's
- * preferred email address(es).
+ * matching the placeholders in the .docx template. "Send Welcome Letter" saves
+ * the member and asks the server to email them the letter.
+ *
+ * 🔴 A64: SAVING NO LONGER DEPENDS ON THE LETTER. The server saves first and then
+ * says what happened to the letter (`welcomeLetter`: `LETTER_OUTCOMES`), so a
+ * member with no email address, a server with no mail (dev.sasbo.online), and a
+ * failed send all leave the member captured -- and the dialog says which it was.
+ * Before Send is pressed it already says whether a letter will go at all
+ * (`useWelcomeLetterEmail`). The button keeps its name: the capture screen and the
+ * automation suite both find it by it, and it still sends wherever mail is set up.
  *
  * 🔑 THE CARD'S WORLD, BY RULE. card.html drew no letter, so the preview takes the world's materials rather than a
  * page of its own: the sheet is `surface` on the dialog's `bg`, ruled with `line`, its ink `ink` and `ink-muted`, in
@@ -19,8 +34,12 @@ import { formatDate } from '@/utils/validateSAID.js';
  * says what the member will receive.
  */
 export default function WelcomeLetter({ open, onClose, member, onSuccess }) {
-    const [sendState, setSendState] = useState('idle'); // idle | sending | sent | error
+    const [sendState, setSendState] = useState('idle'); // idle | sending | done | error
     const [errorMessage, setErrorMessage] = useState('');
+    // What the server said happened to the letter, and the member as it saved them -- a retry sends for THAT record.
+    const [outcome, setOutcome] = useState(null);
+    const [saved, setSaved] = useState(null);
+    const emailing = useWelcomeLetterEmail();
 
     /*
      * 🔴 A51: ONE SEND STATE PER MEMBER. CaptureMember keeps this dialog mounted and swaps its member, so a state that
@@ -34,6 +53,8 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess }) {
         setStateFor(memberKey);
         setSendState('idle');
         setErrorMessage('');
+        setOutcome(null);
+        setSaved(null);
     }
 
     if (!member) return null;
@@ -49,8 +70,11 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess }) {
      * 🔴 A52: NOTHING ASSIGNS A MEMBERSHIP NUMBER YET (A54, the server's), so a newly captured member has none and the
      * emailed letter goes out with the space blank. The preview said "—", which reads as a number to come. It now
      * says, before Send is pressed, that the letter carries no number.
+     *
+     * Once this dialog has saved the member, the server has given them a number (03.4), and the saved record is what
+     * the letter shows -- the first sight of the number a clerk gets, on the screen that captured them.
      */
-    const membershipNo = member.membershipNumber || '';
+    const membershipNo = saved?.membershipNumber || member.membershipNumber || '';
 
     const preferredLabel = (() => {
         const pref = member.preferredEmail;
@@ -62,26 +86,45 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess }) {
     })();
 
     /*
-     * 🔴 A56: A LETTER WITH NOWHERE TO GO WAS STILL OFFERED. Capture saves a member with no email address, and the dialog
-     * read "emailed as an attachment to —" beside an enabled Send; the server refuses it (400, "No email address is
-     * available for this member."). Send is not offered when the member has no address at all, and the dialog says why.
+     * 🔴 A56, THEN A64: A LETTER WITH NOWHERE TO GO IS NEVER PROMISED -- AND NEVER BLOCKS THE SAVE. A56 found the dialog
+     * reading "emailed as an attachment to —" beside an enabled Send, and its fix disabled Send for a member with no
+     * address. Since Send is also the SAVE, that left such a member with no way to be captured at all (A64); SASBO's
+     * register holds members with no address. Send stays enabled, and the dialog says no letter will go.
      */
     const hasAddress = Boolean(member.personalEmail || member.workEmail);
+
+    // A member already on record -- given one, or saved by this dialog -- is SENT a letter; otherwise Send CAPTURES.
+    const onRecord = saved?.id ? saved : (member.id ? member : null);
+    const done = sendState === 'done';
+    const result = done ? (LETTER_OUTCOMES[outcome] ?? UNKNOWN_OUTCOME) : null;
+    const canSend = !done || result.retry;
 
     const handleSend = () => {
         setSendState('sending');
         setErrorMessage('');
-        const sendPromise = member.id
-            ? memberService.sendWelcomeLetter(member.id)
-            : memberService.createMember(member, { sendWelcome: true });
 
-        sendPromise
+        if (onRecord) {
+            memberService.sendWelcomeLetter(onRecord.id)
+                .then(() => {
+                    setOutcome('SENT');
+                    setSendState('done');
+                })
+                .catch((err) => {
+                    setErrorMessage(err?.message || 'The letter could not be emailed. Please try again.');
+                    setSendState('error');
+                });
+            return;
+        }
+
+        memberService.createMember(member, { sendWelcome: true })
             .then((savedMember) => {
-                setSendState('sent');
+                setSaved(savedMember ?? null);
+                setOutcome(outcomeOf(savedMember));
+                setSendState('done');
                 onSuccess?.(savedMember || member);
             })
             .catch((err) => {
-                setErrorMessage(err?.message || 'The email could not be sent and member was not saved. Please try again.');
+                setErrorMessage(err?.message || 'The member was not saved. Please try again.');
                 setSendState('error');
             });
     };
@@ -98,37 +141,49 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess }) {
             footer={
                 <>
                     <ModalClose variant="ghost">Close</ModalClose>
-                    {sendState === 'sent' ? (
+                    {done && (
                         <span role="status" className="flex items-center gap-2 text-sm font-medium text-status-active">
                             <CheckCircle2 className="size-4" aria-hidden="true" />
-                            Welcome Letter Sent
+                            {result.status}
                         </span>
-                    ) : (
+                    )}
+                    {canSend && (
                         <Button
                             variant="primary"
                             onClick={handleSend}
-                            disabled={sendState === 'sending' || !hasAddress}
+                            disabled={sendState === 'sending'}
                         >
                             {sendState === 'sending'
                                 ? <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden="true" />
                                 : <Send className="mr-1.5 size-4" aria-hidden="true" />}
-                            {sendState === 'sending' ? 'Sending…' : 'Send Welcome Letter'}
+                            {/* A capture is a SAVE first, whatever happens to the letter after it. */}
+                            {sendState === 'sending' ? (onRecord ? 'Sending…' : 'Saving…') : 'Send Welcome Letter'}
                         </Button>
                     )}
                 </>
             }
         >
-            {/* Recipient notice */}
-            {hasAddress ? (
+            {/* What will happen -- or, once the member is saved, what did. Never a status role: the footer holds the one. */}
+            {saved || done ? (
+                <LetterOutcome result={result ?? LETTER_OUTCOMES.FAILED} outcome={outcome} to={preferredLabel} />
+            ) : !hasAddress ? (
+                <Notice tone="pending">
+                    This member has no email address, so no letter will be sent. Send Welcome Letter still saves them.
+                </Notice>
+            ) : emailing === 'off' ? (
+                <Notice tone="pending">
+                    Emailing is not switched on yet, so this letter will not be sent. Send Welcome Letter saves the member.
+                </Notice>
+            ) : emailing === 'on' ? (
                 <p className="mb-4 text-sm text-ink-muted">
                     This letter will be emailed as an attachment to{' '}
                     <strong className="text-ink">{preferredLabel}</strong>
                     {member.preferredEmail === 'both' && ' (both addresses)'}.
                 </p>
             ) : (
-                <p className="mb-4 flex items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended">
-                    <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                    <span>This member has no email address, so the letter cannot be sent. Add one to the member's record first.</span>
+                <p className="mb-4 text-sm text-ink-muted">
+                    Send Welcome Letter saves the member and, where emailing is switched on, sends this letter to{' '}
+                    <strong className="text-ink">{preferredLabel}</strong>.
                 </p>
             )}
 
@@ -220,5 +275,26 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess }) {
                 <p className="text-ink-muted">General Secretary: Sasbo the Finance Union</p>
             </div>
         </Modal>
+    );
+}
+
+/** Once the member is saved: where the letter went, or -- for every other outcome -- why it did not. */
+function LetterOutcome({ result, outcome, to }) {
+    if (outcome === 'SENT') {
+        return (
+            <p className="mb-4 text-sm text-ink-muted">
+                The letter was emailed as an attachment to <strong className="text-ink">{to}</strong>.
+            </p>
+        );
+    }
+    return <Notice tone={result.tone === 'warning' ? 'warning' : 'pending'}>{result.says}</Notice>;
+}
+
+function Notice({ tone, children }) {
+    return (
+        <p className={`mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm ${TONE[tone]}`}>
+            <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <span>{children}</span>
+        </p>
     );
 }
