@@ -8,7 +8,7 @@ import { monthEndExamples } from './monthEndExamples'
  * routes, and an envelope for every refusal code it publishes. A route or a code added on the server without its
  * example reddens here, before a screen is written against a guess.
  */
-const MONTH_END_ROUTE = /^GET (\/api\/reference\/.+|\/api\/workplaces)$/
+const MONTH_END_ROUTE = /^(GET \/api\/reference\/.+|GET \/api\/workplaces|POST \/api\/members\/\{id\}\/status)$/
 
 describe('month end\'s golden answers', () => {
   it('answer every month-end route in the committed API surface', () => {

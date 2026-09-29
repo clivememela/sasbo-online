@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { committedVocabulary } from '../test/apiContractScan'
 import {
-  LIST_EMPTY_REASON, MONTH_END_REFUSAL, WORKPLACES_SERVED, dayLabel, emptyReasonSentence, listProvenance, listRows,
+  LIST_EMPTY_REASON, MEMBER_STATUS_KIND, MONTH_END_REFUSAL, STATUS_KIND, STATUS_REASON, WORKPLACES_SERVED, dayLabel,
+  deletionCodeOptions, emptyReasonSentence, listProvenance, listRows, reasonFor, statusKind, suspensionCodeOptions,
 } from './monthEnd'
 
 /**
@@ -61,5 +62,51 @@ describe('what a person reads', () => {
     expect(listRows([])).toBeNull()
     expect(listRows(null)).toBeNull()
     expect(listRows({})).toBeNull()
+  })
+})
+
+describe('a status, its kind, and the reason a change into it carries (03.1, 03.2)', () => {
+  it('the six statuses and their kinds are the server's, in its order', () => {
+    expect(Object.entries(MEMBER_STATUS_KIND).map(([name, kind]) => ({ name, kind }))).toEqual(monthEnd.memberStatuses)
+  })
+
+  it('the kinds are the three the server knows, and no other', () => {
+    expect([...new Set(monthEnd.memberStatuses.map((s) => s.kind))].sort()).toEqual(Object.values(STATUS_KIND).sort())
+  })
+
+  it('every reason a screen sends is one the server knows -- and none is ACB's or capture's', () => {
+    expect(monthEnd.statusReasons).toEqual(expect.arrayContaining(Object.values(STATUS_REASON)))
+    for (const theirs of ['SUBS_IN_ARREARS', 'UNPAID_SUSPENDED', 'CAPTURED']) {
+      expect(monthEnd.statusReasons).toContain(theirs)
+      expect(Object.values(STATUS_REASON)).not.toContain(theirs)
+    }
+  })
+
+  it('the reason follows the kind, as the server judges it, and a status nobody knows has neither', () => {
+    const byKind = { LEAVING: 'DELETION_CODE', SUSPENDED: 'SUSPENSION_CODE', NEITHER: 'REINSTATED' }
+    for (const { name, kind } of monthEnd.memberStatuses) {
+      expect(statusKind(name)).toBe(kind)
+      expect(reasonFor(name)).toBe(byKind[kind])
+    }
+    expect(statusKind('Gone')).toBeNull()
+    expect(reasonFor('Gone')).toBeNull()
+  })
+})
+
+describe('SASBO's codes as a person chooses one (RC7: the number, never the row's id)', () => {
+  it('every numbered deletion code the server publishes is offered by its number, the reasons under code 2 beneath it', () => {
+    const options = deletionCodeOptions(monthEnd.deletionCodes)
+    const numbered = monthEnd.deletionCodes.filter((row) => Number.isInteger(row.code))
+    expect(options.map((o) => o.code)).toEqual(numbered.map((row) => row.code))
+    expect(options.every((o) => o.label.startsWith(`${o.code} · `))).toBe(true)
+    const underTwo = monthEnd.deletionCodes.filter((row) => row.under === 2).map((row) => row.name)
+    expect(underTwo.length).toBeGreaterThan(0)
+    expect(options.find((o) => o.code === 2).under).toEqual(underTwo)
+    expect(options.filter((o) => o.code !== 2).every((o) => o.under.length === 0)).toBe(true)
+  })
+
+  it('every suspension code the server publishes is offered by its number', () => {
+    expect(suspensionCodeOptions(monthEnd.suspensionCodes).map((o) => o.code))
+      .toEqual(monthEnd.suspensionCodes.map((row) => row.code))
   })
 })

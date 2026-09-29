@@ -4,6 +4,7 @@ import { debounceService } from '../services/debounceService'
 import { jobGradeService } from '../services/jobGradeService'
 import { locationService } from '../services/locationService'
 import { memberService } from '../services/memberService'
+import { memberStatusService } from '../services/memberStatusService'
 import { recruiterService } from '../services/recruiterService'
 import { recruitmentChannelService } from '../services/recruitmentChannelService'
 import { referenceService } from '../services/referenceService'
@@ -30,6 +31,7 @@ export const SERVICE_MODULES = [
   { name: 'jobGradeService', module: jobGradeService },
   { name: 'locationService', module: locationService },
   { name: 'memberService', module: memberService },
+  { name: 'memberStatusService', module: memberStatusService },
   { name: 'recruiterService', module: recruiterService },
   { name: 'recruitmentChannelService', module: recruitmentChannelService },
   { name: 'referenceService', module: referenceService },
@@ -78,6 +80,9 @@ const ARGS = {
   'acbRunService.markHandled': ['7', '21', 'Synthetic handled note'],
   'acbRunService.sendLetter': ['7', '21'],
   'acbRunService.searchMembers': [{ surname: 'Synthetic' }, 0, 25],
+  'memberStatusService.changeStatus': ['7', {
+    toStatus: 'Resigned', expectedStatus: 'Active', reason: 'DELETION_CODE', deletionCode: 2,
+  }],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS

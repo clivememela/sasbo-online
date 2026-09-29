@@ -11,7 +11,77 @@
 export const MONTH_END_REFUSAL = Object.freeze({
   REQUEST_MALFORMED: 'REQUEST_MALFORMED',
   WORKPLACE_PAGE_INVALID: 'WORKPLACE_PAGE_INVALID',
+  // A change of status (03.1): the member moved since the screen read it -- re-read, and say so; the member is gone;
+  // the code chosen left SASBO's list since the dialog loaded it -- load the list again.
+  STATUS_CHANGED_SINCE: 'STATUS_CHANGED_SINCE',
+  MEMBER_NOT_FOUND: 'MEMBER_NOT_FOUND',
+  DELETION_CODE_UNKNOWN: 'DELETION_CODE_UNKNOWN',
+  SUSPENSION_CODE_UNKNOWN: 'SUSPENSION_CODE_UNKNOWN',
 });
+
+/**
+ * What a status IS (03.2): leaving, suspended, or neither. **A figure reads a status's kind, never its spelling** --
+ * no status is renamed before SASBO's table, and a figure that counted by spelling would break the day one is.
+ */
+export const STATUS_KIND = Object.freeze({
+  LEAVING: 'LEAVING',
+  SUSPENDED: 'SUSPENDED',
+  NEITHER: 'NEITHER',
+});
+
+/** The six statuses and the kind of each, in the server's order (`memberStatuses`). */
+export const MEMBER_STATUS_KIND = Object.freeze({
+  Active: STATUS_KIND.NEITHER,
+  Pending: STATUS_KIND.NEITHER,
+  Suspended: STATUS_KIND.SUSPENDED,
+  Resigned: STATUS_KIND.LEAVING,
+  Retired: STATUS_KIND.LEAVING,
+  Terminated: STATUS_KIND.LEAVING,
+});
+
+/** A status's kind -- `null` for a status the browser has never heard of, which no figure may guess at. */
+export const statusKind = (status) => MEMBER_STATUS_KIND[status] ?? null;
+
+/** The reasons a person's change of status carries (03.1). ACB's two, and capture's, are never sent from a screen. */
+export const STATUS_REASON = Object.freeze({
+  DELETION_CODE: 'DELETION_CODE',
+  SUSPENSION_CODE: 'SUSPENSION_CODE',
+  REINSTATED: 'REINSTATED',
+});
+
+/**
+ * The reason a change INTO a status carries, as the server judges it -- by the status's kind and no finer, until
+ * SASBO's table (MM49): into a leaving status SASBO's deletion code, into Suspended its suspension code, into any
+ * other a reinstatement. `null` for a status the browser does not know.
+ */
+export const reasonFor = (toStatus) => {
+  switch (statusKind(toStatus)) {
+    case STATUS_KIND.LEAVING: return STATUS_REASON.DELETION_CODE;
+    case STATUS_KIND.SUSPENDED: return STATUS_REASON.SUSPENSION_CODE;
+    case STATUS_KIND.NEITHER: return STATUS_REASON.REINSTATED;
+    default: return null;
+  }
+};
+
+/**
+ * SASBO's deletion codes as a person chooses one (03.3): each numbered code with its number and name, and the five
+ * reasons SASBO keeps under code 2 -- *Resigned Society* -- which have no number of their own. `rows` is the list as
+ * the server answers it (`{ code, name, under? }`); a row with neither a number nor a code above it is left out
+ * rather than offered as a code nobody can send.
+ */
+export const deletionCodeOptions = (rows) => {
+  const numbered = rows.filter((row) => Number.isInteger(row.code));
+  return numbered.map((row) => ({
+    code: row.code,
+    label: `${row.code} · ${row.name}`,
+    under: rows.filter((sub) => !Number.isInteger(sub.code) && sub.under === row.code).map((sub) => sub.name),
+  }));
+};
+
+/** SASBO's suspension codes as a person chooses one: each with its number and name. */
+export const suspensionCodeOptions = (rows) => rows
+  .filter((row) => Number.isInteger(row.code))
+  .map((row) => ({ code: row.code, label: `${row.code} · ${row.name}` }));
 
 /**
  * Why one of SASBO's lists -- or the workplaces -- has nothing to show here (ME-19): one sentence for each of the
