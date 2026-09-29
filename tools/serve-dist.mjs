@@ -282,9 +282,99 @@ const memberSummary = {
   seededMembers: 0, membersFrom: null, leaversFrom: null,
 };
 
+/*
+ * Month end's reads (`01.1`, `01.2`): SASBO's nine lists, each by its own route (MD41), and the workplaces a page at a
+ * time -- read by the member's Workplace control on capture and the record (`01.3`), the workplaces' screen (`01.5`)
+ * and the first screen's Area control (`02.3`). And the change of status (`03.1`), a POST that a prefix match would
+ * answer with the list of members.
+ *
+ * 🔑 ANSWERED AS THE SERVER ANSWERED THEM (MD48). `src/test/month-end-examples.json` holds the server's golden answers,
+ * generated from invented lists and invented workplaces and copied into this repository byte for byte -- the file the
+ * suite's handlers are cut from, so a sweep and the suite see one server. Nothing in it is SASBO's (MD57). It is read
+ * from the client root, where this runs (`stubDrift` reads `src/services` the same way), and a route it holds no
+ * answer for stops the start by name: a shape guessed here would measure a screen nobody will ever see.
+ */
+const MONTH_END_EXAMPLES = 'src/test/month-end-examples.json';
+const monthEndExamples = (() => {
+  try {
+    return JSON.parse(readFileSync(MONTH_END_EXAMPLES, 'utf8'));
+  } catch (e) {
+    throw new Error(`serve-dist runs from the client root, and cannot read ${MONTH_END_EXAMPLES} here (${e.message})`);
+  }
+})();
+const golden = (route) => {
+  const example = monthEndExamples.answers?.[route];
+  if (example?.status !== 200) throw new Error(`${MONTH_END_EXAMPLES} has no answer for ${route}`);
+  return example.body;
+};
+const pageRefused = monthEndExamples.refusals?.WORKPLACE_PAGE_INVALID;
+if (!pageRefused) throw new Error(`${MONTH_END_EXAMPLES} has no refusal WORKPLACE_PAGE_INVALID`);
+const statusChanged = golden('POST /api/members/{id}/status');
+
+/*
+ * THE WORKPLACES. The golden page holds two rows -- right for the suite, too few to measure a sheet with -- so they
+ * lead a list of invented ones cut from the same two (every field the server sends, named as it names them), with one
+ * row at every cap the sheet truncates, as `members[7]` is for the register. The page and its size are the request's:
+ * the capture control's search of eight gets eight, the screen's page of fifty gets fifty and a second page to turn
+ * to, and a page past the last is refused as the server refuses it. The criteria are not matched -- it measures the
+ * sheet, not the search.
+ */
+const goldenWorkplaces = golden('GET /api/workplaces').content;
+const workplaces = [
+  ...goldenWorkplaces,
+  ...Array.from({ length: 55 }, (_, i) => ({
+    ...goldenWorkplaces[i % goldenWorkplaces.length],
+    id: 100 + i,
+    raNumber: 910100 + i,
+    name: `INVENTED WORKPLACE ${100 + i}`,
+    staffComplement: 6 + ((i * 37) % 180),
+  })),
+];
+Object.assign(workplaces[4], {
+  name: 'INVENTED CENTRAL BUSINESS DISTRICT REGIONAL PROCESSING CENTRE',
+  employerId: null,
+  employer: null,
+  employerPrinted: 'INVENTED BANK DEPARTMENTS AND SUBSIDIARIES, AS PRINTED',
+  committeeName: 'INVENTED NORTH AND CENTRAL PROVINCES COMMITTEE',
+  staffComplement: 12345,
+});
+const WORKPLACE_PAGE = 50;
+const workplacePage = (page, size) => ({
+  content: workplaces.slice(page * size, (page + 1) * size),
+  page, size, totalElements: workplaces.length, totalPages: Math.ceil(workplaces.length / size), reason: null,
+});
+
+/** Month end's shapes a prefix match cannot answer; `false` when the path is not one of them. */
+const monthEndAnswer = (req, path, query) => {
+  if (req.method === 'GET' && path === '/api/workplaces') {
+    const page = Number(query.get('page') ?? 0);
+    const size = Number(query.get('size') ?? WORKPLACE_PAGE);
+    if (!(size > 0) || !(page >= 0) || page >= Math.ceil(workplaces.length / size)) {
+      return { status: pageRefused.status, body: pageRefused.body };
+    }
+    return { status: 200, body: workplacePage(page, size) };
+  }
+  // It answers the golden change whatever is asked: it measures the dialog, not the rule.
+  const m = /^\/api\/members\/(\d+)\/status$/.exec(path);
+  if (req.method === 'POST' && m) return { status: 200, body: { ...statusChanged, memberId: Number(m[1]) } };
+  return false;
+};
+
 const API = {
   '/api/members': members,
   '/api/members/summary': memberSummary,
+  // Month end's reads, from the server's golden answers (`golden`, above). The workplaces' key answers their first
+  // page; every page, and its size, is answered per request by `monthEndAnswer`.
+  '/api/reference/regions': golden('GET /api/reference/regions'),
+  '/api/reference/areas': golden('GET /api/reference/areas'),
+  '/api/reference/employer-groups': golden('GET /api/reference/employer-groups'),
+  '/api/reference/employers': golden('GET /api/reference/employers'),
+  '/api/reference/table-codes': golden('GET /api/reference/table-codes'),
+  '/api/reference/committee-provinces': golden('GET /api/reference/committee-provinces'),
+  '/api/reference/committees': golden('GET /api/reference/committees'),
+  '/api/reference/suspension-codes': golden('GET /api/reference/suspension-codes'),
+  '/api/reference/status': golden('GET /api/reference/status'),
+  '/api/workplaces': workplacePage(0, WORKPLACE_PAGE),
   // The runs list; one run and its sheets are answered per shape by `acbRunAnswer`.
   '/api/acb/runs': acbPage(acbRuns, 12),
   // The Debits screen's member search (`04.1`) -- a POST, answered by `acbRunAnswer` first; the key is what
@@ -475,10 +565,11 @@ const server = createServer((req, res) => {
       res.end();
       return;
     }
-    const acb = acbRunAnswer(req, path);
-    if (acb) {
-      res.writeHead(acb.status, { 'content-type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify(acb.body));
+    // The shapes a prefix match cannot answer: A.C.B.'s runs, and month end's pages and change of status.
+    const shaped = acbRunAnswer(req, path) || monthEndAnswer(req, path, url.searchParams);
+    if (shaped) {
+      res.writeHead(shaped.status, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(shaped.body));
       return;
     }
     const key = API_KEYS.find((k) => path.startsWith(k));
