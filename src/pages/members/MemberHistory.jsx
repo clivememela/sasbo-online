@@ -39,17 +39,31 @@ import {
  * words; asking for it again would get the same answer, so there is no *Try again* for it.
  */
 
+/*
+ * ⚖️ THE CSS IS SPENT ON WHAT THE LAYOUT NEEDS, AND ON NOTHING ELSE. The stylesheet was within 0.4 KiB of its ceiling,
+ * and the mock's own measures -- 5px, 7px, 13px, 12.5px, a line height apiece -- each cost a rule of its own. So every
+ * spacing, size and rule here is one the build already ships, within a pixel or two of the mock (the ramp's `text-sm`
+ * for its 12.5px, `text-xs` for its 12px, `py-3.5` for its 13/14px), and the new ones are only these: the two fixed
+ * measures that make the sheet a sheet -- the When column, and the labels' column that starts every From and every To
+ * on one line down the page -- the bleed into the record's gutter, baseline alignment, and one line height for all of it.
+ */
 /** The sheet's two measures, the mock's own: the When column, and the From / To / Reason / Note labels. */
 const ROW = 'grid grid-cols-[5rem_minmax(0,1fr)] gap-x-3 px-3';
-const RULED = 'border-b border-line pb-3.5 pt-[13px] last:border-b-0';
-const VALUES = 'grid grid-cols-[3.5rem_minmax(0,1fr)] items-baseline gap-x-2.5 gap-y-[5px]';
+const VALUES = 'grid grid-cols-[3.5rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1';
 const TERM = 'text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted';
-const WHAT = 'text-base font-semibold leading-[1.35] text-ink';
-const VALUE = 'min-w-0 text-base leading-[1.4] tabular-nums [overflow-wrap:anywhere]';
+const WHAT = 'text-base font-semibold text-ink';
+const VALUE = 'min-w-0 text-base [overflow-wrap:anywhere]';
 /** A value's second line -- a workplace's R/A number, the reason a member gave under SASBO's code. */
-const SUB = 'mt-px block text-[0.78125rem] font-normal text-ink-muted';
+const SUB = 'mt-0.5 block text-sm font-normal text-ink-muted';
+/**
+ * 🔢 TABULAR FIGURES FOR A NUMBER, AND FOR NOTHING ELSE -- as the mock sets them (`.num`). This font gives its colon and
+ * its full stop figure width under `tabular-nums`, so a sentence set that way reads "email ." and "Invented : letter".
+ * A number-shaped value -- a phone number, a date, an amount -- keeps its figures in step with the one above it.
+ */
+const NUMBER_SHAPED = /^(R\s)?[+\d][\d\s\-/.,]*$/;
+const figures = (text) => (NUMBER_SHAPED.test(text) ? 'tabular-nums' : null);
 /** The small print beside a change: the mask's reason, and a save that runs on past the page. */
-const ASIDE = 'text-[0.75rem] leading-[1.4] text-ink-muted';
+const ASIDE = 'text-xs font-normal text-ink-muted';
 
 const EMPTY_MESSAGE =
   'Nothing on this record has changed since the history was switched on. Changes made before then were not recorded.';
@@ -98,18 +112,18 @@ function Head() {
 /** The loading state's rows: the shape of what is coming, so nothing jumps when the changes land. */
 function Placeholders() {
   return (
-    <ol aria-hidden="true">
+    <ol aria-hidden="true" className="divide-y divide-line">
       {PLACEHOLDERS.map(([what, from, to]) => (
-        <li key={`${what}-${from}-${to}`} className={cn(ROW, RULED)}>
+        <li key={`${what}-${from}-${to}`} className={cn(ROW, 'py-3.5')}>
           {/* `.skeleton` is unlayered (index.css), so each is sized inline: a utility would lose to it. */}
-          <div className="grid content-start gap-[7px]">
+          <div className="grid content-start gap-1.5">
             <span className="skeleton" style={{ width: 70, height: 12 }} />
             <span className="skeleton" style={{ width: 36, height: 11 }} />
           </div>
-          <div className="grid gap-[9px]">
+          <div className="grid gap-2">
             <span className="skeleton" style={{ width: `${what}%`, height: 13, marginBottom: 3 }} />
             {[from, to].map((width) => (
-              <span key={width} className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-x-2.5">
+              <span key={width} className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-x-3">
                 <span className="skeleton" style={{ width: 34, height: 9 }} />
                 <span className="skeleton" style={{ width: `${width}%`, height: 11 }} />
               </span>
@@ -124,20 +138,25 @@ function Placeholders() {
 /**
  * One value of a change, as the record reads it: a status as its chip; a workplace as its name over its R/A number; a
  * number the server keeps only the last four of as `••••1234`, read aloud as *ending 1234*; anything missing as *Not on
- * file*. The old value in the quieter ink, the new one in the record's.
+ * file*. The old value in the quieter ink, the new one in the record's. `aside` is small print under the value -- the
+ * mask's reason, said once, under the new value.
  */
-function Value({ entry, value, side }) {
+function Value({ entry, value, side, aside = null }) {
   const text = valueText(entry.what, value);
-  if (text === null) return <dd className={cn(VALUE, 'font-normal text-ink-muted')}>Not on file</dd>;
+  const under = aside && <span className={cn(ASIDE, 'mt-0.5 block')}>{aside}</span>;
+  if (text === null) return <dd className={cn(VALUE, 'font-normal text-ink-muted')}>Not on file{under}</dd>;
   if (isStatus(entry)) return <dd className={VALUE}><StatusChip status={text} /></dd>;
   const tone = side === 'from' ? 'text-ink-muted' : 'font-medium text-ink';
   const tail = maskedTail(text);
   if (tail !== null) {
     return (
-      <dd className={cn(VALUE, tone, 'tracking-[0.02em]')}>
-        <span aria-hidden="true">••••</span>
-        <span className="sr-only">{tail ? 'ending ' : 'kept hidden'}</span>
-        {tail}
+      <dd className={cn(VALUE, tone)}>
+        <span className="tabular-nums">
+          <span aria-hidden="true">••••</span>
+          <span className="sr-only">{tail ? 'ending ' : 'kept hidden'}</span>
+          {tail}
+        </span>
+        {under}
       </dd>
     );
   }
@@ -146,11 +165,12 @@ function Value({ entry, value, side }) {
     return (
       <dd className={cn(VALUE, tone)}>
         {workplace.name}
-        <span className={SUB}>R/A {workplace.raNumber}</span>
+        <span className={cn(SUB, 'tabular-nums')}>R/A {workplace.raNumber}</span>
+        {under}
       </dd>
     );
   }
-  return <dd className={cn(VALUE, tone)}>{text}</dd>;
+  return <dd className={cn(VALUE, tone)}><span className={figures(text)}>{text}</span>{under}</dd>;
 }
 
 /**
@@ -183,8 +203,7 @@ function Change({ entry, labelOf }) {
         <dt className={TERM}>From</dt>
         <Value entry={entry} value={entry.from} side="from" />
         <dt className={TERM}>To</dt>
-        <Value entry={entry} value={entry.to} side="to" />
-        {masked && <dd className={cn(ASIDE, 'col-start-2 mt-px')}>Only the last four digits are kept.</dd>}
+        <Value entry={entry} value={entry.to} side="to" aside={masked ? 'Only the last four digits are kept.' : null} />
         {reason && (
           <>
             <dt className={TERM}>Reason</dt>
@@ -213,26 +232,26 @@ function HistoryRow({ row, labelOf }) {
   const when = whenOf(row.first.changedAt);
   const count = row.entries.length;
   return (
-    <li className={cn(ROW, RULED)} data-history-row="">
-      <div className="grid content-start text-[0.78125rem] leading-[1.45] text-ink-muted tabular-nums">
+    <li className={cn(ROW, 'py-3.5')} data-history-row="">
+      <div className="grid content-start text-sm text-ink-muted">
         <time dateTime={row.first.changedAt || undefined} className="grid">
-          <span className="text-sm font-medium tracking-[0.01em] text-ink">{when.date}</span>
+          <span className="font-medium text-ink tabular-nums">{when.date}</span>
           {/* Read, not stacked against a column of sums: proportional figures, so the colon does not stand apart. */}
-          {when.time && <span className="normal-nums">{when.time}</span>}
+          {when.time && <span>{when.time}</span>}
         </time>
-        <span className="mt-[5px]">
+        <span className="mt-1">
           <span className="sr-only">Who: </span>
           {whoOf(row.first.changedBy)}
         </span>
         {isSaveOfSeveral(row) && (
-          <span className="mt-[7px] text-[0.75rem] leading-[1.35]" data-history-save="">
+          <span className="mt-1.5 text-xs" data-history-save="">
             {count} {count === 1 ? 'change' : 'changes'}{' '}
             <br />
             in one save
           </span>
         )}
       </div>
-      <div className="grid min-w-0 gap-3.5">
+      <div className="grid min-w-0 gap-y-3.5">
         {row.continuedFrom !== false && (
           <p className={ASIDE}>
             {row.continuedFrom ? 'Continued from the previous page.' : 'This save may have begun on the previous page.'}
@@ -339,7 +358,7 @@ export default function MemberHistory({ member, labelOf }) {
       tabIndex={-1}
       aria-label="History of changes, newest first"
       data-history={view}
-      className="-mx-3 rounded-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-brand-ring"
+      className="-mx-3 rounded-sm leading-[1.4] focus:outline-none focus-visible:outline-2 focus-visible:outline-brand-ring"
     >
       {notice && <p role="status" className="px-3 pb-3 text-sm text-ink-muted">{notice}</p>}
       {view === 'ready' && olderThanHistory(member, answer.historyFrom) && (
@@ -358,12 +377,12 @@ export default function MemberHistory({ member, labelOf }) {
         </>
       )}
       {view === 'ready' && (
-        <ol>
+        <ol className="divide-y divide-line">
           {rows.map((row) => <HistoryRow key={row.key} row={row} labelOf={labelOf} />)}
         </ol>
       )}
       {(view === 'error' || view === 'empty') && (
-        <div className="px-5 pb-8 pt-[30px]">
+        <div className="px-5 py-8">
           <DataState
             state={view}
             className="gap-2 p-0"

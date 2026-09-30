@@ -163,6 +163,8 @@ describe('the History tab, ready -- the approved mock\'s sheet', () => {
     expect(within(to).getByText('ending')).toHaveClass('sr-only')
     expect(valueOf(row, 'Identity Number', 'From')).toHaveTextContent('••••ending 4081')
     expect(within(row).getAllByText('Only the last four digits are kept.')).toHaveLength(1)
+    // Said once, under the new value.
+    expect(within(to).getByText('Only the last four digits are kept.')).toBeInTheDocument()
     // Nothing else on the sheet says so -- the sentence belongs to a masked value.
     expect(within(sheet()).getAllByText('Only the last four digits are kept.')).toHaveLength(1)
   })
@@ -178,6 +180,11 @@ describe('the History tab, ready -- the approved mock\'s sheet', () => {
     expect(valueOf(row, 'Cellphone Number', 'To')).toHaveTextContent('+27 60 555 0188')
     expect(valueOf(row, 'Personal Email', 'From')).toHaveTextContent(/^Not on file$/)
     expect(valueOf(row, 'Residential Address', 'To')).toHaveTextContent('4 Invented Lane, Invented Heights')
+    // Tabular figures for a number, as the mock sets them -- never for words, where this font spaces out ":" and ".".
+    expect(within(valueOf(row, 'Cellphone Number', 'To')).getByText('+27 60 555 0188')).toHaveClass('tabular-nums')
+    expect(valueOf(row, 'Residential Address', 'To').querySelector('.tabular-nums')).toBeNull()
+    expect(valueOf(rows()[0], 'Account Membership Status', 'Note').querySelector('.tabular-nums')).toBeNull()
+    expect(valueOf(rows()[0], 'Account Membership Status', 'Note')).not.toHaveClass('tabular-nums')
     // A single field is a change, not a save.
     for (const other of [rows()[1], rows()[3]]) expect(other.querySelector('[data-history-save]')).toBeNull()
   })
