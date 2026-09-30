@@ -53,8 +53,13 @@ const VALUES = 'grid grid-cols-[3.5rem_minmax(0,1fr)] items-baseline gap-x-3 gap
 const TERM = 'text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted';
 const WHAT = 'text-base font-semibold text-ink';
 const VALUE = 'min-w-0 text-base [overflow-wrap:anywhere]';
-/** A value's second line -- a workplace's R/A number, the reason a member gave under SASBO's code. */
-const SUB = 'mt-0.5 block text-sm font-normal text-ink-muted';
+/**
+ * A value's second line -- a workplace's R/A number, the reason a member gave under SASBO's code -- and the When column:
+ * the mock's 12.5px, the size the record's own foot already ships (`MemberPanel`), so it costs no rule. 13px would not
+ * do in the When column: "Not recorded" no longer fits its 5rem, and breaks.
+ */
+const SMALL = 'text-[12.5px]';
+const SUB = cn('mt-0.5 block font-normal text-ink-muted', SMALL);
 /**
  * 🔢 TABULAR FIGURES FOR A NUMBER, AND FOR NOTHING ELSE -- as the mock sets them (`.num`). This font gives its colon and
  * its full stop figure width under `tabular-nums`, so a sentence set that way reads "email ." and "Invented : letter".
@@ -233,9 +238,9 @@ function HistoryRow({ row, labelOf }) {
   const count = row.entries.length;
   return (
     <li className={cn(ROW, 'py-3.5')} data-history-row="">
-      <div className="grid content-start text-sm text-ink-muted">
+      <div className={cn('grid content-start text-ink-muted', SMALL)}>
         <time dateTime={row.first.changedAt || undefined} className="grid">
-          <span className="font-medium text-ink tabular-nums">{when.date}</span>
+          <span className="text-sm font-medium text-ink tabular-nums">{when.date}</span>
           {/* Read, not stacked against a column of sums: proportional figures, so the colon does not stand apart. */}
           {when.time && <span>{when.time}</span>}
         </time>
