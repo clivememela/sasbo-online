@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { flushSync } from "react-dom";
 import { useNavigate, useLocation, useOutletContext } from "react-router-dom";
 import {
@@ -31,6 +31,7 @@ import {
 import PageTitle from "../../components/common/PageTitle.jsx";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState.jsx";
+import ErrorBoundary from "../../components/common/ErrorBoundary.jsx";
 import FigureStrip from "../../components/members/FigureStrip.jsx";
 import MemberPanel from "../../components/members/MemberPanel.jsx";
 import Criteria, { CRITERION } from "../../components/common/Criteria.jsx";
@@ -53,6 +54,17 @@ import useWorkplaceChoice from "../../hooks/useWorkplaceChoice.js";
 import useMemberWorkplace from "../../hooks/useMemberWorkplace.js";
 import { WORKPLACE_UNKNOWN } from "@/config/monthEnd.js";
 import ChangeStatus from "../../components/members/ChangeStatus.jsx";
+
+/*
+ * 📜 THE HISTORY TAB IS A CHUNK OF ITS OWN (month end 03.6): it is fetched when the tab is opened -- never at the
+ * register's first paint -- and a chunk that will not load, or a tab that throws, is held by a boundary of its own and
+ * says so in one line, the record around it untouched (Home's figures do the same).
+ */
+const MemberHistory = lazy(() => import("./MemberHistory.jsx"));
+
+const historyFailed = () => (
+    <p role="alert" className="text-sm text-ink-muted">The history could not be shown. Reload the page to try again.</p>
+);
 
 
 const PAGE_SIZE = memberService.getPageSize();
@@ -117,12 +129,16 @@ const FILTER_FIELDS = [
  * NAME, so a screen reader and the automation suite (`openModalTab('Employment & Bank')`)
  * still address each tab by the phrase that names it. The visible word is always contained in
  * the full phrase, which is what WCAG 2.5.3 asks of a label that differs from its name.
+ *
+ * 📜 SIX SINCE MONTH END 03.6: History, before Structures -- the owner's approval of the mock on
+ * 2026-09-30 (`TAB_PLACE`, below). The order here is the keyboard's, and it follows the eye.
  */
-const RECORD_TABS = [
+export const RECORD_TABS = [
     { id: "personal", label: "Personal", full: "Personal Information" },
     { id: "employment", label: "Employment", full: "Employment & Bank" },
     { id: "membership", label: "Membership", full: "Membership & Subscriptions" },
     { id: "representatives", label: "Recruitment", full: "Recruitment Channel" },
+    { id: "history", label: "History", full: "History of changes" },
     { id: "structures", label: "Structures", full: "Sasbo Structures" },
 ];
 const TABS = RECORD_TABS;
@@ -155,18 +171,44 @@ const amountOnFile = (value) => {
  * ④ And the strip is SYMMETRICAL about its own centre line: the left column reads from the
  *    left edge, the right column to the right edge, and the middle one is centred.
  *
- * It applies only at five sections -- a sixth would fill a 3x2 grid with nothing left to
- * balance, so any other count falls back to the plain left-aligned flow.
+ * 🗣️ AT SIX -- the owner's approval of month end 03.6's mock, 2026-09-30, the "proposed" strip:
+ *
+ *     Personal        Employment        Membership
+ *     Recruitment      History          Structures
+ *
+ * A sixth tab fills the 3x2 grid, and the arrangement above would have been switched off whole
+ * (it applied at five and at no other number). ④ is kept as ④ reads for a grid with no hole in
+ * it: each column keeps its edge -- the left from the left, the right to the right, the middle
+ * centred -- so the four corners stay where he put them and Structures stays under Membership
+ * (*"Make structures aligned under Membership"*). What gives is Employment, up from between the
+ * rows into the top row, because at six the middle column holds two like the others. Placed by
+ * the grid's own flow, in `RECORD_TABS` order, so the keyboard follows the eye.
+ *
+ * Five is kept exactly as it was, and any other count falls back to the plain flow.
  */
-const TAB_PLACE = TABS.length === 5
-  ? [
+export const tabPlace = (count) => {
+  if (count === 5) {
+    return [
       'justify-self-start',
       'row-span-2 justify-self-center self-center',
       'justify-self-end',
       'justify-self-start',
       'col-start-3 justify-self-end',
-    ]
-  : [];
+    ];
+  }
+  if (count === 6) {
+    return [
+      'justify-self-start',
+      'justify-self-center',
+      'justify-self-end',
+      'justify-self-start',
+      'justify-self-center',
+      'justify-self-end',
+    ];
+  }
+  return [];
+};
+const TAB_PLACE = tabPlace(TABS.length);
 
 /*
  * 🔴 THE 44 "BEC COMMITTEES" THIS FILE CARRIED WERE INVENTED (CM-14) -- names like "Century City Banking Cluster",
@@ -306,7 +348,8 @@ const readable = (key, value, record) => {
 const readableIn = (member, key) =>
     key === "becCommitteeCode" && member.becCommitteeName ? member.becCommitteeName : readable(key, member[key], member);
 
-const fieldLabel = (key) =>
+/** A field of the record by the name the record gives it -- the save's confirmation, and since 03.6 the History tab. */
+export const fieldLabel = (key) =>
     RECORD_FIELD_LABELS[key] || MEMBER_FIELD_LABEL_MAP[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 
 const getChangedFields = (draft, original) => Object.keys(draft)
@@ -2027,6 +2070,16 @@ export default function Members() {
                                         </div>
                                     )}
                                 </div>
+                            )}
+
+                            {/* 📜 03.6: the record's changes, newest first -- its own chunk, asked for now that the tab
+                                is open, and keyed by the member so another member's record starts on its first page. */}
+                            {activeTab === "history" && (
+                                <ErrorBoundary fallback={historyFailed}>
+                                    <Suspense fallback={null}>
+                                        <MemberHistory key={selectedMember.id} member={selectedMember} labelOf={fieldLabel} />
+                                    </Suspense>
+                                </ErrorBoundary>
                             )}
                         </div>
 

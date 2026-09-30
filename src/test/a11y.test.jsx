@@ -4,6 +4,8 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 
 import MembersPage from '../pages/members/Members'
+// The record's History tab is a lazy chunk; in the registry before the scan, so it waits on the page, not on the box.
+import '../pages/members/MemberHistory.jsx'
 import CaptureMember from '../pages/members/CaptureMember'
 import BankListing from '../pages/bank_branch/BankListing'
 import Home from '../pages/Home'
@@ -103,6 +105,54 @@ describe('accessibility', () => {
     // scan of the whole document costs whatever else it holds. `region` is off for the same reason as theirs -- a
     // dialog is not a page, and the landmarks are the shell's, asserted above.
     await expectNoA11yViolations(dialog, { rules: { region: { enabled: false } } })
+  })
+
+  describe('the record\'s History tab (month end 03.6, MR-ROB-37)', () => {
+    // The golden page's own entry, with invented values in its shape: the mock's sheet -- a change of status with SASBO's
+    // code, the reason under it and a note, a workplace, a save of three fields, a number kept as its last four, a capture.
+    const golden = monthEndBody('GET /api/members/{id}/history')
+    const entry = (fields) => ({ ...golden.content[0], reason: null, code: null, codeName: null, reasonUnderCode: null, note: null, ...fields })
+    const sheet = [
+      entry({ kind: 'STATUS', id: 1, what: 'status', from: 'Active', to: 'Resigned', reason: 'DELETION_CODE', code: 2,
+        codeName: 'Resigned Society', reasonUnderCode: 'INVENTED: MOVED AWAY', saveId: null, note: 'Invented: a letter.' }),
+      entry({ id: 13, what: 'workplace', from: '900002 INVENTED HEAD OFFICE', to: '900003 INVENTED HARBOUR', saveId: 's13' }),
+      entry({ id: 12, what: 'phone', from: '+27 60 555 0101', to: '+27 60 555 0188', saveId: 's10' }),
+      entry({ id: 11, what: 'personalEmail', from: null, to: 'synthetic.member@example.invalid', saveId: 's10' }),
+      entry({ id: 10, what: 'address', from: '12 Invented Road', to: '4 Invented Lane', saveId: 's10' }),
+      entry({ id: 9, what: 'identityNumber', from: '****4081', to: '****4087', saveId: 's9' }),
+      ...golden.content,
+    ]
+    const member = { id: 1, membershipNumber: 'M0001', firstNames: 'Synthetic', surname: 'Testperson', status: 'Resigned' }
+
+    const openHistory = async () => {
+      const user = setupUser()
+      const view = renderWithProviders(<MembersPage />)
+      await user.click(await screen.findByRole('button', { name: /open the record for/i }))
+      await user.click(await screen.findByRole('button', { name: 'History of changes' }))
+      return { ...view, tab: await screen.findByRole('region', { name: 'History of changes, newest first' }) }
+    }
+
+    it('its sheet has no violations -- every kind of row the mock draws, and the pager', async () => {
+      server.use(
+        http.get('*/api/members', () => HttpResponse.json([member])),
+        http.get('*/api/members/:id/history', () => HttpResponse.json({ ...golden, content: sheet, totalElements: sheet.length })),
+      )
+      const { container, tab } = await openHistory()
+      await waitFor(() => expect(tab).toHaveAttribute('data-history', 'ready'))
+      expect(within(tab).getByText('Only the last four digits are kept.')).toBeInTheDocument()
+      await expectNoA11yViolations(container)
+    })
+
+    it('its failed state has no violations -- the alert, Try again and the Details', async () => {
+      server.use(
+        http.get('*/api/members', () => HttpResponse.json([member])),
+        http.get('*/api/members/:id/history', () => HttpResponse.error()),
+      )
+      const { container, tab } = await openHistory()
+      await waitFor(() => expect(tab).toHaveAttribute('data-history', 'error'))
+      expect(within(tab).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+      await expectNoA11yViolations(container)
+    })
   })
 
   it('the CaptureMember form has no violations', async () => {

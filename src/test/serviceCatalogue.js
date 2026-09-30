@@ -4,6 +4,7 @@ import { debounceService } from '../services/debounceService'
 import { jobGradeService } from '../services/jobGradeService'
 import { locationService } from '../services/locationService'
 import { memberService } from '../services/memberService'
+import { memberHistoryService } from '../services/memberHistoryService'
 import { memberStatusService } from '../services/memberStatusService'
 import { monthEndService } from '../services/monthEndService'
 import { recruiterService } from '../services/recruiterService'
@@ -33,6 +34,7 @@ export const SERVICE_MODULES = [
   { name: 'jobGradeService', module: jobGradeService },
   { name: 'locationService', module: locationService },
   { name: 'memberService', module: memberService },
+  { name: 'memberHistoryService', module: memberHistoryService },
   { name: 'memberStatusService', module: memberStatusService },
   { name: 'monthEndService', module: monthEndService },
   { name: 'recruiterService', module: recruiterService },
@@ -97,6 +99,7 @@ const ARGS = {
   'monthEndService.getRepresentatives': ['2026-08', {}],
   'monthEndService.askPack': ['2026-08'],
   'monthEndService.getPack': [7],
+  'memberHistoryService.getMemberHistory': ['7', 0, 50],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS
