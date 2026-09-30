@@ -13,6 +13,7 @@ import {
   smokeHandlers,
 } from './test/msw/smokeLayer'
 import { assertNonVacuousScan, FLOORS } from './test/assertNonVacuousScan'
+import { LAZY_DECLARATIONS, SPLIT_PAGES, warmSplitPages } from './test/splitPages'
 
 /**
  * EVERY ROUTE MOUNTS. Discovered, not listed.
@@ -66,6 +67,10 @@ const discoverRoutes = () => {
 
 const ROUTES = discoverRoutes()
 
+// Every split page's first import, paid before any route is timed (`./test/splitPages.js`). A page whose import throws
+// is left to fail at its own route below -- the warm-up settles, it does not reject.
+await warmSplitPages()
+
 const renderRoute = (path) =>
   render(
     <MemoryRouter initialEntries={[path]}>
@@ -88,6 +93,10 @@ describe('every declared route mounts', () => {
     // editing; the floor above is the separate non-vacuity canary.
     expect(ROUTES).toContain('/')
     expect(ROUTES).toContain('/login')
+    expect(
+      SPLIT_PAGES.length,
+      'a lazy() page is declared in a spelling splitPages.js cannot read, so its first import is timed again',
+    ).toBe(LAZY_DECLARATIONS)
   })
 
   it.each(ROUTES)('%s mounts without throwing', async (path) => {

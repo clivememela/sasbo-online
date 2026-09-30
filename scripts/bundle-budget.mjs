@@ -244,7 +244,19 @@ const CEILINGS = {
   // 723.15 -> 723.16 on 2026-09-22, MEASURED ON THE GATE'S RUNNER: SNAPSHOT_INCOMPLETE's label made general (it
   // covers the account type since 00.5) -- 79240a9 builds 734,790 B, +9 B over ff9df5e, all of it acbPaging (run
   // 35722286575). ACB's bytes: 44,185 + 9 = 44,194 B = 43.158 KiB. 680 + 43.158 = 723.158, so 723.16.
-  js: 723.16 * KB,
+  //
+  // 723.16 -> 726.99 on 2026-09-30, MEASURED, for SASBO's structures tree on Edit Member (V55; SASBO, through the
+  // owner, 2026-09-30: "we need those functionalities back"). Two builds from one install of the same lock in
+  // C:\tmp\sasbo-work, the tracked `.env`, each reproducing the gate's runner to the hundredth (runs 36697501618 and
+  // 36715656966, whose budget refused this tree at 723.48):
+  //   main 8a58340 ON ITS OWN   736,928 B (719.656 KiB)
+  //   the tree (e55dc4d)        740,843 B, +3,915 B over it, chunk by chunk: Members +3,582 (the tree's controls,
+  //                            its rules in utils/structures.js, the checkbox group's error -- net of the 44 invented
+  //                            committee names it deletes) · memberConstants +328 (SASBO's three lists) · acbPaging +5.
+  // Checked before raising, as the header asks: nothing from src/test/ is imported by the product, and no test library
+  // is in the built bundle. Raised by exactly the tree's bytes, as ACB's were: 723.16 + 3.823 = 726.983, so 726.99
+  // (rounded UP). The 3.50 KiB main still had spare is the design arc's remainder, and stays with it.
+  js: 726.99 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before

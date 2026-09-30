@@ -50,6 +50,24 @@ export const YEAR_OPTIONS = /* @__PURE__ */ Array.from({ length: 21 }, (_, i) =>
 
 export const BEC_STRUCTURE_OPTIONS = ['Shop Stewart', 'Branch Executive Committee'];
 
+/*
+ * 🗣️ SASBO'S STRUCTURES TREE, 2026-09-30 -- what the record's Structures tab asks under BEC Member = Yes and
+ * COSATU Member = Yes. Each list is the server's (`BecStructure`, `BecExecutivePosition`, `CosatuPosition`),
+ * published in `src/test/api-vocabulary.json`; `vocabulary.parity.test.js` holds these to it, in order, because
+ * the server refuses anything else and writes the rest back in this spelling.
+ *
+ * The tree lists Locals and Region among COSATU's too: those are structures a member SITS ON, asked yes/no
+ * (`isCosatuLocal` / `isCosatuRegional`, the stakeholder, 2026-09-17), not positions -- so not in this list.
+ */
+export const BEC_STRUCTURES_REPRESENTED = ['INC / IC', 'NCF / SJC', 'VP', 'President', 'MANCOM', 'Resolutions Committee'];
+export const BEC_EXECUTIVE_POSITIONS = ['Chairperson', 'Deputy Chairperson', 'Secretary', 'Deputy Secretary', 'Treasurer'];
+export const COSATU_POSITIONS = ['PEC', 'CEC', 'Chairperson', 'Secretary', 'Treasurer'];
+/** COSATU's two executive committees, spelt out where they are offered -- as the record offered them before 2026-09-17. */
+export const COSATU_POSITION_LABELS = {
+  PEC: 'PEC (Provincial Executive Committee)',
+  CEC: 'CEC (Central Executive Committee)',
+};
+
 export const BRANCH_OPTIONS = [
   'Cape Town', 'Durban', 'Head Office', 'Johannesburg', 'Johannesburg Branch', 'Midrand', 'Pretoria',
   'Representative Office', 'Rivonia', 'Rosebank', 'Sandton', 'South Africa Branch', 'Soweto', 'Stellenbosch',
@@ -128,6 +146,12 @@ export const MEMBER_FIELD_TABS = {
   accountType: 'employment',
   debitDay: 'employment',
   workplaceId: 'employment',
+  // V55: what a structure's Yes needs beside it -- a refused save opens the tab that asks. The record's
+  // only: capture asks no structure (its Structures tab came off in 2026-09).
+  shopStewardElectionDate: 'structures',
+  becCommitteeCode: 'structures',
+  becStructures: 'structures',
+  becExecutivePosition: 'structures',
 };
 
 /**
