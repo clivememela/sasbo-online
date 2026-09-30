@@ -220,6 +220,11 @@
             "under" : null
           },
           {
+            "code" : null,
+            "name" : "INVENTED: MOVED AWAY",
+            "under" : 2
+          },
+          {
             "code" : 5,
             "name" : "Subscription in Arrears",
             "under" : null
@@ -306,7 +311,7 @@
           },
           {
             "list" : "deletionCodes",
-            "rows" : 2,
+            "rows" : 3,
             "printedOn" : "2026-08-31",
             "confirmedOn" : null,
             "seededAt" : "2026-09-29T08:00:00Z",
@@ -516,6 +521,8 @@
             "to" : "+27 60 555 0002",
             "reason" : null,
             "code" : null,
+            "codeName" : null,
+            "reasonUnderCode" : null,
             "saveId" : "invented-save-2",
             "note" : null
           },
@@ -529,6 +536,8 @@
             "to" : "M-900001",
             "reason" : null,
             "code" : null,
+            "codeName" : null,
+            "reasonUnderCode" : null,
             "saveId" : "invented-save-1",
             "note" : null
           }
@@ -536,7 +545,8 @@
         "page" : 0,
         "size" : 50,
         "totalElements" : 2,
-        "totalPages" : 1
+        "totalPages" : 1,
+        "historyFrom" : "2026-09-01"
       }
     },
     "POST /api/members/{id}/status" : {
@@ -546,6 +556,7 @@
         "expectedStatus" : "Active",
         "reason" : "DELETION_CODE",
         "deletionCode" : 2,
+        "reasonUnderCode" : "INVENTED: MOVED AWAY",
         "note" : "Invented: moved away"
       },
       "status" : 200,
@@ -560,7 +571,7 @@
           "reason" : "DELETION_CODE",
           "deletionCode" : 2,
           "deletionReason" : "Resigned Society",
-          "reasonUnderCode" : null,
+          "reasonUnderCode" : "INVENTED: MOVED AWAY",
           "suspensionCode" : null,
           "suspensionReason" : null,
           "note" : "Invented: moved away",
@@ -1623,6 +1634,11 @@
             "legacyTitle" : "SUMMARY BY BANK OF MEMBERS HAVING RESIGNED SOCIETY",
             "columns" : [
               {
+                "key" : "reason1",
+                "label" : "INVENTED: MOVED AWAY",
+                "kind" : "COUNT"
+              },
+              {
                 "key" : "noReason",
                 "label" : "No reason given",
                 "kind" : "COUNT"
@@ -1641,6 +1657,7 @@
               "fewerThanFive" : false,
               "withheld" : false,
               "cells" : [
+                0,
                 0,
                 0
               ]
