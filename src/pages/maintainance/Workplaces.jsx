@@ -13,7 +13,7 @@ import { EMPTY, formatInt } from '../../lib/format.js';
 import {
   LIST_EMPTY_REASON, MONTH_END_REFUSAL, emptyReasonSentence, listProvenance, listRows,
 } from '../../config/monthEnd.js';
-import { referenceService } from '../../services/referenceService.js';
+import { getAreas, getCommittees, getEmployers } from '../../services/referenceService.js';
 import { workplaceService } from '../../services/workplaceService.js';
 
 /**
@@ -63,9 +63,9 @@ const NO_ROWS = [];
  * that has not arrived, so "when the control is opened" is as soon after the page as the page allows.
  */
 const LISTS = {
-  employer: referenceService.getEmployers,
-  area: referenceService.getAreas,
-  committee: referenceService.getCommittees,
+  employer: getEmployers,
+  area: getAreas,
+  committee: getCommittees,
 };
 
 const areaLabel = (row) => (row.region ? `${row.letter} · ${row.region}` : row.letter);
