@@ -6,7 +6,9 @@ import { locationService } from '../services/locationService'
 import { memberService } from '../services/memberService'
 import { recruiterService } from '../services/recruiterService'
 import { recruitmentChannelService } from '../services/recruitmentChannelService'
+import { referenceService } from '../services/referenceService'
 import { subscriptionsService } from '../services/subscriptionsService'
+import { workplaceService } from '../services/workplaceService'
 import * as api from '../services/api'
 
 /**
@@ -30,7 +32,9 @@ export const SERVICE_MODULES = [
   { name: 'memberService', module: memberService },
   { name: 'recruiterService', module: recruiterService },
   { name: 'recruitmentChannelService', module: recruitmentChannelService },
+  { name: 'referenceService', module: referenceService },
   { name: 'subscriptionsService', module: subscriptionsService },
+  { name: 'workplaceService', module: workplaceService },
 ]
 
 /** The one module that exports no method that performs a request. */
