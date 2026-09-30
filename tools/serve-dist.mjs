@@ -291,6 +291,8 @@ const memberSummary = {
   rows: summaryRows.map((row) => (row.fewerThanFive || row.withheld ? { ...row, figures: null } : row)),
   unplaced: { statuses: [{ status: 'Inactive', members: 3 }], noWorkplace: 18, noTableCode: 0 },
   seededMembers: 0, membersFrom: null, leaversFrom: null,
+  // A month not taken (04.2's rule F): the server answers both keys, and null, until the month is frozen.
+  takenAt: null, takenBy: null,
 };
 
 /*
