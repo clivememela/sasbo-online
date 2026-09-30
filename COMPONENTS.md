@@ -1039,7 +1039,10 @@ the finish review of 2026-09-10 named it as the one material contradiction on Ho
 menu page, so the menu takes the register's grammar: a sheet of rows, each with its icon in the
 brand's ink, its name, what it holds, and a chevron — read down the page the way the register is.
 
-**Props.** `title`, `icon` (a lucide component), `href`, `desc`, `onSelect`.
+**Props.** `title`, `icon` (a lucide component), `href`, `desc`, `onSelect`, `note` (the caption of a row with no
+`href`, default *Not yet available* — month end's listings say *Waits for sign-in*, being built and refusing until
+sign-in; keep it short, it never wraps). `NavigationList` takes `cards`, `onSelect`, `wide` and `className` (month end's
+page sets its lists under section headings).
 
 **States.**
 
@@ -1057,7 +1060,8 @@ brand's ink, its name, what it holds, and a chevron — read down the page the w
 The icon is `aria-hidden`. The whole row is the target — a row whose only hit area is its title is
 the commonest way a touch target ends up under 44px while looking enormous.
 
-**Held by.** **Nothing.** Ten call sites and no test.
+**Held by.** No test of its own. `src/pages/admin/MonthlyMenu.test.jsx` drives both branches through the Month end
+page: its statistics as links, and its listings as rows that are not links, with their `note`.
 
 ---
 

@@ -189,7 +189,9 @@ Each page component in `src/pages/`:
 8. **Admin** (`admin/`):
     - **Admin**: Dashboard
     - **DailyMenu**: Daily operations menu
-    - **MonthlyMenu**: Monthly operations menu
+    - **MonthlyMenu**: the **Month end** page, at `/admin/monthly-menu` (the address kept, MD38) — the month, its six
+      statistics (`MonthEndStatistic`, `/admin/monthly-menu/:statistic`), the statistics pack, and the listings that
+      wait for sign-in
     - **Maintenance**: System maintenance page
 9. **Auth** (`auth/Auth.jsx`): Login/signup page
 

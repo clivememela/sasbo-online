@@ -44,6 +44,8 @@ const FIGURES = (state) => `!!document.querySelector('[data-figures="${state}"]'
 /** The first screen's menu rows -- a row of the page, not the rail's entry for the same area. */
 const MENU_ROWS = `!!document.querySelector('main a[href="/members"]')`;
 const EXPANDED = (scope) => `!!document.querySelector(${JSON.stringify(`${scope} [aria-expanded="true"]`)})`;
+/** The Month end page's six statistics, each a link to its screen (`04.1`). */
+const MONTH_END_LINKS = `document.querySelectorAll('main a[href^="/admin/monthly-menu/"]').length === 6`;
 
 /* ── drivers used here only ─────────────────────────────────────────────────────────────────────── */
 
@@ -434,6 +436,46 @@ export const SURFACES = [
   // A figures chunk that will not load is held by the page's own boundary: one line, and the menu rows beneath it.
   { name: 'home-figures-chunk-failed', route: '/home', intercept: { url: '*/assets/HomeFigures-*.js', mode: 'fail' },
     ready: TEXT('The figures could not be shown.'), present: { MENU: MENU_ROWS } },
+
+  // ── month end (`04.1`-`04.10`) ────────────────────────────────────────────────────────────────
+  // The Month end page and a statistic's screen, from `serve-dist.mjs`'s golden months and sheets: August 2026 taken,
+  // September 2026 open. Each state is reached the way a person meets it -- a month chosen by its address, a sheet
+  // failed, hung or of the wrong shape by interception, a pack prepared and polled by the stub's own job.
+  { name: 'month-end', route: '/admin/monthly-menu', ready: TEXT('Its figures are the month as it stood then'),
+    present: { TAKEN: TEXT('Taken on'), STATISTICS: MONTH_END_LINKS,
+      LISTINGS: TEXT('This waits until administrators sign in to the system. Nothing was produced.') } },
+  { name: 'month-end-open', route: '/admin/monthly-menu?month=2026-09', ready: TEXT('is the open month'),
+    present: { LIVE: TEXT('read live'), TAKE_WHY: TEXT('Taking a month freezes its figures for good') } },
+  { name: 'month-end-months-failed', route: '/admin/monthly-menu', intercept: { url: '*/api/month-end/months*', mode: 'fail' },
+    ready: TEXT('Month could not be loaded.'), present: { FAILED: STATE('error'), STATISTICS: MONTH_END_LINKS } },
+  // The pack's job, measurable: the stub answers PREPARING twice and then READY, on A.C.B.'s first two delays.
+  { name: 'month-end-pack', route: '/admin/monthly-menu', ready: TEXT('Its figures are the month as it stood then'),
+    steps: [step('prepare the pack', clickByText('main button', '/^Prepare the pack for /'), TEXT('is ready'))],
+    present: { READY: TEXT('is ready'),
+      LINKS: `document.querySelectorAll('main a[download][href*="/api/month-end/packs/"]').length === 2` } },
+  // Membership holds the widest sheet, eleven columns by table code: the one a phone scrolls sideways.
+  { name: 'month-end-statistic', route: '/admin/monthly-menu/membership?month=2026-08', ready: ROWS,
+    present: { TAKEN: TEXT('as taken on'), TOTAL: TEXT('All groups'), WIDE: TEXT('By payroll deduction (R)'),
+      NOTES: TEXT('Members are the members on record') } },
+  { name: 'month-end-statistic-rule-c', route: '/admin/monthly-menu/branches?month=2026-08', ready: ROWS,
+    present: { FEWER: TEXT('fewer than five'), WITHHELD: TEXT('withheld') } },
+  // The open month read live -- and recruitment's sheets, which hold no row, each in its empty state.
+  { name: 'month-end-statistic-open', route: '/admin/monthly-menu/recruitment?month=2026-09', ready: TEXT('is the open month'),
+    present: { LIVE: TEXT('read live'), EMPTY: TEXT('Nothing was counted on this sheet for September 2026.') },
+    covers: ['pages/admin/MonthEndStatistic.jsx#DataState@sheet empty'] },
+  { name: 'month-end-statistic-loading', route: '/admin/monthly-menu/membership?month=2026-08',
+    intercept: { url: '*/api/month-end/2026-08/membership*', mode: 'hang' },
+    ready: STATE('loading'), present: { LOADING: STATE('loading') }, covers: ['pages/admin/MonthEndStatistic.jsx#DataState@state'] },
+  { name: 'month-end-statistic-error', route: '/admin/monthly-menu/membership?month=2026-08',
+    intercept: { url: '*/api/month-end/2026-08/membership*', mode: 'fail' },
+    ready: STATE('error'), present: { ERROR: STATE('error') }, covers: ['pages/admin/MonthEndStatistic.jsx#DataState@state'] },
+  { name: 'month-end-statistic-not-available', route: '/admin/monthly-menu/membership?month=2026-08',
+    intercept: { url: '*/api/month-end/2026-08/membership*', mode: 'empty' },
+    ready: TEXT('This statistic is not available from this server yet.'), present: { ERROR: STATE('error') } },
+  { name: 'month-end-statistic-refused', route: '/admin/monthly-menu/membership?month=2026-07',
+    ready: TEXT('That month was not taken'), present: { REFUSED: STATE('error') } },
+  { name: 'month-end-statistic-unknown', route: '/admin/monthly-menu/no-such-statistic', ready: HEADING,
+    present: { NOT_FOUND: TEXT('No such statistic') } },
 
   // ── the shell ─────────────────────────────────────────────────────────────────────────────────
   { name: 'shell-drawer', route: '/home', widths: [390], ready: HEADING,

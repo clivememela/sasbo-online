@@ -357,8 +357,167 @@ const workplacePage = (page, size) => ({
   page, size, totalElements: workplaces.length, totalPages: Math.ceil(workplaces.length / size), reason: null,
 });
 
+/*
+ * MONTH END ITSELF (`04.1`-`04.10`): the months, the six statistics, the listings and the take that refuse, and the
+ * statistics pack -- every answer cut from the golden ones, and every refusal the server's own envelope, so a sweep
+ * photographs what the server says.
+ *
+ *   the months       the golden answer: the open month and the one month taken.
+ *   a statistic      its golden sheets, for the month asked: the taken month as it was taken, the open month live --
+ *                    `state`, `takenAt` and `takenBy` as the server answers them, and the month's name in the sheets'
+ *                    titles. A month neither taken nor open is `MONTH_NOT_TAKEN`; after the open one `MONTH_NOT_BEGUN`;
+ *                    one that is not a month `REQUEST_MALFORMED`; an area or region SASBO's lists do not hold
+ *                    `SUMMARY_AREA_UNKNOWN`. 🔑 THE BRANCHES CARRY RULE C: two invented employers, one of fewer than
+ *                    five and one withheld beside it -- the golden sheets have none, and the words a screen shows for
+ *                    them are what a sweep of it must photograph.
+ *   the pack         STATEFUL, as A.C.B.'s prepare is: a POST starts pack 7001 `PREPARING`, and its first two reads
+ *                    answer `PREPARING` before it is `READY` -- the polling, measurable, reset on every POST. A READY
+ *                    pack's workbook is an attachment of the spreadsheet's type: a small stub body, never a workbook.
+ */
+const MONTHS = golden('GET /api/month-end/months');
+const MONTH_STATISTICS = ['new-and-deleted', 'membership', 'leavers', 'branches', 'recruitment', 'representatives'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October',
+  'November', 'December'];
+const monthName = (month) => `${MONTH_NAMES[Number(month.slice(5)) - 1]} ${month.slice(0, 4)}`;
+/** A refusal in the server's envelope: the golden one for its code, with this request's sentence and details. */
+const envelope = (code, message, details) => {
+  const example = monthEndExamples.refusals?.[code];
+  if (!example) throw new Error(`${MONTH_END_EXAMPLES} has no refusal ${code}`);
+  return { status: example.status, body: { ...example.body, ...(message && { message }), ...(details && { details }) } };
+};
+// Every refusal a month end route answers here, looked up now: one the golden file lacks stops the start by name.
+['REQUEST_MALFORMED', 'MONTH_NOT_BEGUN', 'MONTH_NOT_TAKEN', 'SUMMARY_AREA_UNKNOWN', 'IDENTITY_REQUIRED', 'PACK_NOT_FOUND']
+  .forEach((code) => envelope(code));
+const AREAS = new Set(golden('GET /api/reference/areas').rows.map((row) => row.letter));
+const REGIONS = new Set(golden('GET /api/reference/regions').rows.map((row) => row.code));
+
+/** The month a month end route names, judged as the server judges it (`MonthEndTakes.month`); `null` when it may be read. */
+const monthRefused = (month) => {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+    return envelope('REQUEST_MALFORMED', 'That month could not be read. Name it as year and month -- 2026-09.', { field: 'month' });
+  }
+  if (month > MONTHS.openMonth) {
+    return envelope('MONTH_NOT_BEGUN', 'That month has not begun yet.', { month, current: MONTHS.openMonth });
+  }
+  if (month !== MONTHS.openMonth && !MONTHS.taken.some((taken) => taken.month === month)) {
+    return envelope('MONTH_NOT_TAKEN', 'That month was not taken, and a past month is read only from what was taken.',
+      { month, open: MONTHS.openMonth });
+  }
+  return null;
+};
+
+/** Rule C, drawn: an employer of one to four, and the one withheld beside it -- invented, with no number on either. */
+const ruleC = (sheet) => ({
+  ...sheet,
+  rows: [
+    ...sheet.rows,
+    { key: 'E8', label: 'INVENTED SMALL EMPLOYER', level: 'ROW', fewerThanFive: true, withheld: false, cells: sheet.columns.map(() => null) },
+    { key: 'E9', label: 'INVENTED NEIGHBOURING EMPLOYER', level: 'ROW', fewerThanFive: false, withheld: true, cells: sheet.columns.map(() => null) },
+  ],
+});
+
+const statisticAnswer = (statistic, month, query) => {
+  const refused = monthRefused(month);
+  if (refused) return refused;
+  const area = query.get('area');
+  const region = query.get('region');
+  if (area && region) return envelope('REQUEST_MALFORMED', 'Ask for an area or a region, not both.', { field: 'region' });
+  if (area && !AREAS.has(area)) return envelope('SUMMARY_AREA_UNKNOWN', 'That area is not on record here.', { field: 'area' });
+  if (region && !REGIONS.has(region)) return envelope('SUMMARY_AREA_UNKNOWN', 'That region is not on record here.', { field: 'region' });
+  const example = golden(`GET /api/month-end/{month}/${statistic}`);
+  const taken = MONTHS.taken.find((record) => record.month === month);
+  // The golden answer is the taken month's, and its sheets' titles name it: they name the month asked instead. Only
+  // the titles -- the year to date's note names the months taken, and they are what they are.
+  const sheets = example.sheets.map((sheet) => ({
+    ...sheet,
+    title: sheet.title.replaceAll(monthName(example.month), monthName(month)),
+  }));
+  return {
+    status: 200,
+    body: {
+      ...example,
+      month,
+      state: taken ? 'TAKEN' : 'OPEN',
+      takenAt: taken?.takenAt ?? null,
+      takenBy: taken?.takenBy ?? null,
+      area: area || null,
+      region: area ? null : region || null,
+      sheets: statistic === 'branches' ? sheets.map(ruleC) : sheets,
+      // The open month is read live: the note saying when a month was taken is the taken month's alone.
+      notes: taken ? example.notes : example.notes.filter((note) => !/ was taken on /.test(note)),
+    },
+  };
+};
+
+const PACK_ID = 7001;
+const packExample = golden('GET /api/month-end/packs/{id}');
+let pack = null;
+let packReads = 0;
+const packOf = (status) => ({
+  ...packExample, id: PACK_ID, month: pack.month, status,
+  finishedAt: status === 'READY' ? packExample.finishedAt : null,
+  workbooks: status === 'READY' ? packExample.workbooks : [],
+});
+const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+/** Month end's own routes, each refusal carrying the path it was asked at, as the server's envelope does. */
+const monthEndOwnAnswer = (req, path, query) => {
+  const answer = monthEndShape(req, path, query);
+  return answer?.body?.code ? { ...answer, body: { ...answer.body, path } } : answer;
+};
+
+/** Month end's own routes by their shape; `false` for a path that is not one of them. */
+const monthEndShape = (req, path, query) => {
+  if (req.method === 'GET' && path === '/api/month-end/months') return { status: 200, body: MONTHS };
+  let m = /^\/api\/month-end\/([^/]+)\/([a-z-]+)$/.exec(path);
+  if (req.method === 'GET' && m && MONTH_STATISTICS.includes(m[2])) return statisticAnswer(m[2], m[1], query);
+  if (req.method === 'POST' && m && m[2] === 'pack') {
+    const refused = monthRefused(m[1]);
+    if (refused) return refused;
+    pack = { month: m[1] };
+    packReads = 0;
+    return { status: 202, body: packOf('PREPARING') };
+  }
+  if (req.method === 'POST' && m && m[2] === 'take') {
+    return monthRefused(m[1]) ?? envelope('IDENTITY_REQUIRED', null, { month: m[1] });
+  }
+  m = /^\/api\/month-end\/([^/]+)\/listings\/([^/]+)$/.exec(path);
+  if (req.method === 'GET' && m) {
+    return envelope('IDENTITY_REQUIRED', 'A listing names members, so it waits until administrators sign in to this '
+      + 'system. The statistics beside it are counts, and are open.', { listing: m[2] });
+  }
+  m = /^\/api\/month-end\/packs\/(\d+)(?:\/([^/]+))?$/.exec(path);
+  if (req.method === 'GET' && m) {
+    const known = pack && Number(m[1]) === PACK_ID;
+    if (!m[2]) {
+      if (!known) return envelope('PACK_NOT_FOUND', null, { pack: m[1] });
+      packReads += 1;
+      return { status: 200, body: packOf(packReads <= 2 ? 'PREPARING' : 'READY') };
+    }
+    if (!known || packReads <= 2 || !packExample.workbooks.includes(m[2])) {
+      return envelope('PACK_NOT_FOUND', null, { pack: m[1], workbook: m[2] });
+    }
+    return {
+      status: 200,
+      type: XLSX,
+      headers: { 'content-disposition': `attachment; filename="sasbo-${pack.month}-${m[2]}.xlsx"` },
+      raw: Buffer.from(`INVENTED STUB WORKBOOK ${m[2]} ${pack.month} -- serve-dist.mjs, not a spreadsheet\n`, 'utf8'),
+    };
+  }
+  m = /^\/api\/month-end\/([^/]+)$/.exec(path);
+  if (req.method === 'GET' && m) {
+    const refused = monthRefused(m[1]);
+    if (refused) return refused;
+    const taken = MONTHS.taken.find((record) => record.month === m[1]);
+    return { status: 200, body: taken ?? { month: m[1], state: 'OPEN', takenAt: null, takenBy: null } };
+  }
+  // Anything else under /api/month-end is a route the server does not have.
+  return path.startsWith('/api/month-end') ? { status: 404, body: { status: 404, error: 'Not Found', path } } : false;
+};
+
 /** Month end's shapes a prefix match cannot answer; `false` when the path is not one of them. */
 const monthEndAnswer = (req, path, query) => {
+  if (path.startsWith('/api/month-end')) return monthEndOwnAnswer(req, path, query);
   if (req.method === 'GET' && path === '/api/workplaces') {
     const page = Number(query.get('page') ?? 0);
     const size = Number(query.get('size') ?? WORKPLACE_PAGE);
@@ -389,6 +548,12 @@ const API = {
   '/api/reference/suspension-codes': golden('GET /api/reference/suspension-codes'),
   '/api/reference/status': golden('GET /api/reference/status'),
   '/api/workplaces': workplacePage(0, WORKPLACE_PAGE),
+  // Month end `04.1`-`04.10`. Every path under these three is answered by `monthEndOwnAnswer` first -- a statistic, a
+  // pack and a month each by its shape; the keys are what `stubDrift` reads, so the services' paths are covered by
+  // name. The longer two stop the shorter one answering the months or a pack by prefix.
+  '/api/month-end/months': MONTHS,
+  '/api/month-end/packs': packExample,
+  '/api/month-end': MONTHS,
   // The runs list; one run and its sheets are answered per shape by `acbRunAnswer`.
   '/api/acb/runs': acbPage(acbRuns, 12),
   // The Debits screen's member search (`04.1`) -- a POST, answered by `acbRunAnswer` first; the key is what
@@ -591,8 +756,9 @@ const server = createServer((req, res) => {
     // The shapes a prefix match cannot answer: A.C.B.'s runs, and month end's pages and change of status.
     const shaped = acbRunAnswer(req, path) || monthEndAnswer(req, path, url.searchParams);
     if (shaped) {
-      res.writeHead(shaped.status, { 'content-type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify(shaped.body));
+      // A JSON body, unless the shape carries bytes of its own type (the pack's workbook, an attachment).
+      res.writeHead(shaped.status, { 'content-type': shaped.type ?? 'application/json; charset=utf-8', ...shaped.headers });
+      res.end(shaped.raw ?? JSON.stringify(shaped.body));
       return;
     }
     const key = API_KEYS.find((k) => path.startsWith(k));

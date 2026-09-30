@@ -46,7 +46,11 @@ const Acb = lazy(() => import('./pages/admin/Acb.jsx'));
 const AcbDebits = lazy(() => import('./pages/acb/AcbDebits.jsx'));
 const AcbRuns = lazy(() => import('./pages/acb/AcbRuns.jsx'));
 const DailyMenu = lazy(() => import('./pages/admin/DailyMenu.jsx'));
+// Month end `04.1`: the page is renamed "Month end" and its address is not (MD38) -- the Monthly Menu's address is
+// written in five places, two of them tools' route lists (BR47). `04.3`-`04.8`: ONE route, and one chunk, for the six
+// statistics; a name the server has no statistic for is the page's not-found state, never a blank.
 const MonthlyMenu = lazy(() => import('./pages/admin/MonthlyMenu.jsx'));
+const MonthEndStatistic = lazy(() => import('./pages/admin/MonthEndStatistic.jsx'));
 const CaptureMember = lazy(() => import('./pages/members/CaptureMember.jsx'));
 const Maintenance = lazy(() => import('./pages/admin/Maintenance.jsx'));
 const BankListing = lazy(() => import('./pages/bank_branch/BankListing.jsx'));
@@ -84,6 +88,7 @@ function App() {
         <Route path="admin/acb/runs" element={<AcbRuns />} />
         <Route path="admin/daily-menu" element={<DailyMenu />} />
         <Route path="admin/monthly-menu" element={<MonthlyMenu />} />
+        <Route path="admin/monthly-menu/:statistic" element={<MonthEndStatistic />} />
         <Route path="recruiters" element={<Recruiters />} />
         <Route path="banks" element={<MapsScope><BanksPage /></MapsScope>} />
         <Route path="banks/listing" element={<BankListing />} />

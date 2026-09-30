@@ -9,10 +9,12 @@ import BankListing from '../pages/bank_branch/BankListing'
 import Home from '../pages/Home'
 // The first screen's figures are a lazy chunk; in the registry before the scan, so it waits on the page, not on the box.
 import '../pages/home/HomeFigures.jsx'
+import MonthlyMenu from '../pages/admin/MonthlyMenu'
+import MonthEndStatistic from '../pages/admin/MonthEndStatistic'
 import { renderWithProviders } from './renderWithProviders'
 import { expectNoA11yViolations } from './assertions'
 import { server } from './msw/server'
-import { monthEndAnswer } from './msw/monthEndExamples'
+import { monthEndAnswer, monthEndBody } from './msw/monthEndExamples'
 import { smokeHandlers } from './msw/smokeLayer'
 import { pageFixtures } from './msw/pageFixtures'
 import { setupUser } from './user'
@@ -127,6 +129,41 @@ describe('accessibility', () => {
     server.use(monthEndAnswer('GET /api/members/summary'))
     const { container } = renderWithProviders(<Home />)
     await screen.findByText('INVENTED GROUP CORE')
+    await expectNoA11yViolations(container)
+  })
+
+  it('the Month end page has no violations -- its month, its statistics, the pack ready with its links, the listings (04.1, MR-ROB-37)', async () => {
+    // A state-gated surface, opened first: the months read, the open month chosen so Take the month is there with its
+    // reason, and the pack asked for -- the golden answer is a READY pack, so its two links are scanned too.
+    server.use(monthEndAnswer('GET /api/month-end/months'), monthEndAnswer('POST /api/month-end/{month}/pack'))
+    const user = setupUser()
+    const { container } = renderWithProviders(<MonthlyMenu />, { initialEntries: ['/admin/monthly-menu?month=2026-09'] })
+    await user.click(await screen.findByRole('button', { name: 'Prepare the pack for September 2026' }))
+    await screen.findByRole('link', { name: /^Download the statistics workbook/ })
+    expect(screen.getByRole('button', { name: 'Take September 2026' })).toBeDisabled()
+    await expectNoA11yViolations(container)
+  })
+
+  it('a statistic\'s screen has no violations -- its criteria, its sheets with rule C, and its notes (04.3-04.8, MR-ROB-37)', async () => {
+    // The branches, with a row of fewer than five and one withheld beside it, in the golden answer's own shape: the
+    // words and their descriptions are part of what is scanned.
+    const branches = monthEndBody('GET /api/month-end/{month}/branches')
+    const hidden = (key, label, rule) => ({ key, label, level: 'ROW', fewerThanFive: rule === 'few', withheld: rule === 'withheld', cells: [null, null, null, null, null, null] })
+    server.use(
+      monthEndAnswer('GET /api/month-end/months'),
+      http.get('*/api/month-end/:month/branches', () => HttpResponse.json({
+        ...branches,
+        sheets: branches.sheets.map((sheet, index) => (index === 1
+          ? { ...sheet, rows: [...sheet.rows, hidden('E8', 'INVENTED SMALL EMPLOYER', 'few'), hidden('E9', 'INVENTED NEIGHBOURING EMPLOYER', 'withheld')] }
+          : sheet)),
+      })),
+    )
+    const { container } = renderWithProviders(<MonthEndStatistic />, {
+      initialEntries: ['/admin/monthly-menu/branches?month=2026-08'],
+      path: '/admin/monthly-menu/:statistic',
+    })
+    await screen.findByText('fewer than five')
+    await screen.findByRole('heading', { level: 2, name: 'Notes' })
     await expectNoA11yViolations(container)
   })
 

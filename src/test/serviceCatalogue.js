@@ -5,6 +5,7 @@ import { jobGradeService } from '../services/jobGradeService'
 import { locationService } from '../services/locationService'
 import { memberService } from '../services/memberService'
 import { memberStatusService } from '../services/memberStatusService'
+import { monthEndService } from '../services/monthEndService'
 import { recruiterService } from '../services/recruiterService'
 import { recruitmentChannelService } from '../services/recruitmentChannelService'
 import { referenceService } from '../services/referenceService'
@@ -33,6 +34,7 @@ export const SERVICE_MODULES = [
   { name: 'locationService', module: locationService },
   { name: 'memberService', module: memberService },
   { name: 'memberStatusService', module: memberStatusService },
+  { name: 'monthEndService', module: monthEndService },
   { name: 'recruiterService', module: recruiterService },
   { name: 'recruitmentChannelService', module: recruitmentChannelService },
   { name: 'referenceService', module: referenceService },
@@ -86,6 +88,15 @@ const ARGS = {
     toStatus: 'Resigned', expectedStatus: 'Active', reason: 'DELETION_CODE', deletionCode: 2,
   }],
   'summaryService.getSummary': [{ month: '2026-09', by: 'employer' }],
+  'monthEndService.getMonths': [],
+  'monthEndService.getNewAndDeleted': ['2026-08', { area: 'A' }],
+  'monthEndService.getMembership': ['2026-08', {}],
+  'monthEndService.getLeavers': ['2026-08', { region: 'NORTH' }],
+  'monthEndService.getBranches': ['2026-08'],
+  'monthEndService.getRecruitment': ['2026-09', {}],
+  'monthEndService.getRepresentatives': ['2026-08', {}],
+  'monthEndService.askPack': ['2026-08'],
+  'monthEndService.getPack': [7],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS
