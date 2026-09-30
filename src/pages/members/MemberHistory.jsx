@@ -282,6 +282,12 @@ export default function MemberHistory({ member, labelOf }) {
   const [attempt, setAttempt] = useState(0);
   const [notice, setNotice] = useState(null);
   const [read, setRead] = useState({ question: null });
+  /*
+   * WHAT LIES JUST PAST EACH EDGE OF THE PAGE -- read after the page, never before it. The rows are shown the moment the
+   * page arrives, and a save at an edge says nothing of the page beyond until the entry there has been read: an answer
+   * held back for it cost every multi-page history a round trip, and a look that hung would have held the whole sheet.
+   */
+  const [edges, setEdges] = useState({ question: null });
   const sectionRef = useRef(null);
 
   /*
@@ -308,16 +314,19 @@ export default function MemberHistory({ member, labelOf }) {
     };
     getMemberHistory(memberId, page, HISTORY_PAGE_SIZE)
       .then((body) => {
-        const answer = historyPageOf(body);
-        if (!answer) return { answer: null };
-        if (!answer.content.length && page > 0) return { gone: true };
-        return Promise.all([edgeSave(memberId, answer, 'before'), edgeSave(memberId, answer, 'after')])
-          .then(([before, after]) => ({ answer, before, after }));
-      })
-      .then((result) => {
         if (!current) return;
-        if (result.gone) backToFirst(pageGoneSentence(null));
-        else setRead({ question: asked, ...result, failure: result.answer ? null : failureOf(null) });
+        const answer = historyPageOf(body);
+        if (answer && !answer.content.length && page > 0) {
+          backToFirst(pageGoneSentence(null));
+          return;
+        }
+        setRead({ question: asked, answer, failure: answer ? null : failureOf(null) });
+        if (!answer) return;
+        // `edgeSave` settles every way it can end -- a look that fails is UNKNOWN -- so this never rejects.
+        Promise.all([edgeSave(memberId, answer, 'before'), edgeSave(memberId, answer, 'after')])
+          .then(([before, after]) => {
+            if (current) setEdges({ question: asked, before, after });
+          });
       })
       .catch((error) => {
         if (!current) return;
@@ -337,7 +346,9 @@ export default function MemberHistory({ member, labelOf }) {
   const failure = pending ? null : read.failure;
   const answer = pending || failure ? null : read.answer;
   const view = pending ? 'loading' : failure ? 'error' : answer.content.length ? 'ready' : 'empty';
-  const rows = view === 'ready' ? historyRows(answer.content, { before: read.before, after: read.after }) : [];
+  // Until the entries past the edges are read, nothing is said of them: no page beyond, as far as the rows can tell.
+  const edgesKnown = edges.question === question ? edges : {};
+  const rows = view === 'ready' ? historyRows(answer.content, { before: edgesKnown.before, after: edgesKnown.after }) : [];
   const first = answer ? answer.page * answer.size : 0;
   const began = answer?.historyFrom ? formatDateLong(answer.historyFrom) : EMPTY;
 

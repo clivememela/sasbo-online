@@ -367,6 +367,10 @@ describe('the History tab\'s other three states', () => {
 })
 
 describe('paging', () => {
+  /** The looks past a page's edge -- each a page of ONE entry, whose page number is its place in the history. */
+  const looks = (asked) => asked.filter(({ size }) => size === 1).map(({ page }) => page)
+  const pages = (asked) => asked.filter(({ size }) => size === 50).map(({ page }) => page)
+
   it('turns page by page, the pager counting entries, and the keyboard\'s place moves to the top of the sheet', async () => {
     const asked = []
     server.use(historyServes(manyChanges(53), { asked }))
@@ -386,8 +390,8 @@ describe('paging', () => {
     await user.click(within(sheet()).getByRole('button', { name: /Previous/ }))
     await waitFor(() => expect(pagerText()).toHaveTextContent('Showing 1–50 of 53 · Page 1 of 2'))
     // Pages of fifty, asked by number; and past each edge where the row there is a save, the one entry beyond it.
-    expect(asked.filter(({ size }) => size === 50).map(({ page }) => page)).toEqual([0, 1, 0])
-    expect(asked.filter(({ size }) => size === 1).map(({ page }) => page)).toEqual([50, 49, 50])
+    expect(pages(asked)).toEqual([0, 1, 0])
+    await waitFor(() => expect(looks(asked)).toEqual([50, 49, 50]))
     // None of these saves runs past an edge, so no page says one does.
     expect(within(sheet()).queryByText(/(next|previous) page\./)).toBeNull()
   })
@@ -395,7 +399,7 @@ describe('paging', () => {
   it('a page past the last goes back to the first page, and says so -- in the server\'s words, with no Try again', async () => {
     const asked = []
     // The history the first page describes has a second page; asked for, the server says it does not exist.
-    server.use(historyServes(manyChanges(53), { asked, refuse: ({ page }) => page === 1 }))
+    server.use(historyServes(manyChanges(53), { asked, refuse: ({ page, size }) => page === 1 && size === 50 }))
     const user = setupUser()
     show()
     await ready()
@@ -408,7 +412,7 @@ describe('paging', () => {
     expect(pagerText()).toHaveTextContent('Showing 1–50 of 53 · Page 1 of 2')
     expect(within(sheet()).queryByRole('button', { name: 'Try again' })).toBeNull()
     expect(within(sheet()).queryByRole('alert')).toBeNull()
-    expect(asked.filter(({ size }) => size === 50).map(({ page }) => page)).toEqual([0, 1, 0])
+    expect(pages(asked)).toEqual([0, 1, 0])
   })
 
   it('a save split across two pages says so on each -- and a save that ends at the edge says nothing', async () => {
@@ -421,20 +425,40 @@ describe('paging', () => {
     show()
     await ready()
 
-    const last = rows().at(-1)
-    expect(last.querySelector('[data-history-save]')).toHaveTextContent('1 change in one save')
-    expect(last).toHaveTextContent('Continues on the next page.')
+    await waitFor(() => expect(rows().at(-1)).toHaveTextContent('Continues on the next page.'))
+    expect(rows().at(-1).querySelector('[data-history-save]')).toHaveTextContent('1 change in one save')
     expect(rows()[0]).not.toHaveTextContent(/page\./)
-    // The one entry just past the page's edge, asked as a page of one: its page number is its place in the history.
-    expect(asked.map(({ page, size }) => `${page}/${size}`)).toEqual(['0/50', '50/1'])
+    expect(looks(asked)).toEqual([50])
 
     await user.click(within(sheet()).getByRole('button', { name: /Next/ }))
     await waitFor(() => expect(pagerText()).toHaveTextContent('Showing 51–52 of 52 · Page 2 of 2'))
-    const first = rows()[0]
-    expect(first.querySelector('[data-history-save]')).toHaveTextContent('1 change in one save')
-    expect(first).toHaveTextContent('Continued from the previous page.')
+    await waitFor(() => expect(rows()[0]).toHaveTextContent('Continued from the previous page.'))
+    expect(rows()[0].querySelector('[data-history-save]')).toHaveTextContent('1 change in one save')
     expect(rows()[1]).not.toHaveTextContent(/page\./)
     expect(asked.map(({ page, size }) => `${page}/${size}`)).toEqual(['0/50', '50/1', '1/50', '49/1'])
+  })
+
+  it('the rows are shown as soon as the page arrives -- and nothing is said past its edge until that has been read', async () => {
+    const entries = manyChanges(52).map((change, index) =>
+      (index === 49 || index === 50 ? { ...change, saveId: 'straddling' } : change))
+    const held = deferred()
+    server.use(historyServes(entries))
+    server.use(http.get('*/api/members/:id/history', async ({ request }) => {
+      if (new URL(request.url).searchParams.get('size') !== '1') return undefined
+      await held.promise
+      return undefined
+    }))
+    show()
+    try {
+      await ready()
+      expect(rows()).toHaveLength(50)
+      // The save at the edge is one field on this page, and until the entry beyond is read it is not called a save.
+      expect(rows().at(-1).querySelector('[data-history-save]')).toBeNull()
+      expect(rows().at(-1)).not.toHaveTextContent(/page\./)
+    } finally {
+      held.resolve()
+    }
+    await waitFor(() => expect(rows().at(-1)).toHaveTextContent('Continues on the next page.'))
   })
 
   it('a save at the edge whose neighbour could not be read MAY run on -- the tab does not claim what it could not check', async () => {
@@ -445,9 +469,9 @@ describe('paging', () => {
     show()
     await ready()
 
-    const last = rows().at(-1)
-    expect(last).toHaveTextContent('This save may continue on the next page.')
-    expect(last.querySelector('[data-history-save]')).toHaveTextContent('1 change in one save')
+    await waitFor(() => expect(rows().at(-1)).toHaveTextContent('This save may continue on the next page.'))
+    expect(rows().at(-1).querySelector('[data-history-save]')).toHaveTextContent('1 change in one save')
     expect(within(sheet()).queryByRole('alert')).toBeNull()
   })
 })
+
