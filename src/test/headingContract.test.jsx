@@ -8,6 +8,7 @@ import { ThemeProvider } from '../context/ThemeContext'
 import { server } from './msw/server'
 import { smokeHandlers } from './msw/smokeLayer'
 import { assertNonVacuousScan, FLOORS } from './assertNonVacuousScan'
+import { LAZY_DECLARATIONS, SPLIT_PAGES, warmSplitPages } from './splitPages'
 
 /**
  * BR-18 — ONE `<h1>` PER PAGE, AND IT NAMES THE PAGE.
@@ -61,6 +62,10 @@ const discoverRoutes = () => {
 
 const ROUTES = discoverRoutes()
 
+// Every split page's first import, paid before any route is timed (`./splitPages.js`): the 5 s below waits for React
+// to swap a fallback for a page that has arrived, never for this machine to transform one.
+await warmSplitPages()
+
 /**
  * Routes with no page-level `<h1>` yet.
  *
@@ -113,6 +118,10 @@ describe('BR-18 — the heading contract', () => {
 
   it('the route scan found the whole route table', () => {
     assertNonVacuousScan(ROUTES, FLOORS.ROUTES, 'routes declared in App.jsx')
+    expect(
+      SPLIT_PAGES.length,
+      'a lazy() page is declared in a spelling splitPages.js cannot read, so its first import is timed again',
+    ).toBe(LAZY_DECLARATIONS)
   })
 
   it('no route renders more than one <h1>, and the ones with none are P4 schedule', async () => {

@@ -9,9 +9,11 @@ import { memberService } from "@/services/memberService.js";
 import { jobGradeService } from "@/services/jobGradeService.js";
 import { bankService } from "@/services/bankService.js";
 import { recruiterService } from "@/services/recruiterService.js";
+import { referenceService } from "@/services/referenceService.js";
 import { recruitedArea } from "@/utils/recruitment.js";
+import { committeeOptions, inOrder, isCosatuMember, structureErrors, withStructureAnswer } from "@/utils/structures.js";
 import useAsyncOptions from "../../hooks/useAsyncOptions.js";
-import { TextInput, SearchableSelect, SelectInput, Button, DateField } from "../../components/form";
+import { TextInput, SearchableSelect, SelectInput, Button, CheckboxGroup, DateField } from "../../components/form";
 import StatusChip, { CANCELLED_STATUSES } from "../../components/common/StatusChip.jsx";
 import Table from "../../components/table/Table.jsx";
 import { ConfirmDialog, closeOn } from "../../components/overlay/Modal.jsx";
@@ -20,7 +22,7 @@ import {
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, IDENTITY_TYPE_PASSPORT,
     DEBIT_DAY_OPTIONS, PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
-    ACCOUNT_TYPE_OPTIONS,
+    ACCOUNT_TYPE_OPTIONS, BEC_STRUCTURES_REPRESENTED, BEC_EXECUTIVE_POSITIONS, COSATU_POSITIONS, COSATU_POSITION_LABELS,
 } from "@/config/memberConstants.js";
 import {
     validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID
@@ -38,7 +40,7 @@ import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
 import { ERROR_KINDS, writeMayHaveLanded } from "@/services/parseApiError.js";
 import useFocusOn from "../../hooks/useFocusOn.js";
-import { EMPTY, formatDate, formatZar, parseDate, sameDate, sameMonth, today } from "@/lib/format.js";
+import { EMPTY, formatDate, formatZar, parseDate, sameDate, sameMonth, today, toWireDate } from "@/lib/format.js";
 import { finishField, sanitiseField, validateField } from "@/utils/inputRules.js";
 import { branchNamesForBank } from "@/utils/bankBranches.js";
 import { cn } from "@/lib/utils.js";
@@ -181,55 +183,19 @@ const FIELD_TO_TAB_MAP = {
     paymentType: "employment",
     bankAccountNumber: "employment",
     accountType: "employment",
-    debitDay: "employment"
+    debitDay: "employment",
+    // V55: what a structure's Yes needs beside it -- a refused save opens the tab that asks.
+    shopStewardElectionDate: "structures",
+    becCommitteeCode: "structures",
+    becStructures: "structures",
+    becExecutivePosition: "structures",
 };
 
-export const SASBO_BEC_BRANCHES = [
-    { id: "bec-01", name: "Tshwane CBD Regional Branch", region: "Gauteng North" },
-    { id: "bec-02", name: "Centurion Financial Hub Committee", region: "Gauteng North" },
-    { id: "bec-03", name: "Pretoria East Banking Cluster", region: "Gauteng North" },
-    { id: "bec-04", name: "Hatfield & Menlyn Corporate Branch", region: "Gauteng North" },
-    { id: "bec-05", name: "Soshanguve & Garankuwa Local Committee", region: "Gauteng North" },
-    { id: "bec-06", name: "Johannesburg Central Regional Branch", region: "Gauteng South" },
-    { id: "bec-07", name: "Braamfontein & Parktown Hub", region: "Gauteng South" },
-    { id: "bec-08", name: "Rosebank Financial Cluster", region: "Gauteng South" },
-    { id: "bec-09", name: "Sandton Central Banking Hub", region: "Gauteng South" },
-    { id: "bec-10", name: "Soweto Local Branches Committee", region: "Gauteng South" },
-    { id: "bec-11", name: "Ekurhuleni East Regional Branch", region: "Gauteng East" },
-    { id: "bec-12", name: "Kempton Park & OR Tambo Cluster", region: "Gauteng East" },
-    { id: "bec-13", name: "West Rand & Krugersdorp Committee", region: "Gauteng West" },
-    { id: "bec-14", name: "Vaal Triangle & Vereeniging Branch", region: "Gauteng South" },
-    { id: "bec-15", name: "Cape Town CBD Regional Branch", region: "Western Cape" },
-    { id: "bec-16", name: "Bellville & Tyger Valley Corporate Hub", region: "Western Cape" },
-    { id: "bec-17", name: "Century City Banking Cluster", region: "Western Cape" },
-    { id: "bec-18", name: "Southern Suburbs Local Committee", region: "Western Cape" },
-    { id: "bec-19", name: "Boland & Winelands Regional Branch", region: "Western Cape" },
-    { id: "bec-20", name: "Garden Route & George Branch", region: "Western Cape" },
-    { id: "bec-21", name: "Durban Central Regional Branch", region: "KwaZulu-Natal" },
-    { id: "bec-22", name: "Umhlanga Financial Ridge Committee", region: "KwaZulu-Natal" },
-    { id: "bec-23", name: "Westville Corporate Hub Cluster", region: "KwaZulu-Natal" },
-    { id: "bec-24", name: "Pietermaritzburg & Midlands Branch", region: "KwaZulu-Natal" },
-    { id: "bec-25", name: "KZN North Coast & Richards Bay Committee", region: "KwaZulu-Natal" },
-    { id: "bec-26", name: "KZN South Coast Local Branch", region: "KwaZulu-Natal" },
-    { id: "bec-27", name: "Gqeberha (Port Elizabeth) Regional Branch", region: "Eastern Cape" },
-    { id: "bec-28", name: "East London Central Branch", region: "Eastern Cape" },
-    { id: "bec-29", name: "Karoo & Inland Local Committee", region: "Eastern Cape" },
-    { id: "bec-30", name: "Mthatha Regional Committee", region: "Eastern Cape" },
-    { id: "bec-31", name: "Bloemfontein Central Regional Branch", region: "Free State" },
-    { id: "bec-32", name: "Welkom & Goldfields Committee", region: "Free State" },
-    { id: "bec-33", name: "Kimberley & Northern Cape West Branch", region: "Northern Cape" },
-    { id: "bec-34", name: "Upington Local Hub Committee", region: "Northern Cape" },
-    { id: "bec-35", name: "Mbombela (Nelspruit) Regional Branch", region: "Mpumalanga" },
-    { id: "bec-36", name: "Emalahleni (Witbank) Mining & Finance Cluster", region: "Mpumalanga" },
-    { id: "bec-37", name: "Secunda & Highveld Local Committee", region: "Mpumalanga" },
-    { id: "bec-38", name: "Polokwane Central Regional Branch", region: "Limpopo" },
-    { id: "bec-39", name: "Thohoyandou & Vhembe Hub Committee", region: "Limpopo" },
-    { id: "bec-40", name: "Tzaneen & Mopani Local Committee", region: "Limpopo" },
-    { id: "bec-41", name: "Rustenburg Mining Belt Committee", region: "North West" },
-    { id: "bec-42", name: "Potchefstroom & Klerksdorp Cluster", region: "North West" },
-    { id: "bec-43", name: "South African Reserve Bank (SARB) Dedicated Branch", region: "Corporate National" },
-    { id: "bec-44", name: "BankservAfrica & Financial Infrastructure Committee", region: "Corporate National" }
-];
+/*
+ * 🔴 THE 44 "BEC COMMITTEES" THIS FILE CARRIED WERE INVENTED (CM-14) -- names like "Century City Banking Cluster",
+ * grouped by made-up regions, stored against nothing. The committee a BEC member sits on is chosen from SASBO's own
+ * list since V55, as their month-end report prints it (`GET /api/reference/committees`, Monthly Menu 01.1).
+ */
 
 /**
  * The stored value, folded onto the name the form offers.
@@ -277,9 +243,8 @@ const RECORD_FIELD_LABELS = {
     isShopSteward: "Shop Steward",
     shopStewardElectionDate: "Shop Steward Election Date",
     isBec: "BEC Member",
-    becCommitteeId: "BEC Committee",
+    becCommitteeCode: "Branch Executive Committee",
     isBecRecruiter: "BEC Recruiter",
-    becRecruiterRole: "BEC Recruiter Role",
     isBecStructureRep: "BEC Structure Representative",
     becStructures: "BEC Structures Represented",
     isBecExecutive: "BEC Executive",
@@ -292,7 +257,7 @@ const RECORD_FIELD_LABELS = {
     cosatuPositions: "COSATU Positions",
 };
 
-/** Never listed: identifiers, and a name the form derives from a field that is listed (the committee's id). */
+/** Never listed: identifiers, and a name the form keeps beside a field that is listed (the committee's code). */
 const UNLISTED_KEYS = new Set(["id", "membershipNumber", "memberId", "becCommitteeName"]);
 
 /**
@@ -301,12 +266,24 @@ const UNLISTED_KEYS = new Set(["id", "membershipNumber", "memberId", "becCommitt
  */
 const yesNo = (flag, unanswered = "No") => (flag === true ? "Yes" : flag === false ? "No" : unanswered);
 
-/** COSATU is stored as V19's "Y"/"N"; older records carry a boolean. */
-const isCosatuMember = (member) => member?.isCosatu === "Y" || member?.isCosatu === true;
+/** The errors a Structures answer settles besides its own: a Yes/No's follow-ups, which a No takes away. */
+const STRUCTURE_ERRORS_SETTLED_BY = {
+    isShopSteward: ["shopStewardElectionDate"],
+    isBec: ["becCommitteeCode", "becStructures", "becExecutivePosition"],
+    isBecStructureRep: ["becStructures"],
+    isBecExecutive: ["becExecutivePosition"],
+};
 
-/** A value as the form holds it, for comparing: a yes/no flag as a boolean, a list as its joined text. */
+/** A list the record holds, as a person reads it. */
+const listText = (list, none = "None") => (Array.isArray(list) && list.length > 0 ? list.join(", ") : none);
+
+/**
+ * A value as the form holds it, for comparing: a yes/no flag as a boolean, a list as its joined text, a date as its
+ * calendar day -- the record's `[y, m, d]` and the picker's "yyyy-mm-dd" are one day in two spellings.
+ */
 const comparable = (key, value) => {
     if (key === "paymentType") return normalizePaymentType(value);
+    if (DATE_KEYS.has(key)) return toWireDate(value);
     if (/^is[A-Z]/.test(key)) return value === true || value === "Y";
     if (Array.isArray(value)) return value.join(",");
     if (value === null || value === undefined) return "";
@@ -322,20 +299,23 @@ const comparable = (key, value) => {
 const recordDate = (value) => (value ? formatDate(value) : "");
 
 /** The record's date fields, by name. conventions §15 gives them all one shape: `yyyy/mm/dd`. */
-const DATE_KEYS = new Set(["dateOfBirth", "joinDate", "electionDate"]);
+const DATE_KEYS = new Set(["dateOfBirth", "joinDate", "electionDate", "shopStewardElectionDate"]);
 
 /** A value as a person reads it. */
 const readable = (key, value) => {
     const shown = comparable(key, value);
     if (typeof shown === "boolean") return shown ? "Yes" : "No";
-    if (key === "becCommitteeId") return SASBO_BEC_BRANCHES.find((branch) => branch.id === shown)?.name ?? (shown || "—");
     if (key === "becStructures" || key === "cosatuPositions") return shown ? String(shown).split(",").join(", ") : "none";
-    // R3-F1: a LocalDate arrives as [y, m, d], and `comparable` joins an array with commas -- so an untouched date
-    // read "1988,6,15", and a changed one "1988,6,15 → 1988-06-15". Dates are NAMED, never sniffed: a value that
-    // merely looks like one is not one, and the record holds exactly these three.
+    // R3-F1: a LocalDate arrives as [y, m, d], and a date was compared as its array joined with commas -- so an
+    // untouched date read "1988,6,15", and a changed one "1988,6,15 → 1988-06-15". Dates are NAMED, never sniffed: a
+    // value that merely looks like one is not one, and the record holds exactly these four.
     if (DATE_KEYS.has(key)) return formatDate(value);
     return shown === "" ? "—" : String(shown);
 };
+
+/** A field of a member as a person reads it -- the committee by its name, which the form keeps beside its code. */
+const readableIn = (member, key) =>
+    key === "becCommitteeCode" && member.becCommitteeName ? member.becCommitteeName : readable(key, member[key]);
 
 const fieldLabel = (key) =>
     RECORD_FIELD_LABELS[key] || MEMBER_FIELD_LABEL_MAP[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
@@ -343,7 +323,7 @@ const fieldLabel = (key) =>
 const getChangedFields = (draft, original) => Object.keys(draft)
     .filter((key) => !UNLISTED_KEYS.has(key))
     .filter((key) => comparable(key, draft[key]) !== comparable(key, original[key]))
-    .map((key) => `${fieldLabel(key)}: ${readable(key, original[key])} → ${readable(key, draft[key])}`);
+    .map((key) => `${fieldLabel(key)}: ${readableIn(original, key)} → ${readableIn(draft, key)}`);
 
 
 /**
@@ -467,6 +447,17 @@ export default function Members() {
             recruiters: recordRecruiters.options,
             listState: recordRecruiters.loading ? "loading" : recordRecruiters.error ? "failed" : "ready",
         });
+
+    /*
+     * 🗣️ SASBO'S COMMITTEES, as their month-end report prints them -- the Branch Executive Committee a BEC member sits
+     * on (V55). Fetched only while one can be chosen: editing, on the Structures tab, with BEC answered Yes. The read
+     * side needs no list: the record carries the committee's name.
+     */
+    const committeeList = useAsyncOptions(
+        () => referenceService.getCommittees().then(committeeOptions),
+        [],
+        { enabled: isEditing && activeTab === "structures" && editForm.isBec === true },
+    );
 
     /**
      * A27 — THE THREE STATES, AT LAST, AND THE DEFECT WAS THAT THERE WAS ONLY ONE.
@@ -804,6 +795,19 @@ export default function Members() {
         });
     }, [editForm.identityType, branchOptionsFor]);
 
+    /**
+     * One Structures answer changed. `withStructureAnswer` clears what a No leaves behind -- the rule the server holds
+     * too -- and the errors that answer settles go with it. `extra` rides along: the committee's name beside its code.
+     */
+    const setStructure = useCallback((field, value, extra = null) => {
+        setEditForm((prev) => ({ ...withStructureAnswer(prev, field, value), ...extra }));
+        setFieldErrors((prev) => {
+            const next = { ...prev };
+            for (const key of [field, ...(STRUCTURE_ERRORS_SETTLED_BY[field] ?? [])]) delete next[key];
+            return next;
+        });
+    }, []);
+
     const validateEditForm = () => {
         const errors = {};
         if (!editForm.firstNames?.trim()) errors.firstNames = "First Name(s) field is required";
@@ -839,9 +843,12 @@ export default function Members() {
             if (message) errors[key] = message;
         }
 
+        // V55: what each structure's Yes needs beside it, by the rule the server holds (`utils/structures.js`) -- a
+        // legacy Yes with nothing beside it stays saveable, against the record as it stood when editing began.
         // No COSATU-requires-BEC check here: the form cannot express the contradiction (COSATU is only
         // offered under BEC = Yes, and BEC = No clears it), and a legacy member stored as COSATU with no BEC
         // answer must stay saveable unchanged -- the server's validateStructures owns both halves.
+        Object.assign(errors, structureErrors(editForm, original));
         return errors;
     };
 
@@ -1776,51 +1783,99 @@ export default function Members() {
                                         <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">SASBO structures</h3>
                                     </div>
 
-                                    {/* 🗣️ THE STAKEHOLDER'S SHAPE, 2026-09-17, and the owner's "only these fields":
-                                        Shop Steward? · BEC Member? → COSATU Member? → the two COSATU structures.
-                                        🔴 COSATU IS NESTED UNDER BEC AGAIN, AND THIS TIME IT IS THE RULE, NOT A DEFECT.
-                                        `04.2` (N5 / BR-15) un-nested it because nothing then said BEC was a
-                                        prerequisite; the stakeholder has now said it is -- "for a member to participate
-                                        in COSATU structures, they have to be within the BEC structure" -- and the server
-                                        refuses COSATU without BEC (`MemberValidator.validateStructures`). A COSATU Local
-                                        and a COSATU Region are structures a member SITS ON, so each is a yes/no, not a
-                                        name. BEC committee, recruiter, structure-representative and executive
-                                        sub-questions, the election date and COSATU positions are gone from the screen:
-                                        none of them had a column (CM-05), so nothing they held was ever stored. */}
+                                    {/* 🗣️ SASBO'S STRUCTURES TREE, THROUGH THE OWNER, 2026-09-30 -- "we need those
+                                        functionalities back":
+                                          Shop Steward? → Election Date
+                                          BEC Member? → Branch Executive Committee · BEC Recruiter? ·
+                                                        BEC Structure Representative? → the structures represented ·
+                                                        BEC Executive? → the one position held ·
+                                                        COSATU Member? → Local? · Regional? · COSATU positions
+                                        This tab asked all of it until 2026-09-17 and was cut to Shop Steward, BEC and
+                                        COSATU then, because nothing below them had a column (CM-05). V55 gives each one,
+                                        so the tree is back; the rules are `utils/structures.js`, held by the server too.
+                                        🔑 EDIT MEMBER ONLY: SASBO's spec took the structures off Capture Member, "because
+                                        a newly captured member cannot sit on a structure" (2.4).
+                                        🔴 COSATU STAYS NESTED UNDER BEC -- the stakeholder, 2026-09-17: "for a member to
+                                        participate in COSATU structures, they have to be within the BEC structure", which
+                                        the server enforces (`validateStructures`). A COSATU Local and a COSATU Region are
+                                        structures a member SITS ON, so each stays a yes/no; SASBO's tree lists them with
+                                        the positions. */}
                                     {isEditing ? (
                                         <div className="space-y-6">
-                                            <Detail label="Shop Steward?" value={yesNo(editForm.isShopSteward)} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
-                                                setEditForm(prev => ({ ...prev, isShopSteward: e.target.value === "Yes" }));
-                                            }} />
+                                            <div className="space-y-4">
+                                                <Detail label="Shop Steward?" value={yesNo(editForm.isShopSteward)} isEditing={true} options={["Yes", "No"]} onChange={(e) => setStructure("isShopSteward", e.target.value === "Yes")} />
+                                                {editForm.isShopSteward === true && (
+                                                    <div className="border-l border-line pl-4">
+                                                        <DateField
+                                                            label="Election Date"
+                                                            required
+                                                            value={editForm.shopStewardElectionDate || ""}
+                                                            error={fieldErrors.shopStewardElectionDate || undefined}
+                                                            max="today"
+                                                            hint="ago"
+                                                            onChange={(e) => setStructure("shopStewardElectionDate", e.target.value || null)}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
 
                                             <div className="border-t border-line pt-4">
-                                                <Detail label="BEC (Branch Executive Committee) Member?" value={yesNo(editForm.isBec)} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
-                                                    const isYes = e.target.value === "Yes";
-                                                    // Leaving BEC leaves COSATU with it: the one cannot be held without the other.
-                                                    setEditForm(prev => ({
-                                                        ...prev,
-                                                        isBec: isYes,
-                                                        ...(!isYes ? { isCosatu: "N", isCosatuLocal: false, isCosatuRegional: false } : {}),
-                                                    }));
-                                                }} />
+                                                <Detail label="BEC (Branch Executive Committee) Member?" value={yesNo(editForm.isBec)} isEditing={true} options={["Yes", "No"]} onChange={(e) => setStructure("isBec", e.target.value === "Yes")} />
 
                                                 {editForm.isBec === true && (
                                                     <div className="mt-4 space-y-4 border-l border-line pl-4">
-                                                        <Detail label="COSATU Member?" value={isCosatuMember(editForm) ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => {
-                                                            const isYes = e.target.value === "Yes";
-                                                            setEditForm(prev => ({
-                                                                ...prev,
-                                                                isCosatu: isYes ? "Y" : "N",
-                                                                ...(!isYes ? { isCosatuLocal: false, isCosatuRegional: false } : {}),
-                                                            }));
-                                                        }} />
+                                                        {/* SASBO's own committees, alphabetical (18 Sep 2026); UNATTACHED is not one. */}
+                                                        <SearchableSelect
+                                                            label="Branch Executive Committee"
+                                                            value={editForm.becCommitteeCode || ""}
+                                                            options={committeeList.options}
+                                                            loading={committeeList.loading}
+                                                            loadError={committeeList.error}
+                                                            onRetryLoad={committeeList.refetch}
+                                                            emptyLabel="SASBO's committees are not on this system yet"
+                                                            placeholder="Choose a committee…"
+                                                            required
+                                                            error={fieldErrors.becCommitteeCode || undefined}
+                                                            onChange={(code, option) => setStructure("becCommitteeCode", code || "", { becCommitteeName: option?.label ?? "" })}
+                                                        />
+                                                        <Detail label="BEC Recruiter?" value={yesNo(editForm.isBecRecruiter)} isEditing={true} options={["Yes", "No"]} onChange={(e) => setStructure("isBecRecruiter", e.target.value === "Yes")} />
 
-                                                        {isCosatuMember(editForm) && (
-                                                            <div className="grid grid-cols-1 gap-4 border-l border-line pl-4 md:grid-cols-2">
-                                                                <Detail label="Sits on a COSATU Local structure?" value={yesNo(editForm.isCosatuLocal)} isEditing={true} options={["Yes", "No"]} onChange={(e) => setEditForm(prev => ({ ...prev, isCosatuLocal: e.target.value === "Yes" }))} />
-                                                                <Detail label="Sits on a COSATU Regional structure?" value={yesNo(editForm.isCosatuRegional)} isEditing={true} options={["Yes", "No"]} onChange={(e) => setEditForm(prev => ({ ...prev, isCosatuRegional: e.target.value === "Yes" }))} />
-                                                            </div>
+                                                        <Detail label="BEC Structure Representative?" value={yesNo(editForm.isBecStructureRep)} isEditing={true} options={["Yes", "No"]} onChange={(e) => setStructure("isBecStructureRep", e.target.value === "Yes")} />
+                                                        {editForm.isBecStructureRep === true && (
+                                                            <CheckboxGroup
+                                                                legend="Structures represented"
+                                                                required
+                                                                options={BEC_STRUCTURES_REPRESENTED}
+                                                                selected={editForm.becStructures || []}
+                                                                error={fieldErrors.becStructures}
+                                                                onToggle={(next) => setStructure("becStructures", inOrder(next, BEC_STRUCTURES_REPRESENTED))}
+                                                            />
                                                         )}
+
+                                                        <Detail label="BEC Executive?" value={yesNo(editForm.isBecExecutive)} isEditing={true} options={["Yes", "No"]} onChange={(e) => setStructure("isBecExecutive", e.target.value === "Yes")} />
+                                                        {editForm.isBecExecutive === true && (
+                                                            <Detail label="Executive Position" value={editForm.becExecutivePosition} isEditing={true} options={BEC_EXECUTIVE_POSITIONS} required error={fieldErrors.becExecutivePosition} onChange={(e) => setStructure("becExecutivePosition", e.target.value)} />
+                                                        )}
+
+                                                        <div className="border-t border-line pt-4">
+                                                            <Detail label="COSATU Member?" value={isCosatuMember(editForm) ? "Yes" : "No"} isEditing={true} options={["Yes", "No"]} onChange={(e) => setStructure("isCosatu", e.target.value === "Yes" ? "Y" : "N")} />
+
+                                                            {isCosatuMember(editForm) && (
+                                                                <div className="mt-4 space-y-4 border-l border-line pl-4">
+                                                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                                        <Detail label="Sits on a COSATU Local structure?" value={yesNo(editForm.isCosatuLocal)} isEditing={true} options={["Yes", "No"]} onChange={(e) => setStructure("isCosatuLocal", e.target.value === "Yes")} />
+                                                                        <Detail label="Sits on a COSATU Regional structure?" value={yesNo(editForm.isCosatuRegional)} isEditing={true} options={["Yes", "No"]} onChange={(e) => setStructure("isCosatuRegional", e.target.value === "Yes")} />
+                                                                    </div>
+                                                                    <CheckboxGroup
+                                                                        legend="COSATU positions"
+                                                                        options={COSATU_POSITIONS}
+                                                                        labelFor={(position) => COSATU_POSITION_LABELS[position] ?? position}
+                                                                        selected={editForm.cosatuPositions || []}
+                                                                        onToggle={(next) => setStructure("cosatuPositions", inOrder(next, COSATU_POSITIONS))}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>
@@ -1829,14 +1884,34 @@ export default function Members() {
                                         <div className="space-y-3">
                                             <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Core Appointments</h4>
                                             <Detail label="Shop Steward" value={yesNo(selectedMember.isShopSteward, "Not recorded")} isEditing={false} />
+                                            {selectedMember.isShopSteward === true && (
+                                                <div className="border-l border-line pl-4">
+                                                    <Detail label="Election Date" value={recordDate(selectedMember.shopStewardElectionDate) || "Not recorded"} isEditing={false} />
+                                                </div>
+                                            )}
                                             <Detail label="BEC Member" value={yesNo(selectedMember.isBec, "Not recorded")} isEditing={false} />
                                             {(selectedMember.isBec === true || isCosatuMember(selectedMember)) && (
                                                 <div className="space-y-3 border-l border-line pl-4">
+                                                    {selectedMember.isBec === true && (
+                                                        <>
+                                                            <Detail label="Branch Executive Committee" value={selectedMember.becCommitteeName || "Not recorded"} isEditing={false} />
+                                                            <Detail label="BEC Recruiter" value={yesNo(selectedMember.isBecRecruiter, "Not recorded")} isEditing={false} />
+                                                            <Detail label="BEC Structure Representative" value={yesNo(selectedMember.isBecStructureRep, "Not recorded")} isEditing={false} />
+                                                            {selectedMember.isBecStructureRep === true && (
+                                                                <Detail label="Structures Represented" value={listText(selectedMember.becStructures, "Not recorded")} isEditing={false} />
+                                                            )}
+                                                            <Detail label="BEC Executive" value={yesNo(selectedMember.isBecExecutive, "Not recorded")} isEditing={false} />
+                                                            {selectedMember.isBecExecutive === true && (
+                                                                <Detail label="Executive Position" value={selectedMember.becExecutivePosition || "Not recorded"} isEditing={false} />
+                                                            )}
+                                                        </>
+                                                    )}
                                                     <Detail label="COSATU Member" value={isCosatuMember(selectedMember) ? "Yes" : "No"} isEditing={false} />
                                                     {isCosatuMember(selectedMember) && (
                                                         <>
                                                             <Detail label="COSATU Local structure" value={yesNo(selectedMember.isCosatuLocal, "Not recorded")} isEditing={false} />
                                                             <Detail label="COSATU Regional structure" value={yesNo(selectedMember.isCosatuRegional, "Not recorded")} isEditing={false} />
+                                                            <Detail label="COSATU Positions" value={listText(selectedMember.cosatuPositions)} isEditing={false} />
                                                         </>
                                                     )}
                                                 </div>

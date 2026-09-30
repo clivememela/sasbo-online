@@ -367,6 +367,25 @@ describe('vocabulary parity between this browser and its server', () => {
         'ACCOUNT_TYPE_OPTIONS is not the list the server publishes from AccountType.',
       ).toEqual(vocabulary.accountTypes)
     })
+
+    it('V55 offers exactly the SASBO-structure lists the server holds a member to', () => {
+      // EQUALITY, in order: the server refuses any structure or position outside its list
+      // (MemberValidator.validateBecRoles / validateCosatuPositions), and writes the rest back in
+      // this spelling and order -- so a box the browser offers and the server lacks is a save that
+      // fails, and one the server has and the browser lacks is a role nobody can record.
+      expect(
+        memberConstants.BEC_STRUCTURES_REPRESENTED,
+        'BEC_STRUCTURES_REPRESENTED is not the list the server publishes from BecStructure.',
+      ).toEqual(vocabulary.memberStructures.becStructures)
+      expect(
+        memberConstants.BEC_EXECUTIVE_POSITIONS,
+        'BEC_EXECUTIVE_POSITIONS is not the list the server publishes from BecExecutivePosition.',
+      ).toEqual(vocabulary.memberStructures.becExecutivePositions)
+      expect(
+        memberConstants.COSATU_POSITIONS,
+        'COSATU_POSITIONS is not the list the server publishes from CosatuPosition.',
+      ).toEqual(vocabulary.memberStructures.cosatuPositions)
+    })
   })
 
   describe('the failure envelope', () => {

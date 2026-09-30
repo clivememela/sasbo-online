@@ -186,6 +186,14 @@ export const SURFACES = [
       step('make the identity a passport', chooseOption(PANEL, '/^Identity Type/', 'Passport Number'), `!!document.querySelector('${PANEL} input[aria-haspopup="dialog"]')`),
       step('open Date of Birth', mouseDownOn(`${PANEL} input[aria-haspopup="dialog"]`, '/^Date of Birth/'), DATE_PICKER_OPEN)],
     present: { DATE_PICKER_OPEN }, covers: ['pages/members/Members.jsx#DateField@Date of Birth', 'components/form/DateField.jsx#aria-expanded@field'] },
+  { name: 'record-election-date', route: '/members', ready: ROWS,
+    // V55: the shop steward's Election Date is asked only once Shop Steward? is answered Yes on the record's
+    // Structures tab (SASBO, 2026-09-30) -- a picker that exists in one state, so a surface drives it there.
+    steps: [OPEN_EDITABLE_MEMBER, EDIT_RECORD,
+      step('open Structures', clickByText(`${PANEL} button`, '/Structures/i'), TEXT('SASBO structures')),
+      step('answer Shop Steward? Yes', chooseOption(PANEL, '/^Shop Steward\\?/', 'Yes'), `!!document.querySelector('${PANEL} input[aria-haspopup="dialog"]')`),
+      step('open Election Date', mouseDownOn(`${PANEL} input[aria-haspopup="dialog"]`, '/^Election Date/'), DATE_PICKER_OPEN)],
+    present: { DATE_PICKER_OPEN }, covers: ['pages/members/Members.jsx#DateField@Election Date'] },
 
   // ── Capture Member ────────────────────────────────────────────────────────────────────────────
   { name: 'capture-discard', route: '/members/capture', ready: TEXT('Save Member'),
