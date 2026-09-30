@@ -385,6 +385,7 @@ const API = {
   '/api/reference/table-codes': golden('GET /api/reference/table-codes'),
   '/api/reference/committee-provinces': golden('GET /api/reference/committee-provinces'),
   '/api/reference/committees': golden('GET /api/reference/committees'),
+  '/api/reference/deletion-codes': golden('GET /api/reference/deletion-codes'),
   '/api/reference/suspension-codes': golden('GET /api/reference/suspension-codes'),
   '/api/reference/status': golden('GET /api/reference/status'),
   '/api/workplaces': workplacePage(0, WORKPLACE_PAGE),

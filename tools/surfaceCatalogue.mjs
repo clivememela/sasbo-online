@@ -174,6 +174,13 @@ export const SURFACES = [
   { name: 'record-membership', route: '/members', ready: ROWS,
     steps: [OPEN_FIRST_MEMBER, step('open Membership & Subscriptions', clickByText(`${PANEL} button`, '/Membership/i'), TEXT('Date Joined Sasbo'))],
     present: { TAB: TEXT('Date Joined Sasbo') } },
+  // Month end 03.3: the record's one way to move a status, beside the status on the Membership tab. Opening it asks the
+  // server for nothing; SASBO's codes are asked for once a leaving or suspended status is chosen.
+  { name: 'record-change-status', route: '/members', ready: ROWS,
+    steps: [OPEN_FIRST_MEMBER,
+      step('open Membership & Subscriptions', clickByText(`${PANEL} button`, '/Membership/i'), TEXT('Date Joined Sasbo')),
+      step('Change status', clickByText(`${PANEL} button`, '/^Change status$/'), dialogNamed('/^Change status$/'))],
+    present: { DIALOG: dialogNamed('/^Change status$/') }, covers: ['components/members/ChangeStatus.jsx#Modal@change status'] },
   { name: 'record-edit', route: '/members', ready: ROWS, steps: [OPEN_FIRST_MEMBER, EDIT_RECORD], present: { EDITING: TEXT('Save changes') } },
   { name: 'record-save-confirm', route: '/members', ready: ROWS,
     steps: [OPEN_EDITABLE_MEMBER, EDIT_RECORD, CHANGE_PHONE,

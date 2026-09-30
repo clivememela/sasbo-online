@@ -1,6 +1,6 @@
 // @vitest-environment jsdom -- axe walks a real DOM tree; there is nothing to scan without one
 import { beforeEach, describe, expect, it } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 
 import MembersPage from '../pages/members/Members'
@@ -15,6 +15,7 @@ import { server } from './msw/server'
 import { monthEndAnswer } from './msw/monthEndExamples'
 import { smokeHandlers } from './msw/smokeLayer'
 import { pageFixtures } from './msw/pageFixtures'
+import { setupUser } from './user'
 
 /**
  * THE ACCESSIBILITY GATE, on the surfaces named below -- the three this phase named, and the first screen since
@@ -77,6 +78,30 @@ describe('accessibility', () => {
    * carries a real `<label htmlFor>`. See `knownDefects.js` for the retirement note and
    * for the SECOND site the register never named.
    */
+
+  it('the record\'s Change status dialog has no violations, with SASBO\'s codes listed (month end 03.3, MV-12)', async () => {
+    // A state-gated surface, opened first: the record, its Membership tab, the dialog, and a leaving status, so that the
+    // code list is there to be scanned rather than an empty dialog.
+    server.use(
+      http.get('*/api/members', () =>
+        HttpResponse.json([{ id: 1, membershipNumber: 'M0001', firstNames: 'Synthetic', surname: 'Testperson', status: 'Active' }]),
+      ),
+      monthEndAnswer('GET /api/reference/deletion-codes'),
+    )
+    const user = setupUser()
+    renderWithProviders(<MembersPage />)
+    await user.click(await screen.findByRole('button', { name: /open the record for/i }))
+    await user.click(await screen.findByRole('button', { name: /Membership & Subscriptions/i }))
+    await user.click(screen.getByRole('button', { name: 'Change status' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Change status' })
+    await user.selectOptions(within(dialog).getByLabelText(/^New status/), 'Resigned')
+    await waitFor(() => expect(within(dialog).getByLabelText(/^SASBO’s deletion code/)).toBeEnabled())
+
+    // Scoped to the dialog, as Modal's and DateField's scans are: the dialog is portalled out of `container`, and a
+    // scan of the whole document costs whatever else it holds. `region` is off for the same reason as theirs -- a
+    // dialog is not a page, and the landmarks are the shell's, asserted above.
+    await expectNoA11yViolations(dialog, { rules: { region: { enabled: false } } })
+  })
 
   it('the CaptureMember form has no violations', async () => {
     const { container } = renderWithProviders(<CaptureMember />)
