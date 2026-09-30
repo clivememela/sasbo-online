@@ -256,14 +256,41 @@ const CEILINGS = {
   // Checked before raising, as the header asks: nothing from src/test/ is imported by the product, and no test library
   // is in the built bundle. Raised by exactly the tree's bytes, as ACB's were: 723.16 + 3.823 = 726.983, so 726.99
   // (rounded UP). The 3.50 KiB main still had spare is the design arc's remainder, and stays with it.
-  js: 726.99 * KB,
+  //
+  // 726.99 -> 781.72 on 2026-09-30, MEASURED, for month end's screens, on the owner's word (MO14, "Raise to measured":
+  // both ceilings set to the measured figures in the client PR, citing the run). The pair, each built on a team runner
+  // and listed by its chunk-bytes step: client main f6b1b3a 740,843 B (723.48 KiB, run 36773278932) -> month end's
+  // integration f194755 800,474 B (781.71 KiB, run 36773289808), +59,631 B, chunk by chunk:
+  //   useWorkplaceChoice 0 -> 14,179 B · bankBranches 7,303 -> 0   the Workplace control's search (01.3). Capture and
+  //                            the record share it and the bank lookup, and Rollup gives what exactly those two pages
+  //                            share one chunk: the control's own bytes are the difference, +6,876.
+  //   MemberHistory 0 -> 11,342 B   the record's History tab (03.6) -- lazy, nothing of it before the tab is opened.
+  //   useMonths 0 -> 5,965 · MonthEndStatistic 0 -> 5,665 · MonthlyMenu 2,644 -> 6,308 · monthEnd 0 -> 3,416
+  //                            the Month end page, a statistic's screen, the months and the pack (04.1, 04.3-04.10).
+  //   Workplaces 0 -> 5,498      the workplaces' screen (01.5).
+  //   HomeFigures 0 -> 5,471 · FigureStrip 0 -> 2,086 · Home +970   the first screen's figures (02.3, 02.4).
+  //   acbRunRules 0 -> 5,273 · acbPaging 6,160 -> 917   moved, not new: the pack polls with A.C.B.'s own run rules, so
+  //                            they left A.C.B.'s paging chunk for one of their own (+30 B between the two).
+  //   Members +4,180            Change status (03.3), the Workplace field, the strip at six.
+  //   index +1,907              the routes and the rail's Month end leaf (04.1).
+  //   referenceService 0 -> 1,162 · workplaceService 0 -> 400 · memberConstants +445   the lists' and workplaces' reads.
+  //   Admin +121 · Maintenance +117 · CaptureMember +117 · format +93 · AcbDebits +39 · AcbRuns +39
+  //   · NavigationCard +23 · Modal +5 · DataState +3 · DateField +1 · bankService +1 · Locations -5   imports and stubs.
+  // Checked before raising, as the header asks: nothing from src/test/ is imported by the product, and no test library
+  // is in the built bundle. The ceiling is the measured 781.713 rounded UP to the hundredth, and no more: the 3.51 KiB
+  // main had spare is spent by it, as the owner chose the measured figure.
+  js: 781.72 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
   // raising: nothing from src/test/ is in the product; the growth is the design. 80 keeps
   // the same headroom over the measured figure that 70 kept over 60.
   css: 80 * KB,
-  total: 900 * KB,
+  // 900 -> 925.12 on 2026-09-30, MEASURED, on the owner's word (MO14), the first time `all assets` was over: the same
+  // pair as the javascript's, 866.48 KiB (run 36773278932) -> 925.11 KiB (run 36773289808). The javascript's +59,631 B
+  // and the stylesheet's +409 B (296 of them the History tab's: its column widths, gutter bleed, alignment and one line
+  // height; css stays under its own 80) are 60,040 B, 58.63 KiB -- the whole difference, to the hundredth. Rounded UP.
+  total: 925.12 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to
