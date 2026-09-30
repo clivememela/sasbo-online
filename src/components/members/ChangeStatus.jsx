@@ -19,7 +19,7 @@ import { getDeletionCodes, getSuspensionCodes } from '../../services/referenceSe
 /** The server keeps a note to this many characters and refuses one longer (03.1) -- so the field stops there. */
 export const NOTE_LIMIT = 500;
 
-const BLANK = { to: '', code: '', note: '', notice: null, codeError: null, gone: false };
+const BLANK = { to: '', code: '', reason: '', note: '', notice: null, codeError: null, reasonError: null, gone: false };
 
 /** Why a list has nothing to choose from when the SERVER gave no reason -- the route is not there, or not a list. */
 const NOT_HERE = 'This server does not have this list yet.';
@@ -60,8 +60,13 @@ function useCodeList(read, wanted) {
  *
  * The new status, SASBO's code for it, a note. A status is judged by its KIND, never its spelling (03.2): into a leaving
  * status SASBO's deletion code, by its number (RC7); into *Suspended* its suspension code; any other is a reinstatement
- * and carries none. The reasons SASBO keeps under a code (the reasons for resigning, under 2) are shown with it: the
- * change carries the code alone, so which of them applies goes in the note.
+ * and carries none.
+ *
+ * 🔑 THE REASON UNDER A CODE (04.5). SASBO keeps reasons under a code -- the reasons a member gave for resigning, under
+ * 2 -- and its `resigned` report counts them. Where the chosen code has any, *The reason they gave* offers them: optional,
+ * sent by its name as `reasonUnderCode` only when one is chosen, and named in what is said once the change is made. The
+ * note stays the administrator's own words; nothing is written into it for them. A reason the server no longer keeps
+ * under the code (`DELETION_CODE_UNKNOWN` naming what it `known`s) is said at the reason, and the list asked for again.
  *
  * `expectedStatus` is the status this screen shows, so a change made on a stale view is refused `STATUS_CHANGED_SINCE`
  * rather than written over somebody else's. WHAT IS SAID IS SAID AFTER THE MEMBER IS READ AGAIN (ME-3): the page's
@@ -105,6 +110,8 @@ export default function ChangeStatus({ member, open, onOpenChange, reread, onDon
   const answer = list && !list.loading && !list.error ? list.options[0] : null;
   const codes = !answer ? [] : leaving ? deletionCodeOptions(answer.rows) : suspensionCodeOptions(answer.rows);
   const chosen = codes.find((option) => String(option.code) === form.code);
+  // The reasons SASBO keeps under the deletion code chosen -- none under most codes, and none for a suspension.
+  const reasons = leaving ? chosen?.under ?? [] : [];
 
   const who = personName(member) || 'This member';
   const why = form.gone ? null : !form.to ? 'Choose the new status.' : list && !chosen ? 'Choose SASBO’s code for it.' : null;
@@ -112,26 +119,34 @@ export default function ChangeStatus({ member, open, onOpenChange, reread, onDon
   const submit = async () => {
     const { to, code } = form;
     const note = form.note.trim();
-    const done = (status, already) =>
-      onDone(already ? `${who} was already ${status}. Nothing more was written.` : `${who} is now ${status}.`);
+    const reasonUnderCode = reasons.includes(form.reason) ? form.reason : '';
+    // What was written is the server's to say: the reason is named as its answer names it, and not where it names none.
+    const done = (status, already, reason) =>
+      onDone(already ? `${who} was already ${status}. Nothing more was written.`
+        : `${who} is now ${status}.${reason ? ` The reason they gave: ${reason}.` : ''}`);
     setBusy(true);
-    edit({ notice: null, codeError: null });
+    edit({ notice: null, codeError: null, reasonError: null });
     try {
       const changed = await memberStatusService.changeStatus(member.id, {
         toStatus: to,
         expectedStatus: member.status,
         reason: reasonFor(to),
         ...(leaving && { deletionCode: Number(code) }),
+        ...(leaving && reasonUnderCode && { reasonUnderCode }),
         ...(suspending && { suspensionCode: Number(code) }),
         ...(note && { note }),
       });
       await reread(member.id, changed.status);
-      done(changed.status, !changed.change);
+      done(changed.status, !changed.change, changed.change?.reasonUnderCode);
     } catch (error) {
       reportError('ChangeStatus.change', error);
       const refused = error?.body?.code;
-      if (refused === DELETION_CODE_UNKNOWN || refused === SUSPENSION_CODE_UNKNOWN) {
-        edit({ code: '', codeError: error.message });
+      if (refused === DELETION_CODE_UNKNOWN && error.body.details && 'known' in error.body.details) {
+        // The code stands; the reason under it is not one SASBO keeps (any more): said there, and the list read again.
+        edit({ reason: '', reasonError: error.message });
+        list?.refetch();
+      } else if (refused === DELETION_CODE_UNKNOWN || refused === SUSPENSION_CODE_UNKNOWN) {
+        edit({ code: '', reason: '', codeError: error.message });
         list?.refetch();
       } else if (refused === STATUS_CHANGED_SINCE || writeMayHaveLanded(error)) {
         const now = error?.body?.details?.currentStatus;
@@ -188,7 +203,7 @@ export default function ChangeStatus({ member, open, onOpenChange, reread, onDon
           label="New status"
           required
           value={form.to}
-          onChange={(to) => edit({ to, code: '', codeError: null })}
+          onChange={(to) => edit({ to, code: '', reason: '', codeError: null, reasonError: null })}
           options={Object.keys(MEMBER_STATUS_KIND).filter((status) => status !== member?.status)}
           placeholder="Choose a status"
           disabled={busy || form.gone}
@@ -198,7 +213,7 @@ export default function ChangeStatus({ member, open, onOpenChange, reread, onDon
             label={`SASBO’s ${leaving ? 'deletion' : 'suspension'} code`}
             required
             value={form.code}
-            onChange={(code) => edit({ code, codeError: null })}
+            onChange={(code) => edit({ code, reason: '', codeError: null, reasonError: null })}
             options={codes}
             optionValue="code"
             optionLabel="label"
@@ -208,10 +223,19 @@ export default function ChangeStatus({ member, open, onOpenChange, reread, onDon
             onRetryLoad={list.refetch}
             emptyLabel={answer?.why ?? emptyReasonSentence(answer?.reason || 'EMPTY')}
             error={form.codeError || undefined}
-            hint={[
-              listProvenance(answer),
-              chosen?.under?.length && `Under ${chosen.code}, SASBO keeps: ${chosen.under.join(' · ')} — say which in the note.`,
-            ].filter(Boolean).join('. ') || undefined}
+            hint={listProvenance(answer) || undefined}
+            disabled={busy}
+          />
+        )}
+        {reasons.length > 0 && (
+          <SelectInput
+            label="The reason they gave"
+            value={form.reason}
+            onChange={(reason) => edit({ reason, reasonError: null })}
+            options={reasons}
+            placeholder="No reason given"
+            error={form.reasonError || undefined}
+            hint={`Optional — a reason SASBO keeps under ${chosen.label}.`}
             disabled={busy}
           />
         )}

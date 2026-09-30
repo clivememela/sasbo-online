@@ -181,6 +181,17 @@ export const SURFACES = [
       step('open Membership & Subscriptions', clickByText(`${PANEL} button`, '/Membership/i'), TEXT('Date Joined Sasbo')),
       step('Change status', clickByText(`${PANEL} button`, '/^Change status$/'), dialogNamed('/^Change status$/'))],
     present: { DIALOG: dialogNamed('/^Change status$/') }, covers: ['components/members/ChangeStatus.jsx#Modal@change status'] },
+  // Month end 04.5: the reason a resigning member gave -- offered once a deletion code with reasons under it is chosen.
+  // `serve-dist.mjs` answers the golden deletion codes, which keep one invented reason under 2.
+  { name: 'record-change-status-reason', route: '/members', ready: ROWS,
+    steps: [OPEN_FIRST_MEMBER,
+      step('open Membership & Subscriptions', clickByText(`${PANEL} button`, '/Membership/i'), TEXT('Date Joined Sasbo')),
+      step('Change status', clickByText(`${PANEL} button`, '/^Change status$/'), dialogNamed('/^Change status$/')),
+      step('choose Resigned', chooseOption('[role="dialog"]', '/^New status/', 'Resigned'),
+        `[...document.querySelectorAll('[role="dialog"] select')].some((s) => !s.disabled && /^SASBO’s deletion code/.test(s.labels?.[0]?.textContent || ''))`),
+      step('choose code 2', chooseOption('[role="dialog"]', '/^SASBO’s deletion code/', '2'),
+        `[...document.querySelectorAll('[role="dialog"] select')].some((s) => /^The reason they gave/.test(s.labels?.[0]?.textContent || ''))`)],
+    present: { REASON: `[...document.querySelectorAll('[role="dialog"] select')].some((s) => /^The reason they gave/.test(s.labels?.[0]?.textContent || ''))` } },
   { name: 'record-edit', route: '/members', ready: ROWS, steps: [OPEN_FIRST_MEMBER, EDIT_RECORD], present: { EDITING: TEXT('Save changes') } },
   { name: 'record-save-confirm', route: '/members', ready: ROWS,
     steps: [OPEN_EDITABLE_MEMBER, EDIT_RECORD, CHANGE_PHONE,

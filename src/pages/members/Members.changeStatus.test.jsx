@@ -66,6 +66,8 @@ function made(change) {
       toStatus: change.toStatus,
       reason: change.reason,
       deletionCode: change.deletionCode ?? null,
+      // The reason under the code as THIS change carried it -- never the golden change's own.
+      reasonUnderCode: change.reasonUnderCode ?? null,
       suspensionCode: change.suspensionCode ?? null,
       note: change.note ?? null,
     },
@@ -109,6 +111,8 @@ const panel = () => within(screen.getByTestId('member-panel'))
 const statusField = () => panel().getByText('Account Membership Status').nextElementSibling
 /** Asked for afresh each time: a list that failed and came back is a new control, not the one that was disabled. */
 const codeSelect = (dialog) => dialog.getByLabelText(/^SASBO’s (deletion|suspension) code/)
+/** The reason SASBO keeps under the code chosen -- there only where the code has any (04.5). */
+const reasonSelect = (dialog) => dialog.getByLabelText(/^The reason they gave/)
 const optionsOf = (select) => within(select).getAllByRole('option').map((option) => option.textContent)
 
 async function openRecord(user) {
@@ -283,14 +287,16 @@ describe('the dialog\'s code list -- four states, and never an empty dropdown', 
 })
 
 describe('what is sent -- the status the screen showed, and SASBO\'s code by its number (RC7)', () => {
-  it('🔑 a leaving: the deletion code and the note, exactly the server\'s own example -- then read again, and said', async () => {
+  it('🔑 a leaving: the deletion code, the reason under it and the note, exactly the server\'s own example -- then read again, and said', async () => {
     const user = setupUser()
     const dialog = await openDialog(user)
     await choose(dialog, user, 'Resigned', 2)
+    await user.selectOptions(reasonSelect(dialog), CHANGED.requestBody.reasonUnderCode)
     await user.type(dialog.getByLabelText(/^Note/), 'Invented: moved away')
     await press(dialog, user)
 
-    expect(await screen.findByText('Synthetic Alpha is now Resigned.')).toBeInTheDocument()
+    expect(await screen.findByText(`Synthetic Alpha is now Resigned. The reason they gave: ${CHANGED.requestBody.reasonUnderCode}.`))
+      .toBeInTheDocument()
     expect(sent).toEqual([CHANGED.requestBody])
     expect(reads, 'the record read the member again before it said anything').toBe(1)
     await closed()
@@ -338,23 +344,107 @@ describe('what is sent -- the status the screen showed, and SASBO\'s code by its
     expect(dialog.getByText(`8 of ${NOTE_LIMIT} characters`)).toBeInTheDocument()
   })
 
-  it('the reasons SASBO keeps under a code are shown with it -- and the change carries the code alone', async () => {
-    // SASBO's published codes (`api-vocabulary.json`): numbered, and the reasons for resigning kept under 2.
-    server.use(http.get('*/api/reference/deletion-codes', () =>
-      HttpResponse.json({ ...monthEndBody(DELETION_CODES), rows: vocabulary.monthEnd.deletionCodes })))
-    const numbered = vocabulary.monthEnd.deletionCodes.filter((row) => Number.isInteger(row.code))
-    const underTwo = vocabulary.monthEnd.deletionCodes.filter((row) => row.under === 2).map((row) => row.name)
+})
+
+describe('the reason under a code -- what a resigning member gave, as SASBO keeps it (04.5)', () => {
+  // SASBO's published codes (`api-vocabulary.json`): numbered, and the reasons for resigning kept under 2.
+  const numbered = vocabulary.monthEnd.deletionCodes.filter((row) => Number.isInteger(row.code))
+  const underTwo = vocabulary.monthEnd.deletionCodes.filter((row) => row.under === 2).map((row) => row.name)
+  const published = () => server.use(http.get('*/api/reference/deletion-codes', () => {
+    asked.deletion += 1
+    return HttpResponse.json({ ...monthEndBody(DELETION_CODES), rows: vocabulary.monthEnd.deletionCodes })
+  }))
+
+  it('the reasons kept under the code chosen are offered -- optional -- and none chosen, the change carries the code alone', async () => {
+    published()
     const user = setupUser()
     const dialog = await openDialog(user)
     await choose(dialog, user, 'Resigned', 2)
 
     expect(optionsOf(codeSelect(dialog))).toEqual(['Choose a code', ...numbered.map((row) => `${row.code} · ${row.name}`)])
-    expect(dialog.getByText(/Under 2, SASBO keeps:/))
-      .toHaveTextContent(`Under 2, SASBO keeps: ${underTwo.join(' · ')} — say which in the note.`)
+    expect(optionsOf(reasonSelect(dialog))).toEqual(['No reason given', ...underTwo])
+    expect(reasonSelect(dialog)).not.toBeRequired()
+    expect(reasonSelect(dialog)).toHaveAccessibleDescription('Optional — a reason SASBO keeps under 2 · Resigned Society.')
+    expect(dialog.getByRole('button', { name: 'Change status' })).toBeEnabled()
     await press(dialog, user)
 
     expect(await screen.findByText('Synthetic Alpha is now Resigned.')).toBeInTheDocument()
     expect(sent).toEqual([{ toStatus: 'Resigned', expectedStatus: 'Active', reason: 'DELETION_CODE', deletionCode: 2 }])
+  })
+
+  it('🔴 one chosen is sent by its name as reasonUnderCode, and what is said names it -- the note stays the administrator\'s own', async () => {
+    published()
+    const user = setupUser()
+    const dialog = await openDialog(user)
+    await choose(dialog, user, 'Resigned', 2)
+    await user.selectOptions(reasonSelect(dialog), 'Financial')
+    await user.type(dialog.getByLabelText(/^Note/), 'Invented note')
+    await press(dialog, user)
+
+    expect(await screen.findByText('Synthetic Alpha is now Resigned. The reason they gave: Financial.')).toBeInTheDocument()
+    expect(sent).toEqual([{
+      toStatus: 'Resigned', expectedStatus: 'Active', reason: 'DELETION_CODE', deletionCode: 2, reasonUnderCode: 'Financial',
+      note: 'Invented note',
+    }])
+  })
+
+  it('a code with no reasons under it offers none -- and changing the code lets go of the reason chosen', async () => {
+    published()
+    const user = setupUser()
+    const dialog = await openDialog(user)
+    await choose(dialog, user, 'Resigned', 5)
+    expect(dialog.queryByLabelText(/^The reason they gave/)).not.toBeInTheDocument()
+
+    await user.selectOptions(codeSelect(dialog), '2')
+    await user.selectOptions(reasonSelect(dialog), 'Personal')
+    await user.selectOptions(codeSelect(dialog), '5')
+    expect(dialog.queryByLabelText(/^The reason they gave/)).not.toBeInTheDocument()
+    await user.selectOptions(codeSelect(dialog), '2')
+    expect(reasonSelect(dialog)).toHaveValue('')
+    await press(dialog, user)
+
+    expect(await screen.findByText('Synthetic Alpha is now Resigned.')).toBeInTheDocument()
+    expect(sent).toEqual([{ toStatus: 'Resigned', expectedStatus: 'Active', reason: 'DELETION_CODE', deletionCode: 2 }])
+  })
+
+  it('a suspension never carries one, whatever was chosen for a leaving before it', async () => {
+    published()
+    const user = setupUser()
+    const dialog = await openDialog(user)
+    await choose(dialog, user, 'Resigned', 2)
+    await user.selectOptions(reasonSelect(dialog), 'Personal')
+    await choose(dialog, user, 'Suspended', 13)
+    expect(dialog.queryByLabelText(/^The reason they gave/)).not.toBeInTheDocument()
+    await press(dialog, user)
+
+    expect(await screen.findByText('Synthetic Alpha is now Suspended.')).toBeInTheDocument()
+    expect(sent).toEqual([{ toStatus: 'Suspended', expectedStatus: 'Active', reason: 'SUSPENSION_CODE', suspensionCode: 13 }])
+  })
+
+  it('🔴 a reason the server does not keep under the code: said AT THE REASON in its words, the code kept, the list read again', async () => {
+    published()
+    // The server's refusal in its golden shape, naming the reason's code and what it keeps under it (details `known`).
+    const refusal = monthEndExamples.refusals.DELETION_CODE_UNKNOWN
+    const sentence = 'That reason is not one SASBO keeps under code 2. Choose one of its own, or none.'
+    server.use(http.post('*/api/members/:id/status', async ({ request }) => {
+      sent.push(await request.json())
+      return HttpResponse.json({ ...refusal.body, message: sentence, details: { deletionCode: '2', known: underTwo.join(',') } },
+        { status: refusal.status })
+    }))
+    const user = setupUser()
+    const dialog = await openDialog(user)
+    await choose(dialog, user, 'Resigned', 2)
+    await user.selectOptions(reasonSelect(dialog), 'Other Union')
+    await press(dialog, user)
+
+    await waitFor(() => expect(asked.deletion).toBe(2))
+    await waitFor(() => expect(reasonSelect(dialog)).toHaveAccessibleDescription(sentence))
+    expect(reasonSelect(dialog)).toHaveValue('')
+    expect(codeSelect(dialog)).toHaveValue('2')
+    expect(codeSelect(dialog)).not.toHaveAccessibleDescription(sentence)
+    expect(dialog.getAllByText(sentence)).toHaveLength(1)
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).toMatchObject({ deletionCode: 2, reasonUnderCode: 'Other Union' })
   })
 })
 
