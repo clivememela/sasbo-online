@@ -30,6 +30,12 @@ export const MEMBER_NOT_FOUND = 'MEMBER_NOT_FOUND';
 export const DELETION_CODE_UNKNOWN = 'DELETION_CODE_UNKNOWN';
 export const SUSPENSION_CODE_UNKNOWN = 'SUSPENSION_CODE_UNKNOWN';
 
+/**
+ * A page of a member's history that does not exist (03.6) -- the record's History tab goes back to the first page and
+ * says so, and offers no *Try again*: asking for the same page again gets the same answer.
+ */
+export const HISTORY_PAGE_INVALID = 'HISTORY_PAGE_INVALID';
+
 /** The refusal codes the screens branch on (ME-13) -- each one the server publishes. */
 export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   REQUEST_MALFORMED: 'REQUEST_MALFORMED',
@@ -39,6 +45,7 @@ export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   MEMBER_NOT_FOUND,
   DELETION_CODE_UNKNOWN,
   SUSPENSION_CODE_UNKNOWN,
+  HISTORY_PAGE_INVALID,
 });
 
 /**

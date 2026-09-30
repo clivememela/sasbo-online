@@ -358,6 +358,76 @@ const workplacePage = (page, size) => ({
 });
 
 /*
+ * A MEMBER'S HISTORY (`03.6`), `GET /api/members/{id}/history?page=&size=`. The golden page holds two entries -- a
+ * field changed, and the capture -- right for the suite and too few to measure a sheet with, so they sit among invented
+ * ones in the same shape, as the tab's mock draws them: a change of status with SASBO's code and the reason under it, a
+ * change of workplace (the golden workplaces'), a save of three fields, and an identity number kept as its last four.
+ * Newest first and then by the entry's own number, as the server orders them. The page and its size are the request's,
+ * so the tab's page of fifty and its one-entry look past a page's edge are each answered as asked; a page past the last
+ * is refused as the server refuses it, and a member the stub does not hold is `MEMBER_NOT_FOUND`. Every member holds the
+ * same history -- it measures the tab, not the member.
+ */
+const goldenHistory = golden('GET /api/members/{id}/history');
+const historyEntry = (fields) => ({
+  ...goldenHistory.content[0],
+  reason: null, code: null, codeName: null, reasonUnderCode: null, saveId: null, note: null,
+  ...fields,
+});
+const HISTORY = [
+  historyEntry({
+    kind: 'STATUS', id: 1, changedAt: '2026-09-29T08:14:00Z', what: 'status', from: 'Active', to: 'Resigned',
+    reason: 'DELETION_CODE', code: 2, codeName: 'Resigned Society', reasonUnderCode: 'INVENTED: MOVED AWAY',
+    note: 'Invented: letter of resignation received by email.',
+  }),
+  historyEntry({
+    kind: 'FIELD', id: 7, changedAt: '2026-09-14T13:02:00Z', what: 'workplace',
+    from: '900002 INVENTED HEAD OFFICE', to: '900003 INVENTED HARBOUR', saveId: 'invented-save-7',
+  }),
+  historyEntry({
+    kind: 'FIELD', id: 6, changedAt: '2026-09-12T07:31:00Z', what: 'address',
+    from: '12 Invented Road, Invented Park', to: '4 Invented Lane, Invented Heights', saveId: 'invented-save-4',
+  }),
+  historyEntry({
+    kind: 'FIELD', id: 5, changedAt: '2026-09-12T07:31:00Z', what: 'phone',
+    from: '+27 60 555 0101', to: '+27 60 555 0188', saveId: 'invented-save-4',
+  }),
+  historyEntry({
+    kind: 'FIELD', id: 4, changedAt: '2026-09-12T07:31:00Z', what: 'personalEmail',
+    from: null, to: 'synthetic.member@example.invalid', saveId: 'invented-save-4',
+  }),
+  historyEntry({
+    kind: 'FIELD', id: 3, changedAt: '2026-09-11T09:47:00Z', what: 'identityNumber',
+    from: '****4081', to: '****4087', saveId: 'invented-save-3',
+  }),
+  ...goldenHistory.content,
+];
+const HISTORY_PAGE = 50;
+const historyAnswer = (memberId, path, query) => {
+  const page = Number(query.get('page') ?? 0);
+  const size = Number(query.get('size') ?? HISTORY_PAGE);
+  const refused = (code, message, details) => {
+    const { status, body } = envelope(code, message, details);
+    return { status, body: { ...body, path } };
+  };
+  if (!Number.isInteger(page) || !Number.isInteger(size) || page < 0 || size < 1 || size > 200) {
+    return refused('HISTORY_PAGE_INVALID', null, { page: String(page), size: String(size), maxSize: '200' });
+  }
+  if (!members.some((member) => member.id === memberId)) {
+    return refused('MEMBER_NOT_FOUND', null, { memberId: String(memberId) });
+  }
+  const content = HISTORY.slice(page * size, (page + 1) * size);
+  if (!content.length && page > 0) {
+    return refused('HISTORY_PAGE_INVALID', null, { page: String(page), size: String(size), maxSize: '200' });
+  }
+  return {
+    status: 200,
+    body: {
+      ...goldenHistory, content, page, size, totalElements: HISTORY.length, totalPages: Math.ceil(HISTORY.length / size),
+    },
+  };
+};
+
+/*
  * MONTH END ITSELF (`04.1`-`04.10`): the months, the six statistics, the listings and the take that refuse, and the
  * statistics pack -- every answer cut from the golden ones, and every refusal the server's own envelope, so a sweep
  * photographs what the server says.
@@ -386,7 +456,8 @@ const envelope = (code, message, details) => {
   return { status: example.status, body: { ...example.body, ...(message && { message }), ...(details && { details }) } };
 };
 // Every refusal a month end route answers here, looked up now: one the golden file lacks stops the start by name.
-['REQUEST_MALFORMED', 'MONTH_NOT_BEGUN', 'MONTH_NOT_TAKEN', 'SUMMARY_AREA_UNKNOWN', 'IDENTITY_REQUIRED', 'PACK_NOT_FOUND']
+['REQUEST_MALFORMED', 'MONTH_NOT_BEGUN', 'MONTH_NOT_TAKEN', 'SUMMARY_AREA_UNKNOWN', 'IDENTITY_REQUIRED', 'PACK_NOT_FOUND',
+  'HISTORY_PAGE_INVALID', 'MEMBER_NOT_FOUND']
   .forEach((code) => envelope(code));
 const AREAS = new Set(golden('GET /api/reference/areas').rows.map((row) => row.letter));
 const REGIONS = new Set(golden('GET /api/reference/regions').rows.map((row) => row.code));
@@ -526,6 +597,9 @@ const monthEndAnswer = (req, path, query) => {
     }
     return { status: 200, body: workplacePage(page, size) };
   }
+  // A member's history (03.6) -- a prefix match would answer it with the list of members.
+  const history = /^\/api\/members\/(\d+)\/history$/.exec(path);
+  if (req.method === 'GET' && history) return historyAnswer(Number(history[1]), path, query);
   // It answers the golden change whatever is asked: it measures the dialog, not the rule.
   const m = /^\/api\/members\/(\d+)\/status$/.exec(path);
   if (req.method === 'POST' && m) return { status: 200, body: { ...statusChanged, memberId: Number(m[1]) } };

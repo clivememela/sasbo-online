@@ -46,6 +46,11 @@ const MENU_ROWS = `!!document.querySelector('main a[href="/members"]')`;
 const EXPANDED = (scope) => `!!document.querySelector(${JSON.stringify(`${scope} [aria-expanded="true"]`)})`;
 /** The Month end page's six statistics, each a link to its screen (`04.1`). */
 const MONTH_END_LINKS = `document.querySelectorAll('main a[href^="/admin/monthly-menu/"]').length === 6`;
+/**
+ * The record's History tab in one of its four states (`MemberHistory.jsx`'s `data-history`) -- not `DataState`'s own
+ * `data-state`, which turns `slow` after five seconds of a held request while the tab is still loading.
+ */
+const HISTORY = (state) => `!!document.querySelector('${PANEL} [data-history="${state}"]')`;
 
 /* ── drivers used here only ─────────────────────────────────────────────────────────────────────── */
 
@@ -108,6 +113,17 @@ const DIALOG_DATE_IN_VIEW = step('bring Election Date into view', scrollIntoView
 const network = (what, offline, until) => ({ what, network: offline, until });
 
 const OPEN_FIRST_MEMBER = step('open the first member', clickByText('[data-row-action]', '/open the record for/i'), PANEL_OPEN);
+/** Open the record's History tab (month end 03.6) -- shown "History", named "History of changes" -- until `state`. */
+const OPEN_HISTORY = (state) => step('open History', clickByText(`${PANEL} button`, '/^History/'), HISTORY(state));
+/**
+ * An empty history as the server answers one (ME-7): the golden page with no entries, and the day the history began --
+ * a member older than the history, whose record nothing has changed since. Read when a capture asks for it.
+ */
+const emptyHistory = () => {
+  const golden = JSON.parse(readFileSync(join(REPO_ROOT, 'src', 'test', 'month-end-examples.json'), 'utf8'))
+    .answers['GET /api/members/{id}/history'].body;
+  return { ...golden, content: [], totalElements: 0, totalPages: 0 };
+};
 /**
  * A member whose record can be SAVED. The stub's first member is flagged BEC with no primary committee, so its edit stops
  * at the app's own validation ("Please select an active primary BEC Committee") before any confirmation can ask -- a
@@ -194,6 +210,33 @@ export const SURFACES = [
       step('choose code 2', chooseOption('[role="dialog"]', '/^SASBO’s deletion code/', '2'),
         `[...document.querySelectorAll('[role="dialog"] select')].some((s) => /^The reason they gave/.test(s.labels?.[0]?.textContent || ''))`)],
     present: { REASON: `[...document.querySelectorAll('[role="dialog"] select')].some((s) => /^The reason they gave/.test(s.labels?.[0]?.textContent || ''))` } },
+  // Month end 03.6: the record's History tab, a chunk of its own asked for when the tab is opened. `serve-dist.mjs`
+  // answers every member's history with the golden page among invented entries in its shape -- a change of status with
+  // SASBO's code and the reason under it, a workplace, a save of three fields, a number kept as its last four -- so the
+  // sheet a sweep measures is the mock's. Each other state is reached the way a person meets it: held, failed, empty.
+  { name: 'record-history', route: '/members', ready: ROWS, steps: [OPEN_FIRST_MEMBER, OPEN_HISTORY('ready')],
+    present: { SHEET: HISTORY('ready'), WHO: TEXT('Not recorded'), REASON: TEXT('Code 2 · Resigned Society'),
+      SAVE: TEXT('in one save'), MASKED: TEXT('Only the last four digits are kept.'), PAGER: TEXT('Showing 1–8 of 8') } },
+  { name: 'record-history-loading', route: '/members', ready: ROWS,
+    intercept: { url: '*/api/members/*/history*', mode: 'hang' },
+    steps: [OPEN_FIRST_MEMBER, OPEN_HISTORY('loading')],
+    present: { LOADING: HISTORY('loading'), PAGER: TEXT('Loading changes…') },
+    covers: ['pages/members/MemberHistory.jsx#DataState@loading'] },
+  { name: 'record-history-error', route: '/members', ready: ROWS,
+    intercept: { url: '*/api/members/*/history*', mode: 'fail' },
+    steps: [OPEN_FIRST_MEMBER, OPEN_HISTORY('error')],
+    present: { ERROR: HISTORY('error'), NOT_EMPTY: TEXT('this is not an empty history'), PAGER: TEXT('Could not load changes') },
+    covers: ['pages/members/MemberHistory.jsx#DataState@state'] },
+  { name: 'record-history-empty', route: '/members', ready: ROWS,
+    intercept: { url: '*/api/members/*/history*', mode: 'fulfill', body: emptyHistory },
+    steps: [OPEN_FIRST_MEMBER, OPEN_HISTORY('empty')],
+    present: { EMPTY: HISTORY('empty'), SINCE: TEXT('No changes recorded since 01 Sep 2026') },
+    covers: ['pages/members/MemberHistory.jsx#DataState@state'] },
+  // A History chunk that will not load is held by the record's own boundary: one line, and the record around it.
+  { name: 'record-history-chunk-failed', route: '/members', ready: ROWS,
+    intercept: { url: '*/assets/MemberHistory-*.js', mode: 'fail' },
+    steps: [OPEN_FIRST_MEMBER, step('open History', clickByText(`${PANEL} button`, '/^History/'), TEXT('The history could not be shown.'))],
+    present: { FAILED: TEXT('The history could not be shown.'), RECORD: PANEL_OPEN } },
   { name: 'record-edit', route: '/members', ready: ROWS, steps: [OPEN_FIRST_MEMBER, EDIT_RECORD], present: { EDITING: TEXT('Save changes') } },
   { name: 'record-save-confirm', route: '/members', ready: ROWS,
     steps: [OPEN_EDITABLE_MEMBER, EDIT_RECORD, CHANGE_PHONE,

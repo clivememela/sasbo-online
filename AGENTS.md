@@ -172,6 +172,8 @@ Each page component in `src/pages/`:
    - Uses `bankService.getBankListing()` for consolidated bank data (bank name, abbreviation, universal branch code)
    - Simpler UI focused on lookup and display
 4. **Members** (`members/Members.jsx`): Search & manage members
+   - **MemberHistory**: the record's History tab (month end `03.6`) -- one ruled row a change, newest first, from
+     `GET /api/members/{id}/history`; a lazy chunk of its own, asked for when the tab is opened
    - **CaptureMember**: Form to add new member
    - **Representatives**: Search representatives
 5. **Forms** (`forms/`):
