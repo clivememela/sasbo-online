@@ -1,3 +1,5 @@
+import { useId } from 'react';
+
 import { cn } from '../../lib/utils';
 
 /**
@@ -27,12 +29,28 @@ export default function CheckboxGroup({
   selected = [],
   onToggle,
   labelFor = (option) => option,
+  // V55: the record's structures need at least one box ticked, so the group says so -- the required marker and
+  // the error as `Field` renders them, and the error named on the FIELDSET, where a screen reader announces the
+  // question it belongs to. Built from what renders, as `Field`'s describedby is.
+  required = false,
+  error = null,
   className,
 }) {
+  const errorId = `${useId()}-error`;
   return (
-    <fieldset className={cn('rounded-lg border border-line bg-surface-2 p-4', className)}>
+    <fieldset
+      aria-describedby={error ? errorId : undefined}
+      className={cn('rounded-lg border bg-surface-2 p-4', error ? 'border-status-suspended-dot' : 'border-line', className)}
+    >
       <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
         {legend}
+        {required && (
+          <>
+            {' '}
+            <span aria-hidden="true" className="text-status-suspended">*</span>
+            <span className="sr-only">(required)</span>
+          </>
+        )}
       </legend>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {options.map((option) => {
@@ -59,6 +77,11 @@ export default function CheckboxGroup({
           );
         })}
       </div>
+      {error && (
+        <p id={errorId} role="alert" className="mt-2 text-xs font-normal normal-case tracking-normal text-status-suspended">
+          {error}
+        </p>
+      )}
     </fieldset>
   );
 }
