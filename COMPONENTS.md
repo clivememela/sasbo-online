@@ -1039,7 +1039,10 @@ the finish review of 2026-09-10 named it as the one material contradiction on Ho
 menu page, so the menu takes the register's grammar: a sheet of rows, each with its icon in the
 brand's ink, its name, what it holds, and a chevron — read down the page the way the register is.
 
-**Props.** `title`, `icon` (a lucide component), `href`, `desc`, `onSelect`.
+**Props.** `title`, `icon` (a lucide component), `href`, `desc`, `onSelect`, `note` (the caption of a row with no
+`href`, default *Not yet available* — month end's listings say *Waits for sign-in*, being built and refusing until
+sign-in; keep it short, it never wraps). `NavigationList` takes `cards`, `onSelect`, `wide` and `className` (month end's
+page sets its lists under section headings).
 
 **States.**
 
@@ -1057,7 +1060,8 @@ brand's ink, its name, what it holds, and a chevron — read down the page the w
 The icon is `aria-hidden`. The whole row is the target — a row whose only hit area is its title is
 the commonest way a touch target ends up under 44px while looking enormous.
 
-**Held by.** **Nothing.** Ten call sites and no test.
+**Held by.** No test of its own. `src/pages/admin/MonthlyMenu.test.jsx` drives both branches through the Month end
+page: its statistics as links, and its listings as rows that are not links, with their `note`.
 
 ---
 
@@ -1527,7 +1531,9 @@ the automation arc finds by that name), `aria-hidden="true"` when not. `data-tes
 
 ## `FigureStrip` — `src/components/members/FigureStrip.jsx`
 
-**One consumer: `Members.jsx`.**
+**Two consumers: `Members.jsx`, and the first screen's figures (`src/pages/home/HomeFigures.jsx`, month end `02.3`).**
+They are two instruments — the register counts the list it holds, the first screen reads the server's summary — and
+one strip draws both (`02.4`, BR9).
 
 **What it is for.** The register's totals as a **ruled figure strip** — a ledger line, not tiles.
 DESIGN.md's refusals name the alternative explicitly ("hero-metric tiles, dashboards of same-size
@@ -1535,10 +1541,14 @@ cards, nested cards"), so **the shape is the decision**: a ledger rules a line a
 figures and separates them with hairlines, because a box says *"this is a thing"* and a ruled column
 says *"this is a reading of one thing"*.
 
-**Props.** `total`, `active`, `pending`, `suspended`, `newThisMonth` and `newDebitOrders` (optional —
-the month's joiners and how many of them pay by debit order; absent means that figure is not rendered),
-`updatedToday` (optional — absent means that figure is not rendered at all), `state`
-(`'ready'|'loading'|'error'`, default `'ready'`), `className`.
+**Props.** `figures` — the figures **as data**, ruled in the order given: `{ label, value, dot?, quiet?,
+breakdown?, definition? }`, where `definition` is the figure's second line saying what it counted (ME-10) and a
+`value` of `null` reads *not available*, never a nought — `label` (the strip's name for a screen reader, default
+*Register summary*), `state` (`'ready'|'loading'|'error'`, default `'ready'`), `className`. **The register's own
+props are still accepted** and become that list through the exported `registerFigures`: `total`, `active`, `pending`,
+`suspended`, `newThisMonth` and `newDebitOrders` (optional — the month's joiners and how many of them pay by debit
+order; absent means that figure is not rendered), `updatedToday` (optional — absent means that figure is not rendered
+at all). A `breakdown` or a `definition` is printed only once its figure was read.
 
 **"New this month" (SASBO, 18 Sep 2026).** One quiet figure with a second line, "N by debit order" —
 not two figures, because six divide evenly into the stylesheet's three- and two-column modes where
@@ -1568,11 +1578,16 @@ utility classes cannot resize it. `Table`'s skeleton took the same fix for its s
 📐 The columns are the stylesheet's — one equal column per figure, then three, then two — answering
 **the strip's own width** (**The Container Rule**), which is why the component is a wrapper plus a list.
 Measured at 1280×661 with scrollbars shown: six columns of 160 px in one row at full width, 3 + 3 at
-534 px with a record docked, no label overflowing.
+534 px with a record docked, no label overflowing. **Each figure is three rows of the strip's own grid** (a
+subgrid: label, value, second line), and a label wider than its column takes a second line and sits on its value —
+so the first screen's *Members on record* beside the rail moves its whole row down with it, and the values stay level.
 
 **Held by.** `src/components/members/FigureStrip.test.jsx` — the three cases above, with the genuinely
 empty register as the must-pass, plus the six-figure arrangement and a caller that passes no month
 figure; `src/pages/members/Members.newThisMonth.test.jsx` reads the month against a pinned calendar.
+`src/components/members/FigureStrip.data.test.jsx` holds the figures given as data — the order, the definitions, a
+`null` that is not a nought, and the register's props drawing the identical strip; `src/pages/Home.figures.test.jsx`
+holds the first screen's five states.
 
 ---
 
@@ -1810,7 +1825,7 @@ layout to reach for: **a footer that can overlap content is not a variant worth 
 | `KeyHints` | 1 (`Members.jsx`) | a register affordance, not a primitive |
 | `MembershipCard` | 1 (`MemberPanel`) | the signature object; **The Material-Once Rule** says keep it so |
 | `MemberPanel` | 1 (`Members.jsx`) | the register's third column |
-| `FigureStrip` | 1 (`Members.jsx`) | the register's totals |
+| `FigureStrip` | 2 (`Members.jsx`, `HomeFigures.jsx`) | the register's totals, and the first screen's figures |
 | `WelcomeLetter` | 1 (`CaptureMember.jsx`) | a screen-specific dialog |
 | `OfflineBanner` | 1 (`Main.jsx`) | correct — a shell-level fact |
 | `Footer` | 1 (`AuthLayout.jsx`) | the auth screens' line |

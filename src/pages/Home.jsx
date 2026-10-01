@@ -1,4 +1,6 @@
+import { lazy, Suspense, useDeferredValue } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import ErrorBoundary from '../components/common/ErrorBoundary';
 import { NavigationList } from '../components/common/NavigationCard';
 import { Page } from '../components/common/Sheet.jsx';
 import PageTitle from '../components/common/PageTitle';
@@ -40,11 +42,34 @@ const cards = navItems
     desc: DESCRIPTIONS[item.href],
   }));
 
+/*
+ * 🗣️ *"THE EYE OF SASBO"* (SASBO's 22 Sep agenda): the figures sit above the menu rows -- month end `02.3`.
+ *
+ * 🔑 AND THE MENU NEVER WAITS FOR THEM (MD69). The figures are a chunk of their own, and it is not even asked for until
+ * the menu has painted: `useDeferredValue(true, false)` renders this page first with `false` -- the title and the menu
+ * rows, and no figures -- and then again, after that paint, with `true`, which is when the chunk is fetched and the
+ * summary requested. A figures chunk that cannot load, or that throws, is held by a boundary of its own and says so in
+ * one line: the menu rows beneath it are untouched.
+ */
+const HomeFigures = lazy(() => import('./home/HomeFigures.jsx'));
+
+const figuresFailed = () => (
+  <p className="mt-6 text-sm text-ink-muted">The figures could not be shown. Reload the page to try again.</p>
+);
+
 export default function Home() {
   const { setSelectedCardHref } = useOutletContext() || {};
+  const menuPainted = useDeferredValue(true, false);
   return (
     <Page>
-      <PageTitle title="Welcome to SASBO Online" subtitle="Select an area to begin." />
+      <PageTitle title="Welcome to SASBO Online" subtitle="Where SASBO stands, and every area of the system." />
+      {menuPainted && (
+        <ErrorBoundary fallback={figuresFailed}>
+          <Suspense fallback={null}>
+            <HomeFigures />
+          </Suspense>
+        </ErrorBoundary>
+      )}
       <NavigationList wide cards={cards} onSelect={(card) => setSelectedCardHref?.(card.href)} />
     </Page>
   );

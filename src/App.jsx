@@ -46,12 +46,18 @@ const Acb = lazy(() => import('./pages/admin/Acb.jsx'));
 const AcbDebits = lazy(() => import('./pages/acb/AcbDebits.jsx'));
 const AcbRuns = lazy(() => import('./pages/acb/AcbRuns.jsx'));
 const DailyMenu = lazy(() => import('./pages/admin/DailyMenu.jsx'));
+// Month end `04.1`: the page is renamed "Month end" and its address is not (MD38) -- the Monthly Menu's address is
+// written in five places, two of them tools' route lists (BR47). `04.3`-`04.8`: ONE route, and one chunk, for the six
+// statistics; a name the server has no statistic for is the page's not-found state, never a blank.
 const MonthlyMenu = lazy(() => import('./pages/admin/MonthlyMenu.jsx'));
+const MonthEndStatistic = lazy(() => import('./pages/admin/MonthEndStatistic.jsx'));
 const CaptureMember = lazy(() => import('./pages/members/CaptureMember.jsx'));
 const Maintenance = lazy(() => import('./pages/admin/Maintenance.jsx'));
 const BankListing = lazy(() => import('./pages/bank_branch/BankListing.jsx'));
 const RecruitmentChannel = lazy(() => import('./pages/maintainance/RecruitmentChannel.jsx'));
 const Subscriptions = lazy(() => import('./pages/maintainance/Subscriptions.jsx'));
+// Month end `01.5`: SASBO's workplaces -- a leaf of Maintenance, beside the other tables it maintains.
+const Workplaces = lazy(() => import('./pages/maintainance/Workplaces.jsx'));
 
 // NAMED exports, so the dynamic import has to be adapted to lazy()'s default-export
 // contract. Written out rather than hidden in a helper: the shape of the mistake --
@@ -82,6 +88,7 @@ function App() {
         <Route path="admin/acb/runs" element={<AcbRuns />} />
         <Route path="admin/daily-menu" element={<DailyMenu />} />
         <Route path="admin/monthly-menu" element={<MonthlyMenu />} />
+        <Route path="admin/monthly-menu/:statistic" element={<MonthEndStatistic />} />
         <Route path="recruiters" element={<Recruiters />} />
         <Route path="banks" element={<MapsScope><BanksPage /></MapsScope>} />
         <Route path="banks/listing" element={<BankListing />} />
@@ -100,6 +107,7 @@ function App() {
         <Route path="archives/research-information" element={<ResearchInformation />} />
         <Route path="admin/maintenance" element={<Maintenance/>} />
         <Route path="admin/maintenance/recruitment-channel" element={<RecruitmentChannel />} />
+        <Route path="admin/maintenance/workplaces" element={<Workplaces />} />
       </Route>
     </Routes>
   )

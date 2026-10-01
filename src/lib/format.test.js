@@ -5,6 +5,7 @@ import {
   formatDate,
   formatDateLong,
   formatInt,
+  formatPercent,
   formatZar,
   isValidDate,
   parseDate,
@@ -130,6 +131,20 @@ describe('format — money and numbers name their locale', () => {
     expect(formatInt(1234).replace(/[^\d]/g, '')).toBe('1234')
     expect(formatInt(null)).toBe(EMPTY)
     expect(formatInt('abc')).toBe(EMPTY)
+  })
+
+  it('02.3: a penetration is a percentage with two decimals, shown as it is above a hundred', () => {
+    // The same rule as the rands: the digits and the separator, not the exact space before the sign.
+    expect(formatPercent(0.6337)).toMatch(/^63,37\s%$/)
+    expect(formatPercent(1.042)).toMatch(/^104,20\s%$/)
+    // The must-pass beside the refusals below: a penetration of nought is a figure.
+    expect(formatPercent(0)).toMatch(/^0,00\s%$/)
+  })
+
+  it('🔴 02.3: no staff complement on record is no penetration -- the em dash, never 0,00 %', () => {
+    for (const missing of [null, undefined, '0.5', NaN, Infinity]) {
+      expect(formatPercent(missing), String(missing)).toBe(EMPTY)
+    }
   })
 })
 

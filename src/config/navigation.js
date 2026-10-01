@@ -96,59 +96,14 @@ export const navItems = [
           //{title: 'Area & Table Code', icon: LucidePrinter, href: '/archives', desc: 'Print Members by Area & Table code', color: 'text-red-600 dark:text-red-400'},
         ]
       },
-      /*{
-        title: "Monthly Menu",
-        icon: LucideCalendar,
-        //color: 'text-red-600 dark:text-red-400',
+      // Month end `04.1`: the Monthly Menu, renamed, at the address it always had (MD38) -- a LEAF, with nothing under
+      // it (BR8): its nine legacy rows went with the page's. Written three times -- here, as Admin Membership's card and
+      // as the route -- and `MonthlyMenu.test.jsx` holds the three together.
+      {
+        title: "Month end",
+        icon: LucideCalendarRange,
         href: "/admin/monthly-menu",
-        subItems: [
-          {
-            title: 'Key File Setup',
-            icon: LucideFile,
-            color: 'text-red-600 dark:text-red-400'},
-          {
-            title: 'Flag All Ports',
-            icon: LucideHdmiPort,
-            color: 'text-red-600 dark:text-red-400'
-          },
-          {
-            title: 'Print Log File',
-            icon: LucideLogs,
-            color: 'text-red-600 dark:text-red-400'
-          },
-          {
-            title: 'Merge All Audit Trails',
-            icon: LucideTrain,
-            //href: '/endowment-fund',
-            color: 'text-red-600 dark:text-red-400'
-          },
-          {
-            title: 'Prepare File for Vari Mail',
-            icon: LucideMail,
-            color: 'text-red-600 dark:text-red-400'
-          },
-          {
-            title: 'Extract New and Deleted',
-            icon: LucideTable,
-            color: 'text-red-600 dark:text-red-400'
-          },
-          {
-            title: 'Print Location Listing',
-            icon: LucideLocate,
-            color: 'text-red-600 dark:text-red-400'
-          },
-          {
-            title: 'Print Member Roll (No Adding)' ,
-            icon: LucidePaintRoller,
-            color: 'text-red-600 dark:text-red-400'
-          },
-          {
-            title: 'Print Membership Summary',
-            icon: LucideUserRound,
-            color: 'text-red-600 dark:text-red-400'
-          },
-        ]
-      },*/
+      },
       {
         title: "A.C.B",
         href:'/admin/acb',
@@ -201,6 +156,14 @@ export const navItems = [
             icon: LucideMails,
             href: '/admin/maintenance/subscriptions',
             desc: 'Maintain Subscription Table',
+          },
+          // Month end `01.5` (MD61): SASBO's workplaces. Written twice, here and as `Maintenance.jsx`'s card, and
+          // `Maintenance.test.jsx` holds the two together (MR-ROB-37).
+          {
+            title: 'Workplaces',
+            icon: Building2,
+            href: '/admin/maintenance/workplaces',
+            desc: 'Find a workplace by its name or R/A number',
           },
         ],
       },

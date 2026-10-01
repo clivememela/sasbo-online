@@ -22,18 +22,31 @@ import { readFileSync } from 'node:fs';
 export const ROUTES = [
   '/login', '/home', '/admin', '/admin/acb', '/admin/acb/debits', '/admin/acb/runs', '/admin/daily-menu',
   '/admin/monthly-menu', '/admin/maintenance', '/admin/maintenance/recruitment-channel',
-  '/admin/maintenance/subscriptions', '/recruiters', '/banks', '/banks/listing',
+  '/admin/maintenance/subscriptions', '/admin/maintenance/workplaces', '/recruiters', '/banks', '/banks/listing',
   '/members', '/members/apply', '/members/capture', '/members/recruiters',
   '/reports', '/reports/organizer-report', '/reports/forms', '/reports/locations',
   '/archives', '/archives/affiliations-other-trade-unions', '/archives/finance-houses',
   '/archives/research-information',
+  // Month end `04.3`-`04.8`: the one route `/admin/monthly-menu/:statistic`, swept at each of its six addresses -- a
+  // route with a parameter is a screen a person reaches only by a real value (`routeComplaints`, below).
+  '/admin/monthly-menu/new-and-deleted', '/admin/monthly-menu/membership', '/admin/monthly-menu/leavers',
+  '/admin/monthly-menu/branches', '/admin/monthly-menu/recruitment', '/admin/monthly-menu/representatives',
 ];
+
+/**
+ * A routed path as the addresses it answers: `/admin/monthly-menu/:statistic` answers any one segment where the
+ * parameter is. A route's paths are letters, digits, hyphens and slashes, so nothing in one needs escaping.
+ */
+const answers = (routed) => new RegExp(`^${routed.replace(/:[^/]+/g, '[^/]+')}$`);
 
 /**
  * 🔑 THE LIST ABOVE IS HELD AGAINST `App.jsx`, NOT REMEMBERED. "Every route" is a completeness
  * claim, and the floors doctrine is explicit that a completeness claim is asserted against the
  * set's own discovery: a route added to the router and not to this list is a route the matrix, the
  * edge sweep and the motion proof all skip, inside runs that each say "every route".
+ *
+ * A route with a parameter is swept by the addresses listed for it -- never by its pattern, which no person can visit:
+ * it is covered when at least one listed address answers it, and a listed address is routed when any route answers it.
  *
  * Returns complaints; empty means the list is the router's.
  */
@@ -51,10 +64,11 @@ export function routeComplaints(appFile = 'src/App.jsx') {
     routed.add(`/${path.replace(/^\//, '')}`);
   }
   if (routed.size < 20) return [`read only ${routed.size} routes from ${appFile} -- the scan is not seeing the router`];
-  const listed = new Set(ROUTES);
+  const listed = [...new Set(ROUTES)];
+  const patterns = [...routed].map((r) => [r, answers(r)]);
   return [
-    ...[...routed].filter((r) => !listed.has(r)).map((r) => `${r} is routed in App.jsx and swept by nothing`),
-    ...[...listed].filter((r) => !routed.has(r)).map((r) => `${r} is swept and no longer routed`),
+    ...patterns.filter(([, re]) => !listed.some((l) => re.test(l))).map(([r]) => `${r} is routed in App.jsx and swept by nothing`),
+    ...listed.filter((l) => !patterns.some(([, re]) => re.test(l))).map((l) => `${l} is swept and no longer routed`),
   ];
 }
 

@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { flushSync } from "react-dom";
 import { useNavigate, useLocation, useOutletContext } from "react-router-dom";
 import {
@@ -23,6 +23,7 @@ import {
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, IDENTITY_TYPE_PASSPORT,
     DEBIT_DAY_OPTIONS, PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
     ACCOUNT_TYPE_OPTIONS, BEC_STRUCTURES_REPRESENTED, BEC_EXECUTIVE_POSITIONS, COSATU_POSITIONS, COSATU_POSITION_LABELS,
+    MEMBER_FIELD_TABS as FIELD_TO_TAB_MAP,
 } from "@/config/memberConstants.js";
 import {
     validateSAID, validateEmail, extractDateOfBirthFromSAID, extractGenderFromSAID
@@ -30,6 +31,7 @@ import {
 import PageTitle from "../../components/common/PageTitle.jsx";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import DataState from "../../components/common/DataState.jsx";
+import ErrorBoundary from "../../components/common/ErrorBoundary.jsx";
 import FigureStrip from "../../components/members/FigureStrip.jsx";
 import MemberPanel from "../../components/members/MemberPanel.jsx";
 import Criteria, { CRITERION } from "../../components/common/Criteria.jsx";
@@ -46,6 +48,23 @@ import { branchNamesForBank } from "@/utils/bankBranches.js";
 import { cn } from "@/lib/utils.js";
 import { formalName, personName } from "@/lib/names.js";
 import { fieldValue } from "@/lib/fieldValue.js";
+import WorkplaceField from "../../components/members/WorkplaceField.jsx";
+import useWorkplaceSource from "../../hooks/useWorkplaceSource.js";
+import useWorkplaceChoice from "../../hooks/useWorkplaceChoice.js";
+import useMemberWorkplace from "../../hooks/useMemberWorkplace.js";
+import { WORKPLACE_UNKNOWN } from "@/config/monthEnd.js";
+import ChangeStatus from "../../components/members/ChangeStatus.jsx";
+
+/*
+ * 📜 THE HISTORY TAB IS A CHUNK OF ITS OWN (month end 03.6): it is fetched when the tab is opened -- never at the
+ * register's first paint -- and a chunk that will not load, or a tab that throws, is held by a boundary of its own and
+ * says so in one line, the record around it untouched (Home's figures do the same).
+ */
+const MemberHistory = lazy(() => import("./MemberHistory.jsx"));
+
+const historyFailed = () => (
+    <p role="alert" className="text-sm text-ink-muted">The history could not be shown. Reload the page to try again.</p>
+);
 
 
 const PAGE_SIZE = memberService.getPageSize();
@@ -110,12 +129,16 @@ const FILTER_FIELDS = [
  * NAME, so a screen reader and the automation suite (`openModalTab('Employment & Bank')`)
  * still address each tab by the phrase that names it. The visible word is always contained in
  * the full phrase, which is what WCAG 2.5.3 asks of a label that differs from its name.
+ *
+ * 📜 SIX SINCE MONTH END 03.6: History, before Structures -- the owner's approval of the mock on
+ * 2026-09-30 (`TAB_PLACE`, below). The order here is the keyboard's, and it follows the eye.
  */
-const RECORD_TABS = [
+export const RECORD_TABS = [
     { id: "personal", label: "Personal", full: "Personal Information" },
     { id: "employment", label: "Employment", full: "Employment & Bank" },
     { id: "membership", label: "Membership", full: "Membership & Subscriptions" },
     { id: "representatives", label: "Recruitment", full: "Recruitment Channel" },
+    { id: "history", label: "History", full: "History of changes" },
     { id: "structures", label: "Structures", full: "Sasbo Structures" },
 ];
 const TABS = RECORD_TABS;
@@ -148,53 +171,53 @@ const amountOnFile = (value) => {
  * ④ And the strip is SYMMETRICAL about its own centre line: the left column reads from the
  *    left edge, the right column to the right edge, and the middle one is centred.
  *
- * It applies only at five sections -- a sixth would fill a 3x2 grid with nothing left to
- * balance, so any other count falls back to the plain left-aligned flow.
+ * 🗣️ AT SIX -- the owner's approval of month end 03.6's mock, 2026-09-30, the "proposed" strip:
+ *
+ *     Personal        Employment        Membership
+ *     Recruitment      History          Structures
+ *
+ * A sixth tab fills the 3x2 grid, and the arrangement above would have been switched off whole
+ * (it applied at five and at no other number). ④ is kept as ④ reads for a grid with no hole in
+ * it: each column keeps its edge -- the left from the left, the right to the right, the middle
+ * centred -- so the four corners stay where he put them and Structures stays under Membership
+ * (*"Make structures aligned under Membership"*). What gives is Employment, up from between the
+ * rows into the top row, because at six the middle column holds two like the others. Placed by
+ * the grid's own flow, in `RECORD_TABS` order, so the keyboard follows the eye.
+ *
+ * Five is kept exactly as it was, and any other count falls back to the plain flow.
  */
-const TAB_PLACE = TABS.length === 5
-  ? [
+export const tabPlace = (count) => {
+  if (count === 5) {
+    return [
       'justify-self-start',
       'row-span-2 justify-self-center self-center',
       'justify-self-end',
       'justify-self-start',
       'col-start-3 justify-self-end',
-    ]
-  : [];
-
-const FIELD_TO_TAB_MAP = {
-    title: "personal",
-    initials: "personal",
-    firstNames: "personal",
-    surname: "personal",
-    identityType: "personal",
-    identityNumber: "personal",
-    dateOfBirth: "personal",
-    personalEmail: "personal",
-    workEmail: "personal",
-    phone: "personal",
-    workTel: "personal",
-    homeTel: "personal",
-    employeeNumber: "employment",
-    ibtNo: "employment",
-    employmentType: "employment",
-    jobGrade: "employment",
-    bankName: "employment",
-    branch: "employment",
-    paymentType: "employment",
-    bankAccountNumber: "employment",
-    accountType: "employment",
-    debitDay: "employment",
-    // V55: what a structure's Yes needs beside it -- a refused save opens the tab that asks.
-    shopStewardElectionDate: "structures",
-    becCommitteeCode: "structures",
-    becStructures: "structures",
-    becExecutivePosition: "structures",
+    ];
+  }
+  if (count === 6) {
+    return [
+      'justify-self-start',
+      'justify-self-center',
+      'justify-self-end',
+      'justify-self-start',
+      'justify-self-center',
+      'justify-self-end',
+    ];
+  }
+  return [];
 };
+const TAB_PLACE = tabPlace(TABS.length);
 
 /*
  * 🔴 THE 44 "BEC COMMITTEES" THIS FILE CARRIED WERE INVENTED (CM-14) -- names like "Century City Banking Cluster",
  * grouped by made-up regions, stored against nothing. The committee a BEC member sits on is chosen from SASBO's own
  * list since V55, as their month-end report prints it (`GET /api/reference/committees`, Monthly Menu 01.1).
+ *
+ * Their export, `SASBO_BEC_BRANCHES`, went in month end 01.3 (3,394 bytes of the minified screen), and the
+ * map of each field to its tab with it: capture and the record share `MEMBER_FIELD_TABS` since then, V55's
+ * structure fields among them.
  */
 
 /**
@@ -239,7 +262,9 @@ const RECORD_FIELD_LABELS = {
     debitDay: "Debit Day",
     accountType: "Account Type",
     bankAddress: "Bank Work Address",
-    status: "Account Membership Status",
+    // 🗑️ `status` WAS LABELLED HERE, reclaimed in month end 03.3: a status is changed through *Change status* and never
+    // edited, so no edit can change it and `getChangedFields` never lists it (`Members.changeStatus.test.jsx`).
+    // The structures: every answer of the tab since V55, the committee by its code, read by its name (`readableIn`).
     isShopSteward: "Shop Steward",
     shopStewardElectionDate: "Shop Steward Election Date",
     isBec: "BEC Member",
@@ -255,10 +280,14 @@ const RECORD_FIELD_LABELS = {
     cosatuLocal: "COSATU Local",
     cosatuRegion: "Region within Local",
     cosatuPositions: "COSATU Positions",
+    // 01.3: a workplace is CHANGED when its id is -- two of SASBO's workplaces may share a name -- and is listed by its
+    // name and R/A number (`readable`), once, not three times for its three scalars.
+    workplaceId: "Workplace",
 };
 
-/** Never listed: identifiers, and a name the form keeps beside a field that is listed (the committee's code). */
-const UNLISTED_KEYS = new Set(["id", "membershipNumber", "memberId", "becCommitteeName"]);
+/** Never listed: identifiers, and a name the form keeps beside a field that is listed -- the committee's, beside
+ * its code, and the workplace's name and R/A number, beside its id (month end 01.3). */
+const UNLISTED_KEYS = new Set(["id", "membershipNumber", "memberId", "becCommitteeName", "workplaceName", "workplaceRaNumber"]);
 
 /**
  * A stored yes/no as a person reads it. `null` is its own answer on the read side -- Shop Steward
@@ -302,7 +331,9 @@ const recordDate = (value) => (value ? formatDate(value) : "");
 const DATE_KEYS = new Set(["dateOfBirth", "joinDate", "electionDate", "shopStewardElectionDate"]);
 
 /** A value as a person reads it. */
-const readable = (key, value) => {
+const readable = (key, value, record) => {
+    // 01.3: a workplace is read by its name and R/A number, never by the id the save sends.
+    if (key === "workplaceId") return value == null ? "No workplace on record" : `${record.workplaceName} (R/A ${record.workplaceRaNumber})`;
     const shown = comparable(key, value);
     if (typeof shown === "boolean") return shown ? "Yes" : "No";
     if (key === "becStructures" || key === "cosatuPositions") return shown ? String(shown).split(",").join(", ") : "none";
@@ -315,9 +346,10 @@ const readable = (key, value) => {
 
 /** A field of a member as a person reads it -- the committee by its name, which the form keeps beside its code. */
 const readableIn = (member, key) =>
-    key === "becCommitteeCode" && member.becCommitteeName ? member.becCommitteeName : readable(key, member[key]);
+    key === "becCommitteeCode" && member.becCommitteeName ? member.becCommitteeName : readable(key, member[key], member);
 
-const fieldLabel = (key) =>
+/** A field of the record by the name the record gives it -- the save's confirmation, and since 03.6 the History tab. */
+export const fieldLabel = (key) =>
     RECORD_FIELD_LABELS[key] || MEMBER_FIELD_LABEL_MAP[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 
 const getChangedFields = (draft, original) => Object.keys(draft)
@@ -405,7 +437,6 @@ export default function Members() {
     // serialises to it. Compared whole, so a field the member record never carried still counts once it is typed in.
     const [editBaseline, setEditBaseline] = useState(null);
     const [activeTab, setActiveTab] = useState("personal");
-    const [showSavedNotification, setShowSavedNotification] = useState(false);
     const [fieldErrors, setFieldErrors] = useState({});
     const [membersList, setMembersList] = useState([]);
 
@@ -494,8 +525,22 @@ export default function Members() {
         setActiveTab(next);
     };
 
-    /* The name the toast says, captured at the save so it survives the panel closing. */
-    const [savedName, setSavedName] = useState("");
+    /*
+     * card.css `.toast`: what a write did, low and centred, gone in 2.6s -- the record's save, and since month end 03.3 a
+     * change of status. The sentence is captured when it is said, so it survives the panel closing, and a toast's timer
+     * clears only its own sentence, never one said after it.
+     */
+    const [toast, setToast] = useState("");
+    const say = useCallback((sentence) => {
+        setToast(sentence);
+        window.setTimeout(() => setToast((shown) => (shown === sentence ? "" : shown)), 2600);
+    }, []);
+
+    /*
+     * 🔁 CHANGE STATUS (month end 03.3) -- the record's one way to move a status, a dialog of its own; the edit form only
+     * shows it. `changingStatus` is whether the dialog is open.
+     */
+    const [changingStatus, setChangingStatus] = useState(false);
 
     /*
      * 🖨️ WHICH OF THE TWO THINGS ON THIS SCREEN IS BEING PRINTED.
@@ -542,6 +587,31 @@ export default function Members() {
         loadMembers();
     }, [loadMembers]);
 
+    /**
+     * 🔁 THE RECORD'S OWN RELOAD (month end 03.3): the answer for this one member replaces the record and its row in the
+     * register -- after a change of status, and before the *Change status* dialog says anything of a change whose answer
+     * never came (ME-3). Resolves with the member as they now stand, or `null` where the read failed or answered with
+     * someone else; the record then shows `status`, when the caller knows one -- the change's own answer, or its refusal's
+     * `currentStatus`.
+     *
+     * The workplace's lineage the answer for one member carries is the Employment tab's own read (`useMemberWorkplace`)
+     * and never an input, so it is kept off the record: a later edit's save does not send it back.
+     */
+    const rereadMember = useCallback((id, status) => memberService.getMemberById(id).then(
+        (one) => (one?.id === id ? { ...one, workplace: undefined } : null),
+        (error) => {
+            reportError("Members.reread", error);
+            return null;
+        },
+    ).then((fresh) => {
+        const now = fresh ?? (status ? { status } : null);
+        if (now) {
+            setSelectedMember((member) => (member?.id === id ? { ...member, ...now } : member));
+            setMembersList((rows) => rows.map((row) => (row.id === id ? { ...row, ...now } : row)));
+        }
+        return fresh;
+    }), []);
+
     // The two reference lists are `useReferenceData`'s now; this owns the register alone.
     useEffect(() => {
         loadMembers();
@@ -570,6 +640,38 @@ export default function Members() {
         [bankListing],
     );
     const branchOptions = branchOptionsFor(editForm.bankName);
+
+    /*
+     * A NEW BANK, AND WHAT GOES WITH THE OLD ONE -- one rule, whether a person chose it (`handleEditChange`) or accepted
+     * the Workplace control's offer (01.3). Main's intent (e56dbe4), in the one place it can be told apart from a record
+     * loading: a grade belongs to a bank, so choosing a DIFFERENT bank clears it; and a branch the new bank does not
+     * offer goes with the old bank -- the fourteen names stay for every bank. A branch chosen in the same step stays.
+     */
+    const settleBank = useCallback((prev, next) => {
+        if (next.bankName === prev.bankName) return next;
+        const settled = { ...next, jobGrade: "" };
+        if (next.bankName && prev.branch && next.branch === prev.branch
+            && !branchOptionsFor(next.bankName).includes(prev.branch)) settled.branch = "";
+        return settled;
+    }, [branchOptionsFor]);
+
+    /*
+     * 🏢 THE MEMBER'S WORKPLACE (month end 01.3), on the Employment tab: read from the answer for this one member, which
+     * alone carries the area and the committee (`useMemberWorkplace`), and changed while editing with capture's control
+     * and capture's rule (`useWorkplaceChoice`). SASBO's lists are asked for when the tab first shows the control --
+     * to edit, or to say where a workplace on record came from -- and kept for the visit (MD69).
+     */
+    const workplaceSource = useWorkplaceSource(activeTab === "employment" && (isEditing || selectedMember?.workplaceId != null));
+    const workplace = useWorkplaceChoice({
+        form: editForm,
+        setForm: setEditForm,
+        setFieldErrors,
+        banks: bankOptions,
+        branchesFor: branchOptionsFor,
+        named: true,
+        settle: settleBank,
+    });
+    const memberWorkplace = useMemberWorkplace(selectedMember, activeTab === "employment" && !workplace.workplace);
     const genderOptions = GENDER_OPTIONS;
     /*
      * ✅ A25's SECOND CLAUSE, `06.1b` -- the other of the two callers. Same reasoning as the
@@ -711,6 +813,8 @@ export default function Members() {
         }
         const start = { ...selectedMember, paymentType: normalizePaymentType(selectedMember?.paymentType) };
         initialsTyped.current = false;
+        // Nothing in a new edit was filled by a workplace -- a mark left from another member's edit must not follow.
+        workplace.reset();
         setEditForm(start);
         setEditBaseline(JSON.stringify(start));
         setFieldErrors({});
@@ -740,15 +844,10 @@ export default function Members() {
         const value = sanitiseField(field, rawValue, { identityType: editForm.identityType });
 
         setEditForm((prev) => {
-            const next = { ...prev, [field]: value };
+            let next = { ...prev, [field]: value };
 
-            // Main's intent (e56dbe4), in the one place it can be told apart from a record
-            // loading: a grade belongs to a bank, so choosing a DIFFERENT bank clears it.
-            if (field === "bankName" && value !== prev.bankName) {
-                next.jobGrade = "";
-                // A branch the new bank does not offer goes with the old bank; the fourteen names stay for every bank.
-                if (value && prev.branch && !branchOptionsFor(value).includes(prev.branch)) next.branch = "";
-            }
+            // A grade belongs to a bank, and so may a branch -- `settleBank`, the rule the workplace's offer shares.
+            if (field === "bankName") next = settleBank(prev, next);
 
             // R4-F1: derived until typed -- see `initialsTyped`.
             if (field === "firstNames" && !initialsTyped.current) {
@@ -793,7 +892,7 @@ export default function Members() {
             }
             return newErrors;
         });
-    }, [editForm.identityType, branchOptionsFor]);
+    }, [editForm.identityType, settleBank]);
 
     /**
      * One Structures answer changed. `withStructureAnswer` clears what a No leaves behind -- the rule the server holds
@@ -909,7 +1008,24 @@ export default function Members() {
         // has a `try` of its own, so a third path added later would otherwise leave the record busy for ever.
         try {
             try {
-                await memberService.updateMember(editForm);
+                /*
+                 * 🏢 01.3: THE SAVE NAMES A WORKPLACE BY ITS ID, AND ONLY WHEN THIS EDIT CHANGED IT. A save that names none
+                 * leaves the member's workplace as it was (MD58), so an edit of a telephone number cannot be refused over a
+                 * workplace nobody touched -- say, where the deployment's switch was set back since the register loaded.
+                 * The two scalars the list carries are answers, not inputs, and are not sent back.
+                 *
+                 * 🔁 03.3: AND IT NEVER NAMES THE STATUS. A status is changed through *Change status*, with SASBO's code
+                 * for it; here it is only shown. A save that names none leaves it as it is on the server, so an edit of a
+                 * telephone number can neither put back a status somebody changed since the record was read, nor be
+                 * refused over one nobody touched once the `PUT` stops changing status (03.4).
+                 */
+                await memberService.updateMember({
+                    ...editForm,
+                    status: undefined,
+                    workplaceName: undefined,
+                    workplaceRaNumber: undefined,
+                    workplaceId: editForm.workplaceId === selectedMember.workplaceId ? undefined : editForm.workplaceId,
+                });
             } catch (error) {
                 reportError("Members.save", error);
                 // 06.1 owns the shared error CONTRACT; what this wave owes the screen is that
@@ -918,6 +1034,13 @@ export default function Members() {
                 // 🔴 R3-F2: "Nothing was written" only after a refusal. A timeout, a lost connection or a 5xx may have saved
                 // the change, and a clerk told otherwise redoes it.
                 setPendingSave(null);
+                // 01.3: a workplace that is not on record here is said AT the Workplace field, in the server's words, and
+                // the edit is kept exactly as typed so another can be chosen.
+                const refusal = error?.body?.code === WORKPLACE_UNKNOWN && error.message;
+                if (refusal) {
+                    setFieldErrors({ workplaceId: refusal });
+                    setActiveTab("employment");
+                }
                 setSaveNotice(writeMayHaveLanded(error)
                     ? {
                         kind: "unconfirmed",
@@ -925,7 +1048,7 @@ export default function Members() {
                     }
                     : {
                         kind: "failed",
-                        messages: ["We could not save these changes. Nothing was written — please try again."],
+                        messages: [refusal || "We could not save these changes. Nothing was written — please try again."],
                     });
                 return;
             }
@@ -936,9 +1059,8 @@ export default function Members() {
             setSelectedMember({ ...editForm });
             setEditBaseline(null);
             setIsEditing(false);
-            setSavedName(personName(editForm));
-            setShowSavedNotification(true);
-            window.setTimeout(() => setShowSavedNotification(false), 2600);
+            const savedName = personName(editForm);
+            say(savedName ? `${savedName}’s record saved` : "Changes saved");
             try {
                 const refreshed = await memberService.getMembers();
                 setMembersList(memberRows(refreshed));
@@ -1505,12 +1627,12 @@ export default function Members() {
                 `<output>` NOT `<div role="status">`: its implicit role IS `status`, so the
                 live region is native semantics rather than a generic box wearing an ARIA hat --
                 consistent across every device and screen reader. */}
-            {showSavedNotification && (
+            {toast && (
                 <output
                     className="kind-in fixed bottom-[84px] left-1/2 z-50 flex -translate-x-1/2 items-center gap-2.5 rounded-[10px] bg-ink px-3.5 py-2.5 text-[13.5px] font-medium text-bg shadow-(--shadow-2)"
                 >
                     <CircleCheck size={16} strokeWidth={2} aria-hidden="true" className="text-brand" />
-                    <span>{savedName ? `${savedName}’s record saved` : "Changes saved"}</span>
+                    <span>{toast}</span>
                 </output>
             )}
 
@@ -1707,11 +1829,23 @@ export default function Members() {
 
                             {activeTab === "employment" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
+                                    {/* 🏢 01.3 -- read, the member's workplace and its lineage; editing, capture's control. It
+                                        offers to fill the two bank fields below and never writes them itself. */}
+                                    <WorkplaceField
+                                        className="col-span-full"
+                                        source={isEditing ? workplaceSource : undefined}
+                                        choice={workplace}
+                                        current={{
+                                            ...(workplace.workplace ? { workplace: workplace.workplace } : memberWorkplace),
+                                            from: workplaceSource.workplacesFrom,
+                                        }}
+                                        error={fieldErrors.workplaceId}
+                                    />
                                     <Detail label="Employee Number" value={editForm.employeeNumber} isEditing={isEditing} onChange={handleEditChange("employeeNumber")} kind="reference" />
-                                    <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} {...refs.field('banks')} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} />
+                                    <Detail label="Bank Where Employed" value={editForm.bankName} isEditing={isEditing} {...refs.field('banks')} options={bankOptions} error={fieldErrors.bankName} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("bankName")} note={isEditing && workplace.note("bankName")} />
                                     <Detail label="Employment Type" value={editForm.employmentType} isEditing={isEditing} options={EMPLOYMENT_TYPE_OPTIONS} onChange={handleEditChange("employmentType")} />
                                     <Detail label="Job Grade" value={editForm.jobGrade} isEditing={isEditing} options={jobGrade} onChange={handleEditChange("jobGrade")} disabled={!editForm.bankName} loadError={jobGradeError} onRetryLoad={() => setJobGradeAttempt((n) => n + 1)} />
-                                    <Detail label="Bank Branch" value={editForm.branch} isEditing={isEditing} options={branchOptions} error={fieldErrors.branch} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("branch")} />
+                                    <Detail label="Bank Branch" value={editForm.branch} isEditing={isEditing} options={branchOptions} error={fieldErrors.branch} required={editForm.paymentType === "Debit Order"} onChange={handleEditChange("branch")} note={isEditing && workplace.note("branch")} />
                                     <Detail label="Payment Type" value={editForm.paymentType} isEditing={isEditing} options={paymentTypeOptions} onChange={handleEditChange("paymentType")} />
 
                                     {editForm.paymentType === "Debit Order" && (
@@ -1744,7 +1878,24 @@ export default function Members() {
                             {activeTab === "membership" && (
                                 <div className="fieldgroup grid grid-cols-2 gap-x-4 gap-y-3.5 max-sm:grid-cols-1">
                                     <Detail label="Date Joined Sasbo" value={recordDate(selectedMember.joinDate)} isEditing={false} />
-                                    <Detail label="Account Membership Status" value={editForm.status} isEditing={isEditing} options={statusOptions} onChange={handleEditChange("status")} />
+                                    {/* 🔁 03.3: A STATUS IS CHANGED, NEVER EDITED -- with SASBO's code for it, through
+                                        *Change status*, and the change is kept. Shown here as the card shows it, and
+                                        read-only while editing too, where the note says the way to change it. */}
+                                    <Detail
+                                        label="Account Membership Status"
+                                        value={(
+                                            <span className="flex flex-wrap items-center justify-between gap-2">
+                                                <StatusChip status={editForm.status} />
+                                                {!isEditing && (
+                                                    <Button size="sm" className="no-print" onClick={() => setChangingStatus(true)}>
+                                                        Change status
+                                                    </Button>
+                                                )}
+                                            </span>
+                                        )}
+                                        isEditing={false}
+                                        note={isEditing ? "Changed with Change status, once this edit is saved or cancelled." : null}
+                                    />
                                     <h4 className="col-span-full mt-1.5 border-t border-line pt-[18px] text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Sasbo Subscription Fee Details</h4>
                                     {/* 🔴 A MEMBER WITH NO SUBSCRIPTION ON FILE WAS SHOWN R182.77, MONTHLY (`06.4`) -- two invented
                                         facts about their money, printed as if the record held them. The absence is said instead. */}
@@ -1920,6 +2071,16 @@ export default function Members() {
                                     )}
                                 </div>
                             )}
+
+                            {/* 📜 03.6: the record's changes, newest first -- its own chunk, asked for now that the tab
+                                is open, and keyed by the member so another member's record starts on its first page. */}
+                            {activeTab === "history" && (
+                                <ErrorBoundary fallback={historyFailed}>
+                                    <Suspense fallback={null}>
+                                        <MemberHistory key={selectedMember.id} member={selectedMember} labelOf={fieldLabel} />
+                                    </Suspense>
+                                </ErrorBoundary>
+                            )}
                         </div>
 
                     </div>
@@ -1959,6 +2120,18 @@ export default function Members() {
                 confirmLabel="Discard changes"
                 cancelLabel="Keep editing"
                 onConfirm={discardAndLeave}
+            />
+
+            {/* 🔁 03.3: the record read again before a word is said, and what happened said as the save's is. */}
+            <ChangeStatus
+                member={selectedMember}
+                open={changingStatus}
+                onOpenChange={closeOn(() => setChangingStatus(false))}
+                reread={rereadMember}
+                onDone={(sentence) => {
+                    setChangingStatus(false);
+                    say(sentence);
+                }}
             />
         </div>
     );
@@ -2012,6 +2185,7 @@ function Detail({ label, value, isEditing, onChange, onBlur, className = "", opt
                 options={options}
                 placeholder="Select..."
                 error={error || undefined}
+                hint={note || undefined}
                 disabled={disabled}
                 required={required}
                 loadError={loadError}

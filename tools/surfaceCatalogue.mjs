@@ -39,7 +39,18 @@ const DATE_PICKER_OPEN = `!!document.querySelector('[aria-haspopup="dialog"][ari
   return r.width > 0 && r.height > 0 && r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
 })`;
 const BANNER = (offline, copy) => `!!document.querySelector('[data-testid="offline-banner"][data-offline="${offline}"]') && ${TEXT(copy)}`;
+/** The first screen's figures in one of their five states (`HomeFigures.jsx`'s `data-figures`). */
+const FIGURES = (state) => `!!document.querySelector('[data-figures="${state}"]')`;
+/** The first screen's menu rows -- a row of the page, not the rail's entry for the same area. */
+const MENU_ROWS = `!!document.querySelector('main a[href="/members"]')`;
 const EXPANDED = (scope) => `!!document.querySelector(${JSON.stringify(`${scope} [aria-expanded="true"]`)})`;
+/** The Month end page's six statistics, each a link to its screen (`04.1`). */
+const MONTH_END_LINKS = `document.querySelectorAll('main a[href^="/admin/monthly-menu/"]').length === 6`;
+/**
+ * The record's History tab in one of its four states (`MemberHistory.jsx`'s `data-history`) -- not `DataState`'s own
+ * `data-state`, which turns `slow` after five seconds of a held request while the tab is still loading.
+ */
+const HISTORY = (state) => `!!document.querySelector('${PANEL} [data-history="${state}"]')`;
 
 /* ── drivers used here only ─────────────────────────────────────────────────────────────────────── */
 
@@ -102,6 +113,17 @@ const DIALOG_DATE_IN_VIEW = step('bring Election Date into view', scrollIntoView
 const network = (what, offline, until) => ({ what, network: offline, until });
 
 const OPEN_FIRST_MEMBER = step('open the first member', clickByText('[data-row-action]', '/open the record for/i'), PANEL_OPEN);
+/** Open the record's History tab (month end 03.6) -- shown "History", named "History of changes" -- until `state`. */
+const OPEN_HISTORY = (state) => step('open History', clickByText(`${PANEL} button`, '/^History/'), HISTORY(state));
+/**
+ * An empty history as the server answers one (ME-7): the golden page with no entries, and the day the history began --
+ * a member older than the history, whose record nothing has changed since. Read when a capture asks for it.
+ */
+const emptyHistory = () => {
+  const golden = JSON.parse(readFileSync(join(REPO_ROOT, 'src', 'test', 'month-end-examples.json'), 'utf8'))
+    .answers['GET /api/members/{id}/history'].body;
+  return { ...golden, content: [], totalElements: 0, totalPages: 0 };
+};
 /**
  * A member whose record can be SAVED. The stub's first member is flagged BEC with no primary committee, so its edit stops
  * at the app's own validation ("Please select an active primary BEC Committee") before any confirmation can ask -- a
@@ -170,6 +192,51 @@ export const SURFACES = [
   { name: 'record-membership', route: '/members', ready: ROWS,
     steps: [OPEN_FIRST_MEMBER, step('open Membership & Subscriptions', clickByText(`${PANEL} button`, '/Membership/i'), TEXT('Date Joined Sasbo'))],
     present: { TAB: TEXT('Date Joined Sasbo') } },
+  // Month end 03.3: the record's one way to move a status, beside the status on the Membership tab. Opening it asks the
+  // server for nothing; SASBO's codes are asked for once a leaving or suspended status is chosen.
+  { name: 'record-change-status', route: '/members', ready: ROWS,
+    steps: [OPEN_FIRST_MEMBER,
+      step('open Membership & Subscriptions', clickByText(`${PANEL} button`, '/Membership/i'), TEXT('Date Joined Sasbo')),
+      step('Change status', clickByText(`${PANEL} button`, '/^Change status$/'), dialogNamed('/^Change status$/'))],
+    present: { DIALOG: dialogNamed('/^Change status$/') }, covers: ['components/members/ChangeStatus.jsx#Modal@change status'] },
+  // Month end 04.5: the reason a resigning member gave -- offered once a deletion code with reasons under it is chosen.
+  // `serve-dist.mjs` answers the golden deletion codes, which keep one invented reason under 2.
+  { name: 'record-change-status-reason', route: '/members', ready: ROWS,
+    steps: [OPEN_FIRST_MEMBER,
+      step('open Membership & Subscriptions', clickByText(`${PANEL} button`, '/Membership/i'), TEXT('Date Joined Sasbo')),
+      step('Change status', clickByText(`${PANEL} button`, '/^Change status$/'), dialogNamed('/^Change status$/')),
+      step('choose Resigned', chooseOption('[role="dialog"]', '/^New status/', 'Resigned'),
+        `[...document.querySelectorAll('[role="dialog"] select')].some((s) => !s.disabled && /^SASBO’s deletion code/.test(s.labels?.[0]?.textContent || ''))`),
+      step('choose code 2', chooseOption('[role="dialog"]', '/^SASBO’s deletion code/', '2'),
+        `[...document.querySelectorAll('[role="dialog"] select')].some((s) => /^The reason they gave/.test(s.labels?.[0]?.textContent || ''))`)],
+    present: { REASON: `[...document.querySelectorAll('[role="dialog"] select')].some((s) => /^The reason they gave/.test(s.labels?.[0]?.textContent || ''))` } },
+  // Month end 03.6: the record's History tab, a chunk of its own asked for when the tab is opened. `serve-dist.mjs`
+  // answers every member's history with the golden page among invented entries in its shape -- a change of status with
+  // SASBO's code and the reason under it, a workplace, a save of three fields, a number kept as its last four -- so the
+  // sheet a sweep measures is the mock's. Each other state is reached the way a person meets it: held, failed, empty.
+  { name: 'record-history', route: '/members', ready: ROWS, steps: [OPEN_FIRST_MEMBER, OPEN_HISTORY('ready')],
+    present: { SHEET: HISTORY('ready'), WHO: TEXT('Not recorded'), REASON: TEXT('Code 2 · Resigned Society'),
+      SAVE: TEXT('in one save'), MASKED: TEXT('Only the last four digits are kept.'), PAGER: TEXT('Showing 1–8 of 8') } },
+  { name: 'record-history-loading', route: '/members', ready: ROWS,
+    intercept: { url: '*/api/members/*/history*', mode: 'hang' },
+    steps: [OPEN_FIRST_MEMBER, OPEN_HISTORY('loading')],
+    present: { LOADING: HISTORY('loading'), PAGER: TEXT('Loading changes…') },
+    covers: ['pages/members/MemberHistory.jsx#DataState@loading'] },
+  { name: 'record-history-error', route: '/members', ready: ROWS,
+    intercept: { url: '*/api/members/*/history*', mode: 'fail' },
+    steps: [OPEN_FIRST_MEMBER, OPEN_HISTORY('error')],
+    present: { ERROR: HISTORY('error'), NOT_EMPTY: TEXT('this is not an empty history'), PAGER: TEXT('Could not load changes') },
+    covers: ['pages/members/MemberHistory.jsx#DataState@state'] },
+  { name: 'record-history-empty', route: '/members', ready: ROWS,
+    intercept: { url: '*/api/members/*/history*', mode: 'fulfill', body: emptyHistory },
+    steps: [OPEN_FIRST_MEMBER, OPEN_HISTORY('empty')],
+    present: { EMPTY: HISTORY('empty'), SINCE: TEXT('No changes recorded since 01 Sep 2026') },
+    covers: ['pages/members/MemberHistory.jsx#DataState@state'] },
+  // A History chunk that will not load is held by the record's own boundary: one line, and the record around it.
+  { name: 'record-history-chunk-failed', route: '/members', ready: ROWS,
+    intercept: { url: '*/assets/MemberHistory-*.js', mode: 'fail' },
+    steps: [OPEN_FIRST_MEMBER, step('open History', clickByText(`${PANEL} button`, '/^History/'), TEXT('The history could not be shown.'))],
+    present: { FAILED: TEXT('The history could not be shown.'), RECORD: PANEL_OPEN } },
   { name: 'record-edit', route: '/members', ready: ROWS, steps: [OPEN_FIRST_MEMBER, EDIT_RECORD], present: { EDITING: TEXT('Save changes') } },
   { name: 'record-save-confirm', route: '/members', ready: ROWS,
     steps: [OPEN_EDITABLE_MEMBER, EDIT_RECORD, CHANGE_PHONE,
@@ -403,6 +470,63 @@ export const SURFACES = [
   { name: 'forms-empty', route: '/reports/forms', ready: HEADING,
     steps: [step('filter to nothing', typeIntoLabelled('main', '/^Random access number/', '000000000'), STATE('empty'))],
     present: { EMPTY: STATE('empty') }, covers: ['pages/forms/Forms.jsx#DataState@empty'] },
+
+  // ── the first screen's figures (month end `02.3`, MR-ROB-37) ──────────────────────────────────
+  // The strip and the sheet above the menu rows, from `serve-dist.mjs`'s invented summary. Each state is reached the
+  // way a person meets it, and every one of them keeps the menu rows: they never wait on the figures (MD69).
+  { name: 'home-figures', route: '/home', ready: FIGURES('ready'),
+    present: { STRIP: TEXT('Paying members'), SHEET: TEXT('No workplace on record'), RULE_C: TEXT('fewer than five'),
+      OVER_A_HUNDRED: TEXT('complement out of date'), MENU: MENU_ROWS } },
+  { name: 'home-figures-loading', route: '/home', intercept: { url: '*/api/members/summary*', mode: 'hang' },
+    ready: FIGURES('loading'), present: { LOADING: `!!document.querySelector('[data-figures="loading"] dl[aria-busy="true"]')`, MENU: MENU_ROWS } },
+  { name: 'home-figures-error', route: '/home', intercept: { url: '*/api/members/summary*', mode: 'fail' },
+    ready: FIGURES('error'), present: { ERROR: STATE('error'), MENU: MENU_ROWS } },
+  // The shared fixture's shape, `[]`: what an answer of the wrong shape looks like to a person (MV-36).
+  { name: 'home-figures-not-available', route: '/home', intercept: { url: '*/api/members/summary*', mode: 'empty' },
+    ready: TEXT('The figures are not available from this server yet.'), present: { ERROR: FIGURES('error'), MENU: MENU_ROWS } },
+  // A figures chunk that will not load is held by the page's own boundary: one line, and the menu rows beneath it.
+  { name: 'home-figures-chunk-failed', route: '/home', intercept: { url: '*/assets/HomeFigures-*.js', mode: 'fail' },
+    ready: TEXT('The figures could not be shown.'), present: { MENU: MENU_ROWS } },
+
+  // ── month end (`04.1`-`04.10`) ────────────────────────────────────────────────────────────────
+  // The Month end page and a statistic's screen, from `serve-dist.mjs`'s golden months and sheets: August 2026 taken,
+  // September 2026 open. Each state is reached the way a person meets it -- a month chosen by its address, a sheet
+  // failed, hung or of the wrong shape by interception, a pack prepared and polled by the stub's own job.
+  { name: 'month-end', route: '/admin/monthly-menu', ready: TEXT('Its figures are the month as it stood then'),
+    present: { TAKEN: TEXT('Taken on'), STATISTICS: MONTH_END_LINKS,
+      LISTINGS: TEXT('This waits until administrators sign in to the system. Nothing was produced.') } },
+  { name: 'month-end-open', route: '/admin/monthly-menu?month=2026-09', ready: TEXT('is the open month'),
+    present: { LIVE: TEXT('read live'), TAKE_WHY: TEXT('Taking a month freezes its figures for good') } },
+  { name: 'month-end-months-failed', route: '/admin/monthly-menu', intercept: { url: '*/api/month-end/months*', mode: 'fail' },
+    ready: TEXT('Month could not be loaded.'), present: { FAILED: STATE('error'), STATISTICS: MONTH_END_LINKS } },
+  // The pack's job, measurable: the stub answers PREPARING twice and then READY, on A.C.B.'s first two delays.
+  { name: 'month-end-pack', route: '/admin/monthly-menu', ready: TEXT('Its figures are the month as it stood then'),
+    steps: [step('prepare the pack', clickByText('main button', '/^Prepare the pack for /'), TEXT('is ready'))],
+    present: { READY: TEXT('is ready'),
+      LINKS: `document.querySelectorAll('main a[download][href*="/api/month-end/packs/"]').length === 2` } },
+  // Membership holds the widest sheet, eleven columns by table code: the one a phone scrolls sideways.
+  { name: 'month-end-statistic', route: '/admin/monthly-menu/membership?month=2026-08', ready: ROWS,
+    present: { TAKEN: TEXT('as taken on'), TOTAL: TEXT('All groups'), WIDE: TEXT('By payroll deduction (R)'),
+      NOTES: TEXT('Members are the members on record') } },
+  { name: 'month-end-statistic-rule-c', route: '/admin/monthly-menu/branches?month=2026-08', ready: ROWS,
+    present: { FEWER: TEXT('fewer than five'), WITHHELD: TEXT('withheld') } },
+  // The open month read live -- and recruitment's sheets, which hold no row, each in its empty state.
+  { name: 'month-end-statistic-open', route: '/admin/monthly-menu/recruitment?month=2026-09', ready: TEXT('is the open month'),
+    present: { LIVE: TEXT('read live'), EMPTY: TEXT('Nothing was counted on this sheet for September 2026.') },
+    covers: ['pages/admin/MonthEndStatistic.jsx#DataState@sheet empty'] },
+  { name: 'month-end-statistic-loading', route: '/admin/monthly-menu/membership?month=2026-08',
+    intercept: { url: '*/api/month-end/2026-08/membership*', mode: 'hang' },
+    ready: STATE('loading'), present: { LOADING: STATE('loading') }, covers: ['pages/admin/MonthEndStatistic.jsx#DataState@state'] },
+  { name: 'month-end-statistic-error', route: '/admin/monthly-menu/membership?month=2026-08',
+    intercept: { url: '*/api/month-end/2026-08/membership*', mode: 'fail' },
+    ready: STATE('error'), present: { ERROR: STATE('error') }, covers: ['pages/admin/MonthEndStatistic.jsx#DataState@state'] },
+  { name: 'month-end-statistic-not-available', route: '/admin/monthly-menu/membership?month=2026-08',
+    intercept: { url: '*/api/month-end/2026-08/membership*', mode: 'empty' },
+    ready: TEXT('This statistic is not available from this server yet.'), present: { ERROR: STATE('error') } },
+  { name: 'month-end-statistic-refused', route: '/admin/monthly-menu/membership?month=2026-07',
+    ready: TEXT('That month was not taken'), present: { REFUSED: STATE('error') } },
+  { name: 'month-end-statistic-unknown', route: '/admin/monthly-menu/no-such-statistic', ready: HEADING,
+    present: { NOT_FOUND: TEXT('No such statistic') } },
 
   // ── the shell ─────────────────────────────────────────────────────────────────────────────────
   { name: 'shell-drawer', route: '/home', widths: [390], ready: HEADING,

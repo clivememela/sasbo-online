@@ -38,8 +38,12 @@ const ROW = "flex items-center gap-4 px-5 py-3.5";
  *
  * 🗣️ It matches what the rail already does: `SidebarItem` renders a `<span>`, not a
  * `<Link>`, for a menu entry with no route.
+ *
+ * `note` is that caption, where "not yet available" is not the truth: month end's listings (`04.1`) ARE built, and
+ * refuse until sign-in -- so their rows say *Waits for sign-in*. Keep it short: it never wraps, and sits beside the
+ * title on a phone.
  */
-export default function NavigationCard({ title, icon: Icon, href, desc, onSelect }) {
+export default function NavigationCard({ title, icon: Icon, href, desc, onSelect, note = 'Not yet available' }) {
   const body = (
     <span className="min-w-0 flex-1">
       <span className="block text-base font-semibold leading-tight">{title}</span>
@@ -56,7 +60,7 @@ export default function NavigationCard({ title, icon: Icon, href, desc, onSelect
             weight as a table head, and nine of them down the Monthly Menu formed a second
             column that competed with the nine titles it was annotating. Sentence case in the
             quiet ink says the same thing and lets the names be read first. */}
-        <span className="shrink-0 whitespace-nowrap text-sm text-ink-muted">Not yet available</span>
+        <span className="shrink-0 whitespace-nowrap text-sm text-ink-muted">{note}</span>
       </div>
     );
   }
@@ -88,11 +92,12 @@ export default function NavigationCard({ title, icon: Icon, href, desc, onSelect
  * Reports -- each wrote this sheet and this map, differing only in the React key they chose and in what a press
  * tells the shell. The key is `href` and title together, because two menus hold entries with no route yet.
  *
- * `onSelect(card)` is the page's word to the shell; `wide` is Home's, the one menu that spans the page.
+ * `onSelect(card)` is the page's word to the shell; `wide` is Home's, the one menu that spans the page. `className`
+ * places the sheet -- month end's page (`04.1`) sets its lists under section headings, a step closer than a page head.
  */
-export function NavigationList({ cards, onSelect, wide = false }) {
+export function NavigationList({ cards, onSelect, wide = false, className }) {
   return (
-    <Sheet className={cn("mt-6 divide-y divide-line", !wide && "max-w-4xl")}>
+    <Sheet className={cn("mt-6 divide-y divide-line", !wide && "max-w-4xl", className)}>
       {cards.map((card) => (
         <NavigationCard key={`${card.href}-${card.title}`} {...card} onSelect={onSelect && (() => onSelect(card))} />
       ))}

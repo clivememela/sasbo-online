@@ -1,56 +1,109 @@
-import {
-    LucideTable,
-    LucideLocate, LucideFile,
-    LucideHdmiPort, LucideLogs, LucideTrain, LucideMail, LucidePaintRoller,
-    LucideUserRound
-} from 'lucide-react';
-import { useOutletContext } from 'react-router-dom';
+import { ChartNoAxesCombined, Users } from 'lucide-react';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
+
+import Criteria from '../../components/common/Criteria.jsx';
 import { NavigationList } from '../../components/common/NavigationCard.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
 import { Page } from '../../components/common/Sheet.jsx';
+import Button from '../../components/form/Button.jsx';
+import SelectInput from '../../components/form/SelectInput.jsx';
+import { monthLabel } from '../../config/monthEnd.js';
+import MonthEndPack from './MonthEndPack.jsx';
+import {
+  LISTINGS, LISTING_WAITS, MONTH_CRITERION, STATISTICS, TAKE_WAITS, defaultMonth, monthChoices, monthStateOf,
+  statisticHref, takenSentence,
+} from './monthEndRules.js';
+import useMonths from './useMonths.js';
 
-/*
- * 🔴 NINE ROWS, NINE DEAD ENDS -- the worst state a landing surface can be in, and the last
- * page in the application still in it. Not one of these entries carries an `href`, so
- * `<Link to={undefined}>` rendered nine `<a>` elements pointing at this very url: a pointer
- * cursor, a hover wash, a chevron promising somewhere to go, and a click that did nothing.
- * Measured on the running app, 2026-09-10 -- `9 rows, 9 DEAD`.
+/**
+ * THE MONTH END PAGE -- month end `04.1`, at the Monthly Menu's address (MD38): *Admin → Month end*, a card on Admin
+ * Membership between Daily and A.C.B., and a leaf of the rail's Admin Menu with nothing under it (BR8).
  *
- * The routes do not exist because the OPERATIONS are not built. `NavigationCard` now says so
- * on any row without a route, which is where that decision belongs; the other pages simply
- * comment their unbuilt entries out, and both are honest. The dead `color:` key each card
- * carried is gone with them -- `NavigationCard` has never accepted one.
+ * 🔴 IT LISTS WHAT IS BUILT, AND NOTHING ELSE. The nine legacy rows this page carried were nine dead ends -- *Key File
+ * Setup* to *Print Membership Summary*, not one with a route. They are gone. What is here (screens.md §0.3):
+ *
+ *   the month        chosen ONCE, at the top, from the server's months (MD55): a taken month says who took it and
+ *                    when, the open month that its figures are read live. The browser's clock decides nothing;
+ *   the statistics   six links, each opening its screen for the chosen month (`?month=`), with its plain name and the
+ *                    legacy title as its second line;
+ *   the pack         the two workbooks, prepared as a job and saved from here (`MonthEndPack`);
+ *   the listings     four rows, disabled with their reason -- each names members and refuses until sign-in, so the
+ *                    page says so WITHOUT ASKING: the listing route is never called;
+ *   *Take the month* for the open month, disabled with its reason, as A.C.B.'s *Approve* is -- the take refuses every
+ *                    caller (`IDENTITY_REQUIRED`), so it is never called either.
+ *
+ * `MonthlyMenu.test.jsx` holds the page, the rail, the Admin page and the route together, and forbids a row that links
+ * to the page it is on.
  */
-const cards = [
-    { title: 'Key File Setup', icon: LucideFile },
-    { title: 'Flag All Ports', icon: LucideHdmiPort },
-    { title: 'Print Log File', icon: LucideLogs },
-    { title: 'Merge All Audit Trails', icon: LucideTrain },
-    { title: 'Prepare File for Vari Mail', icon: LucideMail },
-    { title: 'Extract New and Deleted', icon: LucideTable },
-    { title: 'Print Location Listing', icon: LucideLocate },
-    { title: 'Print Member Roll (No Adding)', icon: LucidePaintRoller },
-    { title: 'Print Membership Summary', icon: LucideUserRound },
-];
+export default function MonthlyMenu({ pollDelaysMs }) {
+  const { setSelectedCardHref } = useOutletContext() || {};
 
-export default function MonthlyMenu() {
-    const { setSelectedCardHref, setSideBarOpen } = useOutletContext() || {};
+  // The months, asked once -- and again only when a person asks (*Try again*).
+  const { months, pending, failure, retry } = useMonths('MonthlyMenu.months');
 
-    return (
-        <Page>
-            <PageTitle title="Monthly Menu" subtitle="Select options below" />
-            {/* 📐 A SHEET OF ROWS, like every other menu page -- Home, Admin, ACB, Daily Menu,
-                Maintenance, Archive Search and Report Options all render this exact shape.
-                This one was a `grid md:grid-cols-2 xl:grid-cols-3` of same-size cards, which
-                is the scaffold `NavigationCard`'s own note refuses by name and the direction
-                contract lists first under page scaffolds. */}
-            <NavigationList
-                cards={cards}
-                onSelect={() => {
-                    setSelectedCardHref?.('/admin/monthly-menu');
-                    setSideBarOpen?.(true);
-                }}
-            />
-        </Page>
-    );
+  // The month a person chose -- in the address, as a statistic's screen carries it back here; until they choose, the
+  // newest month taken (or the open month, before any is taken).
+  const [params, setParams] = useSearchParams();
+  const chosen = params.get('month') ?? '';
+  const month = chosen || (months ? defaultMonth(months) : '');
+  const state = months && month ? monthStateOf(months, month) : null;
+  const open = state?.state === 'OPEN';
+
+  return (
+    <Page>
+      <PageTitle
+        title="Month end"
+        subtitle="The month’s statistics, the pack of workbooks made from them, and the listings that wait for sign-in."
+      />
+
+      <Criteria className="mt-6" label="The month">
+        <SelectInput
+          className={MONTH_CRITERION}
+          label="Month"
+          value={month}
+          options={months ? monthChoices(months, chosen) : []}
+          loading={pending}
+          loadError={failure}
+          onRetryLoad={retry}
+          onChange={(value) => setParams({ month: value }, { replace: true })}
+        />
+        {open && (
+          <Button variant="primary" disabled aria-describedby="month-end-take-why">Take {monthLabel(month)}</Button>
+        )}
+      </Criteria>
+      {state && (
+        <p className="mt-2 max-w-prose text-sm text-ink-muted" data-month-state={state.state}>
+          {{
+            OPEN: `${monthLabel(month)} is the open month: its figures are read live, as they stand now, until it is taken.`,
+            TAKEN: `${monthLabel(month)}: ${takenSentence(state)} Its figures are the month as it stood then.`,
+            NOT_TAKEN: `${monthLabel(month)} was not taken, and a past month is read only from what was taken.`,
+            NOT_BEGUN: `${monthLabel(month)} has not begun yet.`,
+          }[state.state]}
+        </p>
+      )}
+      {open && <p id="month-end-take-why" className="mt-1 max-w-prose text-sm text-ink-muted">{TAKE_WAITS}</p>}
+
+      <h2 className="mt-8 text-lg font-semibold text-ink">Statistics</h2>
+      <NavigationList
+        className="mt-3"
+        cards={STATISTICS.map((statistic) => ({
+          title: statistic.name,
+          desc: statistic.legacy,
+          href: statisticHref(statistic.key, month),
+          icon: ChartNoAxesCombined,
+        }))}
+        // The rail keeps Month end marked while a statistic of it is open.
+        onSelect={() => setSelectedCardHref?.('/admin/monthly-menu')}
+      />
+
+      <MonthEndPack month={month} open={open} pollDelaysMs={pollDelaysMs} />
+
+      <h2 className="mt-8 text-lg font-semibold text-ink">Listings of members</h2>
+      <p className="mt-0.5 max-w-prose text-sm text-ink-muted" data-listings-wait="">{LISTING_WAITS}</p>
+      <NavigationList
+        className="mt-3"
+        cards={LISTINGS.map((listing) => ({ title: listing.name, desc: listing.legacy, icon: Users, note: 'Waits for sign-in' }))}
+      />
+    </Page>
+  );
 }

@@ -44,6 +44,14 @@ describe('the Maintenance menu', () => {
     expect(screen.getByRole('link', { name: /Subscriptions/ })).toHaveAttribute('href', '/admin/maintenance/subscriptions')
   })
 
+  it('offers Workplaces on the page and in the rail alike -- the one screen of SASBO\'s workplaces (01.5, MR-ROB-37)', () => {
+    renderWithProviders(<Maintenance />)
+
+    // Written twice -- a card here, a leaf in the rail -- so both halves are asserted by name, not only by count.
+    expect(screen.getByRole('link', { name: /^Workplaces/ })).toHaveAttribute('href', '/admin/maintenance/workplaces')
+    expect(sidebarMaintenance().find((entry) => entry.title === 'Workplaces')?.href).toBe('/admin/maintenance/workplaces')
+  })
+
   it('says the same in the sidebar as on the page -- every entry a link, to the same place', () => {
     renderWithProviders(<Maintenance />)
     const onPage = screen.getAllByRole('link').map((link) => [link.textContent, link.getAttribute('href')])

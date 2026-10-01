@@ -1,5 +1,5 @@
 import {
-    LucideMenu, LucideFile, LucideConstruction
+    LucideMenu, LucideFile, LucideConstruction, LucideCalendarRange
 } from 'lucide-react';
 import { NavigationList } from '../../components/common/NavigationCard';
 import { Page } from '../../components/common/Sheet.jsx';
@@ -7,7 +7,8 @@ import PageTitle from '../../components/common/PageTitle';
 
 const cards = [
     { title: 'Daily', desc: 'Daily Menu' ,icon: LucideMenu, href: '/admin/daily-menu' },
-    //{ title: 'Monthly Menu', icon: LucideCalendar, href: '/admin/monthly-menu' },
+    // Month end `04.1`: the Monthly Menu renamed, at its own address (MD38), between Daily and A.C.B.
+    { title: 'Month end', desc: 'The month taken, its statistics and its pack of workbooks', icon: LucideCalendarRange, href: '/admin/monthly-menu' },
     { title: 'A.C.B', desc: 'A.C.B Menu',icon: LucideFile, href:'/admin/acb'},
     // { title: 'BankBranch', icon: Landmark, href:'/banks' },
     //{ title: 'Utilities', icon: LucideToolbox, color: 'text-red-600 dark:text-red-400' },

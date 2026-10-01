@@ -38,6 +38,16 @@ import { blankingDestroyedCode, readSources, unreadableDirectories } from './sou
 const FETCHES = /\b\w+Service\s*\.\s*\w+\s*\(/
 
 /**
+ * ➕ OR IT IMPORTS A SERVICE'S READS BY NAME (month end, 2026-09-30). A screen that needs two of a service's reads
+ * imports those two, so its chunk carries none of the others -- `import { getAreas } from
+ * '../../services/referenceService.js'` -- and that is a fetch as surely as `referenceService.getAreas()`. The pattern
+ * above cannot see it: found building month end's P4, whose two new pages it did not count as fetching at all, so the
+ * rule held over a population that had quietly lost them.
+ */
+const IMPORTS_A_READ = /import\s*\{[^}]+\}\s*from\s*['"][^'"]*\/services\/\w+Service(?:\.js)?['"]/
+const fetches = (code) => FETCHES.test(code) || IMPORTS_A_READ.test(code)
+
+/**
  * A REJECTION PATH — something that actually runs when the promise rejects.
  *
  * 🔴 THE FIRST VERSION OF THIS WAS TOO GENEROUS, AND THE MUTATION PROOF IS WHAT SAID SO.
@@ -110,6 +120,14 @@ describe('every page that fetches can say the fetch failed', () => {
     expect(handlesFailure('const { state } = usePagedRead(read)\n<Table rows={rows} loading={false} />')).toBe(false)
   })
 
+  it('the predicate itself: a read imported by name from a service is a fetch; an import from elsewhere is not', () => {
+    expect(fetches("import { getAreas } from '../../services/referenceService.js'\ngetAreas().then(setAreas)")).toBe(true)
+    expect(fetches('import { monthEnd } from "../../services/monthEndService"')).toBe(true)
+    // The canary's other half: a named import from a module that is not a service fetches nothing.
+    expect(fetches("import { EMPTY, formatInt } from '../../lib/format.js'")).toBe(false)
+    expect(fetches("import { MONTH_END_REFUSAL } from '../../config/monthEnd.js'")).toBe(false)
+  })
+
   it('finds no page whose only outcome is data', () => {
     const sources = pages()
 
@@ -120,7 +138,7 @@ describe('every page that fetches can say the fetch failed', () => {
     // 🔑 THE MUST-PASS HALF, and without it this whole file is satisfied by a regex that
     // matches nothing. If `FETCHES` stopped matching, no page would fetch, none could be
     // an offender, and the suite would report the rule holding over an empty population.
-    const fetching = sources.filter((source) => FETCHES.test(source.code))
+    const fetching = sources.filter((source) => fetches(source.code))
 
     expect(
       fetching.length,
@@ -149,7 +167,7 @@ describe('every page that fetches can say the fetch failed', () => {
     const sources = pages()
     const wronglyListed = Object.keys(NO_FETCH_OF_THEIR_OWN).filter((path) => {
       const source = sources.find((candidate) => candidate.path === path)
-      return source && FETCHES.test(source.code)
+      return source && fetches(source.code)
     })
 
     expect(

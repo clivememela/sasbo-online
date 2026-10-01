@@ -36,6 +36,14 @@ import { formatInt } from '../../lib/format';
  * many of them pay by debit order is its second line -- a reading of one thing and its make-up,
  * which the ledger allows, rather than another box beside it. Quiet, like "Updated today": both
  * are readings of this month's traffic, not of what the register holds.
+ *
+ * 🔑 THE FIGURES ARE DATA (month end `02.4`, BR9). The register and the first screen are two
+ * instruments -- the register counts the list it holds, the first screen reads the server's
+ * summary -- and ONE strip draws both: `figures` is the list of `{ label, value, dot?, quiet?,
+ * breakdown?, definition? }` it rules, in order. The register's props (`total`, `active`, ...) are
+ * still accepted and become that list through `registerFigures`, so its call site and its tests read
+ * exactly as they did. `definition` is a figure's second line saying what it counted (ME-10) -- shown,
+ * like `breakdown`, only once the figure was read -- and `label` names the strip for a screen reader.
  */
 
 /**
@@ -45,41 +53,36 @@ import { formatInt } from '../../lib/format';
  */
 const groups = (n) => (typeof n === 'number' ? formatInt(n) : n);
 
+/** The register's figures as data: the props it has always passed, as the list the strip rules. */
+export const registerFigures = ({ total, active, pending, suspended, newThisMonth, newDebitOrders, updatedToday }) => [
+  { label: 'Total', value: total },
+  { label: 'Active', value: active, dot: 'bg-status-active-dot' },
+  { label: 'Pending', value: pending, dot: 'bg-status-pending-dot' },
+  { label: 'Suspended', value: suspended, dot: 'bg-status-suspended-dot' },
+  ...(newThisMonth === undefined
+    ? []
+    : [{
+      label: 'New this month',
+      value: newThisMonth,
+      quiet: true,
+      breakdown: newDebitOrders === undefined ? undefined : `${groups(newDebitOrders)} by debit order`,
+    }]),
+  ...(updatedToday === undefined
+    ? []
+    : [{ label: 'Updated today', value: updatedToday, quiet: true }]),
+];
+
 /**
  * @param {{
- *   total: number, active: number, pending: number, suspended: number,
- *   newThisMonth?: number, newDebitOrders?: number,
- *   updatedToday?: number, state?: 'ready'|'loading'|'error', className?: string,
+ *   figures?: Array<{ label: string, value?: number|string|null, dot?: string, quiet?: boolean,
+ *     breakdown?: string, definition?: string }>,
+ *   label?: string, state?: 'ready'|'loading'|'error', className?: string,
+ *   total?: number, active?: number, pending?: number, suspended?: number,
+ *   newThisMonth?: number, newDebitOrders?: number, updatedToday?: number,
  * }} props
  */
-export default function FigureStrip({
-  total,
-  active,
-  pending,
-  suspended,
-  newThisMonth,
-  newDebitOrders,
-  updatedToday,
-  state = 'ready',
-  className,
-}) {
-  const figures = [
-    { label: 'Total', value: total },
-    { label: 'Active', value: active, dot: 'bg-status-active-dot' },
-    { label: 'Pending', value: pending, dot: 'bg-status-pending-dot' },
-    { label: 'Suspended', value: suspended, dot: 'bg-status-suspended-dot' },
-    ...(newThisMonth === undefined
-      ? []
-      : [{
-        label: 'New this month',
-        value: newThisMonth,
-        quiet: true,
-        breakdown: newDebitOrders === undefined ? undefined : `${groups(newDebitOrders)} by debit order`,
-      }]),
-    ...(updatedToday === undefined
-      ? []
-      : [{ label: 'Updated today', value: updatedToday, quiet: true }]),
-  ];
+export default function FigureStrip({ figures, label = 'Register summary', state = 'ready', className, ...register }) {
+  const shown = figures ?? registerFigures(register);
 
   /*
    * 🔴 K1 (`06.3`): A FIGURE NOBODY READ IS NOT A ZERO. The counts are taken from the register the
@@ -88,6 +91,9 @@ export default function FigureStrip({
    * members, over the sentence saying the server had not answered. So no figure is printed until
    * one was read: the skeleton's shimmer while the register is on its way, the record's own "—"
    * when it is not coming, and each with its truth in words for a screen reader.
+   *
+   * 🔑 And a figure that was answered as NOTHING reads the same way: a penetration with no staff
+   * complement on record is `null` from the server, and `null` is not a nought (02.3).
    *
    * ⚠️ The skeleton is sized INLINE: `.skeleton` is an unlayered rule in index.css, so utility
    * classes cannot resize it.
@@ -101,7 +107,7 @@ export default function FigureStrip({
         </>
       );
     }
-    if (state === 'error') {
+    if (state === 'error' || figure.value == null) {
       return (
         <>
           <span aria-hidden="true" className="text-ink-muted">—</span>
@@ -115,14 +121,14 @@ export default function FigureStrip({
   return (
     <div className={cn('figure-strip', className)}>
       <dl
-        aria-label="Register summary"
+        aria-label={label}
         aria-busy={state === 'loading' || undefined}
         data-testid="figure-strip"
         // 🔑 THE RULES ARE THE COMPONENT. Two hairlines, top and bottom, and the figures sit
         // BETWEEN them -- a ledger line, and not a row of boxes.
         className="border-y border-line-strong"
       >
-        {figures.map((figure, index) => (
+        {shown.map((figure, index) => (
           <div
             key={figure.label}
             className={cn(
@@ -131,10 +137,13 @@ export default function FigureStrip({
               // across the strip. The first figure keeps the page's own gutter.
               'grid content-start gap-1 px-5 py-2.5 first:pl-0',
               // The separating hairline, on every figure but the last.
-              index < figures.length - 1 && 'border-r border-line',
+              index < shown.length - 1 && 'border-r border-line',
             )}
           >
-            <dt className="flex items-center gap-[7px] whitespace-nowrap text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+            {/* A label longer than its column takes a second line rather than crossing the hairline beside it: the
+                first screen's six share a desk's width with the rail, and "Members on record" is wider than a sixth.
+                Every label sits on its value (`self-end`), so the strip's rows read level (index.css, the subgrid). */}
+            <dt className="flex items-center gap-[7px] self-end text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
               {figure.dot && <i className={cn('size-[7px] rounded-full', figure.dot)} aria-hidden="true" />}
               {figure.label}
             </dt>
@@ -151,6 +160,8 @@ export default function FigureStrip({
             {figure.breakdown && state === 'ready' && (
               <dd className="whitespace-nowrap text-xs tabular-nums text-ink-muted">{figure.breakdown}</dd>
             )}
+            {/* What the figure counted (ME-10) -- a sentence, so it wraps inside its column. */}
+            {figure.definition && state === 'ready' && <dd className="text-xs text-ink-muted">{figure.definition}</dd>}
           </div>
         ))}
       </dl>

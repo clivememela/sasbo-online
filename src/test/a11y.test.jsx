@@ -1,19 +1,29 @@
 // @vitest-environment jsdom -- axe walks a real DOM tree; there is nothing to scan without one
 import { beforeEach, describe, expect, it } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 
 import MembersPage from '../pages/members/Members'
+// The record's History tab is a lazy chunk; in the registry before the scan, so it waits on the page, not on the box.
+import '../pages/members/MemberHistory.jsx'
 import CaptureMember from '../pages/members/CaptureMember'
 import BankListing from '../pages/bank_branch/BankListing'
+import Home from '../pages/Home'
+// The first screen's figures are a lazy chunk; in the registry before the scan, so it waits on the page, not on the box.
+import '../pages/home/HomeFigures.jsx'
+import MonthlyMenu from '../pages/admin/MonthlyMenu'
+import MonthEndStatistic from '../pages/admin/MonthEndStatistic'
 import { renderWithProviders } from './renderWithProviders'
 import { expectNoA11yViolations } from './assertions'
 import { server } from './msw/server'
+import { monthEndAnswer, monthEndBody } from './msw/monthEndExamples'
 import { smokeHandlers } from './msw/smokeLayer'
 import { pageFixtures } from './msw/pageFixtures'
+import { setupUser } from './user'
 
 /**
- * THE ACCESSIBILITY GATE, on the three surfaces this phase names.
+ * THE ACCESSIBILITY GATE, on the surfaces named below -- the three this phase named, and the first screen since
+ * month end's `02.3` (MR-ROB-37).
  *
  * WHAT IS DELIBERATELY OFF, AND WHY SAYING SO IS BETTER THAN PRETENDING
  * `color-contrast` is disabled, in `expectNoA11yViolations` rather than here,
@@ -73,6 +83,78 @@ describe('accessibility', () => {
    * for the SECOND site the register never named.
    */
 
+  it('the record\'s Change status dialog has no violations, with SASBO\'s codes listed (month end 03.3, MV-12)', async () => {
+    // A state-gated surface, opened first: the record, its Membership tab, the dialog, and a leaving status, so that the
+    // code list is there to be scanned rather than an empty dialog.
+    server.use(
+      http.get('*/api/members', () =>
+        HttpResponse.json([{ id: 1, membershipNumber: 'M0001', firstNames: 'Synthetic', surname: 'Testperson', status: 'Active' }]),
+      ),
+      monthEndAnswer('GET /api/reference/deletion-codes'),
+    )
+    const user = setupUser()
+    renderWithProviders(<MembersPage />)
+    await user.click(await screen.findByRole('button', { name: /open the record for/i }))
+    await user.click(await screen.findByRole('button', { name: /Membership & Subscriptions/i }))
+    await user.click(screen.getByRole('button', { name: 'Change status' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Change status' })
+    await user.selectOptions(within(dialog).getByLabelText(/^New status/), 'Resigned')
+    await waitFor(() => expect(within(dialog).getByLabelText(/^SASBO’s deletion code/)).toBeEnabled())
+
+    // Scoped to the dialog, as Modal's and DateField's scans are: the dialog is portalled out of `container`, and a
+    // scan of the whole document costs whatever else it holds. `region` is off for the same reason as theirs -- a
+    // dialog is not a page, and the landmarks are the shell's, asserted above.
+    await expectNoA11yViolations(dialog, { rules: { region: { enabled: false } } })
+  })
+
+  describe('the record\'s History tab (month end 03.6, MR-ROB-37)', () => {
+    // The golden page's own entry, with invented values in its shape: the mock's sheet -- a change of status with SASBO's
+    // code, the reason under it and a note, a workplace, a save of three fields, a number kept as its last four, a capture.
+    const golden = monthEndBody('GET /api/members/{id}/history')
+    const entry = (fields) => ({ ...golden.content[0], reason: null, code: null, codeName: null, reasonUnderCode: null, note: null, ...fields })
+    const sheet = [
+      entry({ kind: 'STATUS', id: 1, what: 'status', from: 'Active', to: 'Resigned', reason: 'DELETION_CODE', code: 2,
+        codeName: 'Resigned Society', reasonUnderCode: 'INVENTED: MOVED AWAY', saveId: null, note: 'Invented: a letter.' }),
+      entry({ id: 13, what: 'workplace', from: '900002 INVENTED HEAD OFFICE', to: '900003 INVENTED HARBOUR', saveId: 's13' }),
+      entry({ id: 12, what: 'phone', from: '+27 60 555 0101', to: '+27 60 555 0188', saveId: 's10' }),
+      entry({ id: 11, what: 'personalEmail', from: null, to: 'synthetic.member@example.invalid', saveId: 's10' }),
+      entry({ id: 10, what: 'address', from: '12 Invented Road', to: '4 Invented Lane', saveId: 's10' }),
+      entry({ id: 9, what: 'identityNumber', from: '****4081', to: '****4087', saveId: 's9' }),
+      ...golden.content,
+    ]
+    const member = { id: 1, membershipNumber: 'M0001', firstNames: 'Synthetic', surname: 'Testperson', status: 'Resigned' }
+
+    const openHistory = async () => {
+      const user = setupUser()
+      const view = renderWithProviders(<MembersPage />)
+      await user.click(await screen.findByRole('button', { name: /open the record for/i }))
+      await user.click(await screen.findByRole('button', { name: 'History of changes' }))
+      return { ...view, tab: await screen.findByRole('region', { name: 'History of changes, newest first' }) }
+    }
+
+    it('its sheet has no violations -- every kind of row the mock draws, and the pager', async () => {
+      server.use(
+        http.get('*/api/members', () => HttpResponse.json([member])),
+        http.get('*/api/members/:id/history', () => HttpResponse.json({ ...golden, content: sheet, totalElements: sheet.length })),
+      )
+      const { container, tab } = await openHistory()
+      await waitFor(() => expect(tab).toHaveAttribute('data-history', 'ready'))
+      expect(within(tab).getByText('Only the last four digits are kept.')).toBeInTheDocument()
+      await expectNoA11yViolations(container)
+    })
+
+    it('its failed state has no violations -- the alert, Try again and the Details', async () => {
+      server.use(
+        http.get('*/api/members', () => HttpResponse.json([member])),
+        http.get('*/api/members/:id/history', () => HttpResponse.error()),
+      )
+      const { container, tab } = await openHistory()
+      await waitFor(() => expect(tab).toHaveAttribute('data-history', 'error'))
+      expect(within(tab).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+      await expectNoA11yViolations(container)
+    })
+  })
+
   it('the CaptureMember form has no violations', async () => {
     const { container } = renderWithProviders(<CaptureMember />)
     await waitFor(() => expect(screen.getByLabelText(/^Surname/)).toBeInTheDocument())
@@ -89,6 +171,56 @@ describe('accessibility', () => {
     )
     const { container } = renderWithProviders(<BankListing />)
     await waitFor(() => expect(container.querySelectorAll('*').length).toBeGreaterThan(5))
+    await expectNoA11yViolations(container)
+  })
+
+  it('the first screen has no violations, with its figures, their sheet and the menu rows (02.3, MR-ROB-37)', async () => {
+    // The server's own golden answer (MD48): a sheet with rows, a total and the marks the screen draws on them.
+    server.use(monthEndAnswer('GET /api/members/summary'))
+    const { container } = renderWithProviders(<Home />)
+    await screen.findByText('INVENTED GROUP CORE')
+    await expectNoA11yViolations(container)
+  })
+
+  it('the Month end page has no violations -- its month, its statistics, the pack ready with its links, the listings (04.1, MR-ROB-37)', async () => {
+    // A state-gated surface, opened first: the months read, the open month chosen so Take the month is there with its
+    // reason, and the pack asked for -- the golden answer is a READY pack, so its two links are scanned too.
+    server.use(monthEndAnswer('GET /api/month-end/months'), monthEndAnswer('POST /api/month-end/{month}/pack'))
+    const user = setupUser()
+    const { container } = renderWithProviders(<MonthlyMenu />, { initialEntries: ['/admin/monthly-menu?month=2026-09'] })
+    await user.click(await screen.findByRole('button', { name: 'Prepare the pack for September 2026' }))
+    await screen.findByRole('link', { name: /^Download the statistics workbook/ })
+    expect(screen.getByRole('button', { name: 'Take September 2026' })).toBeDisabled()
+    await expectNoA11yViolations(container)
+  })
+
+  it('a statistic\'s screen has no violations -- its criteria, its sheets with rule C, and its notes (04.3-04.8, MR-ROB-37)', async () => {
+    // The branches, with a row of fewer than five and one withheld beside it, in the golden answer's own shape: the
+    // words and their descriptions are part of what is scanned.
+    const branches = monthEndBody('GET /api/month-end/{month}/branches')
+    const hidden = (key, label, rule) => ({ key, label, level: 'ROW', fewerThanFive: rule === 'few', withheld: rule === 'withheld', cells: [null, null, null, null, null, null] })
+    server.use(
+      monthEndAnswer('GET /api/month-end/months'),
+      http.get('*/api/month-end/:month/branches', () => HttpResponse.json({
+        ...branches,
+        sheets: branches.sheets.map((sheet, index) => (index === 1
+          ? { ...sheet, rows: [...sheet.rows, hidden('E8', 'INVENTED SMALL EMPLOYER', 'few'), hidden('E9', 'INVENTED NEIGHBOURING EMPLOYER', 'withheld')] }
+          : sheet)),
+      })),
+    )
+    const { container } = renderWithProviders(<MonthEndStatistic />, {
+      initialEntries: ['/admin/monthly-menu/branches?month=2026-08'],
+      path: '/admin/monthly-menu/:statistic',
+    })
+    await screen.findByText('fewer than five')
+    await screen.findByRole('heading', { level: 2, name: 'Notes' })
+    await expectNoA11yViolations(container)
+  })
+
+  it('the first screen has no violations while its figures are not available -- the shared fixture\'s empty array', async () => {
+    // The state every other test of this screen sees: the strip's "not available" and the sheet's sentence.
+    const { container } = renderWithProviders(<Home />)
+    await screen.findByText('The figures are not available from this server yet.')
     await expectNoA11yViolations(container)
   })
 })

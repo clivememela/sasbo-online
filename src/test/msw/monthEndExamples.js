@@ -13,9 +13,13 @@ import examples from '../month-end-examples.json'
  */
 export const monthEndExamples = examples
 
+/** A route as the server writes it -- `/api/members/{id}/status` -- as MSW matches it: `/api/members/:id/status`. */
+export const mswPath = (path) => path.replace(/\{(\w+)\}/g, ':$1')
+
 const handlerFor = (route, example) => {
   const [method, path] = route.split(' ')
-  return http[method.toLowerCase()](`*${path}`, () => HttpResponse.json(example.body, { status: example.status }))
+  return http[method.toLowerCase()](`*${mswPath(path)}`, () =>
+    HttpResponse.json(example.body, { status: example.status }))
 }
 
 /** Every route of the arc, answered as the server answered it. */

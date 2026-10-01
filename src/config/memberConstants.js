@@ -42,9 +42,11 @@ export const EMPLOYMENT_TYPE_OPTIONS = ['Permanent', 'Contract'];
 // from the API at runtime and fall back to this array only when necessary.
 export const JOB_GRADE_OPTIONS = [];
 export const MANAGER_OPTIONS = ['MGR-001'];
-export const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, '0'));
-export const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
-export const YEAR_OPTIONS = Array.from({ length: 21 }, (_, i) => (new Date().getFullYear() - 10 + i).toString());
+// ⚖️ `@__PURE__` (month end 01.3): no screen reads these three, and a bundler must keep an `Array.from(…, fn)` it cannot
+// prove harmless -- so all three shipped, computed, on every load. Marked, they go wherever nothing imports them.
+export const DAY_OPTIONS = /* @__PURE__ */ Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+export const MONTH_OPTIONS = /* @__PURE__ */ Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+export const YEAR_OPTIONS = /* @__PURE__ */ Array.from({ length: 21 }, (_, i) => (new Date().getFullYear() - 10 + i).toString());
 
 export const BEC_STRUCTURE_OPTIONS = ['Shop Stewart', 'Branch Executive Committee'];
 
@@ -114,6 +116,43 @@ export const MEMBER_TABS = [
   { id: 'membership', label: 'Membership & Subscriptions' },
   // { id: 'history', label: 'History & Remarks' },
 ];
+
+/**
+ * THE TAB EACH FIELD IS ON, for both member screens: where a save that failed on a field sends the administrator, and
+ * which tab is marked as holding an error. Capture and the record each carried an identical copy until month end 01.3,
+ * which needed `workplaceId` in both -- one list now, so the two cannot disagree about where a field lives.
+ */
+export const MEMBER_FIELD_TABS = {
+  title: 'personal',
+  initials: 'personal',
+  firstNames: 'personal',
+  surname: 'personal',
+  identityType: 'personal',
+  identityNumber: 'personal',
+  dateOfBirth: 'personal',
+  personalEmail: 'personal',
+  workEmail: 'personal',
+  phone: 'personal',
+  workTel: 'personal',
+  homeTel: 'personal',
+  employeeNumber: 'employment',
+  ibtNo: 'employment',
+  employmentType: 'employment',
+  jobGrade: 'employment',
+  bankName: 'employment',
+  branch: 'employment',
+  paymentType: 'employment',
+  bankAccountNumber: 'employment',
+  accountType: 'employment',
+  debitDay: 'employment',
+  workplaceId: 'employment',
+  // V55: what a structure's Yes needs beside it -- a refused save opens the tab that asks. The record's
+  // only: capture asks no structure (its Structures tab came off in 2026-09).
+  shopStewardElectionDate: 'structures',
+  becCommitteeCode: 'structures',
+  becStructures: 'structures',
+  becExecutivePosition: 'structures',
+};
 
 /**
  * 🔴 E9a/E9b/A32: the form offered three days -- 20, 25 and 31 -- while the signed spec and the

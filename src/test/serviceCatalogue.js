@@ -4,10 +4,14 @@ import { debounceService } from '../services/debounceService'
 import { jobGradeService } from '../services/jobGradeService'
 import { locationService } from '../services/locationService'
 import { memberService } from '../services/memberService'
+import { memberHistoryService } from '../services/memberHistoryService'
+import { memberStatusService } from '../services/memberStatusService'
+import { monthEndService } from '../services/monthEndService'
 import { recruiterService } from '../services/recruiterService'
 import { recruitmentChannelService } from '../services/recruitmentChannelService'
 import { referenceService } from '../services/referenceService'
 import { subscriptionsService } from '../services/subscriptionsService'
+import { summaryService } from '../services/summaryService'
 import { workplaceService } from '../services/workplaceService'
 import * as api from '../services/api'
 
@@ -30,10 +34,14 @@ export const SERVICE_MODULES = [
   { name: 'jobGradeService', module: jobGradeService },
   { name: 'locationService', module: locationService },
   { name: 'memberService', module: memberService },
+  { name: 'memberHistoryService', module: memberHistoryService },
+  { name: 'memberStatusService', module: memberStatusService },
+  { name: 'monthEndService', module: monthEndService },
   { name: 'recruiterService', module: recruiterService },
   { name: 'recruitmentChannelService', module: recruitmentChannelService },
   { name: 'referenceService', module: referenceService },
   { name: 'subscriptionsService', module: subscriptionsService },
+  { name: 'summaryService', module: summaryService },
   { name: 'workplaceService', module: workplaceService },
 ]
 
@@ -78,6 +86,20 @@ const ARGS = {
   'acbRunService.markHandled': ['7', '21', 'Synthetic handled note'],
   'acbRunService.sendLetter': ['7', '21'],
   'acbRunService.searchMembers': [{ surname: 'Synthetic' }, 0, 25],
+  'memberStatusService.changeStatus': ['7', {
+    toStatus: 'Resigned', expectedStatus: 'Active', reason: 'DELETION_CODE', deletionCode: 2,
+  }],
+  'summaryService.getSummary': [{ month: '2026-09', by: 'employer' }],
+  'monthEndService.getMonths': [],
+  'monthEndService.getNewAndDeleted': ['2026-08', { area: 'A' }],
+  'monthEndService.getMembership': ['2026-08', {}],
+  'monthEndService.getLeavers': ['2026-08', { region: 'NORTH' }],
+  'monthEndService.getBranches': ['2026-08'],
+  'monthEndService.getRecruitment': ['2026-09', {}],
+  'monthEndService.getRepresentatives': ['2026-08', {}],
+  'monthEndService.askPack': ['2026-08'],
+  'monthEndService.getPack': [7],
+  'memberHistoryService.getMemberHistory': ['7', 0, 50],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS
