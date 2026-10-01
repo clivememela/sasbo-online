@@ -210,6 +210,7 @@ const ROW_IS = /* @__PURE__ */ Object.freeze({
   resigned: 'Employer',
   representatives: 'Table code',
   'committee-members': 'Table code',
+  'memnet-members': 'Table code',
   'suspended-by-code': 'Suspension code',
   'due-a-visit': 'Branch',
 });
