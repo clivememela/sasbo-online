@@ -291,7 +291,13 @@ const CEILINGS = {
   //                   · workplaceVisitService 0 -> 510 · Forms +490 (A60: the four criteria reach the form) · the rest
   //                   the contract's copies and imports.
   // Checked before raising, as the header asks: nothing from src/test/ is imported by the product.
-  js: 789.34 * KB,
+  //
+  // 789.34 -> 789.86 on 2026-10-01, MEASURED, under the same word (MO25): 04.9 and Memnet (04.8, MM80). Measured on a
+  // team runner: clivememela/sasbo-online run 36880881477 at a94ff46, javascript 789.85 KiB, 0.52 over 789.33 at
+  // 7b4daa2 (run 36874974129). +530 B by vite's sizes, both chunks there already:
+  //   Members +310 (the record asks and shows the Memnet mark) · useMonths +220 (04.9's statistic, its read and its
+  //   sheet's head; the Memnet sheet's head). Nothing from src/test/ is imported by the product.
+  js: 789.86 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
@@ -309,7 +315,10 @@ const CEILINGS = {
   //
   // 925.12 -> 933.45 on 2026-10-01, MEASURED (MO25): 933.44 KiB on the same run -- the javascript's and the stylesheet's
   // growth above, and nothing else. The hundredth over the printed figure covers its rounding.
-  total: 933.45 * KB,
+  //
+  // 933.45 -> 933.97 on 2026-10-01, MEASURED (MO25): 933.96 KiB on run 36880881477 -- the javascript's +0.52 above, the
+  // stylesheet unmoved at 80.63.
+  total: 933.97 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to
