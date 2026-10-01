@@ -228,6 +228,12 @@ const ROWS_BY = /* @__PURE__ */ Object.freeze({
  * from the sheet's key -- `by-area` is by area -- and a sheet this browser has never seen is headed *Row*, which
  * `monthEndRules.test.js` forbids for every sheet the server answers today.
  */
+/**
+ * The rows a statistic's sheet shows at once -- the workplaces' register's page. Most sheets are a table code or an area
+ * a row and never reach it; 04.9's is a branch a row, every branch of SASBO's at `all`.
+ */
+export const SHEET_PAGE = 50;
+
 export const rowHeader = (sheetKey) =>
   ROW_IS[sheetKey] ?? ROWS_BY[/(?:^|-)by-(.+)$/.exec(sheetKey ?? '')?.[1]] ?? 'Row';
 
