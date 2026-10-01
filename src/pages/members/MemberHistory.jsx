@@ -67,6 +67,13 @@ const SUB = cn('mt-0.5 block font-normal text-ink-muted', SMALL);
  */
 const NUMBER_SHAPED = /^(R\s)?[+\d][\d\s\-/.,]*$/;
 const figures = (text) => (NUMBER_SHAPED.test(text) ? 'tabular-nums' : null);
+/**
+ * An e-mail address breaks after its "@" and after its dots, never mid-word (MO24): the column is about twenty
+ * characters of one, and `overflow-wrap: anywhere` alone broke "synthetic.member@exampl" from "e.invalid". The
+ * anywhere stays, for a part that is longer than the column on its own.
+ */
+const breakable = (text) =>
+  (text.includes('@') ? text.split(/([@.])/).flatMap((part, i) => (i % 2 ? [part, <wbr key={i} />] : [part])) : text);
 /** The small print beside a change: the mask's reason, and a save that runs on past the page. */
 const ASIDE = 'text-xs font-normal text-ink-muted';
 
@@ -175,7 +182,7 @@ function Value({ entry, value, side, aside = null }) {
       </dd>
     );
   }
-  return <dd className={cn(VALUE, tone)}><span className={figures(text)}>{text}</span>{under}</dd>;
+  return <dd className={cn(VALUE, tone)}><span className={figures(text)}>{breakable(text)}</span>{under}</dd>;
 }
 
 /**

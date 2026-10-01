@@ -1833,6 +1833,7 @@ export default function Members() {
                                         offers to fill the two bank fields below and never writes them itself. */}
                                     <WorkplaceField
                                         className="col-span-full"
+                                        stacked
                                         source={isEditing ? workplaceSource : undefined}
                                         choice={workplace}
                                         current={{

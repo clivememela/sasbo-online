@@ -106,8 +106,10 @@ describe('the record -- the member\'s workplace, read', () => {
     const user = setupUser()
     await openEmployment(user, 'Harbour')
 
-    expect(await panel().findByText('Not available. This server does not answer for SASBO’s workplaces yet.'))
-      .toBeInTheDocument()
+    // One paragraph, "Not available." in its strong (the mock's ⑦), the reason beside it.
+    const said = (_, node) => node?.tagName === 'P'
+      && node.textContent === 'Not available. This server does not answer for SASBO’s workplaces yet.'
+    expect(await panel().findByText(said)).toBeInTheDocument()
     expect(panel().queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
   })
 
@@ -220,5 +222,18 @@ describe('the record -- the member\'s workplace, changed', () => {
     expect(within(workplaceGroup()).getByText('INVENTED HEAD OFFICE')).toBeInTheDocument()
     expect(panel().getByText('The changes were not saved')).toBeInTheDocument()
     expect(panel().getAllByText(sentence).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('🔍 MO24 ⑫: in the record\'s panel the employer stands over the search, in the panel\'s one column', async () => {
+    // jsdom lays nothing out: the column is held by the class that makes it, and was measured at 1280 in a browser.
+    const user = setupUser()
+    await openEmployment(user, 'Harbour')
+    await user.click(screen.getByRole('button', { name: /Edit Member/i }))
+    const employer = await panel().findByRole('combobox', { name: /^Employer/ })
+    let pair = panel().getByLabelText(/^Find the workplace/)
+    while (!pair.contains(employer)) pair = pair.parentElement
+
+    expect(pair).toHaveClass('grid')
+    expect(pair, 'two columns in a 424px panel squeezed both controls').not.toHaveClass('grid-cols-2')
   })
 })
