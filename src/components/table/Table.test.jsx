@@ -289,3 +289,26 @@ describe('Table — a footer, and a column that ends a phone card (MO24)', () =>
     expect([...document.querySelectorAll('td[data-end]')].map((cell) => cell.dataset.col)).toEqual(['number', 'number'])
   })
 })
+
+describe('Table — what a row opens onto (month end A.1)', () => {
+  it('`below` puts what it answers under that row alone, across every column, and nothing under the others', () => {
+    renderWithProviders(
+      <Table
+        columns={COLUMNS}
+        rows={MEMBERS}
+        rowKey="id"
+        caption="Members"
+        below={(member) => member.id === 12 && <p>Opened under Sipho Dlamini</p>}
+      />,
+    )
+
+    const opened = screen.getByText('Opened under Sipho Dlamini').closest('tr')
+    expect(opened).toHaveAttribute('data-below')
+    expect(opened.previousElementSibling).toHaveTextContent('Sipho Dlamini')
+    // Every column, the phone's expander among them: the opened row spans the table.
+    expect(opened.querySelector('td')).toHaveAttribute('colspan', '4')
+    expect(document.querySelectorAll('tr[data-below]')).toHaveLength(1)
+    // It is not a row a person acts on: arrows and the row count pass it by.
+    expect(opened).not.toHaveAttribute('data-row')
+  })
+})

@@ -80,6 +80,11 @@ import TableScroller from './TableScroller';
  * a row of the same columns and nothing opens it: its expander cell is there, and empty, so a
  * phone shows no chevron that leads nowhere. **`end`** marks a column that stands at the right of
  * a phone's card row (index.css, "The register on a phone"): the row's second column.
+ *
+ * ➕ **`below` IS WHAT A ROW OPENS ONTO, AT EVERY WIDTH** (month end A.1, a workplace's visits):
+ * given a row, it answers what to show under it, or nothing. The row it opens is the caller's to
+ * mark (`selectedKey`) and its control the caller's to render (`aria-expanded`), as a register's
+ * record is; a phone's card rows keep it as a block of its own (index.css).
  */
 
 /** @typedef {'essential'|'secondary'|'detail'} ColumnPriority */
@@ -128,6 +133,7 @@ export default function Table({
   onRowSelect,
   enterKey,
   footer,
+  below,
 }) {
   const [expanded, setExpanded] = useState(() => new Set());
 
@@ -393,6 +399,7 @@ export default function Table({
               rows.map((row, index) => {
                 const key = resolveRowKey(rowKey, row, index) ?? index;
                 const isOpen = expanded.has(key);
+                const opened = below?.(row, index);
                 const isSelected = selectedKey !== undefined && selectedKey !== null && key === selectedKey;
 
                 return (
@@ -454,6 +461,14 @@ export default function Table({
                               </Fragment>
                             ))}
                           </dl>
+                        </td>
+                      </tr>
+                    )}
+
+                    {opened && (
+                      <tr data-below="">
+                        <td colSpan={columnCount} className="p-0">
+                          {opened}
                         </td>
                       </tr>
                     )}

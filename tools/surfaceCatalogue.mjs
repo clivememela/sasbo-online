@@ -124,6 +124,16 @@ const emptyHistory = () => {
     .answers['GET /api/members/{id}/history'].body;
   return { ...golden, content: [], totalElements: 0, totalPages: 0 };
 };
+/** A workplace's visits (A.1) in one of their four states (`WorkplaceVisits.jsx`'s `data-visits`). */
+const VISITS = (state) => `!!document.querySelector('main [data-visits="${state}"]')`;
+/** Open INVENTED HARBOUR's visits by its R/A number, the row's control -- named by what it opens -- until `state`. */
+const OPEN_VISITS = (state) => step("open a workplace's visits", clickByText('main td button', '/^900003 — the visits to /'), VISITS(state));
+/** A workplace with no visit on record, as the server answers one: the golden page with none on it. */
+const noVisits = () => {
+  const golden = JSON.parse(readFileSync(join(REPO_ROOT, 'src', 'test', 'month-end-examples.json'), 'utf8'))
+    .answers['GET /api/workplaces/{id}/visits'].body;
+  return { ...golden, visits: [], totalElements: 0, totalPages: 0 };
+};
 /**
  * A member whose record can be SAVED. The stub's first member is flagged BEC with no primary committee, so its edit stops
  * at the app's own validation ("Please select an active primary BEC Committee") before any confirmation can ask -- a
@@ -487,6 +497,23 @@ export const SURFACES = [
   // A figures chunk that will not load is held by the page's own boundary: one line, and the menu rows beneath it.
   { name: 'home-figures-chunk-failed', route: '/home', intercept: { url: '*/assets/HomeFigures-*.js', mode: 'fail' },
     ready: TEXT('The figures could not be shown.'), present: { MENU: MENU_ROWS } },
+
+  // ── a workplace's visits (month end A.1, on 01.5) ─────────────────────────────────────────────
+  // `serve-dist.mjs` answers every workplace's visits with the server's golden page: a visit that changed the complement,
+  // and a month of SASBO's own history. The row is opened as a person opens it, by its R/A number; the other states are
+  // the read hung, failed, or answered with nothing on it.
+  { name: 'workplace-visits', route: '/admin/maintenance/workplaces', ready: ROWS, steps: [OPEN_VISITS('ready')],
+    present: { READY: VISITS('ready'), MONTH: TEXT('From SASBO’s list'), WITHHELD: TEXT('shown once sign-in exists') },
+    covers: ['pages/maintainance/Workplaces.jsx#aria-expanded@visits'] },
+  { name: 'workplace-visits-loading', route: '/admin/maintenance/workplaces', ready: ROWS,
+    intercept: { url: '*/api/workplaces/*/visits*', mode: 'hang' }, steps: [OPEN_VISITS('loading')],
+    present: { LOADING: VISITS('loading') }, covers: ['pages/maintainance/WorkplaceVisits.jsx#DataState@state'] },
+  { name: 'workplace-visits-error', route: '/admin/maintenance/workplaces', ready: ROWS,
+    intercept: { url: '*/api/workplaces/*/visits*', mode: 'fail' }, steps: [OPEN_VISITS('error')],
+    present: { ERROR: VISITS('error'), RETRY: TEXT('Try again') } },
+  { name: 'workplace-visits-empty', route: '/admin/maintenance/workplaces', ready: ROWS,
+    intercept: { url: '*/api/workplaces/*/visits*', mode: 'fulfill', body: noVisits }, steps: [OPEN_VISITS('empty')],
+    present: { EMPTY: TEXT('No visits on record') } },
 
   // ── month end (`04.1`-`04.10`) ────────────────────────────────────────────────────────────────
   // The Month end page and a statistic's screen, from `serve-dist.mjs`'s golden months and sheets: August 2026 taken,

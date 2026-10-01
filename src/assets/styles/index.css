@@ -955,8 +955,10 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
   .register td[data-col="branch"] { grid-area: branch; justify-self: end; text-align: right; max-width: none; }
   .register tr[data-row] > td:first-child { padding-left: 0; }
   /* A sheet whose cells name no area of the members' -- the workplaces' (01.5) -- fills the same two columns in its
-     columns' own order, and a column marked `end` (Table.jsx) stands right. */
+     columns' own order, and a column marked `end` (Table.jsx) stands right. What a row opens onto (`below`, A.1's
+     visits) is a block of its own under its card, the sheet's whole width. */
   .register td[data-end] { justify-self: end; text-align: right; }
+  .register tr[data-below], .register tr[data-below] > td { display: block; }
 }
 
 /* ── The register narrower than its three essential columns ────────────────────────
@@ -992,6 +994,7 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
   .register td[data-col="branch"] { grid-area: branch; justify-self: end; text-align: right; max-width: none; }
   .register tr[data-row] > td:first-child { padding-left: 0; }
   .register td[data-end] { justify-self: end; text-align: right; }
+  .register tr[data-below], .register tr[data-below] > td { display: block; }
 }
 
 /* ── Rows arrive as a capped stagger when the query changes (card.css `.rows--enter`) ── */

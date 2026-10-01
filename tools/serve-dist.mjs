@@ -323,6 +323,13 @@ const golden = (route) => {
 const pageRefused = monthEndExamples.refusals?.WORKPLACE_PAGE_INVALID;
 if (!pageRefused) throw new Error(`${MONTH_END_EXAMPLES} has no refusal WORKPLACE_PAGE_INVALID`);
 const statusChanged = golden('POST /api/members/{id}/status');
+/*
+ * A WORKPLACE'S VISITS (A.1). Every workplace answers the golden page -- a visit that changed the complement, and a month
+ * of SASBO's own history -- and a visit recorded answers the golden visit, 201: it measures the screens, not the rule.
+ */
+const visitsPage = golden('GET /api/workplaces/{id}/visits');
+const visitRecorded = monthEndExamples.answers?.['POST /api/workplaces/{id}/visits'];
+if (visitRecorded?.status !== 201) throw new Error(`${MONTH_END_EXAMPLES} has no answer for POST /api/workplaces/{id}/visits`);
 
 /*
  * THE WORKPLACES. The golden page holds two rows -- right for the suite, too few to measure a sheet with -- so they
@@ -589,6 +596,10 @@ const monthEndShape = (req, path, query) => {
 /** Month end's shapes a prefix match cannot answer; `false` when the path is not one of them. */
 const monthEndAnswer = (req, path, query) => {
   if (path.startsWith('/api/month-end')) return monthEndOwnAnswer(req, path, query);
+  // A workplace's visits -- a prefix match would answer them with the workplaces' page.
+  const visits = /^\/api\/workplaces\/(\d+)\/visits$/.exec(path);
+  if (visits && req.method === 'GET') return { status: 200, body: { ...visitsPage, workplaceId: Number(visits[1]) } };
+  if (visits && req.method === 'POST') return { status: 201, body: visitRecorded.body };
   if (req.method === 'GET' && path === '/api/workplaces') {
     const page = Number(query.get('page') ?? 0);
     const size = Number(query.get('size') ?? WORKPLACE_PAGE);

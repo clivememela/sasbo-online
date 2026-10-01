@@ -80,6 +80,11 @@ describe("the register's card rows", () => {
     // A sheet whose columns name no area of the members' fills the card's two columns in its own order (01.5).
     expect(bodyOf(CSS, PHONE)).toContain('.register td[data-end] { justify-self: end; text-align: right; }')
   })
+
+  it('what a row opens onto is a block of its own under the card, the sheet\'s whole width (A.1, a workplace\'s visits)', () => {
+    // Left a table row inside a block body, it would sit in an anonymous table as wide as its words.
+    expect(bodyOf(CSS, PHONE)).toContain('.register tr[data-below], .register tr[data-below] > td { display: block; }')
+  })
 })
 
 /**
