@@ -279,18 +279,37 @@ const CEILINGS = {
   // Checked before raising, as the header asks: nothing from src/test/ is imported by the product, and no test library
   // is in the built bundle. The ceiling is the measured 781.713 rounded UP to the hundredth, and no more: the 3.51 KiB
   // main had spare is spent by it, as the owner chose the measured figure.
-  js: 781.72 * KB,
+  //
+  // 781.72 -> 789.34 on 2026-10-01, MEASURED, on the owner's word again (MO25, "Raise to measured"): the stand-in design
+  // review's fixes (MO24) and A.1's screens (MO22). Measured on a team runner: clivememela/sasbo-online run 36873464879
+  // at bb6508e, javascript 789.33 KiB, 7.61 over 781.72. That run prints two decimals, so each ceiling is its figure and
+  // the hundredth that covers the rounding -- at most 10 B of room, and no more. +8,010 B over the branch's own start
+  // (781.52 KiB at 017a88b, as a local build measures it), chunk by chunk by vite's sizes, as the commits account for them:
+  //   MO24, +1,070 B: HomeFigures +430 · Table +240 (a footer row and the opened-row block) · monthEnd +130
+  //                   · useWorkplaceChoice +130 · MemberHistory +90 · Workplaces +40 · Members +10.
+  //   A.1, +6,940 B:  Workplaces +3,050 (a workplace's visits) · OrganizerReport +2,630 (Save visit)
+  //                   · workplaceVisitService 0 -> 510 · Forms +490 (A60: the four criteria reach the form) · the rest
+  //                   the contract's copies and imports.
+  // Checked before raising, as the header asks: nothing from src/test/ is imported by the product.
+  js: 789.34 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
   // raising: nothing from src/test/ is in the product; the growth is the design. 80 keeps
   // the same headroom over the measured figure that 70 kept over 60.
-  css: 80 * KB,
+  //
+  // 80 -> 80.64 on 2026-10-01, MEASURED (MO25): 80.63 KiB on the same run, +720 B over 79.92 -- MO24's card rows' `end`
+  // rule, the first screen's phone block and five utilities the build had not shipped (+590 B), and A.1's opened row's
+  // rule (+130 B). The hundredth over the printed figure covers its rounding, as the javascript's does.
+  css: 80.64 * KB,
   // 900 -> 925.12 on 2026-09-30, MEASURED, on the owner's word (MO14), the first time `all assets` was over: the same
   // pair as the javascript's, 866.48 KiB (run 36773278932) -> 925.11 KiB (run 36773289808). The javascript's +59,631 B
   // and the stylesheet's +409 B (296 of them the History tab's: its column widths, gutter bleed, alignment and one line
   // height; css stays under its own 80) are 60,040 B, 58.63 KiB -- the whole difference, to the hundredth. Rounded UP.
-  total: 925.12 * KB,
+  //
+  // 925.12 -> 933.45 on 2026-10-01, MEASURED (MO25): 933.44 KiB on the same run -- the javascript's and the stylesheet's
+  // growth above, and nothing else. The hundredth over the printed figure covers its rounding.
+  total: 933.45 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to
