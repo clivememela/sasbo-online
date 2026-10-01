@@ -438,7 +438,10 @@ export function Recruiters() {
             paymentType: member.paymentType || '',
             workBankAddress: member.workBankAddress || '',
             joinDate: member.joinDate || '',
-            status: member.status || 'Active',
+            // 🔁 03.4: NO `status`. A status is changed with *Change status*, with SASBO's code, and the PUT refuses one
+            // that differs from the member's (STATUS_VIA_CHANGE_STATUS) -- so `member.status || 'Active'` would have had
+            // every assign and remove on this screen refused for a member with no status on record. An omitted key
+            // keeps the stored value (decision ⑨, server 0cf00e1).
             /*
              * 🔴 ONE LINE IS DELIBERATELY ABSENT HERE, AND TWO ARE DELIBERATELY STILL PRESENT.
              *
@@ -577,25 +580,33 @@ export function Recruiters() {
         }
     };
 
+    /**
+     * The members a channel's removal touches: those recruited through it. The wire carries the channel by NAME
+     * (`recruitedHow`, `MemberMapper`), and the server clears exactly these.
+     */
+    const channelMembers = useCallback((rep) => members.filter(m => m.recruitedHow === rep.name), [members]);
+
+    /**
+     * 🔒 A49, corrected on the owner's decision of 2026-10-01 (MO21): *Remove recruiter* removes the recruitment channel
+     * this screen listed, and its members KEEP THEIR STATUS, with only their channel cleared.
+     *
+     * One request: the server clears the channel from its members and deletes it in one transaction, so a removal is
+     * whole or nothing and no member is written from here. It used to PUT every member it guessed at -- by a
+     * representative's id, compared with a channel's -- as `Inactive`, a status no list knows, and then DELETE the
+     * representative that happened to share the channel's number, after the members had been changed.
+     */
     const handleRemoveRep = async () => {
         const rep = pendingRemoveRep;
         if (!rep) return;
-        const repMems = members.filter(m => m.recruitmentRepresentativeId === rep.id);
         setPendingRemoveRep(null);
         try {
             setSaving(true);
-            await Promise.all(repMems.map(m => {
-                const cleanData = sanitizeMemberPayload(m, { areasRep: '', status: 'Inactive' });
-                return memberService.updateMember(cleanData);
-            }));
-            await recruiterService.remove(rep.id);
+            await recruitmentChannelService.remove(rep.id);
+            if (selectedRep?.id === rep.id) setSelectedRep(null);
             await refreshAll();
+            succeed(`${rep.name} was removed. Its members keep their status; only their recruitment channel was cleared.`);
         } catch (err) {
-            // 🔴 THE HONEST WORDING MATTERS HERE. This action updates every one of the
-            // recruiter's members and then deletes the recruiter, so a failure part-way
-            // through leaves the data half-changed -- and the old message ("could not
-            // remove recruiter context completely") said that without saying what to do.
-            fail(`The recruiter may be only partly removed -- some members were updated before this failed. Reload and check before trying again. ${err?.message || ''}`.trim());
+            fail(writeFailure(err, `${rep.name}'s removal`, 'the list'));
         } finally {
             setSaving(false);
         }
@@ -1354,17 +1365,13 @@ export function Recruiters() {
                 confirmLabel="Remove recruiter"
                 onConfirm={handleRemoveRep}
             >
-                {/* 🔑 The consequence is SPELLED OUT, and it is the reason this one could
-                    never have stayed a `window.confirm`: it sets every one of the
-                    recruiter's members to Inactive. */}
+                {/* 🔑 The consequence is SPELLED OUT, as it always was here -- now the true one (A49, MO21): the
+                    channel goes, and the members recruited through it keep their status. */}
                 {pendingRemoveRep && (
                     <p className="text-sm text-ink">
-                        <strong className="font-medium">{pendingRemoveRep.name}</strong> will be removed. This sets{' '}
-                        <strong className="font-medium">
-                            {members.filter(m => m.recruitmentRepresentativeId === pendingRemoveRep.id).length}
-                        </strong>{' '}
-                        member(s) to <strong className="font-medium">Inactive</strong> and clears their recruiter
-                        assignment.
+                        <strong className="font-medium">{pendingRemoveRep.name}</strong> will be removed.{' '}
+                        <strong className="font-medium">{channelMembers(pendingRemoveRep).length}</strong>{' '}
+                        member(s) recruited through it keep their status; only their recruitment channel is cleared.
                     </p>
                 )}
             </ConfirmDialog>
