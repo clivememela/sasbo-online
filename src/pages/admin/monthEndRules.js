@@ -67,6 +67,13 @@ export const LISTING_WAITS = 'This waits until administrators sign in to the sys
  */
 export const TAKE_WAITS = 'Taking a month freezes its figures for good, so it waits until administrators sign in to this system.';
 
+/**
+ * Why *Take the month again* is there and cannot be pressed (04.11, MM51): SASBO's answer is that a correction overwrites
+ * the wrong figures, and the take that replaces them refuses every caller until sign-in, as the first take does.
+ */
+export const TAKE_AGAIN_WAITS = 'Taking a month again replaces its figures with the month as it stands now, and keeps the '
+  + 'first take for the record. It waits until administrators sign in to this system.';
+
 /** The statistics pack, as the page names it; the second line is what it replaces. */
 export const PACK = /* @__PURE__ */ Object.freeze({
   name: 'The statistics pack',
@@ -173,9 +180,16 @@ export const instantLabel = (iso) => {
   return `${part.day} ${part.month} ${part.year} at ${part.hour}:${part.minute}`;
 };
 
-/** A taken month's record in one sentence: when, and by whom. */
-export const takenSentence = ({ takenAt, takenBy }) =>
-  `Taken on ${instantLabel(takenAt)}${takenBy ? ` by ${takenBy}` : ''}.`;
+/**
+ * A taken month's record in one sentence: when, and by whom -- and, for a month taken again (04.11), that it was, with
+ * when it was first taken and by whom. Its figures are the newest take's.
+ */
+export const takenSentence = ({ takenAt, takenBy, firstTakenAt, firstTakenBy }) => {
+  const by = (who) => (who ? ` by ${who}` : '');
+  return firstTakenAt
+    ? `Taken again on ${instantLabel(takenAt)}${by(takenBy)}; first taken on ${instantLabel(firstTakenAt)}${by(firstTakenBy)}.`
+    : `Taken on ${instantLabel(takenAt)}${by(takenBy)}.`;
+};
 
 /* ── a statistic ─────────────────────────────────────────────────────────────────────────────────── */
 

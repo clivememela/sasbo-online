@@ -12,7 +12,7 @@ import { server } from '../../test/msw/server'
 import { smokeHandlers } from '../../test/msw/smokeLayer'
 import { monthEndAnswer, monthEndBody } from '../../test/msw/monthEndExamples'
 import { setupUser } from '../../test/user'
-import { LISTINGS, LISTING_WAITS, STATISTICS, TAKE_WAITS } from './monthEndRules'
+import { LISTINGS, LISTING_WAITS, STATISTICS, TAKE_AGAIN_WAITS, TAKE_WAITS, takenSentence } from './monthEndRules'
 
 /**
  * MONTH END `04.1` -- THE MONTH END PAGE, WHERE THE MONTHLY MENU WAS (MD38).
@@ -154,13 +154,27 @@ describe('the listings -- built refusing, and never asked (MD4)', () => {
     const user = setupUser()
     openPage()
     await monthsRead()
-    expect(screen.queryByRole('button', { name: /^Take / })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Take September/ })).not.toBeInTheDocument()
 
     await user.selectOptions(screen.getByLabelText(/^Month/), '2026-09')
     const take = screen.getByRole('button', { name: 'Take September 2026' })
     expect(take).toBeDisabled()
     expect(take).toHaveAccessibleDescription(TAKE_WAITS)
+    expect(screen.queryByRole('button', { name: /again$/ })).not.toBeInTheDocument()
     await user.click(take)
+    expect(requests.some((request) => request.endsWith('/take'))).toBe(false)
+  })
+
+  it('🔴 04.11: Take the month again, for a taken month -- disabled with its reason, and never asked (MM51)', async () => {
+    const user = setupUser()
+    openPage()
+    await monthsRead()
+
+    const again = screen.getByRole('button', { name: 'Take August 2026 again' })
+    expect(again).toBeDisabled()
+    expect(again).toHaveAccessibleDescription(TAKE_AGAIN_WAITS)
+    expect(screen.queryByRole('button', { name: 'Take August 2026' })).not.toBeInTheDocument()
+    await user.click(again)
     expect(requests.some((request) => request.endsWith('/take'))).toBe(false)
   })
 })
@@ -172,6 +186,21 @@ describe('the month -- chosen once, at the top, from the server\'s months (MD55)
 
     expect(screen.getByLabelText(/^Month/)).toHaveValue('2026-08')
     expect(screen.getByText('August 2026: Taken on 29 September 2026 at 10:00 by seed. Its figures are the month as it stood then.'))
+      .toHaveAttribute('data-month-state', 'TAKEN')
+  })
+
+  it('04.11: a month taken again says so -- by whom, and when it was first taken; its figures are the newest take\'s', async () => {
+    const august = MONTHS.taken.find((record) => record.month === '2026-08')
+    const again = { ...august, takenAt: '2026-10-01T08:00:00Z', takenBy: 'corrected', firstTakenAt: august.takenAt,
+      firstTakenBy: august.takenBy }
+    server.use(http.get('*/api/month-end/months', () => HttpResponse.json({ ...MONTHS,
+      taken: MONTHS.taken.map((record) => (record.month === '2026-08' ? again : record)) })))
+    openPage()
+    await monthsRead()
+
+    expect(takenSentence(again)).toBe('Taken again on 1 October 2026 at 10:00 by corrected; first taken on 29 September '
+      + '2026 at 10:00 by seed.')
+    expect(screen.getByText(`August 2026: ${takenSentence(again)} Its figures are the month as it stood then.`))
       .toHaveAttribute('data-month-state', 'TAKEN')
   })
 
