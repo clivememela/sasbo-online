@@ -36,16 +36,25 @@ export const SUSPENSION_CODE_UNKNOWN = 'SUSPENSION_CODE_UNKNOWN';
  */
 export const HISTORY_PAGE_INVALID = 'HISTORY_PAGE_INVALID';
 
+/**
+ * A visit the server would not record (A.1) -- no day, a day still to come, a count below nought, a time out before the
+ * time in, a name past its column. `details.field` names which, and the Location Visit form says it AT that field, the
+ * form kept as typed. A page of a workplace's visits that is gone is `WORKPLACE_PAGE_INVALID`, the workplaces' own.
+ */
+export const VISIT_INVALID = 'VISIT_INVALID';
+export const WORKPLACE_PAGE_INVALID = 'WORKPLACE_PAGE_INVALID';
+
 /** The refusal codes the screens branch on (ME-13) -- each one the server publishes. */
 export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   REQUEST_MALFORMED: 'REQUEST_MALFORMED',
-  WORKPLACE_PAGE_INVALID: 'WORKPLACE_PAGE_INVALID',
+  WORKPLACE_PAGE_INVALID,
   WORKPLACE_UNKNOWN,
   STATUS_CHANGED_SINCE,
   MEMBER_NOT_FOUND,
   DELETION_CODE_UNKNOWN,
   SUSPENSION_CODE_UNKNOWN,
   HISTORY_PAGE_INVALID,
+  VISIT_INVALID,
 });
 
 /**

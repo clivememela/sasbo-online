@@ -13,6 +13,7 @@ import { referenceService } from '../services/referenceService'
 import { subscriptionsService } from '../services/subscriptionsService'
 import { summaryService } from '../services/summaryService'
 import { workplaceService } from '../services/workplaceService'
+import { workplaceVisitService } from '../services/workplaceVisitService'
 import * as api from '../services/api'
 
 /**
@@ -43,6 +44,7 @@ export const SERVICE_MODULES = [
   { name: 'subscriptionsService', module: subscriptionsService },
   { name: 'summaryService', module: summaryService },
   { name: 'workplaceService', module: workplaceService },
+  { name: 'workplaceVisitService', module: workplaceVisitService },
 ]
 
 /** The one module that exports no method that performs a request. */
@@ -100,6 +102,8 @@ const ARGS = {
   'monthEndService.askPack': ['2026-08'],
   'monthEndService.getPack': [7],
   'memberHistoryService.getMemberHistory': ['7', 0, 50],
+  'workplaceVisitService.getVisits': ['7', 0, 20],
+  'workplaceVisitService.recordVisit': ['7', { visitedOn: '2026-09-10', complementFound: 40 }],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS
