@@ -10,7 +10,8 @@ import SelectInput from '../../components/form/SelectInput.jsx';
 import { monthLabel } from '../../config/monthEnd.js';
 import MonthEndPack from './MonthEndPack.jsx';
 import {
-  LISTINGS, LISTING_WAITS, MONTH_CRITERION, STATISTICS, TAKE_WAITS, defaultMonth, monthChoices, monthStateOf,
+  LISTINGS, LISTING_WAITS, MONTH_CRITERION, STATISTICS, TAKE_AGAIN_WAITS, TAKE_WAITS, defaultMonth, monthChoices,
+  monthStateOf,
   statisticHref, takenSentence,
 } from './monthEndRules.js';
 import useMonths from './useMonths.js';
@@ -48,6 +49,7 @@ export default function MonthlyMenu({ pollDelaysMs }) {
   const month = chosen || (months ? defaultMonth(months) : '');
   const state = months && month ? monthStateOf(months, month) : null;
   const open = state?.state === 'OPEN';
+  const taken = state?.state === 'TAKEN';
 
   return (
     <Page>
@@ -70,6 +72,10 @@ export default function MonthlyMenu({ pollDelaysMs }) {
         {open && (
           <Button variant="primary" disabled aria-describedby="month-end-take-why">Take {monthLabel(month)}</Button>
         )}
+        {/* 04.11, MM51: a taken month can be taken again, to correct it -- disabled with its reason, as the take is. */}
+        {taken && (
+          <Button disabled aria-describedby="month-end-take-why">Take {monthLabel(month)} again</Button>
+        )}
       </Criteria>
       {state && (
         <p className="mt-2 max-w-prose text-sm text-ink-muted" data-month-state={state.state}>
@@ -81,7 +87,11 @@ export default function MonthlyMenu({ pollDelaysMs }) {
           }[state.state]}
         </p>
       )}
-      {open && <p id="month-end-take-why" className="mt-1 max-w-prose text-sm text-ink-muted">{TAKE_WAITS}</p>}
+      {(open || taken) && (
+        <p id="month-end-take-why" className="mt-1 max-w-prose text-sm text-ink-muted">
+          {open ? TAKE_WAITS : TAKE_AGAIN_WAITS}
+        </p>
+      )}
 
       <h2 className="mt-8 text-lg font-semibold text-ink">Statistics</h2>
       <NavigationList

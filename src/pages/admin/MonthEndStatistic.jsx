@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import Criteria, { CRITERION } from '../../components/common/Criteria.jsx';
 import DataState from '../../components/common/DataState.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
+import Pager from '../../components/common/Pager.jsx';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import SelectInput from '../../components/form/SelectInput.jsx';
 import Table from '../../components/table/Table.jsx';
@@ -12,8 +13,8 @@ import reportError from '../../lib/reportError.js';
 import { STATISTIC_READS } from '../../services/monthEndService.js';
 import { getAreas, getRegions } from '../../services/referenceService.js';
 import {
-  MONTH_CRITERION, cellText, defaultMonth, failureOf, instantLabel, monthChoices, rowHeader, ruleCNote, statisticNamed,
-  statisticOf,
+  MONTH_CRITERION, SHEET_PAGE, cellText, defaultMonth, failureOf, instantLabel, monthChoices, rowHeader, ruleCNote,
+  statisticNamed, statisticOf,
 } from './monthEndRules.js';
 import useMonths from './useMonths.js';
 
@@ -59,6 +60,14 @@ const strong = (row, text) => (row.level === 'ROW' ? text : <strong className="f
  */
 export function StatisticSheet({ sheet, month, why }) {
   const id = useId();
+  const [page, setPage] = useState(1);
+  // 📄 A sheet longer than a page is paged, its total the last row of every page: 04.9 holds every branch -- on the link,
+  // at `all`, some 5,500 rows, 814 KB, and a phone drew every one. Each new question mounts the sheet afresh, at page 1.
+  const paged = sheet.rows.length > SHEET_PAGE;
+  const pages = paged ? Math.ceil(sheet.rows.length / SHEET_PAGE) : 1;
+  const current = Math.min(page, pages);
+  const first = (current - 1) * SHEET_PAGE;
+  const shown = paged ? sheet.rows.slice(first, first + SHEET_PAGE) : sheet.rows;
   const columns = [
     { key: 'label', header: rowHeader(sheet.key), nowrap: false, cell: (row) => strong(row, row.label) },
     ...sheet.columns.map((column, index) => ({
@@ -84,8 +93,16 @@ export function StatisticSheet({ sheet, month, why }) {
       {sheet.legacyTitle && <p className="mt-0.5 text-sm text-ink-muted">{sheet.legacyTitle}</p>}
       <Sheet className="mt-3">
         {sheet.rows.length ? (
-          <Table caption={sheet.title} columns={columns} rows={sheet.total ? [...sheet.rows, sheet.total] : sheet.rows}
-            rowKey="key" dense />
+          <>
+            <Table caption={sheet.title} columns={columns} rows={sheet.total ? [...shown, sheet.total] : shown}
+              rowKey="key" dense />
+            {/* error={false}, said and not defaulted (contract ⑮): a sheet is drawn only from an answer in hand -- the
+                page's `ready` -- so its rows cannot have failed; a read that failed is the page's own state, above. */}
+            {paged && (
+              <Pager page={current} totalPages={pages} onPageChange={setPage} count={sheet.rows.length}
+                start={first + 1} end={first + shown.length} noun="rows" error={false} />
+            )}
+          </>
         ) : (
           /* 📱 A sheet with no rows says so across the SHEET's width, not the table's: a wide sheet scrolls, and its
              empty row spanned eleven columns, so a phone cut the sentence off at its edge (the width matrix, 390). With
@@ -221,7 +238,9 @@ function StatisticScreen({ statistic }) {
 
       {view === 'ready' ? (
         <>
-          {answer.sheets.map((sheet) => <StatisticSheet key={sheet.key} sheet={sheet} month={answer.month} why={why} />)}
+          {answer.sheets.map((sheet) => (
+            <StatisticSheet key={`${question}|${sheet.key}`} sheet={sheet} month={answer.month} why={why} />
+          ))}
           {answer.notes?.length > 0 && (
             <section aria-labelledby="month-end-notes" className="mt-8 max-w-prose">
               <h2 id="month-end-notes" className="text-lg font-semibold text-ink">Notes</h2>
