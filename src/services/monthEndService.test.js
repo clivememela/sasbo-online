@@ -32,8 +32,10 @@ describe('monthEndService', () => {
     await getMembership('2026-09', { region: 'NORTH' })
     await getMembership('2026-09', { area: 'A', region: 'NORTH' })
 
-    expect(asked.slice(0, 6)).toEqual(Object.keys(STATISTIC_READS).map((statistic) => `${statistic} 2026-08 `))
-    expect(asked.slice(6)).toEqual(['new-and-deleted 2026-08 ?area=A', 'membership 2026-09 ?region=NORTH', 'membership 2026-09 ?area=A'])
+    // As many as there are statistics -- seven since 04.9 -- never a count typed here.
+    const reads = Object.keys(STATISTIC_READS).length
+    expect(asked.slice(0, reads)).toEqual(Object.keys(STATISTIC_READS).map((statistic) => `${statistic} 2026-08 `))
+    expect(asked.slice(reads)).toEqual(['new-and-deleted 2026-08 ?area=A', 'membership 2026-09 ?region=NORTH', 'membership 2026-09 ?area=A'])
   })
 
   it('the golden answers\' own handlers match the routes, {month} and all', async () => {

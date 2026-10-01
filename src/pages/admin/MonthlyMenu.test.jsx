@@ -17,7 +17,7 @@ import { LISTINGS, LISTING_WAITS, STATISTICS, TAKE_WAITS } from './monthEndRules
 /**
  * MONTH END `04.1` -- THE MONTH END PAGE, WHERE THE MONTHLY MENU WAS (MD38).
  *
- * The page lists what is built and nothing else: the six statistics as links for the month chosen, the statistics
+ * The page lists what is built and nothing else: the seven statistics as links for the month chosen, the statistics
  * pack, and the four listings -- disabled with their reason, never asked for. The month is the server's, chosen once at
  * the top: a taken month says who took it and when, the open month that it is read live. The Admin page, the rail and
  * the route agree about where it is and what it is called, and no row links to the page it is on.
@@ -103,7 +103,7 @@ describe('what the page lists -- what is built, and nothing else', () => {
     expect(pageLinks().length).toBeGreaterThan(0)
   })
 
-  it('🔴 the six statistics are its links, each opening its screen for the month chosen -- and nothing else links', async () => {
+  it('🔴 the statistics are its links, each opening its screen for the month chosen -- and nothing else links', async () => {
     openPage()
     await monthsRead()
 

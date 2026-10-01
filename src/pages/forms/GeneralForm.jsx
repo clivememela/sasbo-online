@@ -7,39 +7,22 @@ export default function GeneralForm({ filters }) {
         Array.from({ length: 54 }, (_, i) => ({ id: i + 1, name: '', indicator: '' }))
     );
 
-    const [bankDetails, setBankDetails] = useState({
-        bank: filters?.bankName || 'ABSA BANK',
+    /*
+     * ✅ A60, CLOSED (MO22, with A.1): the Bank and R/A No the Forms screen asks for SEED this form, read once as it
+     * mounts; `Forms.jsx` remounts it with a `key` when it opens it for other criteria. Never an effect -- it would
+     * overwrite what somebody had typed each time a criterion changed.
+     *
+     * 🔴 AND THE `'ABSA BANK'` AND `'94'` THAT STOOD HERE ARE GONE. They were not defaults behind a filter but
+     * hardcoded values wearing a filter's clothes, printed on the form whatever was entered: a criterion left empty is
+     * an empty box now, to be filled in, never somebody else's bank.
+     */
+    const [bankDetails, setBankDetails] = useState(() => ({
+        bank: filters?.bankName || '',
         ibtNo: '',
-        raNo: filters?.randomAccessNumber || '94',
+        raNo: filters?.randomAccessNumber || '',
         costCode: '',
         telNo: ''
-    });
-
-    /*
-     * 🔴 THE EFFECT THAT USED TO BE HERE WAS UNREACHABLE, AND SO IS EVERYTHING ELSE `filters`
-     * TOUCHES ON THIS SCREEN. Register row **A60**; `10.4`, and [F-P60].
-     *
-     * `Forms.jsx` asks the user for Bank, Branch, Area and R/A No, keeps them in its own
-     * `filters` state, uses `filters.formType` to decide which form to render -- and then
-     * renders it with NO PROPS: `Forms.jsx:65` is `<GeneralForm />`. Nothing in `src` has ever
-     * passed `filters` to anything; `git log -S'filters={filters}'` on `Forms.jsx` is empty.
-     *
-     * So `filters` is `undefined` in every consumer, `if (filters)` was permanently false, and
-     * this effect could not run. It is deleted rather than fixed, because there is nothing to
-     * fix in it.
-     *
-     * ⚠️ THE PROP STAYS IN THE SIGNATURE ON PURPOSE, AND SO DOES THIS COMMENT. Deleting the
-     * dead effect quietly would bury the actual defect: the four criteria the user types are
-     * DISCARDED, and the `'ABSA BANK'` and `'94'` above are not defaults behind a filter --
-     * they are hardcoded values wearing a filter's clothes, printed whatever was entered.
-     *
-     * Wiring the criteria through changes what this screen DOES, so it waits on the owner
-     * rather than being smuggled in with a lint fix. When it is granted, note that
-     * `filters={filters}` alone is not the fix: it would make an effect like the deleted one
-     * live AND wrong for a second reason -- it would overwrite whatever the user had typed
-     * into the form every time a criterion changed. Seed it with a `key` on the rendered form
-     * or during render; never with an effect.
-     */
+    }));
 
     const handleNonMemberChange = (index, field, value) => {
         const updated = [...nonMembers];

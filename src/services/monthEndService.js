@@ -63,7 +63,11 @@ export const getRecruitment = (month, place) =>
 export const getRepresentatives = (month, place) =>
   read(apiUrl(`/api/month-end/${encodeURIComponent(month)}/representatives`) + placeQuery(place));
 
-/** The six reads by the statistic's route name -- the key the screen's address carries. */
+/** 04.9: the branches due a visit -- each with its last visit, the longest unvisited first. */
+export const getVisits = (month, place) =>
+  read(apiUrl(`/api/month-end/${encodeURIComponent(month)}/visits`) + placeQuery(place));
+
+/** The seven reads by the statistic's route name -- the key the screen's address carries. */
 export const STATISTIC_READS = Object.freeze({
   'new-and-deleted': getNewAndDeleted,
   membership: getMembership,
@@ -71,6 +75,7 @@ export const STATISTIC_READS = Object.freeze({
   branches: getBranches,
   recruitment: getRecruitment,
   representatives: getRepresentatives,
+  visits: getVisits,
 });
 
 /** 04.10: ask for the month's statistics pack -- a write, at the write ceiling; it sends no body. */

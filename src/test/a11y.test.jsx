@@ -176,9 +176,11 @@ describe('accessibility', () => {
 
   it('the first screen has no violations, with its figures, their sheet and the menu rows (02.3, MR-ROB-37)', async () => {
     // The server's own golden answer (MD48): a sheet with rows, a total and the marks the screen draws on them.
-    server.use(monthEndAnswer('GET /api/members/summary'))
+    // And the lists' status, for the line beneath the sheet (MO24), so it is scanned with the rest.
+    server.use(monthEndAnswer('GET /api/members/summary'), monthEndAnswer('GET /api/reference/status'))
     const { container } = renderWithProviders(<Home />)
     await screen.findByText('INVENTED GROUP CORE')
+    await screen.findByText(/^Grouped by SASBO's lists as printed on/)
     await expectNoA11yViolations(container)
   })
 

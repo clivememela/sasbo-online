@@ -1,5 +1,5 @@
 // @vitest-environment jsdom -- the first screen's figures: rendered, driven through their controls, and read back
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 
@@ -91,10 +91,35 @@ const expectTheMenuRows = () => {
   expect(screen.getAllByRole('link').length).toBeGreaterThan(5)
 }
 
+/*
+ * 🔑 THE LISTS' STATUS IS READ AFTER THE FIGURES, SO A TEST CAN END WITH IT STILL OUT. Left there, it would reach MSW
+ * after this test's handlers were reset and be refused as an unhandled request -- noise that belongs to no test. Every
+ * test therefore ends only once no read of the status is in flight, and on the screen it was asked for.
+ */
+const statusInFlight = new Set()
+const statusAsked = ({ request, requestId }) => {
+  if (new URL(request.url).pathname === '/api/reference/status') statusInFlight.add(requestId)
+}
+const statusAnswered = ({ requestId }) => statusInFlight.delete(requestId)
+beforeAll(() => {
+  server.events.on('request:start', statusAsked)
+  server.events.on('request:end', statusAnswered)
+})
+afterAll(() => {
+  server.events.removeListener('request:start', statusAsked)
+  server.events.removeListener('request:end', statusAnswered)
+})
+afterEach(() => waitFor(() => expect(statusInFlight.size, 'a read of the lists\' status is still out').toBe(0)))
+
 beforeEach(() => {
   // A failed read is reported through the sink, which writes to the console; the report is not the assertion.
   vi.spyOn(console, 'error').mockImplementation(() => {})
+  // The lists' status, read once a grouped sheet has answered, for the line beneath it (MD28, MO24).
+  server.use(monthEndAnswer('GET /api/reference/status'))
 })
+
+/** The line beneath a grouped sheet: which of SASBO's lists grouped it, and whether she has confirmed them. */
+const GROUPED_BY = "Grouped by SASBO's lists as printed on 31 August 2026 — not yet confirmed by SASBO"
 
 describe('the first screen\'s figures (02.3)', () => {
   it('ready: six figures, each saying what it counted, over the sheet by employer group and its total', async () => {
@@ -117,8 +142,8 @@ describe('the first screen\'s figures (02.3)', () => {
     // The sheet: headed by the grouping, the core group marked, no workplace last, and the total beneath it all.
     expect(screen.getByRole('columnheader', { name: 'Employer group' })).toBeInTheDocument()
     expect(screen.getAllByRole('row').slice(1).map((tr) => cellsOf(tr)[0]))
-      .toEqual(['INVENTED GROUP CORE · core', 'INVENTED GROUP OTHER', 'No workplace on record', 'Total'])
-    expect(cellsOf(rowOf('INVENTED GROUP CORE'))).toEqual(['INVENTED GROUP CORE · core', '3 000', '1 900', '30', '10', '100', '63,33 %'])
+      .toEqual(['INVENTED GROUP CORE core', 'INVENTED GROUP OTHER', 'No workplace on record', 'Total'])
+    expect(cellsOf(rowOf('INVENTED GROUP CORE'))).toEqual(['INVENTED GROUP CORE core', '3 000', '1 900', '30', '10', '100', '63,33 %'])
     expect(cellsOf(rowOf('No workplace on record'))).toEqual(['No workplace on record', '—', '18', '1', '0', '0', '—'])
     expect(cellsOf(rowOf('Total'))).toEqual(['Total', '3 630', '2 300', '41', '12', '118', '63,36 %'])
 
@@ -146,16 +171,19 @@ describe('the first screen\'s figures (02.3)', () => {
       const user = setupUser()
       renderWithProviders(<Home />)
       await screen.findByText('INVENTED GROUP CORE')
-
-      expect(requests).toEqual(['/api/members/summary'])
+      // The first paint asked ONE thing, the figures; the lists' status follows their answer, for the line beneath
+      // the sheet (MO24) -- after the paint, never with it.
+      expect(requests[0]).toBe('/api/members/summary')
+      expect(await screen.findByText(GROUPED_BY)).toBeInTheDocument()
+      expect(requests).toEqual(['/api/members/summary', '/api/reference/status'])
 
       await user.click(combobox('Area'))
       expect(await screen.findByRole('option', { name: 'Area A' })).toBeInTheDocument()
       expect(screen.getByRole('option', { name: 'NORTH region' })).toBeInTheDocument()
-      // Opened again: the lists are kept for the visit, not asked for twice.
+      // Opened again: the lists are kept for the visit, not asked for twice -- and nor is the status.
       await user.click(combobox('Area'))
       expect(requests.filter((path) => path.startsWith('/api/reference/')).sort())
-        .toEqual(['/api/reference/areas', '/api/reference/regions'])
+        .toEqual(['/api/reference/areas', '/api/reference/regions', '/api/reference/status'])
     } finally {
       server.events.removeListener('request:start', listen)
     }
@@ -409,5 +437,125 @@ describe('the first screen\'s figures (02.3)', () => {
 
     expect(readings('Penetration')).toEqual(['104,20 %', 'paying members over staff complement: complement out of date'])
     expect(cellsOf(rowOf('INVENTED GROUP CORE')).at(-1)).toBe('104,20 %complement out of date')
+  })
+})
+
+/**
+ * 🔍 MO24 -- THE STAND-IN REVIEW'S FINDINGS ON THIS SCREEN, each held where jsdom can hold it: the marks by the classes
+ * that draw them, the total by its place in the table, the line beneath the sheet by its words and by the read behind
+ * them. ⚠️ jsdom lays nothing out, so the phone's measures are read from the rules that set them; the widths they buy
+ * (nothing runs past at 390 or at 844×390) were measured in a browser, and are recorded with the commit.
+ */
+describe('the first screen\'s figures -- the stand-in review (MO24)', () => {
+  it('a core group wears the mock\'s pill; a word in place of a figure is its quiet italic; complement out of date is the pending flag', async () => {
+    const over = { penetration: 1.042, complementOutOfDate: true }
+    summaryAnswers(september({
+      rows: [
+        row('INVENTED GROUP CORE',
+          { onRecord: 2000, suspended: 100, paying: 1900, joined: 30, left: 10, complement: 1800, ...over }, { core: true }),
+        row('INVENTED GROUP OTHER',
+          { onRecord: 400, suspended: 18, paying: 382, joined: 10, left: 2, complement: 630, penetration: 0.6063 }),
+        { key: 'INVENTED GROUP SMALL', label: 'INVENTED GROUP SMALL', core: false, fewerThanFive: true, withheld: false, figures: null },
+        NO_WORKPLACE,
+      ],
+    }))
+    renderWithProviders(<Home />)
+    await screen.findByText('INVENTED GROUP CORE')
+
+    // `.core`: margin-left, 1px 7px, a full radius, 11.5px small capitals at 600, teal ink on the teal wash.
+    expect(within(rowOf('INVENTED GROUP CORE')).getByText('core')).toHaveClass(
+      'ml-1', 'rounded-full', 'bg-brand-soft', 'px-[7px]', 'py-px', 'text-xs', 'font-semibold', 'uppercase',
+      'tracking-[0.08em]', 'text-brand-ink',
+    )
+    // `.quiet` and `.flag`.
+    expect(screen.getByText('fewer than five')).toHaveClass('italic', 'text-ink-muted')
+    expect(screen.getByText('complement out of date')).toHaveClass('block', 'text-xs', 'font-medium', 'text-status-pending')
+    // The must-pass: a group that is not core carries no pill.
+    expect(within(rowOf('INVENTED GROUP OTHER')).queryByText('core')).not.toBeInTheDocument()
+  })
+
+  it('the total is the sheet\'s foot: a tfoot row whose expander cell is empty -- no chevron that opens nothing', async () => {
+    summaryAnswers(september())
+    renderWithProviders(<Home />)
+    await screen.findByText('INVENTED GROUP CORE')
+
+    const total = rowOf('Total')
+    expect(total.closest('tfoot')).not.toBeNull()
+    const cell = total.querySelector('td[data-expander]')
+    expect(cell, 'the total keeps the column, so its figures stand under their heads').not.toBeNull()
+    expect(cell).toBeEmptyDOMElement()
+    expect(within(total).queryByRole('button')).not.toBeInTheDocument()
+    // The must-pass: every row above it opens, as the register's rows do.
+    for (const label of ['INVENTED GROUP CORE', 'INVENTED GROUP OTHER', 'No workplace on record']) {
+      expect(within(rowOf(label)).getByRole('button', { name: 'Show details' })).toBeInTheDocument()
+    }
+  })
+
+  it('beneath a grouped sheet: which of SASBO\'s lists grouped it, from the lists\' status read (MD28)', async () => {
+    summaryAnswers(september())
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByText(GROUPED_BY)).toBeInTheDocument()
+  })
+
+  it('once SASBO has confirmed every one of her lists, the line says so -- and one list unconfirmed is not one line', async () => {
+    const status = monthEndBody('GET /api/reference/status')
+    const confirmed = (list) => ({ ...list, confirmedOn: '2026-10-09' })
+    summaryAnswers(september())
+    server.use(http.get('*/api/reference/status', () => HttpResponse.json({
+      ...status, workplaces: confirmed(status.workplaces), lists: status.lists.map(confirmed),
+    })))
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByText(
+      "Grouped by SASBO's lists as printed on 31 August 2026 — confirmed by SASBO on 9 October 2026",
+    )).toBeInTheDocument()
+  })
+
+  it('the must-pass: a sheet that is not grouped says no such thing, and asks for no lists', async () => {
+    const requests = []
+    const listen = ({ request }) => requests.push(new URL(request.url).pathname)
+    server.events.on('request:start', listen)
+    try {
+      const onRecord = { onRecord: 18, suspended: 0, paying: 18, joined: 1, left: 0, complement: null, penetration: null }
+      summaryAnswers(september({
+        workplacesServed: 'NONE',
+        totals: figures(onRecord),
+        rows: [row('~NO_WORKPLACE', onRecord, { label: 'No workplace on record' })],
+      }))
+      renderWithProviders(<Home />)
+      expect(await screen.findByText("SASBO's workplaces are not loaded on this demonstration yet.")).toBeInTheDocument()
+
+      expect(screen.queryByText(/^Grouped by SASBO's lists/)).not.toBeInTheDocument()
+      expect(requests).toEqual(['/api/members/summary'])
+    } finally {
+      server.events.removeListener('request:start', listen)
+    }
+  })
+
+  it('a status read that fails takes nothing with it: no line, and the sheet stands', async () => {
+    summaryAnswers(september())
+    let asked = 0
+    server.use(http.get('*/api/reference/status', () => {
+      asked += 1
+      return HttpResponse.json({ status: 503 }, { status: 503 })
+    }))
+    renderWithProviders(<Home />)
+    await screen.findByText('INVENTED GROUP CORE')
+
+    await waitFor(() => expect(asked).toBe(1))
+    expect(screen.queryByText(/^Grouped by SASBO's lists/)).not.toBeInTheDocument()
+    expect(cellsOf(rowOf('Total'))).toEqual(['Total', '3 630', '2 300', '41', '12', '118', '63,36 %'])
+    expect(figuresRegion()).toHaveAttribute('data-figures', 'ready')
+  })
+
+  it('at 760px and below the sheet takes the mock\'s phone measures -- by its class (the rules: registerRows.structural)', async () => {
+    summaryAnswers(september())
+    renderWithProviders(<Home />)
+    await screen.findByText('INVENTED GROUP CORE')
+
+    // jsdom applies no media query and suite CSS is off: the rules are read where they are written, in a node test.
+    expect(screen.getByRole('table').closest('.figures-sheet'), 'the phone\'s measures reach the sheet by this class')
+      .not.toBeNull()
   })
 })

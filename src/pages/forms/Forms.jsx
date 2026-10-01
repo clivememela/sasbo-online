@@ -10,6 +10,9 @@ import PageTitle from '../../components/common/PageTitle';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import DataState from '../../components/common/DataState.jsx';
 
+/** The four criteria a form is opened for -- what A60 found discarded. */
+const criteriaOf = ({ bankName, branch, area, randomAccessNumber }) => ({ bankName, branch, area, randomAccessNumber });
+
 export function Forms(){
     const [filters, setFilters] = useState({
         bankName: "",
@@ -18,6 +21,15 @@ export function Forms(){
         randomAccessNumber: "",
         formType: "",
     });
+    /*
+     * ✅ A60 (MO22, with A.1): THE CRITERIA REACH THE FORM -- the criteria the open form was OPENED for. Choosing a form
+     * type opens it for the criteria as they stand, and "Search Form" opens it again for the criteria as they stand
+     * then: another workplace, so it is remounted (its `key`) and seeded afresh. Changing a criterion alone does
+     * nothing to a form already open -- never an effect that writes the form from the criteria, which would overwrite
+     * what somebody had typed into it each time one changed (the register's warning). Search Form with the criteria
+     * unchanged keeps the same key, and so everything typed.
+     */
+    const [opened, setOpened] = useState(() => criteriaOf(filters));
 
     const formTypeOptions = [
         { label: "Select Form Type", value: "" },
@@ -43,9 +55,11 @@ export function Forms(){
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        setOpened(criteriaOf(filters));
     };
 
     const renderForm = () => {
+        const key = JSON.stringify(opened);
         switch (filters.formType) {
             // 🔴 `embedded`, BECAUSE THIS PICKER RENDERS WHOLE PAGES INSIDE A PAGE.
             // Both of these are also routes of their own, so each brought its own page gutter
@@ -57,12 +71,12 @@ export function Forms(){
                 return <MembershipApplication embedded />;
             case "Branch Form (online)":
             case "Branch Form (offline)":
-                return <OrganizerReport embedded />;
+                return <OrganizerReport key={key} filters={opened} embedded />;
             case "Location Listing":
             case "Bulk Listing":
                 return <LocationListing />;
             case "General Form":
-                return <GeneralForm />;
+                return <GeneralForm key={key} filters={opened} />;
             default:
                 return null;
         }
@@ -100,7 +114,10 @@ export function Forms(){
                     <SearchableSelect
                         label="Form Type"
                         value={filters.formType}
-                        onChange={handleInputChange("formType")}
+                        onChange={(value) => {
+                            handleInputChange("formType")(value);
+                            setOpened(criteriaOf(filters));
+                        }}
                         options={formTypeOptions}
                     />
                 </div>

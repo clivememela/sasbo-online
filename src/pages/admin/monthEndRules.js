@@ -13,7 +13,7 @@ import { EMPTY, formatInt, formatPercent, formatZar } from '../../lib/format.js'
  */
 
 /**
- * The six statistics, in the order SASBO's reports run: the route's own name, the plain name a person reads, and --
+ * The seven statistics, in the order SASBO's reports run: the route's own name, the plain name a person reads, and --
  * until SASBO chooses the plain names at the table (MD8, PA-13) -- the legacy title as the second line: the step of
  * SASBO's *Month End Run* each one answers, as that screen names it.
  */
@@ -36,6 +36,8 @@ export const STATISTICS = /* @__PURE__ */ Object.freeze([
     name: 'Representatives and committee members',
     legacy: 'Print Reps by Area and T/C · Print Comm Mem by Area and T/C · Print Memnet by Area and T/C',
   },
+  // 04.9 (A.1's visits, MO22): the branches longest unvisited first; the manager's details wait for sign-in.
+  { key: 'visits', name: 'The branches due a visit', legacy: 'Print Branches requiring visits' },
 ]);
 
 /** A statistic by its route name -- `null` for a name the server has no statistic for, which is a not-found state. */
@@ -208,7 +210,9 @@ const ROW_IS = /* @__PURE__ */ Object.freeze({
   resigned: 'Employer',
   representatives: 'Table code',
   'committee-members': 'Table code',
+  'memnet-members': 'Table code',
   'suspended-by-code': 'Suspension code',
+  'due-a-visit': 'Branch',
 });
 const ROWS_BY = /* @__PURE__ */ Object.freeze({
   area: 'Area',

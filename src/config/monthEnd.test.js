@@ -6,7 +6,7 @@ import { monthEndBody } from '../test/msw/monthEndExamples'
 import {
   LIST_EMPTY_REASON, MEMBER_STATUS_KIND, MONTH_END_REFUSAL, STATUS_KIND, STATUS_REASON, SUMMARY_GROUPING,
   UNGROUPED_BECAUSE, WORKPLACES_SERVED, dayLabel, deletionCodeOptions, emptyReasonSentence, listProvenance, listRows,
-  monthLabel, monthsTo, placeOptions, placeQuery, reasonFor, statusKind, summaryOf, suspensionCodeOptions,
+  listsProvenance, monthLabel, monthsTo, placeOptions, placeQuery, reasonFor, statusKind, summaryOf, suspensionCodeOptions,
   unplacedSentence,
 } from './monthEnd'
 
@@ -54,6 +54,19 @@ describe('what a person reads', () => {
     expect(listProvenance({ printedOn: '2026-08-31', confirmedOn: '2026-10-09' }))
       .toBe('As printed on 31 August 2026 — confirmed by SASBO on 9 October 2026')
     expect(listProvenance(null)).toBe('')
+  })
+
+  it('MD28 for SASBO\'s lists together (02.1): one line where every list gives the same one, and none where they differ', () => {
+    const status = monthEndBody('GET /api/reference/status')
+    expect(listsProvenance(status)).toBe('As printed on 31 August 2026 — not yet confirmed by SASBO')
+    const confirmed = (list) => ({ ...list, confirmedOn: '2026-10-09' })
+    expect(listsProvenance({ ...status, workplaces: confirmed(status.workplaces), lists: status.lists.map(confirmed) }))
+      .toBe('As printed on 31 August 2026 — confirmed by SASBO on 9 October 2026')
+    // One list confirmed and the rest not, or a list printed on another day: there is no one line to say.
+    expect(listsProvenance({ ...status, lists: [confirmed(status.lists[0]), ...status.lists.slice(1)] })).toBe('')
+    expect(listsProvenance({ ...status, workplaces: { ...status.workplaces, printedOn: '2026-09-30' } })).toBe('')
+    // Not a status read: nothing is claimed.
+    for (const wrong of [null, undefined, [], {}, { lists: status.lists }]) expect(listsProvenance(wrong)).toBe('')
   })
 
   it('an empty list says why; a word the browser has never heard of is shown as the server wrote it', () => {

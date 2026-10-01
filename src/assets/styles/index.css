@@ -873,6 +873,21 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
   .figure-strip > dl > div { padding-left: 0; padding-right: 0; }
 }
 
+/* ── The first screen's sheet on a phone (month end 02.1, its mock's `@media (max-width: 760px)`) ───────────────
+   The table primitive's cells are 14px a side, the first one 20, and its expander 40 wide: at 390 the sheet ran 58px
+   past its own edge and Penetration was cut (MO24, the stand-in review). The mock's phone measures instead -- a head
+   8 and 12, a cell 6 and 10, the grouping 6 from the expander, the expander 36 wide with 12 before its chevron.
+   📐 AND THE GROUPING'S HEAD WRAPS, which the mock's does not: measured at 390 with its measures alone, the sheet still
+   ran 10px past, because "EMPLOYER GROUP" on one line was the widest thing in the column -- two lines of it, as the
+   strip's labels take, and Penetration is whole with 40px to spare.
+   Unlayered, so they win over the primitive's utilities; the cells of a column only, never a state's row. */
+@media (max-width: 760px) {
+  .figures-sheet th[data-col] { padding-left: 8px; padding-right: 12px; }
+  .figures-sheet td[data-col] { padding-left: 6px; padding-right: 10px; }
+  .figures-sheet th[data-col="label"] { padding-left: 6px; white-space: normal; }
+  .figures-sheet [data-expander] { width: 36px; padding: 0 0 0 12px; }
+}
+
 /* ── The criteria row holds one line where the comp does (Criteria.jsx) ─────────────────
    card.css `.crit` is `flex: 0 1 140px; min-width: 120px`, and on the comp's narrowest docked
    register three of them, More criteria and Clear share a line. Docking at 1280 leaves a row the
@@ -939,6 +954,11 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
   .register td[data-col="bankName"] { grid-area: bank; max-width: none; }
   .register td[data-col="branch"] { grid-area: branch; justify-self: end; text-align: right; max-width: none; }
   .register tr[data-row] > td:first-child { padding-left: 0; }
+  /* A sheet whose cells name no area of the members' -- the workplaces' (01.5) -- fills the same two columns in its
+     columns' own order, and a column marked `end` (Table.jsx) stands right. What a row opens onto (`below`, A.1's
+     visits) is a block of its own under its card, the sheet's whole width. */
+  .register td[data-end] { justify-self: end; text-align: right; }
+  .register tr[data-below], .register tr[data-below] > td { display: block; }
 }
 
 /* ── The register narrower than its three essential columns ────────────────────────
@@ -973,6 +993,8 @@ input[type="time"]:focus::-webkit-calendar-picker-indicator {
   .register td[data-col="bankName"] { grid-area: bank; max-width: none; }
   .register td[data-col="branch"] { grid-area: branch; justify-self: end; text-align: right; max-width: none; }
   .register tr[data-row] > td:first-child { padding-left: 0; }
+  .register td[data-end] { justify-self: end; text-align: right; }
+  .register tr[data-below], .register tr[data-below] > td { display: block; }
 }
 
 /* ── Rows arrive as a capped stagger when the query changes (card.css `.rows--enter`) ── */

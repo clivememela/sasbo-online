@@ -189,6 +189,22 @@ describe('the History tab, ready -- the approved mock\'s sheet', () => {
     for (const other of [rows()[1], rows()[3]]) expect(other.querySelector('[data-history-save]')).toBeNull()
   })
 
+  it('🔍 MO24: an e-mail address breaks after its "@" and its dots -- never mid-word', async () => {
+    server.use(historyServes(MOCK))
+    show()
+    await ready()
+
+    const value = valueOf(rows()[2], 'Personal Email', 'To')
+    expect(value).toHaveTextContent(/^synthetic\.member@example\.invalid$/)
+    // The opportunities a line may break at, marked: one after each "@" and ".", and none inside a word. jsdom lays no
+    // line out -- at 390 the review saw "synthetic.member@exampl" over "e.invalid".
+    const marked = [...value.querySelector('span').childNodes]
+      .map((node) => (node.nodeName === 'WBR' ? '|' : node.textContent)).join('')
+    expect(marked).toBe('synthetic.|member@|example.|invalid')
+    // The must-pass: a value that is no address breaks only where its words do.
+    expect(valueOf(rows()[2], 'Residential Address', 'To').querySelector('wbr')).toBeNull()
+  })
+
   it('a workplace: its name over its R/A number, old and new', async () => {
     server.use(historyServes(MOCK))
     show()

@@ -421,7 +421,8 @@ describe('reading: the whole tree, and an unanswered question says so', () => {
     renderWithProviders(<MembersPage />)
     await openStructures(user)
 
-    expect(await screen.findAllByText('Not recorded')).toHaveLength(2)
+    // And Memnet (MM80), asked only since V63: nobody was asked that either.
+    expect(await screen.findAllByText('Not recorded')).toHaveLength(3)
   })
 
   it('a BEC member from before V55 reads "Not recorded" for each question they were never asked', async () => {
@@ -430,8 +431,41 @@ describe('reading: the whole tree, and an unanswered question says so', () => {
     renderWithProviders(<MembersPage />)
     await openStructures(user)
 
-    // Election Date, Branch Executive Committee, BEC Recruiter, BEC Structure Representative, BEC Executive.
-    expect(await screen.findAllByText('Not recorded')).toHaveLength(5)
+    // Election Date, Branch Executive Committee, BEC Recruiter, BEC Structure Representative, BEC Executive -- and
+    // Memnet (MM80), asked only since V63.
+    expect(await screen.findAllByText('Not recorded')).toHaveLength(6)
+  })
+
+  it('🔴 MM80: Memnet is asked on the record, and the answer reaches the server', async () => {
+    // SASBO, 2026-10-01: a member is "captured as a mnet member when we get the nomination firm" -- on the record, as
+    // every structure answer is. Never a default: nothing is sent for a member nobody asked about.
+    let saved
+    server.use(
+      membersRespond([MEMBER]),
+      http.put('*/api/members/:id', async ({ request }) => {
+        saved = await request.json()
+        return HttpResponse.json(saved)
+      }),
+    )
+    const user = setupUser()
+    renderWithProviders(<MembersPage />)
+    await openStructures(user, { edit: true })
+
+    await answer(user, /^Memnet Member\?/, 'Yes')
+    await save(user)
+
+    await waitFor(() => expect(saved).toBeDefined())
+    expect(saved.isMemnet).toBe(true)
+  })
+
+  it('MM80: the record reads its Memnet answer', async () => {
+    server.use(membersRespond([{ ...SEATED, isMemnet: true }]))
+    const user = setupUser()
+    renderWithProviders(<MembersPage />)
+    await openStructures(user)
+
+    expect(await screen.findByText('Core Appointments')).toBeInTheDocument()
+    expect(panel().getByText('Memnet Member').nextElementSibling).toHaveTextContent('Yes')
   })
 })
 

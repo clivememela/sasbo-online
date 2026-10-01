@@ -3,7 +3,15 @@ import TextInput from '../../components/form/TextInput';
 import DateField from '../../components/form/DateField';
 import Button from '../../components/form/Button';
 import PageTitle from '../../components/common/PageTitle';
+import { PageNotice } from '../../components/common/DialogNotice.jsx';
 import { Page } from '../../components/common/Sheet.jsx';
+import { VISIT_INVALID, WORKPLACE_UNKNOWN } from '../../config/monthEnd.js';
+import useFocusOn from '../../hooks/useFocusOn.js';
+import { formatInt } from '../../lib/format.js';
+import reportError from '../../lib/reportError.js';
+import { messageOf, writeFailure } from '../../services/parseApiError.js';
+import { workplaceService } from '../../services/workplaceService.js';
+import { recordVisit } from '../../services/workplaceVisitService.js';
 
 /**
  * 🔴 THESE THREE LIVE AT MODULE SCOPE, AND UNTIL NOW THEY DID NOT -- WHICH BROKE TYPING.
@@ -21,7 +29,7 @@ import { Page } from '../../components/common/Sheet.jsx';
  * the IDENTITY is what had to stop changing; the data was never the problem.
  * `eslint`'s `react-hooks/static-components` had been reporting this the whole time.
  */
-const FormScope = createContext({ values: {}, onChange: () => {} });
+const FormScope = createContext({ values: {}, errors: {}, onChange: () => {} });
 
 /**
  * 🔴 BR-4's FOURTH WRAPPER, AND THE LAST ONE. `blastRadius.md` counted four answers
@@ -36,7 +44,7 @@ const FormScope = createContext({ values: {}, onChange: () => {} });
  * shared chrome: one label element, one error path, one focus ring, one 16px rule.
  */
 const TextArea = ({ label, name, rows = 3 }) => {
-    const { values, onChange } = useContext(FormScope);
+    const { values, errors, onChange } = useContext(FormScope);
     return (
     <TextInput
         label={label}
@@ -45,6 +53,7 @@ const TextArea = ({ label, name, rows = 3 }) => {
         rows={rows}
         value={values[name]}
         onChange={onChange}
+        error={errors[name]}
         className="sm:col-span-2"
     />
     );
@@ -55,7 +64,7 @@ const TextArea = ({ label, name, rows = 3 }) => {
 // wrapper existing at all -- and it is why the conversion is done here rather than at
 // each site. (This wrapper is one of BR-4's four; replacing it wholesale is `04.3`.)
 const Field = ({ label, name, type = 'text', fullWidth = false, textarea = false }) => {
-    const { values, onChange } = useContext(FormScope);
+    const { values, errors, onChange } = useContext(FormScope);
     return textarea
         ? <TextArea label={label} name={name} />
         : (
@@ -63,11 +72,73 @@ const Field = ({ label, name, type = 'text', fullWidth = false, textarea = false
             // is a span past the end, which some engines honour by widening the track.
             <div className={fullWidth ? 'sm:col-span-2' : ''}>
                 {type === 'date'
-                    ? <DateField label={label} name={name} value={values[name]} onChange={onChange} hint="ago" />
-                    : <TextInput label={label} name={name} type={type} value={values[name]} onChange={onChange} />}
+                    ? <DateField label={label} name={name} value={values[name]} onChange={onChange} hint="ago" error={errors[name]} />
+                    : <TextInput label={label} name={name} type={type} value={values[name]} onChange={onChange} error={errors[name]} />}
             </div>
         );
 };
+
+/**
+ * 💾 WHAT A VISIT KEEPS (month end A.1, MO22) -- the server's name for each, and the form's field it comes from. The
+ * day, who visited, when they came and went, and what the organiser found. Everything else on the form -- the
+ * branch's addresses and numbers, its manager and representatives with their telephones and e-mails, the signatures --
+ * is a person's details or the paper's, printed with the form and not sent: the server stores none of it (B1).
+ */
+const VISIT_FIELDS = {
+    visitedOn: 'dateOfVisit',
+    timeIn: 'timeIn',
+    timeOut: 'timeOut',
+    organiser: 'organiserName',
+    complementFound: 'compliment',
+    membershipFound: 'membership',
+    nonMembers: 'noOfNonMembers',
+    recruited: 'noOfNewMembersRecruited',
+    nonMembersInterviewed: 'noOfNonMembersInterviewed',
+};
+/** The counts a visit carries -- whole numbers, or nothing. */
+const COUNTS = new Set(['complementFound', 'membershipFound', 'nonMembers', 'recruited', 'nonMembersInterviewed']);
+
+/**
+ * The visit a filled form records, and the fields it cannot be sent with: a count that is not a whole number, no day,
+ * no R/A number to find the workplace by. Said at each field, BEFORE anything is sent; what the server would refuse
+ * besides -- a day still to come, a time out before the time in -- it says itself, at its field (VISIT_INVALID).
+ */
+const visitOf = (form) => {
+    const visit = {};
+    const errors = {};
+    if (!form.raNumber.trim()) errors.raNumber = 'The R/A number says which workplace was visited.';
+    if (!form.dateOfVisit) errors.dateOfVisit = 'Choose the day of the visit.';
+    for (const [key, field] of Object.entries(VISIT_FIELDS)) {
+        const value = String(form[field] ?? '').trim();
+        if (!value) continue;
+        if (!COUNTS.has(key)) visit[key] = value;
+        else if (/^\d+$/.test(value)) visit[key] = Number(value);
+        else errors[field] = 'A whole number, or leave it empty.';
+    }
+    return { visit, errors };
+};
+
+/** A page of the workplaces a search by R/A number asks for: the number matches exactly, a name only by containing it. */
+const RA_SEARCH = { page: 0, size: 50 };
+
+/** The form as it opens: blank, but for what the Forms screen's criteria name (A60) -- read once, as it mounts. */
+const BLANK = {
+    organiserName: '', dateOfVisit: '', timeIn: '', timeOut: '', bank: '', branchDepartment: '', raNumber: '', area: '',
+    postalAddress: '', physicalAddress: '', branchDepTelNo: '', branchDepFaxNo: '',
+    branchDepManager: '', branchRepName: '', cellPhoneEmail1: '', memnetMemName: '',
+    cellPhoneEmail2: '', becMemberName: '', cellPhoneEmail3: '', compliment: '',
+    noOfNonMembers: '', membership: '', noOfNewMembersRecruited: '',
+    percentagePenetration: '', noOfNonMembersInterviewed: '', organiserSignature: '',
+    organiserSignatureDate: '', snrOrganiserSignature: '', snrOrganiserSignatureDate: '',
+    adminDeptSignature: '', dateCaptured: '',
+};
+const openedWith = (filters) => ({
+    ...BLANK,
+    bank: filters?.bankName || '',
+    branchDepartment: filters?.branch || '',
+    raNumber: filters?.randomAccessNumber || '',
+    area: filters?.area || '',
+});
 
 /*
  * 🔴 THE SOLID TEAL BAND IS GONE. Each section used to be announced by a filled
@@ -102,63 +173,83 @@ const Section = ({ title, children }) => (
  * had -- which is the shape `GeneralForm` uses in the same picker.
  */
 export const OrganizerReport = ({ filters, embedded = false }) => {
-    const [formData, setFormData] = useState({
-        organiserName: '', dateOfVisit: '', timeIn: '', timeOut: '',
-        bank: filters?.bankName || '', branchDepartment: filters?.branch || '',
-        raNumber: filters?.randomAccessNumber || '', area: filters?.area || '',
-        postalAddress: '', physicalAddress: '', branchDepTelNo: '', branchDepFaxNo: '',
-        branchDepManager: '', branchRepName: '', cellPhoneEmail1: '', memnetMemName: '',
-        cellPhoneEmail2: '', becMemberName: '', cellPhoneEmail3: '', compliment: '',
-        noOfNonMembers: '', membership: '', noOfNewMembersRecruited: '',
-        percentagePenetration: '', noOfNonMembersInterviewed: '', organiserSignature: '',
-        organiserSignatureDate: '', snrOrganiserSignature: '', snrOrganiserSignatureDate: '',
-        adminDeptSignature: '', dateCaptured: '',
-    });
-
     /*
-     * 🔴 AN UNREACHABLE EFFECT, DELETED. Register row **A60**; `10.4`, and [F-P60]. Same defect as
-     * `GeneralForm.jsx`, whose comment carries the full account.
-     *
-     * `Forms.jsx:60` renders this as `<OrganizerReport embedded />` and `App.jsx:92` as
-     * `<OrganizerReport />`. Neither passes `filters`, and nothing ever has -- so `if (filters)`
-     * was permanently false and this effect could not run.
-     *
-     * ⚠️ The prop stays in the signature so the real defect is not buried with the dead code:
-     * the Bank, Branch, Area and R/A No the user types into `Forms.jsx` are DISCARDED, and this
-     * report opens with all four blank. Wiring them through is a change to what the screen does
-     * and waits on the owner; when it is granted, seed the form with a `key` or during render,
-     * never by restoring an effect like this one -- it would overwrite what the user had
-     * already typed every time a criterion changed.
+     * ✅ A60, CLOSED (MO22, with A.1). The Bank, Branch, Area and R/A No the Forms screen asks for SEED this form, read
+     * once as it mounts -- never by an effect, which would overwrite what the user had typed each time a criterion
+     * changed. `Forms.jsx` remounts it, with a `key`, only when it opens it for other criteria: another workplace.
      */
+    const [formData, setFormData] = useState(() => openedWith(filters));
+    const [errors, setErrors] = useState({});
+    const [notice, setNotice] = useState(null);
+    const [saving, setSaving] = useState(false);
+    // The form as it stood when it was saved: Save visit rests until something on it changes, so one visit is one save.
+    const [savedAs, setSavedAs] = useState(null);
+    const noticeRef = useFocusOn(notice, notice?.tone === 'error');
 
     // `useCallback` with no dependencies: `setFormData`'s updater form reads the previous
     // state, so this handler never needs to close over `formData` and never has to change.
     const handleChange = useCallback((e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        // A field that is changed is no longer the one a refusal named.
+        setErrors((prev) => (prev[name] ? { ...prev, [name]: undefined } : prev));
     }, []);
 
-    const handleSubmit = (e) => {
+    /*
+     * 💾 SAVE VISIT (A.1): the workplace is found by the form's R/A number -- the workplaces' search, the row whose
+     * number IS it -- and the visit is recorded against it. Nothing is sent while a field is wrong, and a refusal is
+     * said where it belongs: VISIT_INVALID at the field the server names, WORKPLACE_UNKNOWN at the R/A number, the form
+     * kept as typed. A failure that is not a refusal may have landed, and is said so (`writeFailure`) -- never "not
+     * saved". Its failure goes to the sink; a success says nothing to any console (the old `console.log` of the whole
+     * form is why: `Auth.jsx`'s defect again).
+     */
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        /*
-         * 🔴 IT WAS `console.log('Form submitted:', formData)`, AND THAT IS THE `Auth.jsx`
-         * DEFECT AGAIN ON A DIFFERENT SCREEN. Auth logged `{ email, password }` on every
-         * login attempt; this logged the WHOLE organiser report payload -- every field the
-         * user had filled in -- on every submit, to a console that survives in a saved HAR,
-         * in a screen share and in any extension the user has installed.
-         *
-         * ⚠️ THE LINE IS DELETED RATHER THAN ROUTED THROUGH `reportError`. The sink exists
-         * for FAILURES and emits `kind`/`status`/`retryable` only; a successful submit has
-         * no failure to report, so there is nothing here it should be saying. This form has
-         * no backend yet (`04.3` left it as a shape), and when it gets one the write goes
-         * through a service and its failure through the sink like every other.
-         */
+        if (saving) return;
+        const { visit, errors: invalid } = visitOf(formData);
+        setErrors(invalid);
+        setNotice(null);
+        if (Object.keys(invalid).length) return;
+        setSaving(true);
+        const ra = formData.raNumber.trim();
+        let sent = false;
+        try {
+            const found = await workplaceService.getWorkplaces({ ...RA_SEARCH, search: ra });
+            const workplace = found?.content?.find?.((row) => String(row.raNumber) === ra);
+            if (!workplace) {
+                setErrors({ raNumber: 'No workplace with that R/A number is on record here.' });
+                return;
+            }
+            sent = true;
+            const saved = await recordVisit(workplace.id, visit);
+            setSavedAs(formData);
+            setNotice({
+                tone: 'ok',
+                text: `Visit saved for ${workplace.name} (R/A ${workplace.raNumber}).${saved?.complementBefore == null ? ''
+                    : ` Staff complement changed from ${formatInt(saved.complementBefore)} to ${formatInt(saved.complementFound)}.`}`,
+            });
+        } catch (error) {
+            reportError('LocationVisit.save', error);
+            const { code, details } = error?.body ?? {};
+            const field = code === VISIT_INVALID ? VISIT_FIELDS[details?.field] : code === WORKPLACE_UNKNOWN && 'raNumber';
+            if (field) setErrors({ [field]: messageOf(error) });
+            else {
+                setNotice({
+                    tone: 'error',
+                    text: sent
+                        ? writeFailure(error, 'The visit', 'the workplace’s visits on the Workplaces screen')
+                        : `The workplace could not be looked up, so nothing was saved. ${messageOf(error)}`,
+                });
+            }
+        } finally {
+            setSaving(false);
+        }
     };
 
     // One object per render, so a keystroke reaches all 31 fields -- which is what a
     // controlled form does anyway. What must NOT change per render is the component
     // identity, and that is now fixed at module scope above.
-    const scope = useMemo(() => ({ values: formData, onChange: handleChange }), [formData, handleChange]);
+    const scope = useMemo(() => ({ values: formData, errors, onChange: handleChange }), [formData, errors, handleChange]);
 
     const sheet = (
         <FormScope.Provider value={scope}>
@@ -181,7 +272,17 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
                         SASBO Finance Union — Location Visit: Branch / Department
                     </h2>
                 </div>
-                <form onSubmit={handleSubmit}>
+                {/* 🔴 CLEAR FORM RESET THE BOXES AND NOT THE FORM. A native reset puts each control back to its
+                    default and tells React nothing, so the state kept every value the boxes no longer showed --
+                    harmless while the form saved nothing, and a visit saved from stale values once it did. */}
+                <form
+                    onSubmit={handleSubmit}
+                    onReset={() => {
+                        setFormData(openedWith(filters));
+                        setErrors({});
+                        setNotice(null);
+                    }}
+                >
                     <Section title="General Data">
                         <Field label="Organiser Name" name="organiserName" />
                         <Field label="Date of Visit" name="dateOfVisit" type="date" />
@@ -195,6 +296,12 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
                         <Field label="Physical Address" name="physicalAddress" fullWidth textarea />
                         <Field label="Branch / Dep Tel No" name="branchDepTelNo" type="tel" />
                         <Field label="Branch / Dep Fax No" name="branchDepFaxNo" type="tel" />
+                        {/* What Save visit keeps, said beside the fields it does not: they are people's details. On
+                            screen only -- the paper form prints as it always has. */}
+                        <p className="no-print text-sm text-ink-muted sm:col-span-2">
+                            The day, who visited, the times and the counts are saved with the visit. The contact
+                            details are printed with the form and not saved.
+                        </p>
                         <Field label="Branch / Dep Manager" name="branchDepManager" fullWidth />
                         <Field label="Branch Rep Name" name="branchRepName" />
                         <Field label="Cell Phone & E-Mail" name="cellPhoneEmail1" />
@@ -222,11 +329,28 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
                         <Field label="Date Captured" name="dateCaptured" type="date" />
                     </Section>
 
+                    {/* Save visit's outcome, beside the button that asked: a confirmation announced, a failure that
+                        takes focus. On screen only. */}
+                    {notice && (
+                        <PageNotice
+                            ref={noticeRef}
+                            id="visit-notice-title"
+                            tone={notice.tone}
+                            className="no-print"
+                            onDismiss={() => setNotice(null)}
+                        >
+                            {notice.text}
+                        </PageNotice>
+                    )}
+
                     {/* The actions sit where every other surface in this world puts them:
                         at the end of the sheet, to the right, primary last. */}
                     <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-line pt-4">
                         <Button type="reset" variant="default">Clear form</Button>
-                        <Button type="submit" variant="primary">Submit report</Button>
+                        {/* The form's one primary, where "Submit report" sent nothing anywhere (A60). */}
+                        <Button type="submit" variant="primary" loading={saving} disabled={savedAs === formData}>
+                            Save visit
+                        </Button>
                     </div>
                 </form>
             </div>

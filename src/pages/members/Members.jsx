@@ -268,6 +268,7 @@ const RECORD_FIELD_LABELS = {
     isShopSteward: "Shop Steward",
     shopStewardElectionDate: "Shop Steward Election Date",
     isBec: "BEC Member",
+    isMemnet: "Memnet Member",
     becCommitteeCode: "Branch Executive Committee",
     isBecRecruiter: "BEC Recruiter",
     isBecStructureRep: "BEC Structure Representative",
@@ -1833,6 +1834,7 @@ export default function Members() {
                                         offers to fill the two bank fields below and never writes them itself. */}
                                     <WorkplaceField
                                         className="col-span-full"
+                                        stacked
                                         source={isEditing ? workplaceSource : undefined}
                                         choice={workplace}
                                         current={{
@@ -2030,6 +2032,14 @@ export default function Members() {
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* 🧷 Month end 04.8, MM80 -- SASBO, 2026-10-01: a Memnet member is "a contact member, it get
+                                                updated or captured as a mnet member when we get the nomination firm". Asked here, on the
+                                                record, as every structure answer is; never a default (the sixteen hidden keys capture once
+                                                posted had `memnetMember: "N"` among them). Month end counts it by area and table code. */}
+                                            <div className="border-t border-line pt-4">
+                                                <Detail label="Memnet Member?" value={yesNo(editForm.isMemnet)} isEditing={true} options={["Yes", "No"]} onChange={(e) => setStructure("isMemnet", e.target.value === "Yes")} />
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
@@ -2067,6 +2077,7 @@ export default function Members() {
                                                     )}
                                                 </div>
                                             )}
+                                            <Detail label="Memnet Member" value={yesNo(selectedMember.isMemnet, "Not recorded")} isEditing={false} />
                                         </div>
                                     )}
                                 </div>

@@ -34,15 +34,18 @@ const STATUS = monthEndBody('GET /api/reference/status')
 const [HARBOUR, HEAD_OFFICE] = monthEndBody('GET /api/workplaces').content
 
 /** A form of the one key the control writes, and the page's two hooks -- no bank fields, so no offer here. */
-function Harness() {
+function Harness({ stacked }) {
   const source = useWorkplaceSource(true)
   const [form, setForm] = useState({ workplaceId: null })
   const [, setFieldErrors] = useState({})
   const choice = useWorkplaceChoice({
     form, setForm, setFieldErrors, banks: [], branchesFor: () => [], settle: (prev, next) => next,
   })
-  return <WorkplaceField source={source} choice={choice} />
+  return <WorkplaceField source={source} choice={choice} stacked={stacked} />
 }
+
+/** A sentence said in one paragraph, whatever marks part of it -- "Not available." is the mock's strong (⑦). */
+const said = (text) => (_, node) => node?.tagName === 'P' && node.textContent === text
 
 /** SASBO's workplaces as the server searches them: an employer's, by a name or an R/A number. Records each question. */
 function workplacesSearched(asked = []) {
@@ -125,7 +128,7 @@ describe('the Workplace control -- its four states', () => {
     })))
     renderWithProviders(<Harness />)
 
-    expect(await screen.findByText('Not available. SASBO’s workplaces: Not loaded on this demonstration yet.'))
+    expect(await screen.findByText(said('Not available. SASBO’s workplaces: Not loaded on this demonstration yet.')))
       .toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: /^Employer/ })).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/^Find the workplace/)).not.toBeInTheDocument()
@@ -136,7 +139,7 @@ describe('the Workplace control -- its four states', () => {
       HttpResponse.json({ status: 404, error: 'Not Found', path: '/api/reference/status' }, { status: 404 })))
     renderWithProviders(<Harness />)
 
-    expect(await screen.findByText('Not available. This server does not answer for SASBO’s workplaces yet.'))
+    expect(await screen.findByText(said('Not available. This server does not answer for SASBO’s workplaces yet.')))
       .toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Try again' }), 'asking again would only be told no again')
       .not.toBeInTheDocument()
@@ -146,7 +149,7 @@ describe('the Workplace control -- its four states', () => {
     server.use(...pageFixtures)
     renderWithProviders(<Harness />)
 
-    expect(await screen.findByText('Not available. This server’s answer about SASBO’s workplaces could not be read.'))
+    expect(await screen.findByText(said('Not available. This server’s answer about SASBO’s workplaces could not be read.')))
       .toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: /^Employer/ })).not.toBeInTheDocument()
   })
@@ -356,5 +359,67 @@ describe('the Workplace control -- a workplace chosen', () => {
     // Chosen, the search is cleared for another question.
     expect(find()).toHaveValue('')
     await expectNoA11yViolations(container)
+  })
+})
+
+/**
+ * 🔍 MO24 -- THE STAND-IN REVIEW'S FINDINGS ON THIS CONTROL. jsdom lays nothing out and draws no glyph, so each is held
+ * by the structure and the classes that decide it; what they look like at 1280 and 390 was measured in a browser.
+ */
+describe('the Workplace control -- the stand-in review (MO24)', () => {
+  /** The employer and the search's pair: the nearest box that holds both controls. */
+  const pairOf = () => {
+    const employer = screen.getByRole('combobox', { name: /^Employer/ })
+    let pair = find()
+    while (!pair.contains(employer)) pair = pair.parentElement
+    return pair
+  }
+
+  it("⑦ 'Not available.' is said in the record's ink, at 600, before the reason", async () => {
+    answerTheLists(http.get('*/api/reference/status', () => HttpResponse.json({
+      ...STATUS, workplaces: { ...STATUS.workplaces, rows: 0, printedOn: null, seededAt: null, reason: 'NOT_LOADED' },
+      workplacesServed: 'NONE',
+    })))
+    renderWithProviders(<Harness />)
+
+    const words = await screen.findByText('Not available.')
+    expect(words.tagName).toBe('STRONG')
+    expect(words).toHaveClass('font-semibold', 'text-ink')
+    // The reason stays in the quiet ink beside it.
+    expect(words.parentElement).toHaveClass('text-ink-muted')
+  })
+
+  it('🔴 the facts are not set in tabular figures, and a padded part puts no space before the comma', async () => {
+    // A committee as a fixed-width column might hand it over: padded, both of its parts.
+    const padded = { ...HEAD_OFFICE, committee: 'Q01  ', committeeName: '  INVENTED NORTH COMMITTEE ' }
+    answerTheLists(http.get('*/api/workplaces', () =>
+      HttpResponse.json({ content: [padded], page: 0, size: 8, totalElements: 1, totalPages: 1, reason: null })))
+    const user = setupUser()
+    renderWithProviders(<Harness />)
+    await chooseEmployer(user, 'INVENTED BANK')
+    await waitFor(() => expect(find()).toBeEnabled())
+    await user.type(find(), 'head')
+    await user.click(await screen.findByRole('button', { name: /^INVENTED HEAD OFFICE/ }))
+
+    const facts = await screen.findByText('R/A 900002 · Area A · Committee Q01, INVENTED NORTH COMMITTEE')
+    // The face gives a comma a figure's width under tabular-nums: "Q01," read "Q01 ," on screen (the review's capture).
+    expect(facts).not.toHaveClass('tabular-nums')
+  })
+
+  it("on capture the employer and the search stand side by side, as the mock's capture frames draw them", async () => {
+    answerTheLists()
+    renderWithProviders(<Harness />)
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /^Employer/ })).toBeEnabled())
+
+    expect(pairOf()).toHaveClass('grid', 'grid-cols-2', 'max-sm:grid-cols-1')
+  })
+
+  it("⑫ stacked -- the record's panel -- they stand one over the other, in the panel's one column", async () => {
+    answerTheLists()
+    renderWithProviders(<Harness stacked />)
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /^Employer/ })).toBeEnabled())
+
+    expect(pairOf()).toHaveClass('grid')
+    expect(pairOf()).not.toHaveClass('grid-cols-2')
   })
 })
