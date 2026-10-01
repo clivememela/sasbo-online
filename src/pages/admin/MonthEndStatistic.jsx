@@ -96,9 +96,11 @@ export function StatisticSheet({ sheet, month, why }) {
           <>
             <Table caption={sheet.title} columns={columns} rows={sheet.total ? [...shown, sheet.total] : shown}
               rowKey="key" dense />
+            {/* error={false}, said and not defaulted (contract ⑮): a sheet is drawn only from an answer in hand -- the
+                page's `ready` -- so its rows cannot have failed; a read that failed is the page's own state, above. */}
             {paged && (
               <Pager page={current} totalPages={pages} onPageChange={setPage} count={sheet.rows.length}
-                start={first + 1} end={first + shown.length} noun="rows" />
+                start={first + 1} end={first + shown.length} noun="rows" error={false} />
             )}
           </>
         ) : (
