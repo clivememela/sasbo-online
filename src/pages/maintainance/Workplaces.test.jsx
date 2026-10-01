@@ -456,6 +456,73 @@ describe('the workplaces\' screen -- the search (MR-PERF-12)', () => {
   })
 })
 
+/**
+ * 🔍 MO24 -- THE STAND-IN REVIEW'S FINDINGS ON THIS SCREEN: at 390 the R/A number and the staff were behind a sideways
+ * scroll and an expander whose details left them out; at 1280 the staff was cut by 48px. jsdom lays nothing out, so
+ * these hold the STRUCTURE the layout rests on -- the sheet a `register`, every cell in every row, the ladder each
+ * column climbs, the caps -- and the widths it buys were measured in a browser and are recorded with the commit.
+ */
+describe('the workplaces\' screen -- the stand-in review (MO24)', () => {
+  const sheetOf = () => screen.getByRole('table').closest('.register')
+  const COLUMN_KEYS = ['name', 'raNumber', 'employer', 'area', 'committee', 'staffComplement']
+
+  it('the sheet is a register: on a phone each row is a card holding all six -- nothing behind an expander', async () => {
+    server.use(answering(golden))
+    renderWithProviders(<Workplaces />)
+    await screen.findByText('INVENTED HARBOUR')
+
+    expect(sheetOf(), 'the card rows and the ladder are the register\'s (index.css)').not.toBeNull()
+    expect(document.querySelector('[data-expander]')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Show details' })).not.toBeInTheDocument()
+    for (const row of document.querySelectorAll('tr[data-row]')) {
+      expect([...row.querySelectorAll('td')].map((cell) => cell.dataset.col)).toEqual(COLUMN_KEYS)
+    }
+    // The card's second column, in the columns' own order: the R/A number, the area, the staff -- standing right.
+    const ends = [...document.querySelectorAll('tr[data-row]:first-child td[data-end]')].map((cell) => cell.dataset.col)
+    expect(ends).toEqual(['raNumber', 'area', 'staffComplement'])
+  })
+
+  it('wider, the columns yield to the sheet\'s own width: the committee, then the employer, then the area -- the staff never', async () => {
+    server.use(answering(golden))
+    renderWithProviders(<Workplaces />)
+    await screen.findByText('INVENTED HARBOUR')
+
+    const fits = Object.fromEntries(COLUMN_KEYS.map((key) =>
+      [key, document.querySelector(`th[data-col="${key}"]`).dataset.fit ?? 'never']))
+    expect(fits).toEqual({
+      name: 'never', raNumber: 'never', employer: 'medium', area: 'narrow', committee: 'wide', staffComplement: 'never',
+    })
+  })
+
+  it('the workplace is capped at 18rem, the employer and the committee at 16rem -- each whole in its cell\'s title', async () => {
+    const long = workplace(1, {
+      name: 'INVENTED CENTRAL BUSINESS DISTRICT REGIONAL PROCESSING CENTRE',
+      employer: null, employerPrinted: 'INVENTED BANK DEPARTMENTS AND SUBSIDIARIES, AS PRINTED',
+      committeeName: 'INVENTED NORTH AND CENTRAL PROVINCES COMMITTEE',
+    })
+    server.use(answering(() => pageOf([long])))
+    renderWithProviders(<Workplaces />)
+    await screen.findByText(long.name)
+
+    const cell = (key) => document.querySelector(`td[data-col="${key}"]`)
+    expect(cell('name')).toHaveClass('max-w-[18rem]', 'truncate')
+    expect(cell('name')).not.toHaveClass('max-w-[16rem]')
+    expect(cell('name')).toHaveAttribute('title', long.name)
+    expect(cell('employer')).toHaveClass('max-w-[16rem]', 'truncate')
+    expect(cell('employer')).toHaveAttribute('title', long.employerPrinted)
+    expect(cell('committee')).toHaveClass('max-w-[16rem]', 'truncate')
+    expect(cell('committee')).toHaveAttribute('title', long.committeeName)
+  })
+
+  it('on a phone the search takes the whole line', async () => {
+    server.use(answering(golden))
+    renderWithProviders(<Workplaces />)
+    await screen.findByText('INVENTED HARBOUR')
+
+    expect(searchBox().closest('.criterion')).toHaveClass('max-md:basis-full')
+  })
+})
+
 describe('the workplaces\' screen -- where it lives', () => {
   it('the route, the rail and the crumb agree: Maintenance → Workplaces, and one heading that names it', async () => {
     server.use(...smokeHandlers)

@@ -152,6 +152,16 @@ export const listProvenance = (answer) => {
     : `${printed} — not yet confirmed by SASBO`;
 };
 
+/**
+ * The same line for SASBO's lists TOGETHER (02.1) -- from the lists' status read (`GET /api/reference/status`): the
+ * line every one of them, the workplaces' among them, gives alike. Where any of them gives another -- another day
+ * printed, one confirmed and one not -- or the read is not a status read, there is no one line to say, and it is `''`.
+ */
+export const listsProvenance = (status) => {
+  const lines = new Set([status?.workplaces, ...(Array.isArray(status?.lists) ? status.lists : [])].map(listProvenance));
+  return lines.size === 1 ? [...lines][0] : '';
+};
+
 /** The sentence for an empty list's reason; a word the browser has never heard of is shown as the server wrote it. */
 export const emptyReasonSentence = (reason) => LIST_EMPTY_REASON[reason] ?? reason ?? '';
 

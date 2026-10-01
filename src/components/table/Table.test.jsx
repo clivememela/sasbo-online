@@ -263,3 +263,29 @@ describe('Table — truncation stays inside the cell', () => {
     expect(screen.getByText('Braamfontein')).toBeInTheDocument()
   })
 })
+
+describe('Table — a footer, and a column that ends a phone card (MO24)', () => {
+  it('the footer is a tfoot row of the same columns, shown with the rows, whose expander cell is empty', () => {
+    const footer = { number: 'Total', name: '2 members', bank: '2 banks' }
+    renderWithProviders(<Table columns={COLUMNS} rows={MEMBERS} rowKey="id" caption="Members" footer={footer} />)
+
+    const total = screen.getByRole('cell', { name: 'Total' }).closest('tr')
+    expect(total.parentElement.tagName).toBe('TFOOT')
+    expect([...total.querySelectorAll('td[data-col]')].map((cell) => cell.textContent)).toEqual(['Total', '2 members', '2 banks'])
+    expect(total.querySelector('td[data-expander]')).toBeEmptyDOMElement()
+    // The rows above it still open: one expander each, and none in the footer.
+    expect(screen.getAllByRole('button', { name: /show details/i })).toHaveLength(MEMBERS.length)
+  })
+
+  it('the must-pass: a footer is not shown over a table with nothing in it', () => {
+    renderWithProviders(<Table columns={COLUMNS} rows={[]} rowKey="id" caption="Members" footer={{ number: 'Total' }} />)
+    expect(document.querySelector('tfoot')).toBeNull()
+  })
+
+  it('a column marked `end` marks its cells, and only its own', () => {
+    const columns = [{ key: 'name', header: 'Name' }, { key: 'number', header: 'Number', end: true }]
+    renderWithProviders(<Table columns={columns} rows={MEMBERS} rowKey="id" caption="Members" />)
+
+    expect([...document.querySelectorAll('td[data-end]')].map((cell) => cell.dataset.col)).toEqual(['number', 'number'])
+  })
+})

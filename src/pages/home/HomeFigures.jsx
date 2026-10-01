@@ -6,12 +6,12 @@ import SelectInput from '../../components/form/SelectInput.jsx';
 import FigureStrip from '../../components/members/FigureStrip.jsx';
 import Table from '../../components/table/Table.jsx';
 import {
-  SUMMARY_GROUPING, UNGROUPED_BECAUSE, listRows, monthLabel, monthsTo, placeOptions, placeQuery, summaryOf,
-  unplacedSentence,
+  SUMMARY_GROUPING, UNGROUPED_BECAUSE, WORKPLACES_SERVED, listRows, listsProvenance, monthLabel, monthsTo, placeOptions,
+  placeQuery, summaryOf, unplacedSentence,
 } from '../../config/monthEnd.js';
 import { formatInt, formatPercent } from '../../lib/format.js';
 import reportError from '../../lib/reportError.js';
-import { getAreas, getRegions } from '../../services/referenceService.js';
+import { getAreas, getRegions, getStatus } from '../../services/referenceService.js';
 import { summaryService } from '../../services/summaryService.js';
 
 /**
@@ -81,6 +81,9 @@ const WORDS = { ...NUMBER, nowrap: false };
  * The sheet's columns. 🔴 RULE C: a row of one to four members at a named employer, table code or workplace comes
  * with NO figures (MD27, MD37), and so does the row withheld beside it (MV-19) -- it reads *fewer than five* or
  * *withheld*, and not one number, not even its staff.
+ *
+ * The marks are the mock's (MO24): a core group's `.core` pill -- small capitals, teal ink on the teal wash -- a word
+ * read in place of a figure in the mock's quiet italic, and *complement out of date* in the pending ink, as a flag.
  */
 const columnsFor = (by) => [
   {
@@ -89,7 +92,17 @@ const columnsFor = (by) => [
     // A long employer's name takes a second line on a phone rather than pushing Members off the screen.
     nowrap: false,
     cell: (row) => (row.total ? <strong>{row.label}</strong> : (
-      <>{row.label}{row.core && <span className="text-xs text-ink-muted"> · core</span>}</>
+      <>
+        {row.label}
+        {row.core && (
+          <>
+            {' '}
+            <span className="ml-1 rounded-full bg-brand-soft px-[7px] py-px text-xs font-semibold uppercase tracking-[0.08em] text-brand-ink">
+              core
+            </span>
+          </>
+        )}
+      </>
     )),
   },
   { key: 'staff', header: 'Staff', priority: 'secondary', ...NUMBER, cell: count('complement') },
@@ -98,7 +111,7 @@ const columnsFor = (by) => [
     header: 'Members',
     ...WORDS,
     cell: (row) => (row.figures ? formatInt(row.figures.paying)
-      : <span className="text-ink-muted">{row.withheld ? 'withheld' : 'fewer than five'}</span>),
+      : <span className="italic text-ink-muted">{row.withheld ? 'withheld' : 'fewer than five'}</span>),
   },
   { key: 'joined', header: 'Joined', priority: 'secondary', ...NUMBER, cell: count('joined') },
   { key: 'left', header: 'Left', priority: 'secondary', ...NUMBER, cell: count('left') },
@@ -110,7 +123,9 @@ const columnsFor = (by) => [
     cell: (row) => row.figures && (
       <>
         {formatPercent(row.figures.penetration)}
-        {row.figures.complementOutOfDate && <span className="block text-xs text-ink-muted">complement out of date</span>}
+        {row.figures.complementOutOfDate && (
+          <span className="block text-xs font-medium text-status-pending">complement out of date</span>
+        )}
       </>
     ),
   },
@@ -125,6 +140,8 @@ export default function HomeFigures() {
   const [read, setRead] = useState({ pending: true });
   const [places, setPlaces] = useState(null);
   const placesAsked = useRef(false);
+  const [lists, setLists] = useState(null);
+  const listsAsked = useRef(false);
 
   useEffect(() => {
     let current = true;
@@ -145,6 +162,20 @@ export default function HomeFigures() {
       current = false;
     };
   }, [ask]);
+
+  /*
+   * WHICH OF SASBO'S LISTS GROUPED THE SHEET, AND WHETHER SHE HAS CONFIRMED THEM (MD28) -- the line beneath it, from the
+   * lists' status read the Workplace control reads too. Asked once the figures say the sheet is grouped -- after the
+   * first paint's one request, never with it (MD69) -- and kept for the visit. A read that fails says nothing: the line
+   * is where the grouping came from, and no figure waits on it.
+   */
+  const grouped = read.answer?.workplacesServed === WORKPLACES_SERVED.ALL;
+  useEffect(() => {
+    if (!grouped || listsAsked.current) return;
+    listsAsked.current = true;
+    getStatus().then(setLists, (error) => reportError('HomeFigures.lists', error));
+  }, [grouped]);
+  const groupedBy = listsProvenance(lists);
 
   /** A person's question: the grouping, the month or the place changed, or *Try again* -- read once, now. */
   const change = (part) => {
@@ -170,7 +201,7 @@ export default function HomeFigures() {
   const totals = answer?.totals;
   const empty = view === 'ready' && !totals.onRecord && !totals.joined && !totals.left;
   const shown = view === 'ready' || view === 'partial';
-  const rows = view === 'ready' && !empty ? [...answer.rows, { key: '~TOTAL', label: 'Total', figures: totals, total: true }] : [];
+  const rows = view === 'ready' && !empty ? answer.rows : [];
 
   return (
     <section aria-label="SASBO's figures" data-figures={empty ? 'empty' : view} className="mt-6">
@@ -217,7 +248,7 @@ export default function HomeFigures() {
         />
       </Criteria>
 
-      <Sheet className="mt-4">
+      <Sheet className="figures-sheet mt-4">
         <Table
           caption={`The figures by ${SUMMARY_GROUPING[ask.by].toLowerCase()}`}
           columns={columnsFor(ask.by)}
@@ -228,6 +259,8 @@ export default function HomeFigures() {
           onRetry={() => change({})}
           emptyTitle="No members are on record yet."
           dense
+          // The total is the sheet's foot: a row of the same columns that nothing opens (MO24).
+          footer={{ label: 'Total', figures: totals, total: true }}
         />
       </Sheet>
       {view === 'ready' && [
@@ -238,6 +271,7 @@ export default function HomeFigures() {
         unplacedSentence(answer.unplaced),
         UNGROUPED_BECAUSE[answer.workplacesServed],
         answer.month !== serverMonth && 'Grouped by where each member works today.',
+        grouped && groupedBy && `Grouped by SASBO's lists ${groupedBy.replace('As', 'as')}`,
       ].map(note)}
     </section>
   );

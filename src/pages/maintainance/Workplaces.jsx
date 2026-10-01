@@ -72,14 +72,26 @@ const areaLabel = (row) => (row.region ? `${row.letter} · ${row.region}` : row.
 const committeeLabel = (row) => (row.name ? `${row.code} · ${row.name}` : row.code);
 const inWords = (names) => (names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]);
 
-/** Workplace · R/A number · Employer · Area · Committee · Staff. Every absent value is the one absence mark. */
+/**
+ * Workplace · R/A number · Employer · Area · Committee · Staff. Every absent value is the one absence mark.
+ *
+ * 📐 THE SHEET IS A `register` (index.css), AND THAT IS THE WHOLE OF ITS LAYOUT (MO24, the stand-in review):
+ *   - at 760px and below -- and on a sheet too narrow for its columns -- each row is a card of two columns, in the
+ *     columns' own order: the workplace and its R/A number, the employer and the area, the committee and the staff.
+ *     The second column (`end`) stands right. Nothing is hidden and nothing scrolls sideways: the R/A number and the
+ *     staff had been behind a sideways scroll and an expander whose details left them out;
+ *   - wider, the columns yield to the sheet's own width, the register's ladder (`fit`): the committee first, then the
+ *     employer, then the area. The workplace, its R/A number and the staff never do. At 1280 the sheet is ~968px and
+ *     six columns at their caps need ~1,050 -- the staff had been cut by 48px.
+ * The workplace is capped at 18rem and the employer and the committee at 16rem, each whole in its cell's title.
+ */
 const COLUMNS = [
-  { key: 'name', header: 'Workplace', truncate: true, className: 'font-medium' },
-  { key: 'raNumber', header: 'R/A number', className: 'tabular-nums' },
-  { key: 'employer', header: 'Employer', priority: 'secondary', truncate: true, cell: (w) => w.employer ?? w.employerPrinted ?? EMPTY },
-  { key: 'area', header: 'Area', priority: 'secondary', cell: (w) => w.area ?? EMPTY },
-  { key: 'committee', header: 'Committee', priority: 'secondary', truncate: true, cell: (w) => w.committeeName ?? w.committee ?? EMPTY },
-  { key: 'staffComplement', header: 'Staff', align: 'right', className: 'tabular-nums', cell: (w) => formatInt(w.staffComplement) },
+  { key: 'name', header: 'Workplace', truncate: true, className: 'max-w-[18rem] font-medium' },
+  { key: 'raNumber', header: 'R/A number', end: true, className: 'tabular-nums' },
+  { key: 'employer', header: 'Employer', fit: 'medium', truncate: true, cell: (w) => w.employer ?? w.employerPrinted ?? EMPTY },
+  { key: 'area', header: 'Area', fit: 'narrow', end: true, cell: (w) => w.area ?? EMPTY },
+  { key: 'committee', header: 'Committee', fit: 'wide', truncate: true, cell: (w) => w.committeeName ?? w.committee ?? EMPTY },
+  { key: 'staffComplement', header: 'Staff', align: 'right', end: true, className: 'tabular-nums', cell: (w) => formatInt(w.staffComplement) },
 ];
 
 export default function Workplaces() {
@@ -187,7 +199,8 @@ export default function Workplaces() {
 
       <Criteria className="mt-5">
         <TextInput
-          className={CRITERION_WIDE}
+          // A phone gives the search the whole line: two hundred pixels of it left the placeholder cut mid-word.
+          className={`${CRITERION_WIDE} max-md:basis-full`}
           label="Workplace or R/A number"
           kind="search"
           value={text}
@@ -205,7 +218,7 @@ export default function Workplaces() {
         <p role="status" className="mt-4 text-sm text-ink-muted">That page no longer exists, so the list is back at its first page.</p>
       )}
 
-      <Sheet className="mt-4">
+      <Sheet className="register mt-4">
         {/* The number of workplaces on record -- of WORKPLACES, from the last read that asked for all of them. */}
         {onRecord > 0 && (
           <p className="border-b border-line px-5 py-3 text-sm text-ink-muted">

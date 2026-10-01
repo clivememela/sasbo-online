@@ -75,6 +75,11 @@ import TableScroller from './TableScroller';
  * 🔧 **`total` MAKES SERVER PAGING A DROP-IN (R-SCALE-D).** `rows` is what is on screen;
  * `total` is how many exist. When they differ and no pager is wired, the table says *"showing
  * the first N of M -- refine your search"* rather than implying the list is complete.
+ *
+ * ➕ **`footer` IS A SHEET'S TOTAL, IN A `<tfoot>`** (month end `02.1`, the mock's `tfoot`). It is
+ * a row of the same columns and nothing opens it: its expander cell is there, and empty, so a
+ * phone shows no chevron that leads nowhere. **`end`** marks a column that stands at the right of
+ * a phone's card row (index.css, "The register on a phone"): the row's second column.
  */
 
 /** @typedef {'essential'|'secondary'|'detail'} ColumnPriority */
@@ -122,6 +127,7 @@ export default function Table({
   selectedKey,
   onRowSelect,
   enterKey,
+  footer,
 }) {
   const [expanded, setExpanded] = useState(() => new Set());
 
@@ -202,6 +208,24 @@ export default function Table({
     ),
   );
   const expanderCellClass = cn(bodyCell, 'w-10 md:hidden');
+
+  /** A row's cells, column by column -- a body row's and the footer's alike. */
+  const cellsOf = (row, index) =>
+    visible.map((column) => {
+      const content = cellValue(column, row, index);
+      return (
+        <td
+          key={column.key}
+          data-col={column.key}
+          data-fit={column.fit}
+          data-end={column.end ? '' : undefined}
+          className={column.bodyClass}
+          title={column.truncate && typeof content === 'string' ? content : undefined}
+        >
+          {content}
+        </td>
+      );
+    });
 
   const toggle = (key) =>
     setExpanded((current) => {
@@ -412,22 +436,7 @@ export default function Table({
                         </td>
                       )}
 
-                      {visible.map((column) => {
-                        const content = cellValue(column, row, index);
-                        return (
-                          <td
-                            key={column.key}
-                            data-col={column.key}
-                            data-fit={column.fit}
-                            className={column.bodyClass}
-                            title={
-                              column.truncate && typeof content === 'string' ? content : undefined
-                            }
-                          >
-                            {content}
-                          </td>
-                        );
-                      })}
+                      {cellsOf(row, index)}
                     </tr>
 
                     {expandable && isOpen && (
@@ -452,6 +461,15 @@ export default function Table({
                 );
               })}
           </tbody>
+
+          {state === 'rows' && footer && (
+            <tfoot className="border-t border-line">
+              <tr className="touch-size">
+                {expandable && <td data-expander="" className={expanderCellClass} />}
+                {cellsOf(footer, rows.length)}
+              </tr>
+            </tfoot>
+          )}
         </table>
       </TableScroller>
 
