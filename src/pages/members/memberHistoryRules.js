@@ -1,3 +1,4 @@
+import { instantParts } from '../../config/monthEnd.js';
 import { EMPTY, compareDates, formatDate, formatZar, parseDate } from '../../lib/format.js';
 
 /**
@@ -38,10 +39,10 @@ const WHEN = new Intl.DateTimeFormat('en-ZA', {
   hourCycle: 'h23',
 });
 export const whenOf = (instant) => {
-  const moment = typeof instant === 'string' ? new Date(instant) : null;
-  if (!moment || Number.isNaN(moment.getTime())) return { date: instant || EMPTY, time: '' };
-  const part = Object.fromEntries(WHEN.formatToParts(moment).map(({ type, value }) => [type, value]));
-  return { date: `${part.year}/${part.month}/${part.day}`, time: `${part.hour}:${part.minute}` };
+  const part = instantParts(instant, WHEN);
+  return part
+    ? { date: `${part.year}/${part.month}/${part.day}`, time: `${part.hour}:${part.minute}` }
+    : { date: instant || EMPTY, time: '' };
 };
 
 /**

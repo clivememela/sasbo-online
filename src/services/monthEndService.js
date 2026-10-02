@@ -7,7 +7,7 @@ import { requestJson, requestJsonWrite } from './parseApiError';
  *   `getMonths()`                 `{ openMonth, taken: [{ month, state, takenAt, takenBy }] }` -- the month the server
  *                                 says it is, and every month taken, with when and by whom (MD55: the browser's clock
  *                                 decides nothing about a month).
- *   the six statistics            `MonthEndStatisticDto` -- `{ statistic, legacy, month, state, takenAt, takenBy, area,
+ *   the seven statistics          `MonthEndStatisticDto` -- `{ statistic, legacy, month, state, takenAt, takenBy, area,
  *                                 region, workplacesServed, sheets, notes }`, each sheet `{ key, title, legacyTitle,
  *                                 columns, rows, total }`. A taken month is read as it was frozen, the open month live;
  *                                 a past month never taken is `MONTH_NOT_TAKEN`.
@@ -105,6 +105,7 @@ export const monthEndService = {
   getBranches,
   getRecruitment,
   getRepresentatives,
+  getVisits,
   askPack,
   getPack,
 };

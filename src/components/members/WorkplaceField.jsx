@@ -5,6 +5,8 @@ import { workplaceService } from '../../services/workplaceService';
 import { Button, SearchableSelect, TextInput } from '../form';
 import LoadFailureFrame from '../form/LoadFailureFrame';
 import { FILLABLE, WORKPLACE_SEARCH, answerFailed, workplaceResults } from '../../utils/workplaces';
+import { committeeLine } from '../../config/monthEnd';
+import { EMPTY } from '../../lib/format';
 
 /** card.css `.field__label`: the small capitals every label on these screens wears. */
 const LABEL = 'text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted';
@@ -98,8 +100,7 @@ export default function WorkplaceField({
               nothing, so its figures are the face's own (03.6's rule). Each part trimmed as well, so a padded value
               cannot put a space before the comma either. */}
           <p className="text-sm text-ink-muted">
-            {`R/A ${workplace.raNumber} · Area ${workplace.area || '—'} · Committee ${
-              [workplace.committee, workplace.committeeName].map((part) => String(part ?? '').trim()).filter(Boolean).join(', ') || '—'}`}
+            {`R/A ${workplace.raNumber} · Area ${workplace.area || EMPTY} · Committee ${committeeLine(workplace)}`}
           </p>
           <p className="text-xs text-ink-muted">From SASBO’s list of workplaces. {source?.workplacesFrom ?? current.from}</p>
         </div>
@@ -163,7 +164,7 @@ export default function WorkplaceField({
                     className="touch-size flex w-full flex-wrap items-center justify-between gap-x-3 rounded-md px-3 py-2 text-left hover-hover:hover:bg-brand-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
                   >
                     <span className="font-medium">{row.name}</span>
-                    <span className="text-xs text-ink-muted tabular-nums">R/A {row.raNumber} · Area {row.area || '—'}</span>
+                    <span className="text-xs text-ink-muted tabular-nums">R/A {row.raNumber} · Area {row.area || EMPTY}</span>
                   </button>
                 </li>
               ))}

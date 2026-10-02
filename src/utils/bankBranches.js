@@ -59,6 +59,24 @@ export const branchNamesForBank = (bankListing, bankName) => {
 };
 
 /**
+ * A NEW BANK, AND WHAT GOES WITH THE OLD ONE -- one rule for capture and the record, whether a person chose the bank
+ * or accepted the Workplace control's offer to fill it (month end 01.3; main's intent, e56dbe4). A grade belongs to a
+ * bank, so a DIFFERENT bank clears it; a branch the new bank does not offer goes with the old bank -- judged against
+ * the bank actually chosen, so the moment a searchable control passes through an empty bank keeps the branch. A
+ * branch chosen in the same step stays. The same bank is `next` itself.
+ *
+ * `branchesFor(bankName)` is the screen's own list of what a bank offers.
+ */
+export const settleBankChange = (prev, next, branchesFor) => {
+  if (next.bankName === prev.bankName) return next;
+  const settled = { ...next, jobGrade: '' };
+  if (next.bankName && prev.branch && next.branch === prev.branch && !branchesFor(next.bankName).includes(prev.branch)) {
+    settled.branch = '';
+  }
+  return settled;
+};
+
+/**
  * The listing record for one bank+branch pair, under the same rule the server uses.
  * This is the source for every branch-derived field in `04.2`.
  */

@@ -25,7 +25,7 @@ import useMonths from './useMonths.js';
  *
  *   the month        chosen ONCE, at the top, from the server's months (MD55): a taken month says who took it and
  *                    when, the open month that its figures are read live. The browser's clock decides nothing;
- *   the statistics   six links, each opening its screen for the chosen month (`?month=`), with its plain name and the
+ *   the statistics   seven links, each opening its screen for the chosen month (`?month=`), with its plain name and the
  *                    legacy title as its second line;
  *   the pack         the two workbooks, prepared as a job and saved from here (`MonthEndPack`);
  *   the listings     four rows, disabled with their reason -- each names members and refuses until sign-in, so the

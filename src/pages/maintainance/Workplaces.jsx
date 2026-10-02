@@ -11,7 +11,7 @@ import { useDebounce } from '../../hooks/useDebounce.js';
 import reportError from '../../lib/reportError.js';
 import { EMPTY, formatInt } from '../../lib/format.js';
 import {
-  LIST_EMPTY_REASON, MONTH_END_REFUSAL, emptyReasonSentence, listProvenance, listRows,
+  LIST_EMPTY_REASON, WORKPLACE_PAGE_INVALID, emptyReasonSentence, listProvenance, listRows,
 } from '../../config/monthEnd.js';
 import { getAreas, getCommittees, getEmployers } from '../../services/referenceService.js';
 import { workplaceService } from '../../services/workplaceService.js';
@@ -166,7 +166,7 @@ export default function Workplaces() {
       .catch((error) => {
         if (!current) return;
         reportError('Workplaces.read', error);
-        if (page && error?.body?.code === MONTH_END_REFUSAL.WORKPLACE_PAGE_INVALID) {
+        if (page && error?.body?.code === WORKPLACE_PAGE_INVALID) {
           // The list changed under the pager and that page is gone: back to the first, and the screen says so.
           setPaging({ page: 0 });
           setMovedFrom(asking);

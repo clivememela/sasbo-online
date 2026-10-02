@@ -14,8 +14,9 @@ import { requestJson } from './parseApiError';
  *
  * 🔑 EACH READ IS ALSO ITS OWN NAMED EXPORT, so a screen that needs two lists ships two reads and not ten: an object
  * literal's unused methods are never shaken out of a bundle, and the bundle's ceiling is not raised to fit a change.
- * The first screen (`02.3`) reads only the areas and the regions; the member's Workplace control (`01.3`) only the
- * employers and the status; 03.3's Change status dialog only the deletion and the suspension codes.
+ * The first screen (`02.3`) reads only the areas, the regions and the lists' status; the member's Workplace control
+ * (`01.3`) only the employers and the status; 03.3's Change status dialog only the deletion and the suspension codes;
+ * the record's Structures tab only the committees -- by name since 2 Oct, where it had imported the whole object.
  * `referenceService` is the same reads, gathered, for everything that iterates the service layer -- the object holds
  * these very functions, never copies of them.
  */

@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 
 import DataState from '../../components/common/DataState.jsx';
 import Pager from '../../components/common/Pager.jsx';
-import { WORKPLACE_PAGE_INVALID } from '../../config/monthEnd.js';
+import { WORKPLACE_PAGE_INVALID, committeeLine } from '../../config/monthEnd.js';
 import { EMPTY, MONTHS, formatDateLong, formatInt, parseDate } from '../../lib/format.js';
 import reportError from '../../lib/reportError.js';
 import { VISIT_PAGE_SIZE, getVisits } from '../../services/workplaceVisitService.js';
@@ -46,7 +46,7 @@ const foundBy = (visit) => {
 const factsOf = (w) => [
   w.employer ?? w.employerPrinted ?? EMPTY,
   `Area ${w.area ?? EMPTY}`,
-  `Committee ${[w.committee, w.committeeName].filter(Boolean).join(', ') || EMPTY}`,
+  `Committee ${committeeLine(w)}`,
   `Staff ${formatInt(w.staffComplement)}`,
 ].join(' · ');
 

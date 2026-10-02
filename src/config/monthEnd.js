@@ -10,7 +10,7 @@
  * Rollup cannot prove it for a table built from another's members (`MEMBER_STATUS_KIND`), so without the mark a screen
  * importing one word of this file shipped tables it never reads.
  */
-import { formatInt } from '../lib/format.js';
+import { EMPTY, formatInt } from '../lib/format.js';
 
 /**
  * A save naming a workplace that is not on record here (01.3) -- said at the Workplace field, the form kept as typed.
@@ -142,11 +142,26 @@ export const WORKPLACES_SERVED = /* @__PURE__ */ Object.freeze({
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October',
   'November', 'December'];
 
-/** An ISO date as a person writes it -- `2026-08-31` is `31 August 2026`; anything else is passed through. */
+/**
+ * An ISO date as a person writes it -- `2026-08-31` is `31 August 2026`; anything else is passed through, a month or a
+ * day that is none among it: `2026-13-01` read "1 undefined 2026" until 2 Oct (RC17).
+ */
 export const dayLabel = (iso) => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? '');
-  if (!match) return iso ?? '';
-  return `${Number(match[3])} ${MONTHS[Number(match[2]) - 1]} ${match[1]}`;
+  const month = match ? MONTHS[Number(match[2]) - 1] : undefined;
+  const day = match ? Number(match[3]) : 0;
+  return month && day >= 1 && day <= 31 ? `${day} ${month} ${match[1]}` : iso ?? '';
+};
+
+/**
+ * An instant's parts as `formatter` reads them -- `{ day, month, year, hour, minute, … }` -- or `null` for anything that
+ * is not an instant's text. The one guard for every screen that says when something happened, each in its own words
+ * from the same parts: a take's `instantLabel`, the history's `whenOf`.
+ */
+export const instantParts = (iso, formatter) => {
+  const moment = typeof iso === 'string' ? new Date(iso) : null;
+  if (!moment || Number.isNaN(moment.getTime())) return null;
+  return Object.fromEntries(formatter.formatToParts(moment).map(({ type, value }) => [type, value]));
 };
 
 /**
@@ -181,6 +196,15 @@ export const emptyReasonSentence = (reason) => LIST_EMPTY_REASON[reason] ?? reas
 export const listRows = (answer) =>
   answer && typeof answer === 'object' && !Array.isArray(answer) && Array.isArray(answer.rows) ? answer.rows : null;
 
+/**
+ * A workplace's committee in one line -- its code and its name, each trimmed, either absent: `Q01, INVENTED` -- or the
+ * absence mark. Trimmed so a padded value cannot put a space before the comma (MO24's "Q01 ,"). Written once, for the
+ * member's Workplace field and a workplace's visits, which had drifted apart.
+ */
+export const committeeLine = (workplace) =>
+  [workplace?.committee, workplace?.committeeName].map((part) => String(part ?? '').trim()).filter(Boolean).join(', ')
+  || EMPTY;
+
 /* ── The figures (02.2, 02.3) ────────────────────────────────────────────────────────────────────── */
 
 /**
@@ -196,10 +220,14 @@ export const SUMMARY_GROUPING = /* @__PURE__ */ Object.freeze({
   committee: 'Committee',
 });
 
-/** `2026-09` as a person writes it -- `September 2026`; anything else is passed through. */
+/**
+ * `2026-09` as a person writes it -- `September 2026`; anything else is passed through, a month that is none among it:
+ * the address can carry `?month=2026-13`, which read "undefined 2026" on the Month end page until 2 Oct (RC17).
+ */
 export const monthLabel = (yearMonth) => {
   const match = /^(\d{4})-(\d{2})$/.exec(yearMonth ?? '');
-  return match ? `${MONTHS[Number(match[2]) - 1]} ${match[1]}` : yearMonth ?? '';
+  const month = match ? MONTHS[Number(match[2]) - 1] : undefined;
+  return month ? `${month} ${match[1]}` : yearMonth ?? '';
 };
 
 /**

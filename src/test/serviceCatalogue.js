@@ -99,6 +99,7 @@ const ARGS = {
   'monthEndService.getBranches': ['2026-08'],
   'monthEndService.getRecruitment': ['2026-09', {}],
   'monthEndService.getRepresentatives': ['2026-08', {}],
+  'monthEndService.getVisits': ['2026-08', { area: 'B' }],
   'monthEndService.askPack': ['2026-08'],
   'monthEndService.getPack': [7],
   'memberHistoryService.getMemberHistory': ['7', 0, 50],
