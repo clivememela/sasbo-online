@@ -228,6 +228,28 @@ describe('the first screen\'s figures (02.3)', () => {
     await waitFor(() => expect(figuresRegion()).toHaveAttribute('data-figures', 'ready'))
   })
 
+  it('🔴 rule F: a past month TAKEN says its members are grouped as they stood when it was taken -- never "today" (MR-ROB-19)', async () => {
+    // The server reads a taken month from what was frozen, each member placed where they stood that day; a month not
+    // taken is worked out now. Before this, every past month said "grouped by where each member works today".
+    summaryAnswers(
+      september(),
+      september({ month: '2026-08', monthFromTheServer: false, takenAt: '2026-09-29T08:00:00Z', takenBy: 'seed', groupedAsAt: '2026-09-29' }),
+      september({ month: '2026-07', monthFromTheServer: false, takenAt: null, takenBy: null }),
+    )
+    const user = setupUser()
+    renderWithProviders(<Home />)
+    await screen.findByText('INVENTED GROUP CORE')
+
+    await user.selectOptions(combobox('Month'), 'August 2026')
+    expect(await screen.findByText('As taken: each member is grouped where they stood when August 2026 was taken.')).toBeInTheDocument()
+    expect(screen.queryByText('Grouped by where each member works today.')).not.toBeInTheDocument()
+
+    // The must-pass: a past month NOT taken is worked out now, and says so.
+    await user.selectOptions(combobox('Month'), 'July 2026')
+    expect(await screen.findByText('Grouped by where each member works today.')).toBeInTheDocument()
+    expect(screen.queryByText(/^As taken:/)).not.toBeInTheDocument()
+  })
+
   it('loading: no figure is printed before one was read -- and the menu rows are there already', async () => {
     const held = deferred()
     summaryAnswers(() => held.promise.then(() => HttpResponse.json(september())))

@@ -133,6 +133,15 @@ const columnsFor = (by) => [
 
 const note = (text) => text && <p key={text} className="mt-2 text-sm text-ink-muted">{text}</p>;
 
+/**
+ * How a past month's figures are grouped (MR-ROB-19, rule F). A month TAKEN is read from what was frozen when it was
+ * taken, each member placed as they stood then -- and says so, as the server's answer asks ("as taken on"); a month not
+ * taken is worked out now, from where each member works today.
+ */
+const groupedSentence = (answer) => (answer.takenAt
+  ? `As taken: each member is grouped where they stood when ${monthLabel(answer.month)} was taken.`
+  : 'Grouped by where each member works today.');
+
 export default function HomeFigures() {
   // What a person asked for. The month starts EMPTY -- the first request names none -- and the grouping as the server's.
   const [ask, setAsk] = useState({ by: 'group', month: '', place: '' });
@@ -270,7 +279,7 @@ export default function HomeFigures() {
         !empty && 'Members are paying members: on record and not suspended.',
         unplacedSentence(answer.unplaced),
         UNGROUPED_BECAUSE[answer.workplacesServed],
-        answer.month !== serverMonth && 'Grouped by where each member works today.',
+        answer.month !== serverMonth && groupedSentence(answer),
         grouped && groupedBy && `Grouped by SASBO's lists ${groupedBy.replace('As', 'as')}`,
       ].map(note)}
     </section>
