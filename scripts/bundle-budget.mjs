@@ -304,7 +304,13 @@ const CEILINGS = {
   //   MonthEndStatistic +360 (a sheet longer than a page is paged under the card's pager -- 04.9 holds every branch)
   //   · useMonths +310 (SHEET_PAGE; why a month taken again waits; the sentence of a month taken again)
   //   · MonthlyMenu +140 (Take the month again, disabled with its reason). Nothing from src/test/ is imported.
-  js: 790.66 * KB,
+  //
+  // 790.66 -> 790.76 on 2026-10-02, MEASURED, on the owner's word once more (MO33, "Raise to measured"): a past month
+  // that was taken says its members are grouped as they stood when it was taken, never "today". Measured on a team
+  // runner: clivememela/sasbo-online run 36988020502 at b0f9a4d, javascript 790.75 KiB, 0.10 over 790.65 at 0eb0d56
+  // (run 36903903677). +100 B by vite's sizes, in one chunk there already: HomeFigures 5.90 -> 6.00 kB (the sentence,
+  // and the choice between it and "today"). Nothing from src/test/ is imported.
+  js: 790.76 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
@@ -328,7 +334,10 @@ const CEILINGS = {
   //
   // 933.97 -> 934.77 on 2026-10-01, MEASURED (MO30): 934.76 KiB on run 36897384908 -- the javascript's +0.80 above,
   // the stylesheet unmoved.
-  total: 934.77 * KB,
+  //
+  // 934.77 -> 934.87 on 2026-10-02, MEASURED (MO33): 934.86 KiB on run 36988020502 -- the javascript's +0.10 above,
+  // the stylesheet unmoved at 80.63.
+  total: 934.87 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to
