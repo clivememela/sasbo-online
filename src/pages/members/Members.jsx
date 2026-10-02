@@ -9,7 +9,7 @@ import { memberService } from "@/services/memberService.js";
 import { jobGradeService } from "@/services/jobGradeService.js";
 import { bankService } from "@/services/bankService.js";
 import { recruiterService } from "@/services/recruiterService.js";
-import { referenceService } from "@/services/referenceService.js";
+import { getCommittees } from "@/services/referenceService.js";
 import { recruitedArea } from "@/utils/recruitment.js";
 import { committeeOptions, inOrder, isCosatuMember, structureErrors, withStructureAnswer } from "@/utils/structures.js";
 import useAsyncOptions from "../../hooks/useAsyncOptions.js";
@@ -44,7 +44,7 @@ import { ERROR_KINDS, writeMayHaveLanded } from "@/services/parseApiError.js";
 import useFocusOn from "../../hooks/useFocusOn.js";
 import { EMPTY, formatDate, formatZar, parseDate, sameDate, sameMonth, today, toWireDate } from "@/lib/format.js";
 import { finishField, sanitiseField, validateField } from "@/utils/inputRules.js";
-import { branchNamesForBank } from "@/utils/bankBranches.js";
+import { branchNamesForBank, settleBankChange } from "@/utils/bankBranches.js";
 import { cn } from "@/lib/utils.js";
 import { formalName, personName } from "@/lib/names.js";
 import { fieldValue } from "@/lib/fieldValue.js";
@@ -486,7 +486,7 @@ export default function Members() {
      * side needs no list: the record carries the committee's name.
      */
     const committeeList = useAsyncOptions(
-        () => referenceService.getCommittees().then(committeeOptions),
+        () => getCommittees().then(committeeOptions),
         [],
         { enabled: isEditing && activeTab === "structures" && editForm.isBec === true },
     );
@@ -643,18 +643,11 @@ export default function Members() {
     const branchOptions = branchOptionsFor(editForm.bankName);
 
     /*
-     * A NEW BANK, AND WHAT GOES WITH THE OLD ONE -- one rule, whether a person chose it (`handleEditChange`) or accepted
-     * the Workplace control's offer (01.3). Main's intent (e56dbe4), in the one place it can be told apart from a record
-     * loading: a grade belongs to a bank, so choosing a DIFFERENT bank clears it; and a branch the new bank does not
-     * offer goes with the old bank -- the fourteen names stay for every bank. A branch chosen in the same step stays.
+     * A new bank and what goes with the old one -- capture's rule (`settleBankChange`), whether a person chose it
+     * (`handleEditChange`) or accepted the Workplace control's offer (01.3), here where it can be told apart from a
+     * record loading. The fourteen names stay for every bank (`branchOptionsFor`).
      */
-    const settleBank = useCallback((prev, next) => {
-        if (next.bankName === prev.bankName) return next;
-        const settled = { ...next, jobGrade: "" };
-        if (next.bankName && prev.branch && next.branch === prev.branch
-            && !branchOptionsFor(next.bankName).includes(prev.branch)) settled.branch = "";
-        return settled;
-    }, [branchOptionsFor]);
+    const settleBank = useCallback((prev, next) => settleBankChange(prev, next, branchOptionsFor), [branchOptionsFor]);
 
     /*
      * 🏢 THE MEMBER'S WORKPLACE (month end 01.3), on the Employment tab: read from the answer for this one member, which

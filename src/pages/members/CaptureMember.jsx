@@ -22,7 +22,9 @@ import { formatZar, toWireDate, today } from "@/lib/format.js";
 import { finishField, sanitiseField, validateField } from "@/utils/inputRules.js";
 import { subscriptionsService } from "@/services/subscriptionsService.js";
 import { findSubscriptionForBank, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
-import { branchCodeOf, branchNamesForBank, findBranchRecord, formatBranchAddress } from "@/utils/bankBranches.js";
+import {
+    branchCodeOf, branchNamesForBank, findBranchRecord, formatBranchAddress, settleBankChange,
+} from "@/utils/bankBranches.js";
 import { DERIVATION, derivationNote, derivationStateOf } from "@/utils/derivation.js";
 import { channelHasNoRecruiter, recruitedArea, recruitersFor } from "@/utils/recruitment.js";
 import { debitDateSentence, holidaySetFor } from "@/utils/debitDate.js";
@@ -250,11 +252,7 @@ export default function CaptureMember() {
     /**
      * A NEW BANK OR BRANCH, AND WHAT FOLLOWS FROM IT -- one rule, whether a person chose it or accepted the Workplace
      * control's offer to fill it (01.3). `next` is the form with the new value(s); what it returns is the form to hold.
-     *
-     * A different bank: its grades and its branches are different ones. The grade always goes; the branch goes only if
-     * the new bank's list does not offer it (the fourteen names are offered for every bank) -- and it is judged against
-     * the bank actually CHOSEN: the searchable control passes through an empty bank while the administrator clears it to
-     * pick another, and that moment must not drop a branch the next bank offers. A branch chosen in the same step stays.
+     * What a different bank clears is `settleBankChange`'s, the rule the record shares.
      *
      * E4 + E6: the branch record already holds the IBT number and the address. Derived HERE, where the branch changes,
      * rather than in an effect -- an effect that writes the form from the form is the shape that overwrites people
@@ -263,12 +261,7 @@ export default function CaptureMember() {
      * empty one, because it is wrong AND it looks deliberate.
      */
     const settleBank = (prev, next) => {
-        const settled = { ...next };
-        if (settled.bankName !== prev.bankName) {
-            settled.jobGrade = "";
-            if (settled.bankName && prev.branch && settled.branch === prev.branch
-                && !branchOptionsFor(settled.bankName).includes(prev.branch)) settled.branch = "";
-        }
+        const settled = { ...settleBankChange(prev, next, branchOptionsFor) };
         const record = findBranchRecord(bankListing, settled.bankName, settled.branch);
         if (!ibtNoTyped) settled.ibtNo = branchCodeOf(record);
         if (!bankAddressTyped) settled.bankAddress = formatBranchAddress(record);

@@ -1,5 +1,5 @@
 import { CRITERION_WIDE } from '../../components/common/Criteria.jsx';
-import { monthLabel } from '../../config/monthEnd.js';
+import { instantParts, monthLabel } from '../../config/monthEnd.js';
 import { EMPTY, formatInt, formatPercent, formatZar } from '../../lib/format.js';
 
 /**
@@ -174,10 +174,8 @@ const INSTANT = new Intl.DateTimeFormat('en-ZA', {
  * Anything unreadable is shown as it came.
  */
 export const instantLabel = (iso) => {
-  const moment = typeof iso === 'string' ? new Date(iso) : null;
-  if (!moment || Number.isNaN(moment.getTime())) return iso ?? '';
-  const part = Object.fromEntries(INSTANT.formatToParts(moment).map(({ type, value }) => [type, value]));
-  return `${part.day} ${part.month} ${part.year} at ${part.hour}:${part.minute}`;
+  const part = instantParts(iso, INSTANT);
+  return part ? `${part.day} ${part.month} ${part.year} at ${part.hour}:${part.minute}` : iso ?? '';
 };
 
 /**
@@ -238,16 +236,16 @@ const ROWS_BY = /* @__PURE__ */ Object.freeze({
 });
 
 /**
- * The head of a sheet's first column: what each of its rows is. The sheet's shape carries no name for it, so it is read
- * from the sheet's key -- `by-area` is by area -- and a sheet this browser has never seen is headed *Row*, which
- * `monthEndRules.test.js` forbids for every sheet the server answers today.
- */
-/**
  * The rows a statistic's sheet shows at once -- the workplaces' register's page. Most sheets are a table code or an area
  * a row and never reach it; 04.9's is a branch a row, every branch of SASBO's at `all`.
  */
 export const SHEET_PAGE = 50;
 
+/**
+ * The head of a sheet's first column: what each of its rows is. The sheet's shape carries no name for it, so it is read
+ * from the sheet's key -- `by-area` is by area -- and a sheet this browser has never seen is headed *Row*, which
+ * `monthEndRules.test.js` forbids for every sheet the server answers today.
+ */
 export const rowHeader = (sheetKey) =>
   ROW_IS[sheetKey] ?? ROWS_BY[/(?:^|-)by-(.+)$/.exec(sheetKey ?? '')?.[1]] ?? 'Row';
 

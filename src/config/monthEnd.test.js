@@ -5,7 +5,8 @@ import { committedVocabulary } from '../test/apiContractScan'
 import { monthEndBody } from '../test/msw/monthEndExamples'
 import {
   LIST_EMPTY_REASON, MEMBER_STATUS_KIND, MONTH_END_REFUSAL, STATUS_KIND, STATUS_REASON, SUMMARY_GROUPING,
-  UNGROUPED_BECAUSE, WORKPLACES_SERVED, dayLabel, deletionCodeOptions, emptyReasonSentence, listProvenance, listRows,
+  UNGROUPED_BECAUSE, WORKPLACES_SERVED, committeeLine, dayLabel, deletionCodeOptions, emptyReasonSentence, listProvenance,
+  listRows,
   listsProvenance, monthLabel, monthsTo, placeOptions, placeQuery, reasonFor, statusKind, summaryOf, suspensionCodeOptions,
   unplacedSentence,
 } from './monthEnd'
@@ -46,6 +47,22 @@ describe('what a person reads', () => {
     expect(dayLabel('2026-08-31')).toBe('31 August 2026')
     expect(dayLabel('2026-8-31')).toBe('2026-8-31')
     expect(dayLabel(undefined)).toBe('')
+  })
+
+  it('RC17: a day whose month or day is none is passed through, never "1 undefined 2026"', () => {
+    expect(dayLabel('2026-13-01')).toBe('2026-13-01')
+    expect(dayLabel('2026-00-01')).toBe('2026-00-01')
+    expect(dayLabel('2026-09-00')).toBe('2026-09-00')
+    expect(dayLabel('2026-09-32')).toBe('2026-09-32')
+    expect(dayLabel('2026-12-01')).toBe('1 December 2026')
+  })
+
+  it("a workplace's committee in one line: code and name trimmed, the absence mark for neither (MO24)", () => {
+    expect(committeeLine({ committee: 'Q01', committeeName: 'INVENTED' })).toBe('Q01, INVENTED')
+    expect(committeeLine({ committee: 'Q01 ', committeeName: ' INVENTED ' })).toBe('Q01, INVENTED')
+    expect(committeeLine({ committee: 'Q01', committeeName: null })).toBe('Q01')
+    expect(committeeLine({ committee: '  ', committeeName: undefined })).toBe('—')
+    expect(committeeLine(undefined)).toBe('—')
   })
 
   it('MD28: a list read off a report says so until SASBO confirms it', () => {
@@ -152,6 +169,13 @@ describe('the figures (02.2, 02.3)', () => {
     expect(monthLabel('2026-09')).toBe('September 2026')
     expect(monthLabel('2026-9')).toBe('2026-9')
     expect(monthLabel(undefined)).toBe('')
+  })
+
+  it('RC17: a month that is none -- the address can carry ?month=2026-13 -- is passed through, never "undefined 2026"', () => {
+    expect(monthLabel('2026-13')).toBe('2026-13')
+    expect(monthLabel('2026-00')).toBe('2026-00')
+    expect(monthLabel('2026-12')).toBe('December 2026')
+    expect(monthLabel('2026-01')).toBe('January 2026')
   })
 
   it('MD55: the months offered are the server\'s and the twelve before it, counted back across a year', () => {

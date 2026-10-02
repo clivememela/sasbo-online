@@ -19,12 +19,12 @@ import {
 import useMonths from './useMonths.js';
 
 /**
- * A STATISTIC'S SCREEN -- month end `04.3` to `04.8`, one lazy route for the six: `/admin/monthly-menu/:statistic`,
+ * A STATISTIC'S SCREEN -- month end `04.3` to `04.9`, one lazy route for the seven: `/admin/monthly-menu/:statistic`,
  * the month and the place in the address (`?month=2026-08&area=A`), so a statistic can be sent to somebody as it is.
  *
  * The Card world's by rule (screens.md §0.3): page head · criteria row -- the month, and an area or a region · a ruled
  * sheet for each of the server's sheets, laid out as SASBO's report is, the total its last row · the notes beneath.
- * ONE SHEET RENDERER draws all six statistics (`StatisticSheet`): the server says what the columns are and what kind
+ * ONE SHEET RENDERER draws all seven statistics (`StatisticSheet`): the server says what the columns are and what kind
  * each is, and this reads it.
  *
  *   the month   chosen from the server's months, as the Month end page does; with none in the address, the newest
@@ -58,7 +58,7 @@ const strong = (row, text) => (row.level === 'ROW' ? text : <strong className="f
  * shares each through the one formatter for their kind. A row of fewer than five, or one withheld, shows the words
  * and no number, and names the note that explains it (`why`).
  */
-export function StatisticSheet({ sheet, month, why }) {
+function StatisticSheet({ sheet, month, why }) {
   const id = useId();
   const [page, setPage] = useState(1);
   // 📄 A sheet longer than a page is paged, its total the last row of every page: 04.9 holds every branch -- on the link,
@@ -196,7 +196,8 @@ function StatisticScreen({ statistic }) {
   const failure = month ? read.failure : monthsFailure;
   const answer = !pending && !failure ? read.answer : null;
   const view = pending ? 'loading' : failure ? 'error' : answer.sheets.length ? 'ready' : 'empty';
-  const why = answer && ruleCNote(answer.notes) >= 0 ? `month-end-note-${ruleCNote(answer.notes)}` : undefined;
+  const note = answer ? ruleCNote(answer.notes) : -1;
+  const why = note >= 0 ? `month-end-note-${note}` : undefined;
 
   return (
     <Page>
