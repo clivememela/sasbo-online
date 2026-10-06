@@ -1,25 +1,34 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { bankService } from "../../services/bankService.js";
+import { validationErrorsOf, writeFailure, writeMayHaveLanded } from "../../services/parseApiError.js";
+import reportError from "../../lib/reportError.js";
 import { TextInput, Button } from "../../components/form";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
 import Modal, { closeOn } from "../../components/overlay/Modal.jsx";
 import { validateEmail } from "../../utils/validateSAID.js";
-
-const EMPTY = {
-  bankName: "", bankAbbreviation: "", branch: "", branchCode: "", area: "",
-  randomAccessNumber: "", phoneNumber: "", fax: "", email: "", managerName: "",
-  physicalAddress: "", postalAddress: "", provinceCommitteeCode: "",
-  provinceCommitteeName: "", sasboAreaCode: "", bankDepartmentCode: "",
-  tableCode: "", subsValueBranch: "", branchStaffComplement: "", branchMemberComplement: "",
-};
+import { toBranchForm, toBranchPayload, toBranchRecord } from "./branchForm.js";
 
 const normalizeText = (value) => (value === null || value === undefined ? "" : String(value)).trim();
+
+/**
+ * What a failed save says. A refusal names its reasons -- the server's sentence, or each field it refused -- and says
+ * nothing was written; a timeout, a lost connection or a 5xx may have saved, so it says to check (R3-F2).
+ */
+const saveFailure = (err, what) => {
+  const fields = Object.values(validationErrorsOf(err));
+  return !writeMayHaveLanded(err) && fields.length > 0
+    ? `${what} was not saved. ${fields.join(" ")}`
+    : writeFailure(err, what, "the branch list");
+};
 
 export default function BankBranchModal({ onClose, onCreated, onUpdated, selectedBank }) {
   const [isEditing, setIsEditing] = useState(false);
   const isReadOnlyView = Boolean(selectedBank) && !isEditing;
   const isEditMode = Boolean(selectedBank) && isEditing;
-  const [form, setForm] = useState(selectedBank || EMPTY);
+  // 🔴 A29: the record converted to the form's strings, never used as the form (see `branchForm.js`).
+  const [form, setForm] = useState(() => toBranchForm(selectedBank));
+  // The form as the record opened it: what a save compares the address against, to send it only when changed.
+  const opened = useMemo(() => toBranchForm(selectedBank), [selectedBank]);
   const [error, setError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -40,7 +49,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
   const [seenBank, setSeenBank] = useState(selectedBank);
   if (selectedBank !== seenBank) {
     setSeenBank(selectedBank);
-    setForm(selectedBank || EMPTY);
+    setForm(toBranchForm(selectedBank));
     setIsEditing(false);
     setFieldErrors({});
   }
@@ -50,13 +59,17 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
     if (field === "email") {
       const err = validateEmail(e.target.value);
       setFieldErrors((prev) => ({ ...prev, email: err || undefined }));
+    } else if (fieldErrors[field]) {
+      // A field the server refused is cleared of its message the moment it is changed.
+      setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   };
 
   const handleCancel = () => {
     setError(null);
     if (isEditMode) {
-      setForm(selectedBank || EMPTY);
+      setForm(toBranchForm(selectedBank));
+      setFieldErrors({});
       setIsEditing(false);
       return;
     }
@@ -81,19 +94,20 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
     setError(null);
     try {
       if (isEditMode) {
-        const updated = await bankService.updateBank(form.id, form);
-        const effectiveUpdated = updated && typeof updated === "object"
-          ? { ...form, ...updated }
-          : { ...form };
-        setForm(effectiveUpdated);
+        const payload = toBranchPayload(form, opened);
+        const answer = await bankService.updateBank(selectedBank.id, payload);
+        const record = toBranchRecord(answer, selectedBank, payload);
+        setForm(toBranchForm(record));
         setIsEditing(false);
-        onUpdated?.(effectiveUpdated);
+        onUpdated?.(record);
       } else {
-        const created = await bankService.createBank(form);
+        const created = await bankService.createBank(toBranchPayload(form));
         onCreated?.(created);
       }
     } catch (err) {
-      setError(err.message);
+      reportError(isEditMode ? "BankBranchModal.update" : "BankBranchModal.create", err);
+      setFieldErrors((prev) => ({ ...prev, ...validationErrorsOf(err) }));
+      setError(saveFailure(err, isEditMode ? "The change to this branch" : "This branch"));
     } finally {
       setLoading(false);
     }
@@ -179,10 +193,10 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
           <section className="space-y-4">
             <h4 className="border-b border-line pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">General Info</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <TextInput label="Bank Name *" value={form.bankName} onChange={set("bankName")} placeholder="e.g. Standard Bank" />
+              <TextInput label="Bank Name *" value={form.bankName} onChange={set("bankName")} placeholder="e.g. Standard Bank" error={fieldErrors.bankName} />
               <TextInput label="Abbreviation" value={form.bankAbbreviation} onChange={set("bankAbbreviation")} placeholder="e.g. STD" />
-              <TextInput label="Branch *" value={form.branch} onChange={set("branch")} placeholder="e.g. Sandton" />
-              <TextInput label="Branch Code" value={form.branchCode} onChange={set("branchCode")} placeholder="6-digit code" />
+              <TextInput label="Branch *" value={form.branch} onChange={set("branch")} placeholder="e.g. Sandton" error={fieldErrors.branch} />
+              <TextInput label="Branch Code" value={form.branchCode} onChange={set("branchCode")} placeholder="6-digit code" error={fieldErrors.branchCode} />
               <TextInput label="Area" value={form.area} onChange={set("area")} placeholder="e.g. Gauteng North" />
               <TextInput label="Random Access Number" value={form.randomAccessNumber} onChange={set("randomAccessNumber")} placeholder="RAN" />
             </div>
@@ -220,7 +234,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
             </div>
           </section>
 
-          {error && <p className="text-sm text-status-suspended">{error}</p>}
+          {error && <p role="alert" className="text-sm text-status-suspended">{error}</p>}
           </form>
         )}
 
@@ -228,52 +242,20 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
   );
 }
 
+/**
+ * One field of the read-only view. Every value is already the form's string (`toBranchForm`), the address included:
+ * the object-formatting this view used to carry was the second address formatter A29 hid behind, and it would have
+ * printed a nested suburb (`{id, name}`) as "[object Object]".
+ */
 function DetailItem({ label, value }) {
-  const displayValue = formatDetailValue(value);
-
   return (
     <div>
       <label className="text-[10px] uppercase tracking-wider text-ink-muted font-bold">
         {label}
       </label>
       <p className="font-semibold text-ink text-lg break-words">
-        {displayValue}
+        {String(value ?? "").trim() || "N/A"}
       </p>
     </div>
   );
-}
-
-function formatDetailValue(value) {
-  if (value === null || value === undefined || value === "") return "N/A";
-
-  if (Array.isArray(value)) {
-    const items = value
-      .map((item) => (item === null || item === undefined ? "" : String(item).trim()))
-      .filter(Boolean);
-    return items.length > 0 ? items.join(", ") : "N/A";
-  }
-
-  if (typeof value === "object") {
-    const preferredAddressParts = [
-      value.complexOrBuilding,
-      value.streetNumber,
-      value.streetName,
-      value.suburbName || value.suburb,
-      value.cityName || value.city,
-      value.provinceName || value.province,
-      value.postalCode,
-    ]
-      .map((part) => (part === null || part === undefined ? "" : String(part).trim()))
-      .filter(Boolean);
-
-    if (preferredAddressParts.length > 0) return preferredAddressParts.join(", ");
-
-    const genericParts = Object.values(value)
-      .map((part) => (part === null || part === undefined ? "" : String(part).trim()))
-      .filter(Boolean);
-
-    return genericParts.length > 0 ? genericParts.join(", ") : "N/A";
-  }
-
-  return String(value);
 }

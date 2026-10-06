@@ -335,17 +335,11 @@ export const DEFECTS = {
 // allowlist empty. The key is still in history and live until its owner rotates it -- the register's half, which no
 // test of the tree can hold.
 
-DEFECTS.A29 = define(
-  'A29',
-  'editing a bank branch crashes the branch screen',
-  'The API returns physicalAddress as an OBJECT ({streetName, streetNumber, suburb, ...}) for ' +
-    'every seeded branch. BankBranchModal hands it unchanged to AddressAutocomplete, whose ' +
-    'debounce effect calls query.trim() on mount, so clicking Edit throws ' +
-    '"query.trim is not a function". The read-only view survives only because DetailItem ' +
-    'formats objects. Found 2026-09-05 by the browser suite; pinned here 2026-09-16. ' +
-    '⚠️ Since the design merge the ErrorBoundary beside the outlet keeps the shell ' +
-    'standing -- the screen falls, not the application. Still this row.',
-)
+// A29 is RETIRED, 2026-10-06, by the October build's bugs stream: the branch dialog converts the API's record to its
+// form's strings on the way in and the form to BankBranchDto's keys on the way out (pages/bank_branch/branchForm.js),
+// so Edit opens a form whose address is a line of text and whose Branch is the record's branchName. Its pin was
+// deleted and its standard-facing test un-skipped in the same commit (BankBranchModal.a29.test.jsx, which now drives
+// Edit end to end on the API's own shape).
 
 // A47 is RETIRED, 2026-09-17, by the design arc's K1 (a95e7b9, 2026-09-14), met at the merge of
 // main into design/06-close.

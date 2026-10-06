@@ -14,8 +14,7 @@ import { setupUser } from '../../test/user'
  * Save was `loading`, and Escape, the scrim, the X and Cancel all still worked. Closed mid-update, `BankBranch`'s
  * `onUpdated` then called `setSelectedBank(updated)` when the write landed -- and REOPENED the dialog on its own.
  *
- * Driven through Add, not Edit: the edit form is where A29 still throws on the API's address object, and that pinned
- * defect is not this finding's to repair. The primitive is the same `Modal` either way.
+ * Driven through Add; the primitive is the same `Modal` for Edit (A29's file drives Edit since that defect's fix).
  */
 
 async function startSaving({ answer }) {
@@ -48,7 +47,7 @@ describe('BankBranchModal, while a save runs (R2-F3)', () => {
       answer: () => HttpResponse.json({ status: 400, message: 'Branch code is required.' }, { status: 400 }),
     })
 
-    expect(await within(dialog).findByText('Branch code is required.')).toBeInTheDocument()
+    expect(await within(dialog).findByText('This branch was not saved. Branch code is required.')).toBeInTheDocument()
     await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalled()
   })
