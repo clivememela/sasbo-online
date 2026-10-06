@@ -106,7 +106,7 @@ Run these 9 test scenarios:
 - [ ] Preview shows correct format
 
 ### 4. Date Format ✅ (2 min)
-- [ ] Check Date of Birth: 31.12/1985 (dd.mm/yyyy)
+- [ ] Check Date of Birth: 31/12/1985 (dd/mm/yyyy)
 - [ ] Check Date Joined: 15 January 2024
 - [ ] Verify all date fields formatted correctly
 
@@ -195,7 +195,7 @@ Before deployment, verify:
 - [ ] Success message appears
 
 ### Data ✅
-- [ ] Date format: dd.mm/yyyy
+- [ ] Date format: dd/mm/yyyy
 - [ ] Passport Number capitalized
 - [ ] Employment fields reordered
 - [ ] Banking Details in Membership tab
@@ -237,7 +237,7 @@ git commit -m "feat: implement two-step welcome letter workflow
 
 - Add ApproveAndSendWelcomeLetter component
 - Capitalize Passport Number label
-- Format dates as dd.mm/yyyy
+- Format dates as dd/mm/yyyy
 - Reorder employment tab fields
 - Move Banking Details to Membership tab
 - Add comprehensive tests and documentation"
@@ -390,7 +390,7 @@ You'll know everything is working when:
 ✅ Success message displays  
 ✅ Email arrives with PDF attachment  
 ✅ PDF contains all member data  
-✅ Dates display as dd.mm/yyyy  
+✅ Dates display as dd/mm/yyyy  
 ✅ Form resets after successful send  
 ✅ Ready to capture next member  
 

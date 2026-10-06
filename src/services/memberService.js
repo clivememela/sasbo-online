@@ -90,6 +90,15 @@ export const memberService = {
       signal,
     })).then(normalizeMember),
 
+  previewWelcomeLetter: (member) =>
+    requestJson((signal) => fetch(apiUrl('/api/members/welcome-letter-preview'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(member),
+      signal,
+    }), { responseType: 'arrayBuffer' }),
+
   createMember: (member, options = {}) =>
     requestJsonWrite((signal) => fetch(apiUrl(options.sendWelcome ? '/api/members?sendWelcome=true' : '/api/members'), {
       method: 'POST',

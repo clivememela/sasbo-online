@@ -23,13 +23,13 @@
 
 #### B. UI/UX Improvements ✅
 - Capitalized "Passport Number" label (dynamic, not hardcoded)
-- Date format changed to dd.mm/yyyy everywhere
+- Date format changed to dd/mm/yyyy everywhere
 - Employment tab fields reordered (Bank → Branch → Employee → Grade → IBT → Address)
 - Banking Details section moved to Membership tab (below Sasbo Subscription)
 - Applied to both Capture Member and Edit Member pages
 
 #### C. Document Population ✅
-- Welcome letter template: "Sasbo Welcome Letter.docx"
+- Welcome letter template: "Sasbo Welcome Letter.pdf"
 - Member data automatically populated
 - All fields display correctly
 - Professional formatting maintained
@@ -93,7 +93,7 @@ Total: 73 automated tests ✅
 |------|---------|
 | CaptureMember.jsx | Updated to use new ApproveAndSendWelcomeLetter component |
 | Members.jsx | Updated to use new ApproveAndSendWelcomeLetter component |
-| format.js | Updated formatDate() to dd.mm/yyyy format |
+| format.js | Updated formatDate() to dd/mm/yyyy format |
 
 ---
 
@@ -435,7 +435,7 @@ git push origin main  # Vercel auto-deploys
 - [x] Email dispatch functional
 - [x] Error handling with retry
 - [x] Form validation working
-- [x] Date format dd.mm/yyyy
+- [x] Date format dd/mm/yyyy
 - [x] Passport Number capitalized
 - [x] Employment fields reordered
 - [x] Banking Details in Membership tab

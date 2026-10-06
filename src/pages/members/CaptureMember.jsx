@@ -312,9 +312,12 @@ export default function CaptureMember() {
             /\D/.test(rawValue);
         // What each field accepts all, as it is typed -- one rule for both member screens (utils/inputRules.js).
         const value = sanitiseField(field, rawValue, { identityType: form.identityType });
+        const normalizedValue = field === "identityNumber" && form.identityType === IDENTITY_TYPE_PASSPORT
+            ? value.toUpperCase()
+            : value;
 
         setForm((prev) => {
-            let updatedForm = { ...prev, [field]: value };
+            let updatedForm = { ...prev, [field]: normalizedValue };
 
             // A different bank: its grades and its branches are different ones. The grade always goes; the branch goes
             // only if the new bank's list does not offer it (the fourteen names are offered for every bank).
@@ -646,7 +649,7 @@ export default function CaptureMember() {
                         {activeTab === "personal" && (
                             <>
                                 <Field label="Title" value={form.title} onChange={handleChange("title")} options={titleOptions} />
-                                <Field label="Initials" value={form.initials} onChange={handleChange("initials")} onBlur={handleBlur("initials")} error={fieldErrors.initials} />
+                                <Field label="Initials" value={form.initials} disabled note="Automatically generated from First Name(s)." />
                                 <Field label="First Name(s)" value={form.firstNames} onChange={handleChange("firstNames")} onBlur={handleBlur("firstNames")} error={fieldErrors.firstNames} required />
                                 <Field label="Surname" value={form.surname} onChange={handleChange("surname")} onBlur={handleBlur("surname")} error={fieldErrors.surname} required />
                                 <Field label="Identity Type" value={form.identityType} onChange={handleChange("identityType")} options={identityTypeOptions} error={fieldErrors.identityType} required />

@@ -106,7 +106,7 @@ The welcome letter preview includes:
 - Member details summary table:
   - Full Name
   - Identity Number
-  - Date of Birth (formatted as dd.mm/yyyy)
+  - Date of Birth (formatted as dd/mm/yyyy)
   - Employee Number
   - Bank
   - Payment Type
@@ -131,7 +131,7 @@ The welcome letter automatically populates with:
 | Date | Current date (formatted for South Africa timezone) |
 | Membership No | `membershipNumber` or "(no membership number yet)" |
 | Identity Number | `identityNumber` or "—" |
-| Date of Birth | `dateOfBirth` formatted as dd.mm/yyyy |
+| Date of Birth | `dateOfBirth` formatted as dd/mm/yyyy |
 | Employee Number | `employeeNumber` or "—" |
 | Bank | `bankName` or "—" |
 | Payment Type | `paymentType` or "—" |
@@ -298,14 +298,14 @@ The welcome letter automatically populates with:
 ### Files Changed
 - `/src/components/members/ApproveAndSendWelcomeLetter.jsx` - **NEW**
 - `/src/pages/members/CaptureMember.jsx` - Updated import and usage
-- `/src/lib/format.js` - Date formatting (dd.mm/yyyy)
+- `/src/lib/format.js` - Date formatting (dd/mm/yyyy)
 
 ### API Calls
 - `memberService.createMember(member, { sendWelcome: true })` - For new members
 - `memberService.sendWelcomeLetter(memberId)` - For existing members
 
 ### Date Format
-- All dates display as `dd.mm/yyyy` (e.g., "15.06/1988")
+- All dates display as `dd/mm/yyyy` (e.g., "15/06/1988")
 - Consistent across entire application
 
 ### No Breaking Changes

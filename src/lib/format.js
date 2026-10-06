@@ -146,14 +146,13 @@ export function parseDate(input) {
 }
 
 /**
- * The STORED and displayed form: `dd.mm/yyyy`. Anywhere in the application
- * Anything unparseable renders as the em dash rather than as the raw input, so a broken
- * value is visible as missing instead of leaking a timestamp into a table cell.
+ * The displayed form: `dd/mm/yyyy`.
+ * Stored/API values remain ISO `yyyy-mm-dd` via `toWireDate`.
  */
 export function formatDate(value) {
   const date = parseDate(value);
   if (!date) return EMPTY;
-  return `${pad2(date.d)}.${pad2(date.m)}/${date.y}`;
+  return `${pad2(date.d)}/${pad2(date.m)}/${date.y}`;
 }
 
 /** The long form, for prose and for the picker's readout: `15 Jun 1988`. */

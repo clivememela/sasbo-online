@@ -34,8 +34,28 @@ import { APIProvider } from '@vis.gl/react-google-maps';
  * and submits a typed address. That is the honest behaviour for a back office whose network
  * may not reach Google, and it is why there is no throw here.
  */
+const configuredKey = import.meta.env.VITE_GOOGLE_API_KEY?.trim();
+const isUsableBrowserKey = Boolean(
+  configuredKey &&
+  /^AIza[\w-]{35}$/.test(configuredKey) &&
+  !configuredKey.includes('your-') &&
+  !configuredKey.includes('dev-key') &&
+  !configuredKey.includes('preprod-key') &&
+  !configuredKey.includes('production-key'),
+);
+
 export default function MapsScope({ children }) {
+  if (!isUsableBrowserKey) {
+    return (
+      <APIProvider apiKey={undefined}>
+        {children}
+      </APIProvider>
+    );
+  }
+
   return (
-    <APIProvider apiKey={import.meta.env.VITE_GOOGLE_API_KEY}>{children}</APIProvider>
+    <APIProvider apiKey={configuredKey}>
+      {children}
+    </APIProvider>
   );
 }

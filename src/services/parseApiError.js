@@ -216,7 +216,7 @@ export function networkError(cause, { timedOut = false } = {}) {
  * @param {{ parseBody?: boolean }} [options] `parseBody: false` for a 204/DELETE.
  * @returns {Promise<unknown>}
  */
-export async function requestJson(send, { parseBody = true, allowEmpty = false, optionalBody = false, timeoutMs = READ_CEILING_MS } = {}) {
+export async function requestJson(send, { parseBody = true, allowEmpty = false, optionalBody = false, responseType = 'json', timeoutMs = READ_CEILING_MS } = {}) {
   /*
    * 🔴 THE CEILING. A14, and the failure mode with the LONGEST time to detection in this
    * application: a hung backend renders the loading state forever, which an administrator reads
@@ -259,6 +259,7 @@ export async function requestJson(send, { parseBody = true, allowEmpty = false, 
   try {
     if (!response.ok) throw await apiErrorFrom(response)
     if (!parseBody) return undefined
+    if (responseType === 'arrayBuffer') return new Uint8Array(await response.arrayBuffer())
     return await readBody(response, { allowEmpty, optionalBody })
   } catch (cause) {
     /*

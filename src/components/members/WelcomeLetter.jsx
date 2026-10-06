@@ -25,7 +25,7 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess }) {
     /*
      * 🔴 A51: ONE SEND STATE PER MEMBER. CaptureMember keeps this dialog mounted and swaps its member, so a state that
      * is never reset carried "sent" onto the next member captured in the same visit -- whose dialog opened with no
-     * Send button. Reset when the member changes, during render (React's pattern for state derived from a prop),
+     * Send button. Reset when the member changes during render (React's pattern for state derived from a prop),
      * never on a re-render of the same member.
      */
     const memberKey = member?.id ?? (member ? (member.identityNumber || member.surname || 'new') : null);
@@ -99,10 +99,10 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess }) {
                 <>
                     <ModalClose variant="ghost">Close</ModalClose>
                     {sendState === 'sent' ? (
-                        <span role="status" className="flex items-center gap-2 text-sm font-medium text-status-active">
+                        <output className="flex items-center gap-2 text-sm font-medium text-status-active">
                             <CheckCircle2 className="size-4" aria-hidden="true" />
                             Welcome Letter Sent
-                        </span>
+                        </output>
                     ) : (
                         <Button
                             variant="primary"
@@ -214,7 +214,7 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess }) {
                         })}
                 </dl>
 
-                {/* Sign-off -- the template's own words (Sasbo Welcome Letter.docx), which is what the member receives. */}
+                {/* Sign-off -- the template's own words (Sasbo Welcome Letter.pdf), which is what the member receives. */}
                 <p className="mt-6">Your Faithfully,</p>
                 <p className="mt-1 font-semibold">Ms. Rosemary M. Rauleka</p>
                 <p className="text-ink-muted">General Secretary: Sasbo the Finance Union</p>

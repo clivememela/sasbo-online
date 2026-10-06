@@ -1,21 +1,23 @@
-import { useState } from 'react';
-import { Send, CheckCircle2, AlertCircle, Loader2, FileText } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Send, CheckCircle2, AlertCircle, Loader2, FileText, Download } from 'lucide-react';
 import Modal, { ModalClose, closeOn } from '../overlay/Modal';
 import Button from '../form/Button';
 import { memberService } from '@/services/memberService.js';
-import { formatDate } from '@/utils/validateSAID.js';
 
 /**
  * Two-step welcome letter workflow:
  * 1. PREVIEW & APPROVE: User views the letter document and approves it before sending
  * 2. SEND: User confirms and sends the welcome letter via email
  *
- * The document is populated with member data matching placeholders in "Sasbo Welcome Letter.docx".
+ * The document is populated with member data matching placeholders in "Sasbo Welcome Letter.pdf".
  * After approval, the member is saved and the email is dispatched as a PDF attachment.
  */
 export default function ApproveAndSendWelcomeLetter({ open, onClose, member, onSuccess }) {
     const [step, setStep] = useState('preview'); // preview | sending | sent | error
     const [errorMessage, setErrorMessage] = useState('');
+    const [pdfUrl, setPdfUrl] = useState('');
+    const [pdfMemberKey, setPdfMemberKey] = useState(null);
+    const [pdfError, setPdfError] = useState('');
 
     // Reset state when member changes or dialog opens
     const memberKey = member?.id ?? (member ? (member.identityNumber || member.surname || 'new') : null);
@@ -26,14 +28,40 @@ export default function ApproveAndSendWelcomeLetter({ open, onClose, member, onS
         setErrorMessage('');
     }
 
+    useEffect(() => {
+        let active = true;
+        if (!open || !member) return undefined;
+        memberService.previewWelcomeLetter(member).then((bytes) => {
+            if (!active) return;
+            setPdfError('');
+            setPdfMemberKey(memberKey);
+            setPdfUrl(URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })));
+        }).catch(() => {
+            if (active) setPdfError('The backend could not prepare the welcome letter PDF. The member cannot be created until it is available for review.');
+        });
+        return () => {
+            active = false;
+            setPdfUrl((current) => {
+                if (current) URL.revokeObjectURL(current);
+                return '';
+            });
+        };
+    }, [open, member, memberKey]);
+
     if (!member) return null;
+
+    const pdfReady = Boolean(pdfUrl) && pdfMemberKey === memberKey && !pdfError;
+
+    const downloadPdf = () => {
+        if (!pdfUrl) return;
+        const link = document.createElement('a');
+        link.href = pdfUrl;
+        link.download = 'Sasbo Welcome Letter.pdf';
+        link.click();
+    };
 
     const fullName = [member.title, member.firstNames, member.surname]
         .filter(Boolean).join(' ');
-
-    const today = new Date().toLocaleDateString('en-ZA', {
-        day: 'numeric', month: 'long', year: 'numeric',
-    });
 
     const membershipNo = member.membershipNumber || '';
     const hasAddress = Boolean(member.personalEmail || member.workEmail);
@@ -110,7 +138,7 @@ export default function ApproveAndSendWelcomeLetter({ open, onClose, member, onS
                             <Button
                                 variant="primary"
                                 onClick={handleApprove}
-                                disabled={!hasAddress}
+                                disabled={!hasAddress || !pdfReady}
                             >
                                 <FileText className="mr-1.5 size-4" aria-hidden="true" />
                                 Approve & Continue
@@ -173,77 +201,28 @@ export default function ApproveAndSendWelcomeLetter({ open, onClose, member, onS
                         </p>
                     )}
 
-                    {/* Letter preview */}
-                    <div data-testid="welcome-letter-preview" className="rounded-lg border border-line bg-surface p-5 text-sm leading-relaxed text-ink sm:p-8">
-                        {/* Header: date + address block */}
-                        <div className="mb-6 flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
-                            <div className="min-w-0 space-y-0.5">
-                                <p>{fullName}</p>
-                                <p>{member.address || ''}</p>
+                    {/* Generated PDF review */}
+                    <div className="mb-4 rounded-lg border border-line bg-surface p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                            <p className="font-medium">Sasbo Welcome Letter.pdf</p>
+                            <Button variant="ghost" onClick={downloadPdf} disabled={!pdfUrl}>
+                                <Download className="mr-1.5 size-4" aria-hidden="true" />
+                                Download PDF
+                            </Button>
+                        </div>
+                        {pdfError ? (
+                            <div role="alert" className="rounded border border-status-suspended-dot bg-status-suspended-bg p-4 text-sm text-status-suspended">
+                                {pdfError}
                             </div>
-                            <p className="sm:text-right">{today}</p>
-                        </div>
-
-                        {/* Membership number banner */}
-                        <div className="mb-6 rounded-md bg-surface-2 px-4 py-2 text-center font-semibold">
-                            Your Sasbo Membership No:{' '}
-                            {membershipNo
-                                ? <span className="text-brand-ink">{membershipNo}</span>
-                                : <span className="font-normal text-ink-muted">(no membership number yet)</span>}
-                        </div>
-
-                        {/* Salutation */}
-                        <p className="mb-4">Dear <strong>{fullName}</strong>,</p>
-
-                        {/* Body */}
-                        <p className="mb-3">
-                            Welcome to Sasbo, thank you for joining the most progressive Union in the financial
-                            services sector. We trust it will be a long and happy relationship as we continue to
-                            make a positive difference in the lives of our members.
-                        </p>
-                        <p className="mb-3">
-                            Now that you are a Sasbo member, be assured of the Unions' responsible protection and
-                            support while being entitled to many money saving benefits. Your membership number is
-                            enclosed at the top of the home page for your convenience. Please keep it safe as you
-                            would need the membership number to appreciate the benefits our Union has to offer you.
-                        </p>
-                        <p className="mb-3">
-                            In the meantime, we have so much more to share to ensure that you are completely
-                            informed about our services, benefits and partnerships we have established for your
-                            benefit. Please refer to the enclosed member onboarding information sheet for your
-                            individual use.
-                        </p>
-                        <p className="mb-3">
-                            We encourage you to play an active role at Sasbo's Annual General Meetings and to
-                            participate in the branch committee in your area. We wish a long and happy relationship
-                            with us.
-                        </p>
-
-                        {/* Member details summary */}
-                        <dl className="my-6 grid grid-cols-[8rem_minmax(0,1fr)] text-sm sm:grid-cols-[11rem_minmax(0,1fr)]">
-                            {[
-                                ['Full Name', fullName],
-                                ['Identity Number', member.identityNumber || '—'],
-                                ['Date of Birth', member.dateOfBirth ? formatDate(member.dateOfBirth) : '—'],
-                                ['Employee Number', member.employeeNumber || '—'],
-                                ['Bank', member.bankName || '—'],
-                                ['Payment Type', member.paymentType || '—'],
-                                ['Date Joined', member.joinDate ? formatDate(String(member.joinDate).split('T')[0]) : today],
-                                ['Status', member.status || 'Active'],
-                            ].map(([label, value], i, rows) => {
-                                const rule = i < rows.length - 1 ? 'border-b border-line' : '';
-                                return [
-                                    <dt key={`${label}-term`} className={`py-1.5 pr-4 font-medium text-ink-muted sm:pr-6 ${rule}`}>{label}</dt>,
-                                    <dd key={`${label}-value`} className={`break-words py-1.5 ${rule}`}>{value}</dd>,
-                                ];
-                            })}
-                        </dl>
-
-                        {/* Sign-off */}
-                        <p className="mt-6">Your Faithfully,</p>
-                        <p className="mt-1 font-semibold">Ms. Rosemary M. Rauleka</p>
-                        <p className="text-ink-muted">General Secretary: Sasbo the Finance Union</p>
+                        ) : pdfUrl && pdfReady ? (
+                            <iframe title="Sasbo Welcome Letter.pdf" src={pdfUrl} className="h-[min(65vh,680px)] w-full rounded border border-line bg-white" />
+                        ) : (
+                            <div className="flex h-48 items-center justify-center text-sm text-ink-muted">
+                                <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" /> Preparing PDF preview…
+                            </div>
+                        )}
                     </div>
+
                 </>
             )}
 

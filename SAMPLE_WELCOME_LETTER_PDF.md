@@ -95,7 +95,7 @@ Full Name                                          Mr John Doe
 
 Identity Number                                    8512315800081
 
-Date of Birth                                      31.12/1985
+Date of Birth                                      31/12/1985
 
 Employee Number                                    EMP001
 
@@ -142,7 +142,7 @@ General Secretary: Sasbo the Finance Union
 
 ### Date Section
 - ✅ Right-aligned date: **15 January 2024**
-- ✅ Format: Day Month YYYY (not dd.mm/yyyy for readable dates)
+- ✅ Format: Day Month YYYY (not dd/mm/yyyy for readable dates)
 
 ### Membership Banner
 - ✅ Centered box with blue background (brand color)
@@ -166,7 +166,7 @@ General Secretary: Sasbo the Finance Union
 - ✅ Fields included:
   - Full Name: Mr John Doe
   - Identity Number: 8512315800081
-  - **Date of Birth: 31.12/1985** (dd.mm/yyyy format!)
+  - **Date of Birth: 31/12/1985** (dd/mm/yyyy format!)
   - Employee Number: EMP001
   - Bank: First National Bank
   - Payment Type: Debit Order
@@ -187,7 +187,7 @@ The PDF must show these date formats:
 
 | Field | Format | Example |
 |-------|--------|---------|
-| Date of Birth | dd.mm/yyyy | 31.12/1985 |
+| Date of Birth | dd/mm/yyyy | 31/12/1985 |
 | Date Generated | Day Month YYYY | 26 September 2024 |
 | Date Joined | Day Month YYYY | 15 January 2024 |
 
@@ -223,7 +223,7 @@ The PDF must show these date formats:
 ```
 Identity Number                                    P1234567
 
-Date of Birth                                      25.06/1990
+Date of Birth                                      25/06/1990
 ```
 
 ### Variation 3: Payroll Deduction Payment
@@ -305,7 +305,7 @@ Backend API Call: POST /api/members/send-welcome-letter
 Payload: { memberId: 1, ... }
     ↓
 Generate PDF from Template:
-  - Load: Sasbo Welcome Letter.docx
+  - Load: Sasbo Welcome Letter.pdf
   - Populate: Member data into placeholders
   - Convert: DOCX → PDF
   - Encoding: UTF-8
@@ -394,7 +394,7 @@ The following sample PDFs are provided for testing:
 
 3. **WelcomeLetter_Sample_Passport.pdf**
    - Passport identity type
-   - Date of Birth: 25.06/1990
+   - Date of Birth: 25/06/1990
    - Shows Passport Number field
 
 4. **WelcomeLetter_Sample_Payroll.pdf**
@@ -410,7 +410,7 @@ The following sample PDFs are provided for testing:
 
 - [ ] **Content Present**
   - [ ] All text visible and readable
-  - [ ] Dates formatted as dd.mm/yyyy (or Day Month YYYY)
+  - [ ] Dates formatted as dd/mm/yyyy (or Day Month YYYY)
   - [ ] Member name correct
   - [ ] Address complete
   - [ ] Membership number correct (or "pending")
@@ -489,7 +489,7 @@ Before considering the feature complete, verify:
 
 - [ ] PDF generated successfully for new member
 - [ ] PDF includes all member fields
-- [ ] Date format: 31.12/1985 (dd.mm/yyyy)
+- [ ] Date format: 31/12/1985 (dd/mm/yyyy)
 - [ ] Membership number: Shows "pending" or assigned number
 - [ ] Email delivered successfully
 - [ ] PDF opens without errors

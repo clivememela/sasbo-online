@@ -40,7 +40,7 @@ describe('format — the UTC trap, which is the reason this module exists', () =
   it('every exported formatter is reachable without constructing a Date from a date string', () => {
     // A date-only value must never be parsed by `new Date("1988-06-15")`, which is midnight
     // UTC. These all go through the field parser instead.
-    expect(formatDate('1988-06-15')).toBe('1988/06/15')
+    expect(formatDate('1988-06-15')).toBe('15/06/1988')
     expect(formatDateLong('1988-06-15')).toBe('15 Jun 1988')
     expect(toWireDate('15/06/1988')).toBe('1988-06-15')
   })

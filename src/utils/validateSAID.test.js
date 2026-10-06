@@ -197,8 +197,8 @@ describe('validateEmail', () => {
 })
 
 describe('formatDate', () => {
-  it('formats an ISO string as dd-mm-yyyy', () => {
-    expect(formatDate('2023-06-15')).toBe('15-06-2023')
+  it('formats an ISO string as dd/mm/yyyy', () => {
+    expect(formatDate('2023-06-15')).toBe('15/06/2023')
   })
 
   it('formats the ARRAY the server actually sends', () => {
@@ -207,7 +207,7 @@ describe('formatDate', () => {
     // wire is [2023,6,15] rather than "2023-06-15". This branch exists ONLY
     // because of that defect. When A20 is fixed the array stops arriving -- and
     // this test is the note explaining why the branch can then be deleted.
-    expect(formatDate([2023, 6, 15])).toBe('15-06-2023')
+    expect(formatDate([2023, 6, 15])).toBe('15/06/2023')
   })
 
   it('renders a missing date as a dash rather than as "undefined-undefined-"', () => {

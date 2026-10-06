@@ -3,7 +3,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { MapPin, Search } from 'lucide-react';
 import { useMapsLibrary } from '@vis.gl/react-google-maps';
 
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils.js';
 import reportError from '../../lib/reportError';
 import Field, { controlClasses } from './Field';
 
@@ -121,8 +121,9 @@ export default function AddressAutocomplete({
         const { suggestions } =
           await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
             input: input.trim(),
-            sessionToken: sessionTokenRef.current,
-            includedRegionCodes: ['za'],
+            ...(sessionTokenRef.current ? { sessionToken: sessionTokenRef.current } : {}),
+            includedRegionCodes: ['ZA'],
+            language: 'en',
           });
 
         setSuggestionsFailed(false);

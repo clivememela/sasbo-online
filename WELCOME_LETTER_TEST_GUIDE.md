@@ -41,7 +41,7 @@ Backend: https://sasbo-online-backend-prod.onrender.com
    - Surname: Doe
    - Identity Type: I.D. Number
    - Identity Number: 8512315800081
-   - Date of Birth: Should auto-fill as 31.12/1985
+   - Date of Birth: Should auto-fill as 31/12/1985
    - Gender: Should auto-fill from I.D.
    - Race: African
    - Personal Email: john.doe@personal.com
@@ -75,7 +75,7 @@ Backend: https://sasbo-online-backend-prod.onrender.com
   - Member details table with:
     - Full Name: Mr John Doe
     - Identity Number: 8512315800081
-    - Date of Birth: 31.12/1985
+    - Date of Birth: 31/12/1985
     - Employee Number: EMP001
     - Bank: First National Bank
     - Payment Type: Debit Order
@@ -194,17 +194,17 @@ Select "Passport Number" instead of "I.D. Number"
 1. Fill form
 2. Select Identity Type: **"Passport Number"** (capitalized!)
 3. Enter passport: P1234567
-4. Manually enter Date of Birth: 25.06/1990
+4. Manually enter Date of Birth: 25/06/1990
 5. Complete rest of form
 6. Click "Save Member"
 
 **Expected Result:**
 - ✓ Identity field label shows: **"Passport Number"** (capitalized)
-- ✓ Date of Birth field shows: 25.06/1990 format
+- ✓ Date of Birth field shows: 25/06/1990 format
 - ✓ Date of Birth is EDITABLE (unlike I.D. which auto-fills)
 - ✓ In preview:
   - Identity Number: P1234567
-  - Date of Birth: 25.06/1990
+  - Date of Birth: 25/06/1990
 - ✓ Send succeeds normally
 
 **Verification:**
@@ -336,16 +336,16 @@ Select "Passport Number" instead of "I.D. Number"
 Use member with DOB: 1988-06-15
 
 **Check Displayed As:**
-- ✓ Capture Member form: 15.06/1988
-- ✓ Welcome Letter preview: 15.06/1988
-- ✓ Members page list: 15.06/1988
-- ✓ Edit Member dialog: 15.06/1988
-- ✓ Member details: 15.06/1988
+- ✓ Capture Member form: 15/06/1988
+- ✓ Welcome Letter preview: 15/06/1988
+- ✓ Members page list: 15/06/1988
+- ✓ Edit Member dialog: 15/06/1988
+- ✓ Member details: 15/06/1988
 
 **Consistency Check:**
-- Dev: All dates match dd.mm/yyyy
-- Preprod: All dates match dd.mm/yyyy
-- Production: All dates match dd.mm/yyyy
+- Dev: All dates match dd/mm/yyyy
+- Preprod: All dates match dd/mm/yyyy
+- Production: All dates match dd/mm/yyyy
 
 ---
 
@@ -380,7 +380,7 @@ npm run test -- --watch
     ✓ displays warning for missing membership number
     ✓ disables approve button without email
     ✓ displays both emails when preferred is both
-    ✓ formats date of birth as dd.mm/yyyy
+    ✓ formats date of birth as dd/mm/yyyy
     ✓ shows em dash for missing fields
 
   ✓ Approve Step Transition (3 tests)
@@ -485,7 +485,7 @@ Test on:
 After any changes, verify:
 
 - [ ] Preview step renders document correctly
-- [ ] Date format is dd.mm/yyyy
+- [ ] Date format is dd/mm/yyyy
 - [ ] Passport Number label is capitalized
 - [ ] Email validation works
 - [ ] Approve button state correct

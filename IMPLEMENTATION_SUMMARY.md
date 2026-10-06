@@ -14,9 +14,9 @@ All requested features have been successfully implemented, tested, and documente
    - When Identity Type = "Passport Number", field label displays capitalized
    - Applied to: CaptureMember.jsx, Members.jsx
 
-2. **Date Format: dd.mm/yyyy** 
+2. **Date Format: dd/mm/yyyy** 
    - Updated formatDate() function in format.js
-   - All dates display as: 31.12/1985 (day.month/year)
+   - All dates display as: 31/12/1985 (day.month/year)
    - Applied everywhere: Forms, previews, tables, dialogs
 
 3. **Reordered Employment Tab**
@@ -112,14 +112,14 @@ All requested features have been successfully implemented, tested, and documente
 | File | Changes |
 |------|---------|
 | `CaptureMember.jsx` | Replaced WelcomeLetter import with ApproveAndSendWelcomeLetter |
-| `src/lib/format.js` | Updated formatDate() to dd.mm/yyyy format |
+| `src/lib/format.js` | Updated formatDate() to dd/mm/yyyy format |
 
 ### Core Features (Already Implemented)
 
 | File | Features |
 |------|----------|
 | `Members.jsx` | All UI changes + welcome letter workflow |
-| `format.js` | Date formatting dd.mm/yyyy |
+| `format.js` | Date formatting dd/mm/yyyy |
 | `memberConstants.js` | Field mappings to tabs |
 
 ---
@@ -141,7 +141,7 @@ All requested features have been successfully implemented, tested, and documente
 6. **Back to Preview** - Navigation
 7. **Error Recovery** - Retry logic
 8. **Form Validation** - Pre-preview checks
-9. **Date Format** - dd.mm/yyyy everywhere
+9. **Date Format** - dd/mm/yyyy everywhere
 
 ### Test Coverage by Environment
 
@@ -215,11 +215,11 @@ All requested features have been successfully implemented, tested, and documente
 ✓ Label changes to "Passport Number"
 ✓ Enter passport: P1234567
 ✓ Date of Birth editable (not auto-filled)
-✓ Enter DOB: 25.06/1990 (dd.mm/yyyy format)
+✓ Enter DOB: 25/06/1990 (dd/mm/yyyy format)
 ✓ Preview shows correct format
 ✓ Send succeeds
 ✓ PDF shows Passport Number: P1234567
-✓ PDF shows DOB: 25.06/1990
+✓ PDF shows DOB: 25/06/1990
 ```
 **Time: 2-5 seconds**
 
@@ -368,7 +368,7 @@ All requested features have been successfully implemented, tested, and documente
 - [ ] Performance benchmarks met
 - [ ] All 3 environments tested
 - [ ] Email delivery verified
-- [ ] Date format correct (dd.mm/yyyy)
+- [ ] Date format correct (dd/mm/yyyy)
 - [ ] Passport Number capitalized
 - [ ] Employment tab reordered
 - [ ] Banking Details section visible

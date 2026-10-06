@@ -5,9 +5,9 @@ import { http, HttpResponse } from 'msw'
 
 import MembersPage from './Members'
 import { renderWithProviders } from '../../test/renderWithProviders'
-import { server } from '../../test/msw/server'
-import { pageFixtures } from '../../test/msw/pageFixtures'
-import { setupUser } from '../../test/user'
+import { server } from '@/test/msw/server.js'
+import { pageFixtures } from '@/test/msw/pageFixtures.js'
+import { setupUser } from '@/test/user.js'
 
 /**
  * 🔴 R3-F1 (P9's independent review): THE RECORD PRINTED DATES FOUR WAYS, AND A PASSPORT HOLDER'S RAN TOGETHER.
@@ -78,7 +78,7 @@ describe('the dates on a member record', () => {
     await openRecord(PASSPORT)
 
     expect(await panel().findByText('Date of Birth')).toBeInTheDocument()
-    expect(valueOf('Date of Birth')).toHaveTextContent('1988/06/15')
+    expect(valueOf('Date of Birth')).toHaveTextContent('15/06/1988')
     expect(valueOf('Date of Birth')).not.toHaveTextContent('1988615')
   })
 
@@ -86,7 +86,7 @@ describe('the dates on a member record', () => {
     await openRecord(ID_HOLDER)
 
     expect(await panel().findByText('Date of Birth')).toBeInTheDocument()
-    expect(valueOf('Date of Birth')).toHaveTextContent('1988/06/15')
+    expect(valueOf('Date of Birth')).toHaveTextContent('15/06/1988')
     expect(valueOf('Date of Birth')).not.toHaveTextContent('15-06-1988')
   })
 
@@ -94,7 +94,7 @@ describe('the dates on a member record', () => {
     await openRecord(PASSPORT, /Membership & Subscriptions/i)
 
     expect(await panel().findByText('Date Joined Sasbo')).toBeInTheDocument()
-    expect(valueOf('Date Joined Sasbo')).toHaveTextContent('2022/01/04')
+    expect(valueOf('Date Joined Sasbo')).toHaveTextContent('04/01/2022')
     expect(valueOf('Date Joined Sasbo')).not.toHaveTextContent('2022-01-04')
   })
 

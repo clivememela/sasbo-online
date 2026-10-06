@@ -5,11 +5,11 @@ import { http, HttpResponse } from 'msw'
 
 import CaptureMember from './CaptureMember'
 import { renderWithProviders } from '../../test/renderWithProviders'
-import { server } from '../../test/msw/server'
-import { pageFixtures } from '../../test/msw/pageFixtures'
-import { IDENTITY_TYPE_OPTIONS } from '../../config/memberConstants'
+import { server } from '@/test/msw/server.js'
+import { pageFixtures } from '@/test/msw/pageFixtures.js'
+import { IDENTITY_TYPE_OPTIONS } from '@/config/memberConstants.js'
 
-import { setupUser } from '../../test/user'
+import { setupUser } from '@/test/user.js'
 
 /**
  * THE FIELD ROUND-TRIP -- the client half of the standards' worst defect class.
@@ -243,6 +243,23 @@ describe('the identity-type vocabulary', () => {
     await fill(user, 'Passport Number', 'A12345678')
     await save(user)
   }
+
+  it('keeps initials read-only because they are derived from first names', async () => {
+    renderWithProviders(<CaptureMember />)
+
+    const initials = labelled('Initials')
+    expect(initials).toBeDisabled()
+  })
+  it('uppercases a passport number as it is typed', async () => {
+    const user = setupUser()
+    renderWithProviders(<CaptureMember />)
+    await user.selectOptions(labelled('Identity Type'), 'Passport Number')
+    const passport = labelled('Passport Number')
+
+    await user.type(passport, 'aB12xy')
+
+    expect(passport).toHaveValue('AB12XY')
+  })
 
   it('A7 (fixed): a passport capture must require a date of birth', async () => {
     // Written to the standard. Unlike an I.D. Number, a passport number

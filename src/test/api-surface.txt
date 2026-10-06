@@ -50,6 +50,7 @@ PUT /api/members/{id}
 PATCH /api/members/{id}/banking
 POST /api/members/{id}/send-welcome
 PATCH /api/members/{id}/subscription
+POST /api/members/welcome-letter-preview
 GET /api/members/{id}/welcome-letter-preview
 GET /api/provinces
 GET /api/recruiters

@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ApproveAndSendWelcomeLetter from './ApproveAndSendWelcomeLetter';
 import { memberService } from '@/services/memberService';
 
@@ -30,12 +32,13 @@ describe('ApproveAndSendWelcomeLetter', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        memberService.previewWelcomeLetter = vi.fn().mockResolvedValue(new Uint8Array([37, 80, 68, 70]));
         memberService.sendWelcomeLetter = vi.fn();
         memberService.createMember = vi.fn();
     });
 
     describe('Preview Step', () => {
-        it('renders preview step when modal opens', () => {
+        it('renders preview step when modal opens', async () => {
             render(
                 <ApproveAndSendWelcomeLetter
                     open={true}
@@ -46,10 +49,10 @@ describe('ApproveAndSendWelcomeLetter', () => {
             );
 
             expect(screen.getByText('Welcome Letter Preview')).toBeInTheDocument();
-            expect(screen.getByTestId('welcome-letter-preview')).toBeInTheDocument();
+            await waitFor(() => expect(screen.getByTitle('Sasbo Welcome Letter.pdf')).toBeInTheDocument());
         });
 
-        it('displays member data in preview', () => {
+        it('displays member data in preview', async () => {
             render(
                 <ApproveAndSendWelcomeLetter
                     open={true}
@@ -59,10 +62,7 @@ describe('ApproveAndSendWelcomeLetter', () => {
                 />
             );
 
-            expect(screen.getByText('Mr John Doe')).toBeInTheDocument();
-            expect(screen.getByText('SM001234')).toBeInTheDocument();
-            expect(screen.getByText(/8512315800081/)).toBeInTheDocument();
-            expect(screen.getByText('First National Bank')).toBeInTheDocument();
+            await waitFor(() => expect(screen.getByText('Sasbo Welcome Letter.pdf')).toBeInTheDocument());
         });
 
         it('displays recipient email in preview', () => {
@@ -126,7 +126,7 @@ describe('ApproveAndSendWelcomeLetter', () => {
             expect(screen.getByText(/both addresses/)).toBeInTheDocument();
         });
 
-        it('formats date of birth as dd.mm/yyyy in preview', () => {
+        it('formats date of birth as dd/mm/yyyy in preview', () => {
             const memberWithDOB = { ...mockMember, dateOfBirth: '1985-12-31' };
 
             render(
@@ -138,8 +138,8 @@ describe('ApproveAndSendWelcomeLetter', () => {
                 />
             );
 
-            // formatDate should return 31.12/1985
-            expect(screen.getByText(/31\.12\/1985/)).toBeInTheDocument();
+            // formatDate should return 31/12/1985
+            expect(screen.getByText(/31\/12\/1985/)).toBeInTheDocument();
         });
     });
 
@@ -176,7 +176,7 @@ describe('ApproveAndSendWelcomeLetter', () => {
             fireEvent.click(screen.getByRole('button', { name: /Approve & Continue/i }));
 
             await waitFor(() => {
-                expect(screen.getByText('John Doe')).toBeInTheDocument();
+                expect(screen.getByText('Sasbo Welcome Letter.pdf')).toBeInTheDocument();
                 expect(screen.getByText('PDF')).toBeInTheDocument();
                 expect(screen.getByText('SM001234')).toBeInTheDocument();
             });

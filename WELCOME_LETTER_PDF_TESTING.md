@@ -13,7 +13,7 @@ First Names: John
 Surname: Doe
 Identity Type: I.D. Number
 Identity Number: 8512315800081
-Date of Birth: 1985-12-31 (displays as 31.12/1985)
+Date of Birth: 1985-12-31 (displays as 31/12/1985)
 Gender: Male
 Race: African
 Personal Email: john.doe@example.com
@@ -93,7 +93,7 @@ Member Details:
 ───────────────────────────────────────────────────────────────
 Full Name                           Mr John Doe
 Identity Number                     8512315800081
-Date of Birth                       31.12/1985
+Date of Birth                       31/12/1985
 Employee Number                     EMP001
 Bank                               First National Bank
 Payment Type                        Debit Order
@@ -124,7 +124,7 @@ First Names: Jane Marie
 Surname: Smith
 Identity Type: Passport Number (CAPITALIZED LABEL)
 Identity Number: P1234567
-Date of Birth: 1990-06-25 (displays as 25.06/1990 - EDITABLE)
+Date of Birth: 1990-06-25 (displays as 25/06/1990 - EDITABLE)
 Preferred Email: Work
 Email: jane.smith@bank.co.za
 
@@ -137,7 +137,7 @@ Payment Type: Payroll Deduction
 - ✓ Title: "Dr"
 - ✓ Name: "Dr Jane Marie Smith"
 - ✓ Identity Number: "P1234567"
-- ✓ Date of Birth: "25.06/1990" (formatted correctly)
+- ✓ Date of Birth: "25/06/1990" (formatted correctly)
 - ✓ Email: jane.smith@bank.co.za (work email)
 - ✓ Bank: Nedbank
 - ✓ Payment Type: Payroll Deduction
@@ -185,18 +185,18 @@ When sending welcome letter to existing member:
 
 ## Date Format Verification
 
-All dates in PDF must display as **dd.mm/yyyy**:
+All dates in PDF must display as **dd/mm/yyyy**:
 
 | Field | Input | Display in PDF |
 |-------|-------|---|
-| Date of Birth | 1985-12-31 | 31.12/1985 |
-| Date of Birth | 1990-06-25 | 25.06/1990 |
+| Date of Birth | 1985-12-31 | 31/12/1985 |
+| Date of Birth | 1990-06-25 | 25/06/1990 |
 | Date of Birth | 2000-01-01 | 01.01/2000 |
 | Date Joined | 2024-01-15 | 15 January 2024 |
 | Today | 2024-09-26 | 26 September 2024 |
 
 **Long dates** use month names (January, February, etc.)
-**Short dates** use dd.mm/yyyy format
+**Short dates** use dd/mm/yyyy format
 
 ---
 
@@ -243,7 +243,7 @@ Option 3: Use test email service (Mailtrap, SendGrid sandbox)
 
 Expected log entry:
 [INFO] Sending welcome letter to john.doe@example.com
-[INFO] PDF generated from template: Sasbo Welcome Letter.docx
+[INFO] PDF generated from template: Sasbo Welcome Letter.pdf
 [INFO] Email sent successfully, member saved with ID: 1
 ```
 
@@ -281,7 +281,7 @@ Check: Email contains:
 - [ ] Sign-off present (Ms. Rosemary M. Rauleka)
 
 ### Date Formatting
-- [ ] Date of Birth: dd.mm/yyyy format
+- [ ] Date of Birth: dd/mm/yyyy format
 - [ ] Date Generated: Day Month YYYY (e.g., "26 September 2024")
 - [ ] Date Joined: Day Month YYYY format
 
@@ -314,7 +314,7 @@ Check: Email contains:
 ### Location in Repository
 ```
 /src/assets/documents/
-├── Sasbo Welcome Letter.docx (template)
+├── Sasbo Welcome Letter.pdf (template)
 └── WelcomeLetter_Sample_SM001234.pdf (example output)
 ```
 
@@ -394,7 +394,7 @@ http://localhost:5173/members/capture
 
 ### PDF Content Incorrect
 1. Check member data in preview
-2. Verify date format (dd.mm/yyyy)
+2. Verify date format (dd/mm/yyyy)
 3. Ensure all fields populated
 4. Regenerate PDF
 
