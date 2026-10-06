@@ -175,16 +175,9 @@ export const DEFECTS = {
 // 📨 The diff shape is owed to the Capture Member arc, whose own copy of this pin flips when the
 // branches meet. Their session was offline when this landed; recorded in repoState.md.
 
-  A23: define(
-    'A23',
-    'subscriptionsService.create writes to the wrong endpoint entirely',
-    'subscriptionsService.create POSTs to /api/recruitment-channels, not ' +
-      '/api/subscriptions. Creating a subscription silently creates a RECRUITMENT ' +
-      'CHANNEL instead. Every other method on the module addresses /api/subscriptions ' +
-      'correctly, so the request succeeds, returns 2xx, and the caller has no way to ' +
-      'tell. Found 2026-09-04 by enumerating each service method against the endpoint ' +
-      'it addresses.',
-  ),
+  // A23 is RETIRED, 2026-10-06, by the October build's bugs stream: subscriptionsService.create POSTs the
+  // subscription's row to /api/subscriptions (it POSTed { name } to /api/recruitment-channels). Its pin was deleted
+  // and its standard-facing test un-skipped in the same commit (services.errorContract.test.js).
 
 // A25 is RETIRED, 2026-09-10, by the design arc's 06.1b.
 //
