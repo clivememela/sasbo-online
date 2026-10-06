@@ -226,7 +226,7 @@ export default function Subscriptions() {
                         <thead className="sticky top-0 bg-surface-2 z-10">
                             <tr>
                                 <th className={HEAD_CELL}>Bank Name</th>
-                                <th className={HEAD_CELL}>ACB Debit Day</th>
+                                <th className={HEAD_CELL}>Debit Order Day</th>
                                 <th className={HEAD_CELL}>Amount</th>
                                 <th className={HEAD_CELL}>Core Banking</th>
                                 <th className={HEAD_CELL}>Status</th>
@@ -259,7 +259,7 @@ export default function Subscriptions() {
                                         <>
                                             <td className={`${BODY_CELL} text-ink`}>{editData.bankName}</td>
                                             <td className={BODY_CELL}>
-                                                <input type="number" aria-label={`ACB debit day for ${editName}`} className={inputCls} value={editData.acbDebitDay ?? ''} onChange={(e) => handleField('acbDebitDay', parseInt(e.target.value))} onClick={e => e.stopPropagation()} />
+                                                <input type="number" aria-label={`Debit order day for ${editName}`} className={inputCls} value={editData.acbDebitDay ?? ''} onChange={(e) => handleField('acbDebitDay', parseInt(e.target.value))} onClick={e => e.stopPropagation()} />
                                             </td>
                                             <td className={BODY_CELL}>
                                                 <input type="number" step="0.01" aria-label={`Subscription amount for ${editName}`} className={inputCls} value={editData.subscriptionAmount ?? ''} onChange={(e) => handleField('subscriptionAmount', parseFloat(e.target.value))} onClick={e => e.stopPropagation()} />

@@ -17,6 +17,18 @@ import {
   LucideConstruction, LucideCopyCheck, UserRoundPen
 } from "lucide-react";
 
+/**
+ * 🗣️ THE MODULE ONCE CALLED "A.C.B." -- named once, here, for the rail's two entries and Admin Membership's card.
+ * "Debit Order Deductions" is SASBO's name for it (the 5 Oct Show & Tell, handover §A; the name the status report SASBO
+ * saw uses), and Stephne's DOD answer settles the rest: "ACB" becomes "Debit Order" everywhere, and the screens keep
+ * their names for now (Runs, Debits). The address stays `/admin/acb` -- deep links and the decks use it.
+ *
+ * 📐 TWO SPELLINGS, BECAUSE A RAIL ROW IS 256px. An entry's `title` is what the rail and the crumbs print, and the whole
+ * name cut off mid-word there ("Debit Order Deducti…"), so the rail's entries take the `short` one; an entry's `name`,
+ * where it has one, is the whole name Home's views print.
+ */
+export const DEBIT_ORDERS = Object.freeze({ name: "Debit Order Deductions", short: "Debit Orders" });
+
 export const navItems = [
   {
     title: "Home",
@@ -105,7 +117,8 @@ export const navItems = [
         href: "/admin/monthly-menu",
       },
       {
-        title: "A.C.B",
+        title: DEBIT_ORDERS.short,
+        name: DEBIT_ORDERS.name,
         href:'/admin/acb',
         icon: LucideFile,
         subItems: [
@@ -181,7 +194,8 @@ export const navItems = [
     ]
   },
   {
-    title: "A.C.B",
+    title: DEBIT_ORDERS.short,
+    name: DEBIT_ORDERS.name,
     href:'/admin/acb',
     icon: LucideFile,
     subItems: [
@@ -317,13 +331,10 @@ export const navItems = [
     href: '/recruiters',
     desc: 'Capture/Print Recruiters'
   },
+  // 🗣️ SUBSCRIPTIONS IS NOT ON THIS LEVEL ANY MORE -- the 5 Oct Show & Tell (handover §A): only staff change the
+  // amounts, so it lives under Admin Menu > Maintenance alone, and it came off Home's quick view with this entry (Home
+  // is this list read across). Its address is unchanged; `Maintenance.test.jsx` holds where it is reached from.
   {
-    title: 'Subscriptions',
-    icon: LucideMails,
-    href: '/admin/maintenance/subscriptions',
-    desc: 'Maintain Subscription Table'
-  },
-  { 
     title: "Reports", 
     icon: ChartNoAxesCombined, 
     href: "/reports",

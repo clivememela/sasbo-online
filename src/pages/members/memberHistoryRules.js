@@ -151,12 +151,13 @@ export const valueText = (what, value) => {
 
 /**
  * Why a status changed where no code of SASBO's is carried -- one sentence for each of the server's reasons
- * (`statusReasons` in `api-vocabulary.json`, held by `memberHistoryRules.test.js`). A.C.B.'s two are its returns loop's
- * (Q27, Q40); where either might sit among SASBO's codes is a proposal (MM58), so no code is shown for them.
+ * (`statusReasons` in `api-vocabulary.json`, held by `memberHistoryRules.test.js`). Debit Order Deductions' two (the
+ * module once called A.C.B.) are its returns loop's (Q27, Q40); where either might sit among SASBO's codes is a proposal
+ * (MM58), so no code is shown for them.
  */
 export const STATUS_REASON_WORDS = /* @__PURE__ */ Object.freeze({
-  SUBS_IN_ARREARS: 'Three unpaid debit orders (A.C.B.)',
-  UNPAID_SUSPENDED: 'An unpaid debit order that is not presented again (A.C.B.)',
+  SUBS_IN_ARREARS: 'Three unpaid debit orders (Debit Order Deductions)',
+  UNPAID_SUSPENDED: 'An unpaid debit order that is not presented again (Debit Order Deductions)',
   DELETION_CODE: 'SASBO’s deletion code',
   SUSPENSION_CODE: 'SASBO’s suspension code',
   REINSTATED: 'Reinstated',

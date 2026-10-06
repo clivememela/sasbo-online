@@ -42,14 +42,57 @@ const ROW = "flex items-center gap-4 px-5 py-3.5";
  * `note` is that caption, where "not yet available" is not the truth: month end's listings (`04.1`) ARE built, and
  * refuse until sign-in -- so their rows say *Waits for sign-in*. Keep it short: it never wraps, and sits beside the
  * title on a phone.
+ *
+ * 🗣️ `tile` IS HOME'S CARD VIEW, AND IT IS SASBO'S ASK OVER THE DIRECTION CONTRACT'S REFUSAL ABOVE. At the 5 Oct Show &
+ * Tell Natalie said she liked the cards Home had before the rows, so Home offers both (handover §A) and opens on the
+ * cards. It is the same destination drawn as a card -- the same icon in the brand's ink, name, line and chevron, the
+ * sheet's surface and resting shadow, the whole card the target, and the same honest dead state -- so the two views
+ * cannot drift apart. Every other menu page keeps the rows.
  */
-export default function NavigationCard({ title, icon: Icon, href, desc, onSelect, note = 'Not yet available' }) {
+const TILE = "flex h-full flex-col gap-3 rounded-lg bg-surface p-5 shadow-(--shadow-1)";
+
+export default function NavigationCard({ title, icon: Icon, href, desc, onSelect, note = 'Not yet available', layout = 'row' }) {
+  const tile = layout === 'tile';
   const body = (
     <span className="min-w-0 flex-1">
-      <span className="block text-base font-semibold leading-tight">{title}</span>
-      {desc && <span className="mt-0.5 block text-sm text-ink-muted">{desc}</span>}
+      <span className={cn("block font-semibold leading-tight", tile ? "text-lg" : "text-base")}>{title}</span>
+      {desc && <span className={cn("block text-sm text-ink-muted", tile ? "mt-1" : "mt-0.5")}>{desc}</span>}
     </span>
   );
+
+  if (tile) {
+    if (!href) {
+      return (
+        <div className={cn(TILE, "text-ink-muted")}>
+          {Icon && <Icon size={24} strokeWidth={1.5} aria-hidden="true" className="shrink-0 text-ink-faint" />}
+          {body}
+          <span className="text-sm text-ink-muted">{note}</span>
+        </div>
+      );
+    }
+    return (
+      <Link
+        to={href}
+        onClick={onSelect}
+        className={cn(
+          TILE,
+          "group text-ink transition-shadow duration-(--duration-fast) ease-(--ease-out)",
+          "hover-hover:hover:shadow-(--shadow-2) focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
+        )}
+      >
+        <span className="flex items-start justify-between gap-3">
+          {Icon && <Icon size={24} strokeWidth={1.5} aria-hidden="true" className="shrink-0 text-brand" />}
+          <ChevronRight
+            size={16}
+            strokeWidth={1.75}
+            aria-hidden="true"
+            className="ml-auto shrink-0 text-ink-faint transition-transform duration-(--duration-fast) hover-hover:group-hover:translate-x-0.5"
+          />
+        </span>
+        {body}
+      </Link>
+    );
+  }
 
   if (!href) {
     return (
@@ -94,8 +137,23 @@ export default function NavigationCard({ title, icon: Icon, href, desc, onSelect
  *
  * `onSelect(card)` is the page's word to the shell; `wide` is Home's, the one menu that spans the page. `className`
  * places the sheet -- month end's page (`04.1`) sets its lists under section headings, a step closer than a page head.
+ * `tiles` lays the same cards out as cards (Home's card view), as many to a row as the page's width holds.
  */
-export function NavigationList({ cards, onSelect, wide = false, className }) {
+export function NavigationList({ cards, onSelect, wide = false, tiles = false, className }) {
+  if (tiles) {
+    return (
+      <div className={cn("mt-6 grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4", className)}>
+        {cards.map((card) => (
+          <NavigationCard
+            key={`${card.href}-${card.title}`}
+            {...card}
+            layout="tile"
+            onSelect={onSelect && (() => onSelect(card))}
+          />
+        ))}
+      </div>
+    );
+  }
   return (
     <Sheet className={cn("mt-6 divide-y divide-line", !wide && "max-w-4xl", className)}>
       {cards.map((card) => (

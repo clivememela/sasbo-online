@@ -6,7 +6,7 @@ import { http, HttpResponse } from 'msw'
 import App from '../../App'
 import Admin from './Admin'
 import MonthlyMenu from './MonthlyMenu'
-import { navItems } from '../../config/navigation'
+import { DEBIT_ORDERS, navItems } from '../../config/navigation'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { smokeHandlers } from '../../test/msw/smokeLayer'
@@ -17,13 +17,15 @@ import { LISTINGS, LISTING_WAITS, STATISTICS, TAKE_AGAIN_WAITS, TAKE_WAITS, take
 /**
  * MONTH END `04.1` -- THE MONTH END PAGE, WHERE THE MONTHLY MENU WAS (MD38).
  *
- * The page lists what is built and nothing else: the seven statistics as links for the month chosen, the statistics
- * pack, and the four listings -- disabled with their reason, never asked for. The month is the server's, chosen once at
- * the top: a taken month says who took it and when, the open month that it is read live. The Admin page, the rail and
- * the route agree about where it is and what it is called, and no row links to the page it is on.
+ * The page lists what is built and nothing else: the month's figures (since the 5 Oct Show & Tell -- their own cases are
+ * `MonthEndFigures.test.jsx`), the seven statistics as links for the month chosen, the statistics pack, and the four
+ * listings -- disabled with their reason, never asked for. The month is the server's, chosen once at the top: a taken
+ * month says who took it and when, the open month that it is read live. The Admin page, the rail and the route agree
+ * about where it is and what it is called, and no row links to the page it is on.
  *
- * Answered as the server answers (MD48): the months are the golden answer's. Every request the page makes is recorded,
- * so "nothing was asked" is a measurement, not an inference.
+ * Answered as the server answers (MD48): the months are the golden answer's, and the figures' read here is the shared
+ * fixture's empty array -- *not available*, which asks nothing more. Every request the page makes is recorded, so
+ * "nothing was asked" is a measurement, not an inference.
  */
 
 const MONTHS = monthEndBody('GET /api/month-end/months')
@@ -36,14 +38,20 @@ const record = ({ request }) => {
   requests.push(`${request.method} ${new URL(request.url).pathname}`)
 }
 
+const FIGURES = 'The month’s figures'
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   requests = []
   server.events.on('request:start', record)
-  server.use(monthEndAnswer('GET /api/month-end/months'))
+  server.use(monthEndAnswer('GET /api/month-end/months'), http.get('*/api/members/summary', () => HttpResponse.json([])))
 })
 
-afterEach(() => {
+afterEach(async () => {
+  // The figures read once the page knows its month: a test ends only once they have answered, so no read of this
+  // test's reaches the next one's handlers.
+  const figures = screen.queryByRole('region', { name: FIGURES })
+  if (figures) await waitFor(() => expect(figures).not.toHaveAttribute('data-figures', 'loading'))
   server.events.removeListener('request:start', record)
 })
 
@@ -58,7 +66,7 @@ const pageLinks = (scope = document.body) =>
   within(scope).queryAllByRole('link').map((link) => link.getAttribute('href'))
 
 describe('where the page is -- the Admin page, the rail and the route agree (04.1, MD38)', () => {
-  it('Admin Membership offers Month end between Daily and A.C.B., at the Monthly Menu\'s address', () => {
+  it('Admin Membership offers Month end between Daily and Debit Order Deductions, at the Monthly Menu\'s address', () => {
     renderWithProviders(<Admin />)
 
     const hrefs = pageLinks()
@@ -67,7 +75,7 @@ describe('where the page is -- the Admin page, the rail and the route agree (04.
     expect(hrefs.indexOf('/admin/acb')).toBe(hrefs.indexOf('/admin/monthly-menu') + 1)
   })
 
-  it('the rail holds it as a LEAF of Admin Menu, between Daily Menu and A.C.B., with nothing under it (BR8)', () => {
+  it('the rail holds it as a LEAF of Admin Menu, between Daily Menu and Debit Order Deductions, with nothing under it (BR8)', () => {
     const admin = navItems.find((item) => item.title === 'Admin Menu')
     const titles = admin.subItems.map((item) => item.title)
     const leaf = admin.subItems.find((item) => item.href === '/admin/monthly-menu')
@@ -75,7 +83,7 @@ describe('where the page is -- the Admin page, the rail and the route agree (04.
     expect(leaf?.title).toBe('Month end')
     expect(leaf.subItems).toBeUndefined()
     expect(titles.indexOf('Month end')).toBe(titles.indexOf('Daily Menu') + 1)
-    expect(titles.indexOf('A.C.B')).toBe(titles.indexOf('Month end') + 1)
+    expect(titles.indexOf(DEBIT_ORDERS.short)).toBe(titles.indexOf('Month end') + 1)
   })
 
   it('🔑 the route renders the page the rail and the crumb name: Admin Menu › Month end', async () => {
@@ -146,11 +154,13 @@ describe('the listings -- built refusing, and never asked (MD4)', () => {
       expect(row).toHaveTextContent(listing.legacy)
       expect(row).toHaveTextContent('Waits for sign-in')
     }
-    expect(requests).toEqual(['GET /api/month-end/months'])
+    // The months, then the figures for the month the page opened on -- and nothing else: no listing is asked for.
+    await waitFor(() => expect(screen.getByRole('region', { name: FIGURES })).toHaveAttribute('data-figures', 'error'))
+    expect(requests).toEqual(['GET /api/month-end/months', 'GET /api/members/summary'])
     expect(requests.some((request) => request.includes('/listings/'))).toBe(false)
   })
 
-  it('Take the month: for the open month, disabled with its reason, as A.C.B.\'s Approve is -- and never asked', async () => {
+  it('Take the month: for the open month, disabled with its reason, as Debit Order Runs\' Approve is -- and never asked', async () => {
     const user = setupUser()
     openPage()
     await monthsRead()
