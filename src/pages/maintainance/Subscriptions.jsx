@@ -14,6 +14,9 @@ import { HEAD_CELL } from "../../components/table/Table.jsx";
 import DataState from "../../components/common/DataState.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
+import { useAuth } from "../../auth/useAuth";
+import RequirePermission from "../../auth/RequirePermission";
+import { PERMISSIONS } from "../../auth/permissions";
 
 // 🔴 `text-sm` WAS 13px, WHICH IS THE iOS ZOOM TRAP, AND THE 16px CHECK COULD NOT SEE
 // IT. That check matches `text-sm` on the TAG; these classes arrive through this variable,
@@ -60,6 +63,10 @@ export default function Subscriptions() {
     const [editData, setEditData] = useState({});
     const refs = useReferenceData(REFERENCE_LOADERS);
     const bankNames = refs.data.banks;
+    // 🔒 Only staff change amounts (the 5 Oct Show & Tell): the server refuses the writes without
+    // SUBSCRIPTIONS_MAINTAIN, so the screen offers no edit it would refuse, and says what is needed instead.
+    const { can } = useAuth();
+    const mayChange = can(PERMISSIONS.SUBSCRIPTIONS_MAINTAIN);
 
     /* ♻️ The private date formatter is gone. It printed the wire's own `2026-09-09` for an
        array and the browser's locale string for anything else -- two shapes on one screen,
@@ -108,7 +115,7 @@ export default function Subscriptions() {
     }, [allSubscriptions, filters.bankName, filters.isCoreBanking]);
 
     const handleRowClick = (sub) => {
-        if (editingId === sub.id) return;
+        if (!mayChange || editingId === sub.id) return;
         setEditingId(sub.id);
         setEditData({ ...sub });
     };
@@ -163,6 +170,12 @@ export default function Subscriptions() {
             </Criteria>
 
             <Sheet className="mt-4">
+
+                {!mayChange && (
+                    <div className="mx-5 mt-4">
+                        <RequirePermission permission={PERMISSIONS.SUBSCRIPTIONS_MAINTAIN} />
+                    </div>
+                )}
 
                 {/* 🔴 IT WAS A BARE `Error: {String(err)}` BANNER WITH NO WAY OUT. Two things
                     changed: the sentence is written for the person reading it rather than a
@@ -253,7 +266,7 @@ export default function Subscriptions() {
                                 <tr
                                     key={sub.id}
                                     onClick={() => handleRowClick(sub)}
-                                    className={`cursor-pointer transition ${editingId === sub.id ? 'bg-brand-soft' : 'hover-hover:hover:bg-surface-2/50'}`}
+                                    className={`${mayChange ? 'cursor-pointer ' : ''}transition ${editingId === sub.id ? 'bg-brand-soft' : 'hover-hover:hover:bg-surface-2/50'}`}
                                 >
                                     {editingId === sub.id ? (
                                         <>
@@ -319,14 +332,16 @@ export default function Subscriptions() {
                                                 opens on a click as a pointer convenience; this is the
                                                 control a keyboard reaches, named for the bank it edits. */}
                                             <td className="whitespace-nowrap px-3.5 py-[11px] text-right first:pl-5">
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={(e) => { e.stopPropagation(); handleRowClick(sub); }}
-                                                    aria-label={`Edit the subscription for ${sub.bankName || 'this bank'}`}
-                                                >
-                                                    <Pencil size={14} strokeWidth={1.75} aria-hidden="true" /> Edit
-                                                </Button>
+                                                {mayChange && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={(e) => { e.stopPropagation(); handleRowClick(sub); }}
+                                                        aria-label={`Edit the subscription for ${sub.bankName || 'this bank'}`}
+                                                    >
+                                                        <Pencil size={14} strokeWidth={1.75} aria-hidden="true" /> Edit
+                                                    </Button>
+                                                )}
                                             </td>
                                         </>
                                     )}
