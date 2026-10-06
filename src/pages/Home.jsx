@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { LayoutGrid, List, Table2 } from 'lucide-react';
 
 import { NavigationList } from '../components/common/NavigationCard';
 import { Page } from '../components/common/Sheet.jsx';
@@ -21,10 +20,12 @@ import { HOME_MODULES, readHomeView, storeHomeView } from './home/homeModules.js
  * liked the cards, so they are what a browser that has chosen nothing opens on; the choice
  * is remembered per browser, and a browser that cannot remember it still shows it.
  */
+// Named in words, with no icons: the three words are the whole choice, and three icons were half a kilobyte the bundle
+// did not have (bundle-budget.mjs).
 const VIEWS = [
-  { value: 'cards', label: 'Cards', icon: LayoutGrid },
-  { value: 'list', label: 'List', icon: List },
-  { value: 'table', label: 'Table', icon: Table2 },
+  { value: 'cards', label: 'Cards' },
+  { value: 'list', label: 'List' },
+  { value: 'table', label: 'Table' },
 ];
 
 export default function Home() {

@@ -57,6 +57,12 @@ const DESCRIPTIONS = {
 };
 
 /**
+ * A module's whole name, where the rail prints a short one: "Debit Order Deductions" is SASBO's name for the module
+ * once called A.C.B. (the 5 Oct Show & Tell), and "Debit Orders" is what a 256px rail row has room for.
+ */
+const NAMES = { '/admin/acb': 'Debit Order Deductions' };
+
+/**
  * Every path through the menu to `href`, as the rail prints each step -- the shortest first. Members is two: on its
  * own, and under Admin Menu › Daily Menu.
  */
@@ -73,14 +79,14 @@ export const menuPaths = (href, items = navItems, path = []) => items
 /**
  * 🔑 THE MODULES ARE THE RAIL, READ ACROSS -- not a list of their own. `navItems` is the one place the application's
  * areas are declared, and Home drops only its own entry: a module added to the menu appears here on the same commit,
- * one removed (Subscriptions, 5 Oct) disappears from both. A module is shown by its whole `name` where the rail has to
- * print a short `title` (Debit Order Deductions, "Debit Orders" on the rail). The table view adds where each sits in the
- * menu and what is under it there, read from the same tree.
+ * one removed (Subscriptions, 5 Oct) disappears from both. A module is shown by its whole name where the rail prints a
+ * short one (`NAMES`). The table view adds where each sits in the menu and what is under it there, read from the same
+ * tree.
  */
 export const HOME_MODULES = /* @__PURE__ */ Object.freeze(navItems
   .filter((item) => item.href && item.href !== '/home')
   .map((item) => ({
-    title: (item.name ?? item.title).trim(),
+    title: NAMES[item.href] ?? item.title.trim(),
     icon: item.icon,
     href: item.href,
     desc: DESCRIPTIONS[item.href],

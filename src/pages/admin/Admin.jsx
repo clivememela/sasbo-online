@@ -4,14 +4,13 @@ import {
 import { NavigationList } from '../../components/common/NavigationCard';
 import { Page } from '../../components/common/Sheet.jsx';
 import PageTitle from '../../components/common/PageTitle';
-import { DEBIT_ORDERS } from '../../config/navigation';
 
 const cards = [
     { title: 'Daily', desc: 'Daily Menu' ,icon: LucideMenu, href: '/admin/daily-menu' },
     // Month end `04.1`: the Monthly Menu renamed, at its own address (MD38), between Daily and Debit Order Deductions.
     { title: 'Month end', desc: 'The month’s figures, its statistics and its pack of workbooks', icon: LucideCalendarRange, href: '/admin/monthly-menu' },
-    // Once "A.C.B." -- the name and why are `DEBIT_ORDERS`'s, in `navigation.js`.
-    { title: DEBIT_ORDERS.name, desc: 'The monthly debit order run, re-debits, unpaids and letters', icon: LucideFile, href: '/admin/acb' },
+    // Once "A.C.B." -- SASBO's name for it since the 5 Oct Show & Tell; why, beside its rail entry in `navigation.js`.
+    { title: 'Debit Order Deductions', desc: 'The monthly debit order run, re-debits, unpaids and letters', icon: LucideFile, href: '/admin/acb' },
     // { title: 'BankBranch', icon: Landmark, href:'/banks' },
     //{ title: 'Utilities', icon: LucideToolbox, color: 'text-red-600 dark:text-red-400' },
     //{ title: 'Regional Branches', icon: LucideGitBranch, color: 'text-red-600 dark:text-red-400' },

@@ -5,7 +5,7 @@ import { screen, within } from '@testing-library/react'
 import { Outlet, Route, Routes } from 'react-router-dom'
 
 import Home from './Home'
-import { DEBIT_ORDERS, navItems } from '../config/navigation'
+import { navItems } from '../config/navigation'
 import { HOME_MODULES, HOME_VIEW_KEY } from './home/homeModules'
 import { server } from '../test/msw/server'
 import { renderWithProviders } from '../test/renderWithProviders'
@@ -18,6 +18,10 @@ import { setupUser } from '../test/user'
  * whose storage throws still renders and still switches. Subscriptions is not a module any more -- it lives under
  * Maintenance.
  */
+
+/** SASBO's name for the module once called A.C.B. (5 Oct), and the short one the rail prints. */
+const MODULE = 'Debit Order Deductions'
+const RAIL = 'Debit Orders'
 
 /** Every request Home makes -- there should be none: the figures, and their reads, went to Month end. */
 let requests
@@ -71,7 +75,7 @@ describe('Home keeps only the modules (the 5 Oct Show & Tell)', () => {
   it('🗣️ the module once called A.C.B. is "Debit Order Deductions", at the address it always had', () => {
     renderWithProviders(<Home />)
 
-    expect(screen.getByRole('link', { name: new RegExp(`^${DEBIT_ORDERS.name}`) })).toHaveAttribute('href', '/admin/acb')
+    expect(screen.getByRole('link', { name: new RegExp(`^${MODULE}`) })).toHaveAttribute('href', '/admin/acb')
     expect(document.body.textContent).not.toMatch(/\bA\.?C\.?B\b|clearing bureau/i)
   })
 })
@@ -113,8 +117,8 @@ describe('the view switch -- cards, a list or a table', () => {
     expect(members).toHaveTextContent('The membership register across every bank')
     expect(members).toHaveTextContent('Admin Menu › Daily Menu › Members')
     expect(members).toHaveTextContent('Under it: Capture Member, Labels')
-    const debitOrders = screen.getByRole('link', { name: DEBIT_ORDERS.name }).closest('tr')
-    expect(debitOrders).toHaveTextContent(`Admin Menu › ${DEBIT_ORDERS.short}`)
+    const debitOrders = screen.getByRole('link', { name: MODULE }).closest('tr')
+    expect(debitOrders).toHaveTextContent(`Admin Menu › ${RAIL}`)
     expect(debitOrders).toHaveTextContent('Under it: Debits, Runs')
 
     await user.click(choice('Cards'))
@@ -210,7 +214,7 @@ describe('the view switch -- cards, a list or a table', () => {
     )
 
     await user.click(choice(name))
-    await user.click(screen.getByRole('link', { name: new RegExp(`^${DEBIT_ORDERS.name}`) }))
+    await user.click(screen.getByRole('link', { name: new RegExp(`^${MODULE}`) }))
     expect(await screen.findByText('Arrived')).toBeInTheDocument()
     expect(screen.getByRole('status', { name: 'selected' })).toHaveTextContent('/admin/acb')
   })

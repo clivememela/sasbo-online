@@ -6,7 +6,7 @@ import { http, HttpResponse } from 'msw'
 import App from '../../App'
 import Admin from './Admin'
 import MonthlyMenu from './MonthlyMenu'
-import { DEBIT_ORDERS, navItems } from '../../config/navigation'
+import { navItems } from '../../config/navigation'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { smokeHandlers } from '../../test/msw/smokeLayer'
@@ -83,7 +83,8 @@ describe('where the page is -- the Admin page, the rail and the route agree (04.
     expect(leaf?.title).toBe('Month end')
     expect(leaf.subItems).toBeUndefined()
     expect(titles.indexOf('Month end')).toBe(titles.indexOf('Daily Menu') + 1)
-    expect(titles.indexOf(DEBIT_ORDERS.short)).toBe(titles.indexOf('Month end') + 1)
+    // The rail prints the module's short name, "Debit Orders" (`navigation.js`).
+    expect(titles.indexOf('Debit Orders')).toBe(titles.indexOf('Month end') + 1)
   })
 
   it('🔑 the route renders the page the rail and the crumb name: Admin Menu › Month end', async () => {

@@ -17,18 +17,6 @@ import {
   LucideConstruction, LucideCopyCheck, UserRoundPen
 } from "lucide-react";
 
-/**
- * 🗣️ THE MODULE ONCE CALLED "A.C.B." -- named once, here, for the rail's two entries and Admin Membership's card.
- * "Debit Order Deductions" is SASBO's name for it (the 5 Oct Show & Tell, handover §A; the name the status report SASBO
- * saw uses), and Stephne's DOD answer settles the rest: "ACB" becomes "Debit Order" everywhere, and the screens keep
- * their names for now (Runs, Debits). The address stays `/admin/acb` -- deep links and the decks use it.
- *
- * 📐 TWO SPELLINGS, BECAUSE A RAIL ROW IS 256px. An entry's `title` is what the rail and the crumbs print, and the whole
- * name cut off mid-word there ("Debit Order Deducti…"), so the rail's entries take the `short` one; an entry's `name`,
- * where it has one, is the whole name Home's views print.
- */
-export const DEBIT_ORDERS = Object.freeze({ name: "Debit Order Deductions", short: "Debit Orders" });
-
 export const navItems = [
   {
     title: "Home",
@@ -116,9 +104,14 @@ export const navItems = [
         icon: LucideCalendarRange,
         href: "/admin/monthly-menu",
       },
+      // 🗣️ THE MODULE ONCE CALLED "A.C.B." -- "Debit Order Deductions" is SASBO's name for it (the 5 Oct Show & Tell,
+      // handover §A; the status report SASBO saw uses it), and Stephne's DOD answer settles the rest: "ACB" becomes
+      // "Debit Order" everywhere, and the screens keep their names for now (Runs, Debits). 📐 The rail and the crumbs
+      // print "Debit Orders": a 256px rail row cuts the whole name off mid-word, and this file ships on every page's
+      // first load. The whole name is Home's (`homeModules.js`) and Admin Membership's. The address stays `/admin/acb`
+      // -- deep links and the decks use it. Written twice, here and on the rail's top level below.
       {
-        title: DEBIT_ORDERS.short,
-        name: DEBIT_ORDERS.name,
+        title: "Debit Orders",
         href:'/admin/acb',
         icon: LucideFile,
         subItems: [
@@ -194,8 +187,7 @@ export const navItems = [
     ]
   },
   {
-    title: DEBIT_ORDERS.short,
-    name: DEBIT_ORDERS.name,
+    title: "Debit Orders",
     href:'/admin/acb',
     icon: LucideFile,
     subItems: [

@@ -5,7 +5,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import App from '../App'
 import Sidebar from '../components/Sidebar'
 import Home from '../pages/Home'
-import { DEBIT_ORDERS, navItems } from '../config/navigation'
+import { navItems } from '../config/navigation'
 import { renderWithProviders } from './renderWithProviders'
 import { server } from './msw/server'
 import { smokeHandlers } from './msw/smokeLayer'
@@ -24,6 +24,10 @@ import { setupUser } from './user'
  * finds. The canary below proves the search convicts each spelling the client carried, and acquits the new name.
  */
 const OLD_NAME = /\bA\.?\s?C\.?\s?B\b|clearing bureau/i
+
+/** SASBO's name for the module, and the short one the rail and the crumbs print (`navigation.js`). */
+const MODULE = 'Debit Order Deductions'
+const RAIL = 'Debit Orders'
 
 /** Everything on the page a person can read or hear. */
 const readable = () => [
@@ -105,7 +109,7 @@ describe('"Debit Order Deductions", never "A.C.B." (the 5 Oct Show & Tell; Steph
       'Members matching the ACB search', 'Automated clearing bureau debits and returns']) {
       expect(OLD_NAME.test(old), old).toBe(true)
     }
-    for (const now of [DEBIT_ORDERS.name, DEBIT_ORDERS.short, 'Debit Order Runs', 'Debit Order Day', 'Feedback',
+    for (const now of [MODULE, RAIL, 'Debit Order Runs', 'Debit Order Day', 'Feedback',
       'Deduct Subs through Debit Order (Y/N)']) {
       expect(OLD_NAME.test(now), now).toBe(false)
     }
@@ -119,7 +123,7 @@ describe('"Debit Order Deductions", never "A.C.B." (the 5 Oct Show & Tell; Steph
     // under its new name in both places it sits, at the address it always had.
     expect(within(rail).getAllByRole('link').length + within(rail).queryAllByTitle('Not available yet').length)
       .toBeGreaterThanOrEqual(everyEntry(navItems).length)
-    const entries = within(rail).getAllByRole('link', { name: DEBIT_ORDERS.short })
+    const entries = within(rail).getAllByRole('link', { name: RAIL })
     expect(entries).toHaveLength(2)
     for (const entry of entries) expect(entry).toHaveAttribute('href', '/admin/acb')
 
@@ -136,7 +140,7 @@ describe('"Debit Order Deductions", never "A.C.B." (the 5 Oct Show & Tell; Steph
     await mount('/admin/acb/runs')
     expect(screen.getByRole('heading', { level: 1, name: 'Debit Order Runs' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' }))
-      .toHaveTextContent(new RegExp(`^Home\\s*Admin Menu\\s*${DEBIT_ORDERS.short}\\s*Runs$`))
+      .toHaveTextContent(new RegExp(`^Home\\s*Admin Menu\\s*${RAIL}\\s*Runs$`))
   })
 
   it('Home, in the list and the table too: the module is "Debit Order Deductions" in every view', async () => {
@@ -145,7 +149,7 @@ describe('"Debit Order Deductions", never "A.C.B." (the 5 Oct Show & Tell; Steph
 
     for (const view of ['List', 'Table']) {
       await user.click(screen.getByRole('button', { name: view }))
-      expect(screen.getByRole('link', { name: new RegExp(`^${DEBIT_ORDERS.name}`) })).toHaveAttribute('href', '/admin/acb')
+      expect(screen.getByRole('link', { name: new RegExp(`^${MODULE}`) })).toHaveAttribute('href', '/admin/acb')
       expect(readable(), `Home's ${view} view`).not.toMatch(OLD_NAME)
     }
   })
