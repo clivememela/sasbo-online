@@ -170,15 +170,16 @@ export const debitsRuns = (runs) => {
 
 /**
  * What the screen says when the member service answered a different debit day from the one chosen, or
- * `null`. 🔴 Register A67: `main`'s member service applies the bank's day over the member's own
- * whenever the bank's row has one in the window -- against SASBO's *"we have asked that this is
- * flexible"* (Q42). The screen shows the day the server kept, and says so, rather than the one chosen.
+ * `null`. It was written for register A67, when the member service set the bank's day over a day chosen
+ * here; since the October build the service keeps a chosen day and gives the bank's only where none is
+ * chosen (SASBO, Q42: *"we have asked that this is flexible"*). It stays as the net: a saved day that is
+ * not the one on screen is never left unsaid.
  */
 export const debitDayReplaced = (chosen, answered) => {
   if (chosen === '' || chosen == null || answered == null) return null;
   if (String(chosen) === String(answered)) return null;
-  return `The debit day was saved as the ${ordinal(answered)}, not the ${ordinal(chosen)} chosen: `
-    + 'this system still sets the bank’s day over the member’s own. It is a known fault.';
+  return `The debit day was saved as the ${ordinal(answered)}, not the ${ordinal(chosen)} chosen. `
+    + 'Check the member’s banking details before the next debit order run.';
 };
 
 export const ordinal = (day) => {
