@@ -19,7 +19,7 @@ const RequirePermission = ({ permission, children, fallback }) => {
   const next = encodeURIComponent(`${location.pathname}${location.search}`);
 
   return (
-    <div role="status" className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+    <div role="status" className="rounded-md border border-line bg-surface p-4 text-sm text-ink">
       {status === 'signed-in' ? (
         <p>You need permission to {what}. Ask your administrator if you should have it.</p>
       ) : (
