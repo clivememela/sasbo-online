@@ -235,7 +235,8 @@ describe('the record -- the member\'s workplace, changed', () => {
     expect(screen.getByRole('button', { name: /^Save changes$/ })).toBeInTheDocument()
     expect(within(workplaceGroup()).getByText('INVENTED HEAD OFFICE')).toBeInTheDocument()
     expect(panel().getByText('The changes were not saved')).toBeInTheDocument()
-    expect(panel().getAllByText(sentence).length).toBeGreaterThanOrEqual(2)
+    // The notice carries the server's sentence too, and says that nothing was written (the manual stream's ⓑ).
+    expect(panel().getByText(`${sentence} Nothing was written.`)).toBeInTheDocument()
   })
 
   it('🔍 MO24 ⑫: in the record\'s panel the employer stands over the search, in the panel\'s one column', async () => {

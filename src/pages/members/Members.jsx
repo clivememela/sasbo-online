@@ -569,7 +569,7 @@ export default function Members() {
      * MEMBERS_VIEW. Anyone else is told what is needed (`RequirePermission`), and no request is sent.
      */
     const auth = useAuth();
-    const mayRead = auth.can(PERMISSIONS.MEMBERS_VIEW) || (auth.mode === "open" && auth.status !== "signed-in");
+    const mayRead = auth.can(PERMISSIONS.MEMBERS_VIEW) || (auth.mode === "open" && !auth.user);
 
     /* The twelve criteria the mock keeps behind "More criteria". Closed at rest. */
     const [moreCriteria, setMoreCriteria] = useState(false);
