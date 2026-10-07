@@ -41,6 +41,7 @@ const ROUTE = 'POST /api/members/{id}/status'
 const CHANGED = monthEndExamples.answers[ROUTE]
 const DELETION_CODES = 'GET /api/reference/deletion-codes'
 const SUSPENSION_CODES = 'GET /api/reference/suspension-codes'
+const NO_DEDUCTION_REASONS = 'GET /api/reference/no-deduction-reasons'
 const AGAIN = 'Asking again is safe — the same change asked twice is written once.'
 
 /** The member as the register listed them, and as the server holds them now -- the two part when somebody else acts. */
@@ -70,6 +71,10 @@ function made(change) {
       reasonUnderCode: change.reasonUnderCode ?? null,
       suspensionCode: change.suspensionCode ?? null,
       note: change.note ?? null,
+      // MEN-17: the reason for no payroll deduction THIS change named, by the server's list -- never the golden one's.
+      noDeductionReasonId: change.noDeductionReasonId ?? null,
+      noDeductionReason: monthEndBody(NO_DEDUCTION_REASONS).rows
+        .find((row) => row.id === change.noDeductionReasonId)?.name ?? null,
     },
   }
 }
@@ -445,6 +450,94 @@ describe('the reason under a code -- what a resigning member gave, as SASBO keep
     expect(dialog.getAllByText(sentence)).toHaveLength(1)
     expect(sent).toHaveLength(1)
     expect(sent[0]).toMatchObject({ deletionCode: 2, reasonUnderCode: 'Other Union' })
+  })
+})
+
+describe('the reason for no payroll deduction -- Stephne, MEN-17: "a dropdown sayin a reason ... Also have the opporenity to type a reason"', () => {
+  /** How often the reasons were asked for -- the server's list, golden (MD48). */
+  let reasonsAsked
+
+  beforeEach(() => {
+    reasonsAsked = 0
+    server.use(http.get('*/api/reference/no-deduction-reasons', () => {
+      reasonsAsked += 1
+      return HttpResponse.json(monthEndBody(NO_DEDUCTION_REASONS))
+    }))
+  })
+
+  const noDeductionSelect = (dialog) => dialog.getByLabelText(/^Reason for no payroll deduction/)
+  const WHY = 'Choose the reason for no payroll deduction, or type it in the note.'
+
+  it('🔑 under a code the reasons stand under, the active reasons under it are offered, in the list\'s order -- asked for once', async () => {
+    const user = setupUser()
+    const dialog = await openDialog(user)
+    await choose(dialog, user, 'Suspended', 11)
+
+    await waitFor(() => expect(noDeductionSelect(dialog)).toBeEnabled())
+    expect(optionsOf(noDeductionSelect(dialog)))
+      .toEqual(['None chosen: typed in the note', 'Unpaid leave', 'Paternity leave', 'Insufficient funds'])
+    expect(reasonsAsked).toBe(1)
+  })
+
+  it('🔴 neither chosen nor typed: Change status waits and says why -- and either one is enough', async () => {
+    const user = setupUser()
+    const dialog = await openDialog(user)
+    await choose(dialog, user, 'Suspended', 11)
+    await waitFor(() => expect(noDeductionSelect(dialog)).toBeEnabled())
+
+    expect(dialog.getByRole('button', { name: 'Change status' })).toBeDisabled()
+    expect(dialog.getByText(WHY)).toBeInTheDocument()
+    await user.type(dialog.getByLabelText(/^Note/), 'Invented: on unpaid leave until the end of the month')
+    expect(dialog.getByRole('button', { name: 'Change status' })).toBeEnabled()
+    await press(dialog, user)
+
+    expect(await screen.findByText('Synthetic Alpha is now Suspended.')).toBeInTheDocument()
+    expect(sent).toEqual([{ toStatus: 'Suspended', expectedStatus: 'Active', reason: 'SUSPENSION_CODE', suspensionCode: 11,
+      note: 'Invented: on unpaid leave until the end of the month' }])
+  })
+
+  it('🔑 one chosen is sent by its id as noDeductionReasonId, beside the code -- and what is said names it', async () => {
+    const user = setupUser()
+    const dialog = await openDialog(user)
+    await choose(dialog, user, 'Suspended', 11)
+    await waitFor(() => expect(noDeductionSelect(dialog)).toBeEnabled())
+    await user.selectOptions(noDeductionSelect(dialog), 'Unpaid leave')
+    await press(dialog, user)
+
+    expect(await screen.findByText('Synthetic Alpha is now Suspended. The reason for no payroll deduction: Unpaid leave.'))
+      .toBeInTheDocument()
+    expect(sent).toEqual([{ toStatus: 'Suspended', expectedStatus: 'Active', reason: 'SUSPENSION_CODE', suspensionCode: 11,
+      noDeductionReasonId: 1 }])
+  })
+
+  it('a debit order code no reason stands under offers none and needs none -- and changing the code lets go of one chosen', async () => {
+    const user = setupUser()
+    const dialog = await openDialog(user)
+    await choose(dialog, user, 'Suspended', 11)
+    await waitFor(() => expect(noDeductionSelect(dialog)).toBeEnabled())
+    await user.selectOptions(noDeductionSelect(dialog), 'Paternity leave')
+    await user.selectOptions(codeSelect(dialog), '13')
+
+    expect(dialog.queryByLabelText(/^Reason for no payroll deduction/)).not.toBeInTheDocument()
+    await press(dialog, user)
+    expect(await screen.findByText('Synthetic Alpha is now Suspended.')).toBeInTheDocument()
+    expect(sent).toEqual([{ toStatus: 'Suspended', expectedStatus: 'Active', reason: 'SUSPENSION_CODE', suspensionCode: 13 }])
+  })
+
+  it('🔴 a reason the server no longer offers: said AT THE REASON in its words, the code kept, the reasons read again', async () => {
+    server.use(monthEndRefusal('NO_DEDUCTION_REASON_UNKNOWN', ROUTE))
+    const user = setupUser()
+    const dialog = await openDialog(user)
+    await choose(dialog, user, 'Suspended', 11)
+    await waitFor(() => expect(noDeductionSelect(dialog)).toBeEnabled())
+    await user.selectOptions(noDeductionSelect(dialog), 'Insufficient funds')
+    await press(dialog, user)
+
+    const refusal = monthEndExamples.refusals.NO_DEDUCTION_REASON_UNKNOWN.body.message
+    expect(await dialog.findByText(refusal)).toBeInTheDocument()
+    expect(codeSelect(dialog)).toHaveValue('11')
+    await waitFor(() => expect(reasonsAsked).toBe(2))
+    expect(noDeductionSelect(dialog)).toHaveValue('')
   })
 })
 

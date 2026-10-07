@@ -44,6 +44,16 @@ export const HISTORY_PAGE_INVALID = 'HISTORY_PAGE_INVALID';
 export const VISIT_INVALID = 'VISIT_INVALID';
 export const WORKPLACE_PAGE_INVALID = 'WORKPLACE_PAGE_INVALID';
 
+/**
+ * A suspension under a code the reasons for no payroll deduction stand under (Stephne, MEN-17) names one of them, or
+ * types the reason in its note: `NO_DEDUCTION_REASON_REQUIRED` where it does neither (`details.reasons`, the ids that may
+ * be chosen), `NO_DEDUCTION_REASON_UNKNOWN` for a reason no longer offered, and `STATUS_REASON_MISMATCH` for a reason
+ * that stands under another code (`details.fits`). Change status says each at the reason, and reads the list again.
+ */
+export const NO_DEDUCTION_REASON_REQUIRED = 'NO_DEDUCTION_REASON_REQUIRED';
+export const NO_DEDUCTION_REASON_UNKNOWN = 'NO_DEDUCTION_REASON_UNKNOWN';
+export const STATUS_REASON_MISMATCH = 'STATUS_REASON_MISMATCH';
+
 /** The refusal codes the screens branch on (ME-13) -- each one the server publishes. */
 export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   REQUEST_MALFORMED: 'REQUEST_MALFORMED',
@@ -55,6 +65,9 @@ export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   SUSPENSION_CODE_UNKNOWN,
   HISTORY_PAGE_INVALID,
   VISIT_INVALID,
+  NO_DEDUCTION_REASON_REQUIRED,
+  NO_DEDUCTION_REASON_UNKNOWN,
+  STATUS_REASON_MISMATCH,
 });
 
 /**
@@ -195,6 +208,16 @@ export const emptyReasonSentence = (reason) => LIST_EMPTY_REASON[reason] ?? reas
  */
 export const listRows = (answer) =>
   answer && typeof answer === 'object' && !Array.isArray(answer) && Array.isArray(answer.rows) ? answer.rows : null;
+
+/**
+ * The reasons for no payroll deduction a suspension under SASBO's `code` may name (Stephne, MEN-17: "Can we have a
+ * dropdown sayin a reason for no payroll deduction"): the ACTIVE reasons standing under that code, in the list's order,
+ * as options by id -- none under a code no reason stands under (a debit order code), and none from an answer that is not
+ * a list's (MV-36).
+ */
+export const noDeductionReasonsUnder = (answer, code) => (listRows(answer) ?? [])
+  .filter((row) => row && row.active === true && Number.isInteger(row.id) && row.suspensionCode === Number(code))
+  .map((row) => ({ value: String(row.id), label: row.name }));
 
 /**
  * A workplace's committee in one line -- its code and its name, each trimmed, either absent: `Q01, INVENTED` -- or the

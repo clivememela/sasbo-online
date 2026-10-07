@@ -8,18 +8,25 @@ import useAsyncOptions from '../../hooks/useAsyncOptions';
 import { personName } from '../../lib/names';
 import reportError from '../../lib/reportError';
 import {
-  DELETION_CODE_UNKNOWN, MEMBER_NOT_FOUND, MEMBER_STATUS_KIND, STATUS_CHANGED_SINCE, STATUS_KIND,
-  SUSPENSION_CODE_UNKNOWN, deletionCodeOptions, emptyReasonSentence, listProvenance, listRows, reasonFor, statusKind,
+  DELETION_CODE_UNKNOWN, MEMBER_NOT_FOUND, MEMBER_STATUS_KIND, NO_DEDUCTION_REASON_REQUIRED,
+  NO_DEDUCTION_REASON_UNKNOWN, STATUS_CHANGED_SINCE, STATUS_KIND, STATUS_REASON_MISMATCH, SUSPENSION_CODE_UNKNOWN,
+  deletionCodeOptions, emptyReasonSentence, listProvenance, listRows, noDeductionReasonsUnder, reasonFor, statusKind,
   suspensionCodeOptions,
 } from '../../config/monthEnd';
 import { memberStatusService } from '../../services/memberStatusService';
 import { writeMayHaveLanded } from '../../services/parseApiError';
-import { getDeletionCodes, getSuspensionCodes } from '../../services/referenceService';
+import { getDeletionCodes, getNoDeductionReasons, getSuspensionCodes } from '../../services/referenceService';
 
 /** The server keeps a note to this many characters and refuses one longer (03.1) -- so the field stops there. */
 export const NOTE_LIMIT = 500;
 
-const BLANK = { to: '', code: '', reason: '', note: '', notice: null, codeError: null, reasonError: null, gone: false };
+const BLANK = {
+  to: '', code: '', reason: '', noDeduction: '', note: '', notice: null, codeError: null, reasonError: null,
+  noDeductionError: null, gone: false,
+};
+
+/** MEN-17's refusals, each said at the reason for no payroll deduction. */
+const NO_DEDUCTION_REFUSALS = [NO_DEDUCTION_REASON_REQUIRED, NO_DEDUCTION_REASON_UNKNOWN, STATUS_REASON_MISMATCH];
 
 /** Why a list has nothing to choose from when the SERVER gave no reason -- the route is not there, or not a list. */
 const NOT_HERE = 'This server does not have this list yet.';
@@ -68,6 +75,13 @@ function useCodeList(read, wanted) {
  * note stays the administrator's own words; nothing is written into it for them. A reason the server no longer keeps
  * under the code (`DELETION_CODE_UNKNOWN` naming what it `known`s) is said at the reason, and the list asked for again.
  *
+ * 🔑 THE REASON FOR NO PAYROLL DEDUCTION (Stephne, MEN-17: "Can we have a dropdown sayin a reason for no payroll
+ * deduction. Also have the opporenity to type a reason"). Where the suspension code chosen is one the reasons stand under
+ * (11, 12 and 21 as seeded), *Reason for no payroll deduction* offers the active reasons under it, sent by id as
+ * `noDeductionReasonId`; or the reason is typed in the note. One of the two is needed before the change is sent, and a
+ * refusal of it (`NO_DEDUCTION_REASON_REQUIRED`, `_UNKNOWN`, `STATUS_REASON_MISMATCH`) is said at the reason, the list
+ * read again. A debit order code (13 and the like) needs neither.
+ *
  * `expectedStatus` is the status this screen shows, so a change made on a stale view is refused `STATUS_CHANGED_SINCE`
  * rather than written over somebody else's. WHAT IS SAID IS SAID AFTER THE MEMBER IS READ AGAIN (ME-3): the page's
  * `reread(id, status)` answers the member as they now stand -- `null` where that read failed, the record then showing
@@ -106,26 +120,36 @@ export default function ChangeStatus({ member, open, onOpenChange, reread, onDon
   const suspending = kind === STATUS_KIND.SUSPENDED;
   const deletions = useCodeList(getDeletionCodes, open && leaving);
   const suspensions = useCodeList(getSuspensionCodes, open && suspending);
+  const noDeductionList = useCodeList(getNoDeductionReasons, open && suspending);
   const list = leaving ? deletions : suspending ? suspensions : null;
   const answer = list && !list.loading && !list.error ? list.options[0] : null;
   const codes = !answer ? [] : leaving ? deletionCodeOptions(answer.rows) : suspensionCodeOptions(answer.rows);
   const chosen = codes.find((option) => String(option.code) === form.code);
   // The reasons SASBO keeps under the deletion code chosen -- none under most codes, and none for a suspension.
   const reasons = leaving ? chosen?.under ?? [] : [];
+  // MEN-17: the active reasons for no payroll deduction under the suspension code chosen -- none under a debit order code.
+  const noDeductionAnswer = noDeductionList.loading || noDeductionList.error ? null : noDeductionList.options[0];
+  const noDeduction = suspending && chosen ? noDeductionReasonsUnder(noDeductionAnswer, chosen.code) : [];
+  const offersNoDeduction = noDeduction.length > 0 || Boolean(suspending && chosen && noDeductionList.error);
+  const chosenNoDeduction = noDeduction.find((option) => option.value === form.noDeduction);
 
   const who = personName(member) || 'This member';
-  const why = form.gone ? null : !form.to ? 'Choose the new status.' : list && !chosen ? 'Choose SASBO’s code for it.' : null;
+  const why = form.gone ? null : !form.to ? 'Choose the new status.' : list && !chosen ? 'Choose SASBO’s code for it.'
+    : suspending && noDeductionList.loading ? 'Reading the reasons for no payroll deduction.'
+      : noDeduction.length > 0 && !chosenNoDeduction && !form.note.trim()
+        ? 'Choose the reason for no payroll deduction, or type it in the note.' : null;
 
   const submit = async () => {
     const { to, code } = form;
     const note = form.note.trim();
     const reasonUnderCode = reasons.includes(form.reason) ? form.reason : '';
     // What was written is the server's to say: the reason is named as its answer names it, and not where it names none.
-    const done = (status, already, reason) =>
+    const done = (status, already, reason, noDeductionReason) =>
       onDone(already ? `${who} was already ${status}. Nothing more was written.`
-        : `${who} is now ${status}.${reason ? ` The reason they gave: ${reason}.` : ''}`);
+        : `${who} is now ${status}.${reason ? ` The reason they gave: ${reason}.` : ''}${noDeductionReason
+          ? ` The reason for no payroll deduction: ${noDeductionReason}.` : ''}`);
     setBusy(true);
-    edit({ notice: null, codeError: null, reasonError: null });
+    edit({ notice: null, codeError: null, reasonError: null, noDeductionError: null });
     try {
       const changed = await memberStatusService.changeStatus(member.id, {
         toStatus: to,
@@ -134,10 +158,11 @@ export default function ChangeStatus({ member, open, onOpenChange, reread, onDon
         ...(leaving && { deletionCode: Number(code) }),
         ...(leaving && reasonUnderCode && { reasonUnderCode }),
         ...(suspending && { suspensionCode: Number(code) }),
+        ...(suspending && chosenNoDeduction && { noDeductionReasonId: Number(chosenNoDeduction.value) }),
         ...(note && { note }),
       });
       await reread(member.id, changed.status);
-      done(changed.status, !changed.change, changed.change?.reasonUnderCode);
+      done(changed.status, !changed.change, changed.change?.reasonUnderCode, changed.change?.noDeductionReason);
     } catch (error) {
       reportError('ChangeStatus.change', error);
       const refused = error?.body?.code;
@@ -145,6 +170,10 @@ export default function ChangeStatus({ member, open, onOpenChange, reread, onDon
         // The code stands; the reason under it is not one SASBO keeps (any more): said there, and the list read again.
         edit({ reason: '', reasonError: error.message });
         list?.refetch();
+      } else if (suspending && offersNoDeduction && NO_DEDUCTION_REFUSALS.includes(refused)) {
+        // MEN-17: said at the reason, in the server's words, the code kept -- and the reasons read again.
+        edit({ noDeduction: '', noDeductionError: error.message });
+        noDeductionList.refetch();
       } else if (refused === DELETION_CODE_UNKNOWN || refused === SUSPENSION_CODE_UNKNOWN) {
         edit({ code: '', reason: '', codeError: error.message });
         list?.refetch();
@@ -203,7 +232,9 @@ export default function ChangeStatus({ member, open, onOpenChange, reread, onDon
           label="New status"
           required
           value={form.to}
-          onChange={(to) => edit({ to, code: '', reason: '', codeError: null, reasonError: null })}
+          onChange={(to) => edit({
+            to, code: '', reason: '', noDeduction: '', codeError: null, reasonError: null, noDeductionError: null,
+          })}
           options={Object.keys(MEMBER_STATUS_KIND).filter((status) => status !== member?.status)}
           placeholder="Choose a status"
           disabled={busy || form.gone}
@@ -213,7 +244,9 @@ export default function ChangeStatus({ member, open, onOpenChange, reread, onDon
             label={`SASBO’s ${leaving ? 'deletion' : 'suspension'} code`}
             required
             value={form.code}
-            onChange={(code) => edit({ code, reason: '', codeError: null, reasonError: null })}
+            onChange={(code) => edit({
+              code, reason: '', noDeduction: '', codeError: null, reasonError: null, noDeductionError: null,
+            })}
             options={codes}
             optionValue="code"
             optionLabel="label"
@@ -236,6 +269,19 @@ export default function ChangeStatus({ member, open, onOpenChange, reread, onDon
             placeholder="No reason given"
             error={form.reasonError || undefined}
             hint={`Optional — a reason SASBO keeps under ${chosen.label}.`}
+            disabled={busy}
+          />
+        )}
+        {offersNoDeduction && (
+          <SelectInput
+            label="Reason for no payroll deduction"
+            value={form.noDeduction}
+            onChange={(choice) => edit({ noDeduction: choice, noDeductionError: null })}
+            options={[{ value: '', label: 'None chosen: typed in the note' }, ...noDeduction]}
+            loadError={noDeductionList.error}
+            onRetryLoad={noDeductionList.refetch}
+            error={form.noDeductionError || undefined}
+            hint={`Choose one, or type the reason in the note. The reasons kept under ${chosen?.label}.`}
             disabled={busy}
           />
         )}
