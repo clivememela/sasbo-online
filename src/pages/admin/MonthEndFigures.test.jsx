@@ -493,7 +493,7 @@ describe('the month\'s figures, on the Month end page (02.3; the 5 Oct Show & Te
     expect(screen.queryByText('Grouped by where each member works today.')).not.toBeInTheDocument()
   })
 
-  it('🔴 rule C: a row of fewer than five, and the row withheld beside it, carry no number at all (MD37, MV-19)', async () => {
+  it('🔴 rule C: a row of fewer than five, and the row beside it, carry no number at all -- and never the word "withheld" (MD37, MV-19)', async () => {
     summaryAnswers(september({
       rows: [
         row('SYNTHETIC EMPLOYER ONE', { onRecord: 2396, suspended: 118, paying: 2278, joined: 40, left: 12, complement: 3600, penetration: 0.6328 }),
@@ -508,9 +508,11 @@ describe('the month\'s figures, on the Month end page (02.3; the 5 Oct Show & Te
     const small = rowOf('SYNTHETIC EMPLOYER TWO')
     expect(small).toHaveTextContent('fewer than five')
     expect(small).not.toHaveTextContent(/\d/)
-    const withheld = rowOf('SYNTHETIC EMPLOYER THREE')
-    expect(withheld).toHaveTextContent('withheld')
-    expect(withheld).not.toHaveTextContent(/\d/)
+    // SASBO read "withheld" as "has to be approved" (5 Oct, transcript ¶92): the row says why it shows nothing instead.
+    const beside = rowOf('SYNTHETIC EMPLOYER THREE')
+    expect(beside).toHaveTextContent('Not shown until you sign in')
+    expect(beside).not.toHaveTextContent(/withheld/i)
+    expect(beside).not.toHaveTextContent(/\d/)
     expect(screen.getByText(/^A row with fewer than five members shows no figures until administrators sign in/))
       .toBeInTheDocument()
     // The must-pass: the row beside them still reads its numbers.
@@ -548,7 +550,7 @@ describe('the month\'s figures, on the Month end page (02.3; the 5 Oct Show & Te
     expect(screen.queryByText(/not loaded on this demonstration/)).not.toBeInTheDocument()
   })
 
-  it('a penetration above a hundred is shown as it is, with the words complement out of date (MM76)', async () => {
+  it('a penetration above a hundred is shown as it is, with the words staff complement out of date (MM76, MEN-26)', async () => {
     const over = { penetration: 1.042, complementOutOfDate: true }
     summaryAnswers(september({
       totals: figures({ onRecord: 2418, suspended: 118, paying: 2300, joined: 41, left: 12, complement: 2207, ...over }),
@@ -561,8 +563,32 @@ describe('the month\'s figures, on the Month end page (02.3; the 5 Oct Show & Te
     openPage()
     await screen.findByText('INVENTED GROUP CORE')
 
-    expect(readings('Penetration')).toEqual(['104,20 %', 'paying members over staff complement: complement out of date'])
-    expect(cellsOf(rowOf('INVENTED GROUP CORE')).at(-1)).toBe('104,20 %complement out of date')
+    expect(readings('Penetration')).toEqual(['104,20 %', 'paying members over staff complement: staff complement out of date'])
+    expect(cellsOf(rowOf('INVENTED GROUP CORE')).at(-1)).toBe('104,20 %staff complement out of date')
+  })
+
+  it('🔴 MEN-26: a penetration over a hundred is flagged where the server did not mark it -- and the server\'s own line is said', async () => {
+    const over = { penetration: 1.042, complementOutOfDate: false }
+    const flagged = 'More members pay than the staff complement on record for one row or more: that complement is out of date.'
+    summaryAnswers(september({
+      totals: figures({ onRecord: 2418, suspended: 118, paying: 2300, joined: 41, left: 12, complement: 2207, ...over }),
+      rows: [
+        row('INVENTED GROUP CORE',
+          { onRecord: 2400, suspended: 118, paying: 2282, joined: 40, left: 12, complement: 2190, ...over }, { core: true }),
+        row('INVENTED GROUP OTHER',
+          { onRecord: 400, suspended: 18, paying: 382, joined: 10, left: 2, complement: 630, penetration: 0.6063 }),
+        NO_WORKPLACE,
+      ],
+      notes: [flagged],
+    }))
+    openPage()
+    await screen.findByText('INVENTED GROUP CORE')
+
+    expect(readings('Penetration')).toEqual(['104,20 %', 'paying members over staff complement: staff complement out of date'])
+    expect(cellsOf(rowOf('INVENTED GROUP CORE')).at(-1)).toBe('104,20 %staff complement out of date')
+    expect(screen.getByText(flagged)).toBeInTheDocument()
+    // The must-pass: a row under a hundred carries no flag.
+    expect(cellsOf(rowOf('INVENTED GROUP OTHER')).at(-1)).toBe('60,63 %')
   })
 })
 
@@ -573,7 +599,7 @@ describe('the month\'s figures, on the Month end page (02.3; the 5 Oct Show & Te
  * (nothing runs past at 390 or at 844×390) were measured in a browser, and are recorded with the commit.
  */
 describe('the month\'s figures -- the stand-in review (MO24)', () => {
-  it('a core group wears the mock\'s pill; a word in place of a figure is its quiet italic; complement out of date is the pending flag', async () => {
+  it('a core group wears the mock\'s pill; a word in place of a figure is its quiet italic; staff complement out of date is the pending flag', async () => {
     const over = { penetration: 1.042, complementOutOfDate: true }
     summaryAnswers(september({
       rows: [
@@ -595,7 +621,7 @@ describe('the month\'s figures -- the stand-in review (MO24)', () => {
     )
     // `.quiet` and `.flag`.
     expect(screen.getByText('fewer than five')).toHaveClass('italic', 'text-ink-muted')
-    expect(screen.getByText('complement out of date')).toHaveClass('block', 'text-xs', 'font-medium', 'text-status-pending')
+    expect(screen.getByText('staff complement out of date')).toHaveClass('block', 'text-xs', 'font-medium', 'text-status-pending')
     // The must-pass: a group that is not core carries no pill.
     expect(within(rowOf('INVENTED GROUP OTHER')).queryByText('core')).not.toBeInTheDocument()
   })

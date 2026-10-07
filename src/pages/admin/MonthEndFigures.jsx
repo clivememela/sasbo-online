@@ -13,6 +13,7 @@ import { formatInt, formatPercent } from '../../lib/format.js';
 import reportError from '../../lib/reportError.js';
 import { getAreas, getRegions, getStatus } from '../../services/referenceService.js';
 import { summaryService } from '../../services/summaryService.js';
+import { COMPLEMENT_OUT_OF_DATE, hiddenRowWords, penetrationOutOfDate } from './monthEndRules.js';
 
 /**
  * THE MONTH'S FIGURES -- month end `02.3`, *"the eye of SASBO"* (SASBO's 22 Sep agenda), the strip and the sheet of
@@ -76,24 +77,27 @@ const stripOf = (answer) => {
     {
       label: 'Penetration',
       value: totals.penetration == null ? null : formatPercent(totals.penetration),
-      definition: `paying members over staff complement${totals.complementOutOfDate ? ': complement out of date' : ''}`,
+      definition: `paying members over staff complement${penetrationOutOfDate(totals.penetration, totals.complementOutOfDate)
+        ? `: ${COMPLEMENT_OUT_OF_DATE}` : ''}`,
     },
   ];
 };
 
 const count = (key) => (row) => row.figures && formatInt(row.figures[key]);
 const NUMBER = { align: 'right', className: 'tabular-nums' };
-// The words a figure's cell may hold -- "fewer than five", "complement out of date" -- wrap on a phone rather than
+// The words a figure's cell may hold -- "fewer than five", "staff complement out of date" -- wrap on a phone rather than
 // widen the sheet past it; a figure itself never breaks, its spaces being no-break ones (`format.js`).
 const WORDS = { ...NUMBER, nowrap: false };
 
 /**
  * The sheet's columns. 🔴 RULE C: a row of one to four members at a named employer, table code or workplace comes
- * with NO figures (MD27, MD37), and so does the row withheld beside it (MV-19) -- it reads *fewer than five* or
- * *withheld*, and not one number, not even its staff.
+ * with NO figures (MD27, MD37), and so does the row beside it that would give it away (MV-19) -- it reads *fewer than
+ * five* or *Not shown until you sign in* (`HIDDEN_ROW_WORDS`: never "withheld", which SASBO read as "has to be
+ * approved"), and not one number, not even its staff.
  *
  * The marks are the mock's (MO24): a core group's `.core` pill -- small capitals, teal ink on the teal wash -- a word
- * read in place of a figure in the mock's quiet italic, and *complement out of date* in the pending ink, as a flag.
+ * read in place of a figure in the mock's quiet italic, and *staff complement out of date* in the pending ink, as a flag
+ * -- wherever a penetration is over 100 % (Stephne, MEN-26), whether or not the server marked the row.
  */
 const columnsFor = (by) => [
   {
@@ -121,7 +125,7 @@ const columnsFor = (by) => [
     header: 'Members',
     ...WORDS,
     cell: (row) => (row.figures ? formatInt(row.figures.paying)
-      : <span className="italic text-ink-muted">{row.withheld ? 'withheld' : 'fewer than five'}</span>),
+      : <span className="italic text-ink-muted">{hiddenRowWords(row)}</span>),
   },
   { key: 'joined', header: 'Joined', priority: 'secondary', ...NUMBER, cell: count('joined') },
   { key: 'left', header: 'Left', priority: 'secondary', ...NUMBER, cell: count('left') },
@@ -133,8 +137,8 @@ const columnsFor = (by) => [
     cell: (row) => row.figures && (
       <>
         {formatPercent(row.figures.penetration)}
-        {row.figures.complementOutOfDate && (
-          <span className="block text-xs font-medium text-status-pending">complement out of date</span>
+        {penetrationOutOfDate(row.figures.penetration, row.figures.complementOutOfDate) && (
+          <span className="block text-xs font-medium text-status-pending">{COMPLEMENT_OUT_OF_DATE}</span>
         )}
       </>
     ),
@@ -289,6 +293,8 @@ export default function MonthEndFigures({ month, openMonth = null }) {
           + 'that would give one away.',
         !empty && 'Members are paying members: on record and not suspended.',
         unplacedSentence(answer.unplaced),
+        // The server's own lines -- since R6, the sentence that says a staff complement is out of date.
+        ...(Array.isArray(answer.notes) ? answer.notes : []),
         UNGROUPED_BECAUSE[answer.workplacesServed],
         answer.month !== serverMonth && groupedSentence(answer),
         grouped && groupedBy && `Grouped by SASBO's lists ${groupedBy.replace('As', 'as')}`,

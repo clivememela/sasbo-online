@@ -157,7 +157,7 @@ describe('rule C -- a row of fewer than five, and the row withheld beside it, ne
   }
   const why = branches.notes[ruleCNote(branches.notes)]
 
-  it('🔴 fewer than five reads "fewer than five", and withheld "withheld" -- no figure on either -- each naming the note that says why', async () => {
+  it('🔴 fewer than five reads "fewer than five", and the row beside it "Not shown until you sign in" -- no figure on either -- each naming the note that says why', async () => {
     server.use(statistics(() => HttpResponse.json(withRuleC)))
     renderAt('/admin/monthly-menu/branches?month=2026-08')
 
@@ -165,9 +165,17 @@ describe('rule C -- a row of fewer than five, and the row withheld beside it, ne
     const smallRow = within(section).getByText(small.label).closest('tr')
     const besideRow = within(section).getByText(beside.label).closest('tr')
     expect(smallRow.textContent).toBe(`${small.label}fewer than five`)
-    expect(besideRow.textContent).toBe(`${beside.label}withheld`)
+    // Never "withheld": SASBO read it as "has to be approved" (5 Oct, transcript ¶92; contracts/monthend-api.md).
+    expect(besideRow.textContent).toBe(`${beside.label}Not shown until you sign in`)
     expect(within(smallRow).getByText('fewer than five')).toHaveAccessibleDescription(why)
-    expect(within(besideRow).getByText('withheld')).toHaveAccessibleDescription(why)
+    expect(within(besideRow).getByText('Not shown until you sign in')).toHaveAccessibleDescription(why)
+  })
+
+  it('the server\'s new note -- "not shown until you sign in" -- is found as the one that says why, as "withheld" was', () => {
+    const notes = ['Members are the members on record.', 'A membership of one to four is shown as fewer than five, and one '
+      + 'row beside it is not shown until you sign in, so that it cannot be worked out by subtraction.']
+    expect(ruleCNote(notes)).toBe(1)
+    expect(ruleCNote(['Members are the members on record.'])).toBe(-1)
   })
 
   it('the must-pass: a row of five or more shows its figures like any other', async () => {
@@ -178,6 +186,51 @@ describe('rule C -- a row of fewer than five, and the row withheld beside it, ne
     const bank = within(section).getByText('INVENTED BANK').closest('tr')
     expect(within(bank).getAllByRole('cell').map((cell) => cell.textContent))
       .toEqual(['INVENTED BANK', '160', '0', '0,00 %', 'R 0,00', '160', '0'])
+  })
+})
+
+describe('MEN-26 -- a penetration over a hundred is shown as it is, and flagged "staff complement out of date"', () => {
+  const branches = golden('branches')
+  const byEmployer = branches.sheets.find((sheet) => sheet.key === 'by-employer')
+  // Invented rows in the golden shape: one the server marked, one over a hundred it did not, one under a hundred.
+  const marked = { key: 'E7', label: 'INVENTED MARKED EMPLOYER', level: 'ROW', fewerThanFive: false, withheld: false,
+    complementOutOfDate: true, cells: [40, 44, 1.1, 7656, 0, 0] }
+  const unmarked = { key: 'E8', label: 'INVENTED UNMARKED EMPLOYER', level: 'ROW', fewerThanFive: false, withheld: false,
+    complementOutOfDate: false, cells: [50, 52, 1.04, 9048, 0, 0] }
+  const under = { key: 'E9', label: 'INVENTED UNDER EMPLOYER', level: 'ROW', fewerThanFive: false, withheld: false,
+    complementOutOfDate: false, cells: [100, 63, 0.63, 10962, 0, 0] }
+  const answer = {
+    ...branches,
+    sheets: branches.sheets.map((sheet) => (sheet === byEmployer ? { ...sheet, rows: [...sheet.rows, marked, unmarked, under] } : sheet)),
+  }
+
+  it('🔴 the flag sits under the penetration figure -- where the server marked the row, and where the figure alone says so', async () => {
+    server.use(statistics(() => HttpResponse.json(answer)))
+    renderAt('/admin/monthly-menu/branches?month=2026-08')
+
+    const section = await sheetNamed(byEmployer.title)
+    const penetration = (label) => within(within(section).getByText(label).closest('tr')).getAllByRole('cell')[3].textContent
+    expect(penetration(marked.label)).toBe('110,00 %staff complement out of date')
+    expect(penetration(unmarked.label)).toBe('104,00 %staff complement out of date')
+    // The must-pass: a penetration under a hundred carries no flag.
+    expect(penetration(under.label)).toBe('63,00 %')
+  })
+
+  it('a sheet with no penetration carries a marked row\'s flag under its staff complement', async () => {
+    const membership = golden('membership')
+    const byGroup = membership.sheets.find((sheet) => sheet.key === 'by-group')
+    const row = { ...byGroup.rows[0], key: 'G9', label: 'INVENTED OVER GROUP', complementOutOfDate: true }
+    server.use(statistics(() => HttpResponse.json({
+      ...membership,
+      sheets: membership.sheets.map((sheet) => (sheet === byGroup ? { ...sheet, rows: [...sheet.rows, row] } : sheet)),
+    })))
+    renderAt('/admin/monthly-menu/membership?month=2026-08')
+
+    const section = await sheetNamed(byGroup.title)
+    const cells = within(within(section).getByText(row.label).closest('tr')).getAllByRole('cell')
+    const complement = byGroup.columns.findIndex((column) => column.key === 'complement') + 1
+    expect(cells[complement].textContent).toMatch(/staff complement out of date$/)
+    expect(within(section).getAllByText('staff complement out of date')).toHaveLength(1)
   })
 })
 
