@@ -36,15 +36,23 @@ describe('codeSays', () => {
 })
 
 describe('callerRefusal and writeOutcome', () => {
-  it('an anonymous caller is asked to sign in, naming what the route needs', () => {
-    const error = rejection(403, { code: 'IDENTITY_REQUIRED', message: 'x', details: { permission: 'DOD_FILE' } })
-    expect(callerRefusal(error)).toBe('Sign in to download the debit order file.')
-    expect(writeOutcome(error, 'The download')).toEqual({ message: 'Sign in to download the debit order file. Nothing was changed.', landed: false })
+  it('nobody signed in (401 SIGN_IN_REQUIRED) is asked to sign in, naming what the step needs (OB29)', () => {
+    const error = rejection(401, { code: 'SIGN_IN_REQUIRED', message: 'Sign in to use this.' })
+    expect(callerRefusal(error, 'DOD_FILE')).toBe('Sign in to download the debit order file.')
+    expect(callerRefusal(error)).toBe('Sign in to do this.')
+    expect(writeOutcome(error, 'The download', 'DOD_FILE')).toEqual({ message: 'Sign in to download the debit order file. Nothing was changed.', landed: false })
   })
 
-  it('a signed-in user without the permission is told whom to ask, never to sign in', () => {
-    const error = rejection(403, { code: 'PERMISSION_REQUIRED', message: 'x', permission: 'DOD_SETTINGS' })
-    expect(callerRefusal(error)).toBe('You need permission to change debit order settings. Ask your administrator if you should have it.')
+  it('a signed-in user without the permission (403 PERMISSION_REQUIRED) gets the server sentence, never a sign-in prompt', () => {
+    const error = rejection(403, { code: 'PERMISSION_REQUIRED', message: 'You do not have permission to change debit order settings.', permission: 'DOD_SETTINGS' })
+    expect(callerRefusal(error)).toBe('You do not have permission to change debit order settings.')
+    // A body with no sentence still names what is missing, and whom to ask.
+    expect(callerRefusal(rejection(403, { code: 'PERMISSION_REQUIRED', permission: 'DOD_SETTINGS' })))
+      .toBe('You need permission to change debit order settings. Ask your administrator if you should have it.')
+  })
+
+  it('the retired IDENTITY_REQUIRED is no longer a caller refusal of its own: the server sentence stands', () => {
+    expect(callerRefusal(rejection(403, { code: 'IDENTITY_REQUIRED', message: 'x' }))).toBeNull()
   })
 
   it('a write that may have landed is never called unsaved, and says to check first', () => {

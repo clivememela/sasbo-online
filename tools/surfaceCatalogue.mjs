@@ -591,6 +591,8 @@ export const UNREACHABLE = [
     ['pages/acb/AcbRunSteps.jsx#Modal@decline', 'DOD_FILE'],
     ['pages/acb/AcbRunReturns.jsx#Modal@record returns', 'DOD_PREPARE'],
     ['pages/acb/AcbRunReturns.jsx#DateField@report date', 'DOD_PREPARE'],
+    ['pages/acb/AcbSuspend.jsx#Modal@suspend member', 'DOD_PREPARE'],
+    ['pages/acb/AcbTerminationReport.jsx#Modal@confirm the ending', 'DOD_PREPARE'],
   ].map(([site, permission]) => ({
     site, why: `behind ${permission}: the browser run signs nobody in until sign-in's stub session is wired into surfaces.mjs`,
   })),

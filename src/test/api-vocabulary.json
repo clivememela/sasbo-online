@@ -103,8 +103,7 @@
       {"code": "CODE_VERSION_CONFLICT", "status": 409},
       {"code": "BANK_NOT_FOUND", "status": 404},
       {"code": "DEBIT_DAY_INVALID", "status": 400},
-      {"code": "MOVE_COUNT_CHANGED", "status": 409},
-      {"code": "IDENTITY_REQUIRED", "status": 403}
+      {"code": "MOVE_COUNT_CHANGED", "status": 409}
     ]
   },
   "monthEnd": {

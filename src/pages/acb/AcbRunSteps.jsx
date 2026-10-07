@@ -122,7 +122,7 @@ export default function AcbRunSteps({ run, onChanged }) {
         + 'Take it to the bank, then record that it was submitted.' });
     } catch (err) {
       reportError('AcbRunSteps.download', err);
-      if (!left.current) setFileNotice({ message: readFailure(err, `The bank file could not be downloaded. ${messageOf(err)}`) });
+      if (!left.current) setFileNotice({ message: readFailure(err, `The bank file could not be downloaded. ${messageOf(err)}`, PERMISSIONS.DOD_FILE) });
     } finally {
       if (!left.current) setDownloading(false);
     }

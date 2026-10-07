@@ -35,7 +35,8 @@ export default function AcbRunReturns({ run, onChanged }) {
   const load = useCallback(() => {
     const mine = ++ticket.current;
     dodService.debitDays(run.id)
-      .then((rows) => { if (!left.current && mine === ticket.current) setDays({ state: 'ready', rows: Array.isArray(rows) ? rows : [], error: null }); })
+      // `AcbDebitDaysDto` (dod-api v2 §3): the run's id and its days. Anything else -- the route smoke's `[]` -- is no days.
+      .then((answer) => { if (!left.current && mine === ticket.current) setDays({ state: 'ready', rows: Array.isArray(answer?.days) ? answer.days : [], error: null }); })
       .catch((err) => {
         reportError('AcbRunReturns.debitDays', err);
         if (!left.current && mine === ticket.current) setDays({ state: 'error', rows: [], error: err });

@@ -20,11 +20,10 @@ export const refusal = (status, code, message, details = {}) => HttpResponse.jso
   timestamp: '2026-10-07T08:00:00.000+00:00', status, error: 'Refused', code, message, path: '/api/acb', details,
 }, { status })
 
-/** A caller nobody has signed in as, on a guarded route (dod-api §1). */
-export const signInRefusal = (permission) => refusal(403, 'IDENTITY_REQUIRED',
-  'Sign in to do this: it needs a permission nobody signed out holds.', { permission })
+/** Nobody signed in, on a guarded route (OB29): the sign-in contract's 401. */
+export const signInRefusal = () => HttpResponse.json({ code: 'SIGN_IN_REQUIRED', message: 'Sign in to use this.' }, { status: 401 })
 
-/** A signed-in caller without the permission -- the sign-in contract's answer. */
+/** A signed-in caller without the permission (OB29): the sign-in contract's 403, naming the permission. */
 export const permissionRefusal = (permission) => HttpResponse.json({
   code: 'PERMISSION_REQUIRED', message: 'You do not have permission to do this.', permission,
 }, { status: 403 })
@@ -54,7 +53,8 @@ export const lineOf = (overrides = {}) => ({
   branchCode: '632005', accountLastFour: '9911', accountType: 1, debitDay: 25, actionDate: '2026-10-26', amount: 174,
   outcome: 'PENDING', rePresentsLineId: null, fileSequence: 4, unpaidCode: null, unpaidReason: null, decision: null,
   suggestedDecision: null, permissionNote: null, letterStatus: null, reDebit: null, reDebitSource: null,
-  suspensionCode: null, memberUnpaidCount: null, codeProvisional: false, ...overrides,
+  suspensionCode: null, memberUnpaidCount: null, codeProvisional: false, reDebitWithdrawn: null, returnsBatchId: null,
+  ...overrides,
 })
 
 /** An unpaid as the unpaids list reads it: bank code 2, which may be re-debited (Stephne, DOD-03). */
@@ -64,15 +64,16 @@ export const unpaidOf = (overrides = {}) => lineOf({
   memberUnpaidCount: 1, ...overrides,
 })
 
-/** Her sheet as the server seeds it (dod-api §7.1); provisional rows say why. */
+/** Her sheet as V70 seeds it (dod-api v2 §7.1); provisional rows say why. */
 export const BANK_CODES = [
-  ['2', 'NOT_PROVIDED_FOR', 'Not provided for (insufficient funds)', 'YES', 'Stephne, DOD-03', 18, 'Insufficient funds', false, null],
-  ['4', 'PAYMENT_STOPPED', 'Payment stopped', 'NO', 'Stephne, DOD-03', 16, 'Payment stopped', false, null],
-  ['6', 'ACCOUNT_FROZEN', 'Account frozen (SASBO: debit returned)', 'UNKNOWN', null, 13, 'Debit returned', true, 'Re-debit not said (Friday item 9)'],
-  ['15', 'ACCOUNT_CLOSED', 'Account closed', 'UNKNOWN', null, 15, 'Account closed', true, 'Re-debit not said (Friday item 9)'],
-  ['18', 'ACCOUNT_HOLDER_DECEASED', 'Account holder deceased', 'UNKNOWN', null, null, null, true, 'Which SASBO code, and re-debit (Friday items 1 and 9)'],
-  ['26', 'INVALID_ACCOUNT_NUMBER', 'Invalid account', 'UNKNOWN', null, 19, 'Invalid account', true, 'Re-debit not said (Friday item 9)'],
-  ['30', 'NO_AUTHORITY_TO_DEBIT', 'No authority to debit', 'NO', 'Stephne, DOD-04', 30, 'No authority to debit', true, 'Which of SASBO\'s 30-33 to record (Friday item 3)'],
+  ['2', 'NOT_PROVIDED_FOR', 'Not Provided For', 'YES', 'Stephne, DOD-03', 18, 'Insufficient funds', false, null],
+  ['4', 'PAYMENT_STOPPED', 'Payment Stopped', 'NO', 'Stephne, DOD-03', 16, 'Payment stopped', false, null],
+  ['6', 'ACCOUNT_FROZEN', 'Debit returned', 'UNKNOWN', null, 13, 'Debit returned', true, 'Re-debit not said (Friday item 9)'],
+  ['15', 'ACCOUNT_CLOSED', 'Account Closed', 'UNKNOWN', null, 15, 'Account closed', true, 'Re-debit not said (Friday item 9)'],
+  ['18', 'ACCOUNT_HOLDER_DECEASED', 'Deceased', 'UNKNOWN', null, null, null, true, 'Which SASBO code, and whether the membership ends (Friday items 1 and 9)'],
+  ['26', 'INVALID_ACCOUNT_NUMBER', 'Invalid Account Number', 'UNKNOWN', null, 19, 'Invalid account', true, 'Re-debit not said (Friday item 9)'],
+  ...['30', '31', '32', '34'].map((bankCode) => [bankCode, 'NO_AUTHORITY_TO_DEBIT', 'No Authority To Debit', 'NO', 'Stephne, DOD-04', 30,
+    'No authority to debit', true, "Which of SASBO's 30-33 to record (Friday item 3)"]),
 ].map(([bankCode, reason, wording, reDebit, reDebitSource, suspensionCode, suspensionName, provisional, note]) => ({
   bankCode, reason, wording, reDebit, reDebitSource, suspensionCode, suspensionName, provisional, note,
   source: 'Suspension codes sheet, 6 Oct 2026', updatedBy: 'system', updatedAt: '2026-10-07T06:00:00Z', version: 1,
@@ -106,20 +107,25 @@ export const RATES = {
   januaryNotice: null,
 }
 
-export const BANKS = [
-  { bankId: 3, name: 'Synthetic Bank', defaultDay: 25, debitOrderMembers: 45, byDay: { 20: 12, 25: 33 } },
-  { bankId: 5, name: 'Second Synthetic Bank', defaultDay: 20, debitOrderMembers: 8, byDay: { 20: 8 } },
-]
+export const BANKS = {
+  banks: [
+    { bankId: 3, name: 'Synthetic Bank', defaultDay: 25, debitOrderMembers: 45, byDay: { 20: 12, 25: 32, none: 1 } },
+    { bankId: 5, name: 'Second Synthetic Bank', defaultDay: 20, debitOrderMembers: 8, byDay: { 20: 8 } },
+  ],
+}
 
 export const moveOf = (overrides = {}) => ({
   bankId: 3, bankName: 'Synthetic Bank', newDay: 27, toMove: 45, alreadyOnDay: 0, byCurrentDay: { 20: 12, 25: 33 },
   liveRuns: [{ runId: 41, actionMonth: '2026-10', status: 'PREPARED' }], ...overrides,
 })
 
-export const DEBIT_DAYS = [
-  { actionDate: '2026-10-20', lines: 12, unpaid: 2, batches: 1 },
-  { actionDate: '2026-10-26', lines: 18, unpaid: 0, batches: 0 },
-]
+export const DEBIT_DAYS = {
+  runId: 41,
+  days: [
+    { actionDate: '2026-10-20', lines: 12, unpaid: 2, batches: 1 },
+    { actionDate: '2026-10-26', lines: 18, unpaid: 0, batches: 0 },
+  ],
+}
 
 export const batchOf = (overrides = {}) => ({
   id: 7, runId: 40, actionDate: '2026-10-26', reportDate: '2026-10-27', source: 'MANUAL', entries: 1, recorded: 1,
@@ -136,7 +142,7 @@ export const OPENING_POSITION = { members: 0, enteredBy: null, enteredAt: null, 
 export const candidateOf = (overrides = {}) => ({
   memberId: 7, membershipNumber: 'SYN-0007', surname: 'Testperson', unpaidCount: 3, terminate: true, twelveMonthTotal: 3,
   unpaidMonths: ['2026-08', '2026-09', '2026-10'], openingUnpaids: 0, status: 'Active', thirdUnpaidOn: '2026-10-26',
-  ...overrides,
+  capturedUnpaids: 0, ...overrides,
 })
 
 export const TERMINATION = {
@@ -190,7 +196,7 @@ export const dodRoutes = (state) => ({
   'POST /api/acb/runs/{id}/approve': () => step(state, 'APPROVED', { approvedBy: ADMIN }),
   'POST /api/acb/runs/{id}/cancel': () => step(state, 'CANCELLED'),
   'POST /api/acb/runs/{id}/close': () => step(state, 'CLOSED'),
-  'GET /api/acb/runs/{id}/debit-days': () => json(DEBIT_DAYS),
+  'GET /api/acb/runs/{id}/debit-days': () => json({ ...DEBIT_DAYS, runId: state.run.id }),
   'POST /api/acb/runs/{id}/declined': async ({ request }) => {
     const { reason, bankWords } = await request.json()
     return step(state, 'DECLINED', { declinedReason: reason, declinedWords: bankWords ?? null })

@@ -79,7 +79,7 @@ describe('recording a day\'s report', () => {
 
     await user.type(within(dialog).getByLabelText('Trace no. 1'), '4')
     await user.type(within(dialog).getByLabelText('Unpaid code'), '2')
-    expect(await within(dialog).findByText('Code 2: Not provided for (insufficient funds) · May be re-debited (Stephne, DOD-03)')).toBeInTheDocument()
+    expect(await within(dialog).findByText('Code 2: Not Provided For · May be re-debited (Stephne, DOD-03)')).toBeInTheDocument()
     await user.selectOptions(within(dialog).getByLabelText('Decision'), 'RE_PRESENT')
     // Enter on the last line's decision adds the next line, and the caret goes to it.
     await user.keyboard('{Enter}')
@@ -87,7 +87,7 @@ describe('recording a day\'s report', () => {
     expect(second).toHaveFocus()
     await user.type(second, '5')
     await user.type(within(dialog).getAllByLabelText('Unpaid code')[1], '4')
-    expect(within(dialog).getByText('Code 4: Payment stopped · Never re-debited (Stephne, DOD-03)')).toBeInTheDocument()
+    expect(within(dialog).getByText('Code 4: Payment Stopped · Never re-debited (Stephne, DOD-03)')).toBeInTheDocument()
     const choices = within(within(dialog).getAllByLabelText('Decision')[1]).getAllByRole('option')
     expect(choices.find((o) => o.textContent === 'Present again')).toBeDisabled()
     await expectNoA11yViolations(dialog, { rules: { region: { enabled: false } } })

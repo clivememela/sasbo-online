@@ -138,7 +138,7 @@ describe('the bank file: the Chief Financial Officer only (DOD-11)', () => {
   })
 
   it('a CFO whose session ended is asked to sign in, by name of what is needed', async () => {
-    server.use(http.get('*/api/acb/runs/:id/file', () => signInRefusal('DOD_FILE')))
+    server.use(http.get('*/api/acb/runs/:id/file', () => signInRefusal()))
     const user = setupUser()
     renderSteps(runOf({ status: 'APPROVED' }), CFO)
     await user.click(screen.getByRole('button', { name: 'Download the bank file' }))

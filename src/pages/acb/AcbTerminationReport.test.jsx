@@ -1,4 +1,4 @@
-// @vitest-environment jsdom -- the termination report on the Re-Debits screen (03.5)
+// @vitest-environment jsdom -- the endings to confirm after the third unpaid (03.5; Stephne, DOD-22 to DOD-24)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
@@ -7,17 +7,20 @@ import AcbTerminationReport from './AcbTerminationReport'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
+import { refusal } from '../../test/msw/dodApi'
+import { setupUser } from '../../test/user'
+import { expectNoA11yViolations } from '../../test/assertions'
 
 /**
- * 03.5 -- the termination report, shown: it was the server's alone. Three unpaid presentations terminate a
- * membership (Q27), and terminating is refused to every caller until administrators sign in (B1) -- so the action
- * is shown disabled with its reason, as Approve is, and a member already terminated shows the status instead.
+ * Three unpaid presentations end a membership (Q27) once a staff member confirms each one (DOD-22), and the member
+ * is sent a short letter (DOD-24). The ending is dated the day it is confirmed; the third unpaid's date is shown
+ * beside it (DOD-23, both boxes ticked). The screen's word is the server's answer. Every red case has its must-pass.
  */
 
 const candidate = (overrides) => ({
   memberId: 7, membershipNumber: 'SYN-0007', surname: 'Testperson', unpaidCount: 3, terminate: true,
-  twelveMonthTotal: 3, unpaidMonths: ['2026-07', '2026-08', '2026-09'], openingUnpaids: 0, status: 'Active',
-  ...overrides,
+  twelveMonthTotal: 3, unpaidMonths: ['2026-08', '2026-09', '2026-10'], openingUnpaids: 0, status: 'Active',
+  thirdUnpaidOn: '2026-10-26', ...overrides,
 })
 
 const report = (members) => ({
@@ -34,42 +37,76 @@ const rowOf = async (surname) => {
   return (await within(table).findByText(surname)).closest('tr')
 }
 
+let ended
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
+  ended = []
+  server.use(http.post('*/api/acb/termination-report/:memberId/terminate', async ({ params, request }) => {
+    ended.push({ memberId: params.memberId, body: await request.text() })
+    return HttpResponse.json({ memberId: Number(params.memberId), membershipNumber: 'SYN-0007', status: 'Terminated',
+      reason: 'SUBS_IN_ARREARS', letterId: 91, letterStatus: 'RENDERED', thirdUnpaidOn: '2026-10-26' })
+  }))
 })
 
-describe('the termination report (03.5)', () => {
-  it('names who the rule terminates and who is one away -- the action refused until sign-in, and saying so', async () => {
+describe('the endings to confirm', () => {
+  it('names who three unpaids reach, with the third unpaid\'s date, and who is one away -- with no action', async () => {
     answer(report([
       candidate(),
       candidate({ memberId: 8, membershipNumber: 'SYN-0008', surname: 'Sampleton', unpaidCount: 2, terminate: false,
-        unpaidMonths: ['2026-08', '2026-09'], twelveMonthTotal: 2 }),
+        unpaidMonths: ['2026-09', '2026-10'], twelveMonthTotal: 2, thirdUnpaidOn: null }),
     ]))
-    renderWithProviders(<AcbTerminationReport />)
+    const { container } = renderWithProviders(<AcbTerminationReport />)
 
     const due = await rowOf('Testperson')
-    expect(within(due).getByText('three — the rule terminates')).toBeInTheDocument()
-    const terminate = within(due).getByRole('button', { name: 'Terminate Testperson’s membership' })
-    expect(terminate).toBeDisabled()
-    expect(terminate).toHaveAccessibleDescription(/opens when administrators sign in to this system/)
+    expect(within(due).getByText('three — the ending is to confirm')).toBeInTheDocument()
+    expect(within(due).getByText('26 Oct 2026')).toBeInTheDocument()
+    expect(within(due).getByRole('button', { name: 'Confirm the ending of Testperson’s membership' })).toBeEnabled()
 
-    // The must-pass twin: one away is listed, and has no action.
     const atTwo = await rowOf('Sampleton')
     expect(within(atTwo).getByText('one more makes three')).toBeInTheDocument()
-    expect(within(atTwo).queryByRole('button', { name: /Terminate/ })).toBeNull()
-
+    expect(within(atTwo).queryByRole('button', { name: /Confirm the ending/ })).toBeNull()
     expect(screen.getByText(/Counted from July 2026\./)).toBeInTheDocument()
-    expect(screen.getByText('Counted from the first month this system sent a file.')).toBeInTheDocument()
+    await expectNoA11yViolations(container)
   })
 
-  it('shows a member already terminated by status, with no action and no reason to give', async () => {
-    answer(report([candidate({ status: 'Terminated' })]))
+  it('confirming asks first, says the ending is dated today and a letter is prepared, and shows the server\'s answer', async () => {
+    answer(report([candidate()]))
+    const user = setupUser()
     renderWithProviders(<AcbTerminationReport />)
+    await user.click(within(await rowOf('Testperson')).getByRole('button', { name: /^Confirm the ending/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'End Testperson’s membership?' })
+    expect(dialog).toHaveTextContent('Their third unpaid was on 26 Oct 2026. The membership ends today, the day you confirm it')
+    await expectNoA11yViolations(dialog, { rules: { region: { enabled: false } } })
 
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm the ending' }))
+
+    expect(await screen.findByText('Testperson’s membership is ended. Their letter: waiting to send.')).toBeInTheDocument()
     const row = await rowOf('Testperson')
     expect(within(row).getByText('Terminated')).toBeInTheDocument()
-    expect(within(row).queryByRole('button', { name: /Terminate/ })).toBeNull()
-    expect(screen.queryByText(/opens when administrators sign in/)).toBeNull()
+    expect(within(row).queryByRole('button', { name: /Confirm the ending/ })).toBeNull()
+    // The request carries nothing (dod-api v2 §4).
+    expect(ended).toEqual([{ memberId: '7', body: '' }])
+  })
+
+  it('a refusal ends nothing, in the server\'s words, and closing reads the report again', async () => {
+    answer(report([candidate()]))
+    server.use(http.post('*/api/acb/termination-report/:memberId/terminate', () =>
+      refusal(409, 'TERMINATION_NOT_DUE', 'The rule no longer reaches this member: a debit has since been paid.')))
+    const user = setupUser()
+    renderWithProviders(<AcbTerminationReport />)
+    await user.click(within(await rowOf('Testperson')).getByRole('button', { name: /^Confirm the ending/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'End Testperson’s membership?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm the ending' }))
+    expect(await within(dialog).findByText(/^Ending Testperson’s membership was not recorded\. Nothing was written: The rule no longer reaches this member/)).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Confirm the ending' })).not.toBeInTheDocument()
+  })
+
+  it('shows a member already ended by status, with no action', async () => {
+    answer(report([candidate({ status: 'Terminated' })]))
+    renderWithProviders(<AcbTerminationReport />)
+    const row = await rowOf('Testperson')
+    expect(within(row).getByText('Terminated')).toBeInTheDocument()
+    expect(within(row).queryByRole('button', { name: /Confirm the ending/ })).toBeNull()
   })
 
   it('says so when nobody is at two unpaids', async () => {

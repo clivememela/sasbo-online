@@ -40,13 +40,12 @@ export const dodService = {
   recordReturns: (id, batch) => write(apiUrl(`/api/acb/runs/${id}/returns`), 'POST', batch),
   returnsBatches: (id, page = 0, size = 20) => read(apiUrl(`/api/acb/runs/${id}/returns/batches?${pageQuery(page, size)}`)),
 
-  // ---- suspensions and endings (dod-api §4) -----------------------------------------------------------------------
+  // ---- suspensions and endings (dod-api §4; reactivating and rejoining are the member record's, MEMBERS_EDIT) -----
   /** `suspensionCode` is SASBO's; the server finds it from the bank's code unless one is sent. */
   suspendMember: (id, lineId, { suspensionCode, note } = {}) =>
     write(apiUrl(`/api/acb/runs/${id}/lines/${lineId}/suspend-member`), 'POST', { suspensionCode, note }),
-  terminate: (memberId, note) => write(apiUrl(`/api/acb/termination-report/${memberId}/terminate`), 'POST', { note }),
-  reactivate: (memberId, note) => write(apiUrl(`/api/acb/members/${memberId}/reactivate`), 'POST', { note }),
-  rejoin: (memberId, joinedOn, note) => write(apiUrl(`/api/acb/members/${memberId}/rejoin`), 'POST', { joinedOn, note }),
+  /** Confirms one ending after the third unpaid (DOD-22); the request has no body (dod-api v2 §4). */
+  terminate: (memberId) => write(apiUrl(`/api/acb/termination-report/${memberId}/terminate`), 'POST'),
 
   // ---- unpaid counts captured by hand, and the opening position (dod-api §5) -------------------------------------
   unpaidCounts: (page = 0, size = 50) => read(apiUrl(`/api/acb/unpaid-counts?${pageQuery(page, size)}`)),

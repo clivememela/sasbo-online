@@ -24,13 +24,17 @@ import AcbHeldLetters from './AcbHeldLetters.jsx';
 import AcbTerminationReport from './AcbTerminationReport.jsx';
 import { PagerFor } from './acbPaging.jsx';
 import { DEBIT_DAYS, asPage, debitDayReplaced, debitsRuns, maskedAccount, ordinal } from './acbRunRules.js';
+import DodGuard from './DodGuard.jsx';
+import { DOD_READ } from './dodRules.js';
+import { useAuth } from '../../auth/useAuth';
+import { PERMISSIONS } from '../../auth/permissions';
 
 const SEARCH_PAGE_SIZE = 25;
 const NO_CRITERIA = { surname: "", membershipNumber: "", identityNumber: "" };
 const DAY_OPTIONS = DEBIT_DAYS.map((day) => ({ value: String(day), label: ordinal(day) }));
 
 /**
- * *Manage Debits* -- the Re-Debits screen (`04.1`).
+ * *Manage Re-Debits* -- the screen's name (Stephne, DOD-37: "For now Yes."), `04.1`.
  *
  * The newest run whose file went to the bank leads: its unpaids, EVERY one, each with its decision
  * (`AcbUnpaids`); then the next run's second re-debits held over for the member's permission
@@ -44,6 +48,21 @@ const DAY_OPTIONS = DEBIT_DAYS.map((day) => ({ value: String(day), label: ordina
  * four digits and no identity number. The full record is ONE member's, loaded when chosen.
  */
 export default function AcbDebits() {
+    return (
+        <Page>
+            <PageTitle title="Manage Re-Debits" subtitle="Unpaid debits presented again, and banking corrected" />
+            {/* 🔒 Unpaids are never shown to organisers (Stephne, DOD-14): any of the three Debit Order permissions,
+                or RequirePermission's sentence -- and nothing below asks the server for anything. */}
+            <DodGuard permissions={DOD_READ}>
+                <DebitsScreen />
+            </DodGuard>
+        </Page>
+    );
+}
+
+function DebitsScreen() {
+    // Recording a decision, the held letters and the endings are an administrator's (DOD_PREPARE, DOD-12, DOD-22).
+    const prepares = useAuth().can(PERMISSIONS.DOD_PREPARE);
     const [notice, setNotice] = useState(null);
     const noticeRef = useFocusOn(notice);
 
@@ -243,8 +262,7 @@ export default function AcbDebits() {
 
     const count = results.totalElements;
     return (
-        <Page>
-            <PageTitle title="Manage Debits" subtitle="Unpaid debits presented again, and banking corrected" />
+        <>
 
             {/* 🔴 WHAT THE `alert()` BECAME. Focused rather than `role="alert"`: the
                 form primitives already give inline messages that role, and stacking a
@@ -371,9 +389,10 @@ export default function AcbDebits() {
                 )}
 
                 {runsState === 'ready' && runs.next && <AcbHeldOver run={runs.next} />}
-                {runsState === 'ready' && runs.returned && <AcbHeldLetters run={runs.returned} />}
-                {/* 03.5: who three unpaids would terminate -- read from every sent month, not from one run. */}
-                <AcbTerminationReport />
+                {prepares && runsState === 'ready' && runs.returned && <AcbHeldLetters run={runs.returned} />}
+                {/* 03.5: who three unpaids would terminate -- read from every sent month, not from one run; each ending
+                    confirmed by a staff member (Stephne, DOD-22). Also its own screen, Endings to confirm. */}
+                {prepares && <AcbTerminationReport />}
 
                 {/* The member search -- for a member outside the unpaid list. card.html's criteria row. */}
                 <div className="mt-8">
@@ -418,6 +437,6 @@ export default function AcbDebits() {
                     </Sheet>
                 )}
             </div>
-        </Page>
+        </>
     );
 }
