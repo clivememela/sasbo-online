@@ -310,7 +310,21 @@ const CEILINGS = {
   // runner: clivememela/sasbo-online run 36988020502 at b0f9a4d, javascript 790.75 KiB, 0.10 over 790.65 at 0eb0d56
   // (run 36903903677). +100 B by vite's sizes, in one chunk there already: HomeFigures 5.90 -> 6.00 kB (the sentence,
   // and the choice between it and "today"). Nothing from src/test/ is imported.
-  js: 790.76 * KB,
+  //
+  // 790.76 -> 813.88 on 2026-10-07, MEASURED, under the October build's rule (OB17, "raise to measured", the parent's
+  // word for every client stream): the organisers' batch print, the members at a branch, the visit drafts. Measured on
+  // a team runner: clivememela/sasbo-online run 37556370376 at 1595f03, javascript 813.87 KiB, against 789.88 at main
+  // cbd11dc (run 37017335321). +24,550 B by vite's sizes:
+  //   BatchPrint 0 -> 12.17 (the new route -- its four modules only, BatchPrint, WorkplaceListing, raNumbers and
+  //   limiter: the build's sourcemaps show no shared module bundled in, and no module of the app in two chunks)
+  //   · OrganizerReport +8.22 (Save draft, Submit visit, My visits, a submitted visit read-only) · LocationListing +1.25
+  //   (the blank-card fix: a /api/branches row read in its own shape; "Complement") · workplaceVisitService +0.92 (the
+  //   drafts' five calls) · permissions 0 -> 0.84 (oct/base's auth context, first imported by a screen here) · the
+  //   entry +0.59, SHELL ONLY (OB17a): the sidebar's Batch print item, the route's lazy line, and the Printer icon,
+  //   which leaves its own shared chunk (-0.32) for the entry because the sidebar now draws it · locationService +0.37 ·
+  //   Locations +0.32 (the line to the batch print) · ReportOptions +0.16 · monthEnd +0.12 (five refusal codes) · the
+  //   rest +/-0.05 of shared-chunk names. Nothing from src/test/ is imported by the product.
+  js: 813.88 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
@@ -320,7 +334,11 @@ const CEILINGS = {
   // 80 -> 80.64 on 2026-10-01, MEASURED (MO25): 80.63 KiB on the same run, +720 B over 79.92 -- MO24's card rows' `end`
   // rule, the first screen's phone block and five utilities the build had not shipped (+590 B), and A.1's opened row's
   // rule (+130 B). The hundredth over the printed figure covers its rounding, as the javascript's does.
-  css: 80.64 * KB,
+  //
+  // 80.64 -> 81.00 on 2026-10-07, MEASURED (OB17): 80.99 KiB on run 37556370376, +380 B over 80.63 at main cbd11dc --
+  // the batch print's page rules (a bank a sheet, its A4 named page, a heading kept with what follows it) and the
+  // utilities its screens are the first to use.
+  css: 81.00 * KB,
   // 900 -> 925.12 on 2026-09-30, MEASURED, on the owner's word (MO14), the first time `all assets` was over: the same
   // pair as the javascript's, 866.48 KiB (run 36773278932) -> 925.11 KiB (run 36773289808). The javascript's +59,631 B
   // and the stylesheet's +409 B (296 of them the History tab's: its column widths, gutter bleed, alignment and one line
@@ -337,7 +355,10 @@ const CEILINGS = {
   //
   // 934.77 -> 934.87 on 2026-10-02, MEASURED (MO33): 934.86 KiB on run 36988020502 -- the javascript's +0.10 above,
   // the stylesheet unmoved at 80.63.
-  total: 934.87 * KB,
+  //
+  // 934.87 -> 958.35 on 2026-10-07, MEASURED (OB17): 958.34 KiB on run 37556370376 -- the javascript's +23.97 KiB and the
+  // stylesheet's +0.37 above, and nothing else, against 933.99 at main cbd11dc.
+  total: 958.35 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to

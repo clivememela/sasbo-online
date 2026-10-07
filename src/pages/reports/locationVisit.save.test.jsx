@@ -46,8 +46,13 @@ const field = (label) => within(form()).getByLabelText(label)
 const saidAt = (label) => document.getElementById(field(label).getAttribute('aria-describedby')?.split(' ').find((id) =>
   document.getElementById(id)?.getAttribute('role') === 'alert'))?.textContent
 
+/**
+ * Each value set in its field, whole. Typed a key at a time, every character re-rendered the form's 31 fields, and a
+ * test that fills a whole visit ran past the 20 s timeout on a loaded runner (seen 7 Oct on a contended box, main's own
+ * form and this file alike) -- a flake by construction. What a key does to a field is `TextInput`'s to test, not this.
+ */
 async function fill(user, values) {
-  for (const [label, value] of Object.entries(values)) await user.type(field(label), value)
+  for (const [label, value] of Object.entries(values)) fireEvent.change(field(label), { target: { value } })
 }
 
 async function chooseToday(user) {
@@ -67,7 +72,7 @@ async function fillAVisit(user) {
     'No of Non-Members Interviewed': '5',
     'Branch Rep Name': 'INVENTED REPRESENTATIVE',
   })
-  await user.type(within(form()).getAllByLabelText('Cell Phone & E-Mail')[0], 'rep@example.invalid')
+  fireEvent.change(within(form()).getAllByLabelText('Cell Phone & E-Mail')[0], { target: { value: 'rep@example.invalid' } })
   // A native time control, which takes a time whole rather than a key at a time.
   fireEvent.change(field('Time In'), { target: { value: '09:30' } })
   fireEvent.change(field('Time Out'), { target: { value: '11:00' } })
