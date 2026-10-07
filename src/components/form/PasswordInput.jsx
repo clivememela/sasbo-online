@@ -35,17 +35,22 @@ export default function PasswordInput({ label, value, onChange, kind = 'password
             type={shown ? 'text' : 'password'}
             className={controlClasses({ invalid, className: 'pr-11' })}
           />
-          <button
-            type="button"
-            aria-label="Show password"
-            aria-pressed={shown}
-            aria-controls={id}
-            disabled={disabled}
-            onClick={() => setShown((was) => !was)}
-            className="touch-target absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-md text-ink-muted hover-hover:hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
-          >
-            {shown ? <EyeOff size={18} strokeWidth={1.75} aria-hidden="true" /> : <Eye size={18} strokeWidth={1.75} aria-hidden="true" />}
-          </button>
+          {/* 🔴 THE WRAPPER PLACES THE TOGGLE, NOT THE TOGGLE ITSELF. `touch-target` is `position: relative` (its 44px
+              overlay needs it), and Tailwind emits it AFTER `absolute`, so on one element it won: the eye fell out of
+              the field to its foot, at the left (the presentation session's /login capture, 7 Oct). */}
+          <span className="absolute inset-y-0 right-1 flex items-center">
+            <button
+              type="button"
+              aria-label="Show password"
+              aria-pressed={shown}
+              aria-controls={id}
+              disabled={disabled}
+              onClick={() => setShown((was) => !was)}
+              className="touch-target grid size-9 place-items-center rounded-md text-ink-muted hover-hover:hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+            >
+              {shown ? <EyeOff size={18} strokeWidth={1.75} aria-hidden="true" /> : <Eye size={18} strokeWidth={1.75} aria-hidden="true" />}
+            </button>
+          </span>
         </div>
       )}
     </Field>
