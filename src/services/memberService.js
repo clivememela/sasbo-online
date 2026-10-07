@@ -1,8 +1,6 @@
 import { apiUrl } from './api';
 import { requestJson, requestJsonWrite } from './parseApiError';
 
-const PAGE_SIZE = 100;
-
 /**
  * Fields the server stores as ONE delimited string ("PEC,CEC") and the browser holds as a list.
  *
@@ -57,13 +55,38 @@ const normalizeMembers = (value) => (Array.isArray(value) ? value.map(normalizeM
  * that can render a state (EH-D10). Nothing is swallowed; every method still rejects.
  */
 export const memberService = {
+  /**
+   * EVERY member, with every field -- SUPERSEDED FOR THE REGISTER by `searchRegister` (register row A10). The Recruiters
+   * screen still reads it on main.
+   */
   getMembers: () =>
     requestJson((signal) => fetch(apiUrl('/api/members'), {
       credentials: 'include',
       signal,
     })).then(normalizeMembers),
 
-  getPageSize: () => PAGE_SIZE,
+  /**
+   * One page of the member register (A10): `{ content, page, size, totalElements, totalPages, sort }` of slim rows --
+   * the six columns and the id, nothing else -- for the question `query` asks (`memberRegister.js`'s `registerQuery`).
+   *
+   * 🔒 A POST, so what is searched for -- a member's name, an identity number -- travels in the body and never in a URL,
+   * which the server's log prints whole. A read for all that: the 10s ceiling.
+   */
+  searchRegister: (query) =>
+    requestJson((signal) => fetch(apiUrl('/api/members/register/search'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(query ?? {}),
+      signal,
+    })),
+
+  /** The register's figure strip and the branches its members are at (A10), for the caller's own register. */
+  getRegisterOverview: () =>
+    requestJson((signal) => fetch(apiUrl('/api/members/register/overview'), {
+      credentials: 'include',
+      signal,
+    })),
 
   updateMember: (updatedMember) =>
     requestJsonWrite((signal) => fetch(apiUrl(`/api/members/${updatedMember.id}`), {

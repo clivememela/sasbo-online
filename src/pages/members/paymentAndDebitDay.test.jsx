@@ -8,6 +8,7 @@ import MembersPage from './Members'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
+import { registerHandlers } from '../../test/msw/memberRegister'
 import { setupUser } from '../../test/user'
 import { DEBIT_DAY_OPTIONS, PAYMENT_TYPE_OPTIONS } from '../../config/memberConstants'
 
@@ -153,7 +154,7 @@ describe('Edit Member', () => {
   }
 
   beforeEach(() => {
-    server.use(http.get('*/api/members', () => HttpResponse.json([LEGACY])))
+    server.use(...registerHandlers([LEGACY]))
   })
 
   it('offers the whole range on the record too', async () => {

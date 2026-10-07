@@ -16,6 +16,7 @@ import { pageFixtures } from '../../test/msw/pageFixtures'
 import { server } from '../../test/msw/server'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { setupUser } from '../../test/user'
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * THE RECORD'S STRIP AT SIX, AND THE HISTORY TAB BEHIND IT -- month end 03.6, the owner's approval of the mock on
@@ -77,7 +78,7 @@ beforeEach(() => {
   historyAsked.length = 0
   // Two `use` calls: the catch-all first, then the specific handlers, which prepend.
   server.use(...pageFixtures)
-  server.use(http.get('*/api/members', () => HttpResponse.json([MEMBER])), historyAnswers())
+  server.use(...registerHandlers([MEMBER]), historyAnswers())
 })
 
 describe('the record\'s strip', () => {

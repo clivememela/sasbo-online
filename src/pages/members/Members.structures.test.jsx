@@ -10,6 +10,7 @@ import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
 import { BEC_EXECUTIVE_POSITIONS, BEC_STRUCTURES_REPRESENTED } from '../../config/memberConstants'
 import { formatDateLong } from '../../lib/format'
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * EDIT MEMBER · SASBO STRUCTURES -- SASBO's structures tree, through the owner, 2026-09-30.
@@ -85,7 +86,8 @@ const COMMITTEES = {
   ],
 }
 
-const membersRespond = (body) => http.get('*/api/members', () => HttpResponse.json(body))
+/** The register answering with `body` -- its page, its figures and each record (A10): handlers, to spread. */
+const membersRespond = (body) => registerHandlers(body)
 const committeesRespond = (body = COMMITTEES) => http.get('*/api/reference/committees', () => HttpResponse.json(body))
 const panel = () => within(screen.getByTestId('member-panel'))
 
@@ -142,7 +144,7 @@ beforeEach(() => {
 
 describe('editing: SASBO\'s tree, each follow-up under the Yes that asks it', () => {
   it('a member who is neither is asked two questions -- nothing under Shop Steward or BEC is offered', async () => {
-    server.use(membersRespond([MEMBER]))
+    server.use(...membersRespond([MEMBER]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     await openStructures(user, { edit: true })
@@ -156,7 +158,7 @@ describe('editing: SASBO\'s tree, each follow-up under the Yes that asks it', ()
   })
 
   it('Shop Steward = Yes asks for the Election Date, and No takes it away', async () => {
-    server.use(membersRespond([MEMBER]))
+    server.use(...membersRespond([MEMBER]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     await openStructures(user, { edit: true })
@@ -168,7 +170,7 @@ describe('editing: SASBO\'s tree, each follow-up under the Yes that asks it', ()
   })
 
   it('BEC = Yes asks the rest of the tree, in SASBO\'s order', async () => {
-    server.use(membersRespond([MEMBER]))
+    server.use(...membersRespond([MEMBER]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     await openStructures(user, { edit: true })
@@ -194,7 +196,7 @@ describe('editing: SASBO\'s tree, each follow-up under the Yes that asks it', ()
   })
 
   it('the committees are SASBO\'s own, alphabetical, and UNATTACHED is not one', async () => {
-    server.use(membersRespond([{ ...MEMBER, isBec: true }]))
+    server.use(...membersRespond([{ ...MEMBER, isBec: true }]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     await openStructures(user, { edit: true })
@@ -206,7 +208,7 @@ describe('editing: SASBO\'s tree, each follow-up under the Yes that asks it', ()
   })
 
   it('the structures and positions offered are exactly SASBO\'s', async () => {
-    server.use(membersRespond([{ ...MEMBER, isBec: true, isBecStructureRep: true, isBecExecutive: true, isCosatu: 'Y' }]))
+    server.use(...membersRespond([{ ...MEMBER, isBec: true, isBecStructureRep: true, isBecExecutive: true, isCosatu: 'Y' }]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     await openStructures(user, { edit: true })
@@ -225,7 +227,7 @@ describe('editing: SASBO\'s tree, each follow-up under the Yes that asks it', ()
   it('🔴 a Yes cannot be saved without what it asks for -- and nothing is sent', async () => {
     let puts = 0
     server.use(
-      membersRespond([MEMBER]),
+      ...membersRespond([MEMBER]),
       http.put('*/api/members/:id', () => {
         puts += 1
         return HttpResponse.json({})
@@ -256,7 +258,7 @@ describe('editing: SASBO\'s tree, each follow-up under the Yes that asks it', ()
   it('the whole tree reaches the server as V55 stores it', async () => {
     let saved
     server.use(
-      membersRespond([MEMBER]),
+      ...membersRespond([MEMBER]),
       http.put('*/api/members/:id', async ({ request }) => {
         saved = await request.json()
         return HttpResponse.json(saved)
@@ -308,7 +310,7 @@ describe('editing: SASBO\'s tree, each follow-up under the Yes that asks it', ()
   })
 
   it('the save confirmation names the committee, not its code', async () => {
-    server.use(membersRespond([{ ...MEMBER, isBec: true, becCommitteeCode: 'G02', becCommitteeName: 'PRETORIA' }]))
+    server.use(...membersRespond([{ ...MEMBER, isBec: true, becCommitteeCode: 'G02', becCommitteeName: 'PRETORIA' }]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     await openStructures(user, { edit: true })
@@ -324,7 +326,7 @@ describe('editing: SASBO\'s tree, each follow-up under the Yes that asks it', ()
   it('leaving BEC clears everything under it, and that is what is saved', async () => {
     let saved
     server.use(
-      membersRespond([SEATED]),
+      ...membersRespond([SEATED]),
       http.put('*/api/members/:id', async ({ request }) => {
         saved = await request.json()
         return HttpResponse.json(saved)
@@ -361,7 +363,7 @@ describe('editing: SASBO\'s tree, each follow-up under the Yes that asks it', ()
   it('🔑 a Yes stored before V55, with nothing beside it, saves an edit of anything else', async () => {
     let saved
     server.use(
-      membersRespond([{ ...MEMBER, isShopSteward: true, isBec: true }]),
+      ...membersRespond([{ ...MEMBER, isShopSteward: true, isBec: true }]),
       http.put('*/api/members/:id', async ({ request }) => {
         saved = await request.json()
         return HttpResponse.json(saved)
@@ -379,7 +381,7 @@ describe('editing: SASBO\'s tree, each follow-up under the Yes that asks it', ()
   })
 
   it('leaves no control on the panel without an accessible name (BR-14, the class)', async () => {
-    server.use(membersRespond([SEATED]))
+    server.use(...membersRespond([SEATED]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     await openStructures(user, { edit: true })
@@ -394,7 +396,7 @@ describe('editing: SASBO\'s tree, each follow-up under the Yes that asks it', ()
 
 describe('reading: the whole tree, and an unanswered question says so', () => {
   it('shows every answer the record holds', async () => {
-    server.use(membersRespond([SEATED]))
+    server.use(...membersRespond([SEATED]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     await openStructures(user)
@@ -416,7 +418,7 @@ describe('reading: the whole tree, and an unanswered question says so', () => {
     const legacy = { ...MEMBER }
     delete legacy.isShopSteward
     delete legacy.isBec
-    server.use(membersRespond([legacy]))
+    server.use(...membersRespond([legacy]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     await openStructures(user)
@@ -426,7 +428,7 @@ describe('reading: the whole tree, and an unanswered question says so', () => {
   })
 
   it('a BEC member from before V55 reads "Not recorded" for each question they were never asked', async () => {
-    server.use(membersRespond([{ ...MEMBER, isShopSteward: true, isBec: true }]))
+    server.use(...membersRespond([{ ...MEMBER, isShopSteward: true, isBec: true }]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     await openStructures(user)
@@ -441,7 +443,7 @@ describe('reading: the whole tree, and an unanswered question says so', () => {
     // every structure answer is. Never a default: nothing is sent for a member nobody asked about.
     let saved
     server.use(
-      membersRespond([MEMBER]),
+      ...membersRespond([MEMBER]),
       http.put('*/api/members/:id', async ({ request }) => {
         saved = await request.json()
         return HttpResponse.json(saved)
@@ -459,7 +461,7 @@ describe('reading: the whole tree, and an unanswered question says so', () => {
   })
 
   it('MM80: the record reads its Memnet answer', async () => {
-    server.use(membersRespond([{ ...SEATED, isMemnet: true }]))
+    server.use(...membersRespond([{ ...SEATED, isMemnet: true }]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     await openStructures(user)
@@ -473,7 +475,7 @@ describe('A37 / A38 -- a list field that arrives as the server\'s delimited stri
   it('a record whose COSATU positions and BEC structures are strings opens, reads and edits without throwing', async () => {
     // The shape that threw "cosatuPositions.join is not a function" on open. memberService unfolds it now;
     // this is the render-level proof that nothing on the page still receives the string.
-    server.use(membersRespond([SEATED]))
+    server.use(...membersRespond([SEATED]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
 

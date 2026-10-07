@@ -8,6 +8,7 @@ import MembersPage from './Members'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
+import { registerHandlers } from '../../test/msw/memberRegister'
 import { setupUser } from '../../test/user'
 
 /**
@@ -174,7 +175,7 @@ describe('Edit Member', () => {
 
   beforeEach(() => {
     server.use(
-      http.get('*/api/members', () => HttpResponse.json([ALPHA, BRAVO])),
+      ...registerHandlers([ALPHA, BRAVO]),
       http.put('*/api/members/:id', async ({ request }) => HttpResponse.json(await request.json())),
     )
   })

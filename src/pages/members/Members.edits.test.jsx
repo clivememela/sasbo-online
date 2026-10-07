@@ -9,6 +9,7 @@ import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
 import { deferred } from '../../test/deferred'
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * EDITS ARE NEVER LOST SILENTLY. `06.5`, the `06.3` critique, F-P55.
@@ -59,7 +60,7 @@ describe('the member record, mid-edit', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     // Two `use` calls: the catch-all first, then the specific handlers, which prepend.
     server.use(...pageFixtures)
-    server.use(http.get('*/api/members', () => HttpResponse.json([ALPHA, BRAVO])))
+    server.use(...registerHandlers([ALPHA, BRAVO]))
   })
 
   it('① choosing another member with a changed field asks first -- and "Keep editing" keeps the change', async () => {
@@ -155,7 +156,7 @@ describe('the member record, mid-edit', () => {
     // something else. `memberService.normalizeMember` unfolds it once.
     let saved
     server.use(
-      http.get('*/api/members', () => HttpResponse.json([{ ...ALPHA, isCosatu: 'Y', cosatuPositions: 'PEC,CEC' }, BRAVO])),
+      ...registerHandlers([{ ...ALPHA, isCosatu: 'Y', cosatuPositions: 'PEC,CEC' }, BRAVO]),
       http.put('*/api/members/:id', async ({ request }) => {
         saved = await request.json()
         return HttpResponse.json(saved)
@@ -180,7 +181,7 @@ describe('the member record, mid-edit', () => {
     // option is "Passport Number", so the rule never ran and a passport member saved with no date on file.
     let saved
     server.use(
-      http.get('*/api/members', () => HttpResponse.json([{ ...ALPHA, identityType: 'Passport Number', identityNumber: 'A12345678' }, BRAVO])),
+      ...registerHandlers([{ ...ALPHA, identityType: 'Passport Number', identityNumber: 'A12345678' }, BRAVO]),
       http.put('*/api/members/:id', async ({ request }) => {
         saved = await request.json()
         return HttpResponse.json(saved)

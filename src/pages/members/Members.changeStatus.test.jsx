@@ -12,6 +12,7 @@ import { pageFixtures } from '../../test/msw/pageFixtures'
 import { monthEndBody, monthEndExamples, monthEndRefusal } from '../../test/msw/monthEndExamples'
 import { setupUser } from '../../test/user'
 import { deferred } from '../../test/deferred'
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * MONTH END `03.3` ON THE RECORD -- A STATUS IS CHANGED, NEVER EDITED.
@@ -50,6 +51,13 @@ let stored
 let sent
 let reads
 let asked
+/**
+ * The record is open. Since A10 the register lists slim rows and a row OPENS by reading the member
+ * (`GET /api/members/{id}`), so the read that opens the record answers `listed` -- what the screen read -- and is not
+ * one of the `reads`; every read after it is the record reading the member AGAIN, and answers `stored`, as the
+ * register's page does from then on.
+ */
+let opened
 
 /** The server's answer to a change it made: the golden answer's shape, carrying this change (MD48). */
 function made(change) {
@@ -81,12 +89,13 @@ beforeEach(() => {
   stored = { ...ALPHA }
   sent = []
   reads = 0
+  opened = false
   asked = { deletion: 0, suspension: 0 }
   // Two `use` calls: the catch-all first, then the specific handlers, which prepend.
   server.use(...pageFixtures)
   server.use(
-    http.get('*/api/members', () => HttpResponse.json([listed])),
     http.get('*/api/members/:id', () => {
+      if (!opened) return HttpResponse.json(listed)
       reads += 1
       return HttpResponse.json(stored)
     }),
@@ -103,6 +112,8 @@ beforeEach(() => {
       sent.push(change)
       return HttpResponse.json(made(change))
     }),
+    // Last, so the record's own handler above answers first. The page is the server's as it stands.
+    ...registerHandlers(() => [opened ? stored : listed]),
   )
 })
 
@@ -119,6 +130,7 @@ async function openRecord(user) {
   renderWithProviders(<MembersPage />)
   await user.click(await screen.findByRole('button', { name: /open the record for.*Alpha/i }))
   await user.click(await panel().findByRole('button', { name: /Membership & Subscriptions/i }))
+  opened = true
 }
 
 async function openDialog(user) {
@@ -547,6 +559,8 @@ describe('what the dialog says -- once the member has been read again (ME-3)', (
     server.use(
       http.post('*/api/members/:id/status', () => HttpResponse.json({ status: 503, error: 'Service Unavailable' }, { status: 503 })),
       http.get('*/api/members/:id', () => {
+        // The read that opens the record is answered (by the handler beneath); every read after it fails.
+        if (!opened) return undefined
         reads += 1
         return HttpResponse.error()
       }),
