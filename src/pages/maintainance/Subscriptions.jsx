@@ -40,6 +40,25 @@ const REFERENCE_LOADERS = {
     banks: () => bankService.getBankNames(),
 };
 
+/** A number as its field holds it: its digits, or nothing. */
+const textOf = (value) => (value === null || value === undefined || Number.isNaN(value) ? '' : String(value));
+
+/**
+ * What a changed row may not be saved with, field by field, in the server's own words (its PUT is @Valid): a debit day
+ * from 1 to 31, and an amount above R0. Empty when the row may be saved.
+ */
+const refusalsOf = (row) => {
+    const refused = {};
+    const day = String(row.acbDebitDay ?? '').trim();
+    if (!/^\d{1,2}$/.test(day) || Number(day) < 1 || Number(day) > 31) {
+        refused.acbDebitDay = 'Debit day must be between 1 and 31.';
+    }
+    const amount = String(row.subscriptionAmount ?? '').trim();
+    if (amount === '' || !Number.isFinite(Number(amount))) refused.subscriptionAmount = 'Subscription amount is required.';
+    else if (Number(amount) <= 0) refused.subscriptionAmount = 'Subscription amount must be more than R0.';
+    return refused;
+};
+
 export default function Subscriptions() {
     const location = useLocation();
 
@@ -114,15 +133,25 @@ export default function Subscriptions() {
         return result;
     }, [allSubscriptions, filters.bankName, filters.isCoreBanking]);
 
+    /*
+     * 🔴 AN EMPTIED NUMBER WAS SAVED AS 0 AND SHOWN AS "NaN" (the manual's reading of Maintenance, 6 Oct). Each field
+     * was `parseInt`/`parseFloat` of what was typed, so emptying the debit day stored NaN; JSON wrote it as null, the
+     * server's whole-number field took that as 0 and saved it, and the row read "NaN". The two numbers are held as typed
+     * now and checked before anything is sent -- the server holds the same rules since (PUT is @Valid).
+     */
+    const [fieldErrors, setFieldErrors] = useState({});
+
     const handleRowClick = (sub) => {
         if (!mayChange || editingId === sub.id) return;
         setEditingId(sub.id);
-        setEditData({ ...sub });
+        setEditData({ ...sub, acbDebitDay: textOf(sub.acbDebitDay), subscriptionAmount: textOf(sub.subscriptionAmount) });
+        setFieldErrors({});
     };
 
     const handleCancel = (e) => {
         e.stopPropagation();
         setSaveError(null);
+        setFieldErrors({});
         setEditingId(null);
         setEditData({});
     };
@@ -130,9 +159,13 @@ export default function Subscriptions() {
     const handleSave = async (e) => {
         e.stopPropagation();
         setSaveError(null);
+        const refused = refusalsOf(editData);
+        setFieldErrors(refused);
+        if (Object.keys(refused).length > 0) return;
+        const row = { ...editData, acbDebitDay: Number(editData.acbDebitDay), subscriptionAmount: Number(editData.subscriptionAmount) };
         try {
-            await subscriptionsService.update(editingId, editData);
-            setAllSubscriptions(prev => prev.map(s => s.id === editingId ? { ...editData } : s));
+            await subscriptionsService.update(editingId, row);
+            setAllSubscriptions(prev => prev.map(s => s.id === editingId ? row : s));
             setEditingId(null);
             setEditData({});
         } catch (err) {
@@ -141,7 +174,10 @@ export default function Subscriptions() {
         }
     };
 
-    const handleField = (field, value) => setEditData(prev => ({ ...prev, [field]: value }));
+    const handleField = (field, value) => {
+        setEditData(prev => ({ ...prev, [field]: value }));
+        setFieldErrors(prev => (prev[field] ? { ...prev, [field]: undefined } : prev));
+    };
 
     /** The row being edited, by name, for its controls' labels -- spelled five times before (RF). */
     const editName = editData.bankName || 'this subscription';
@@ -176,6 +212,15 @@ export default function Subscriptions() {
                         <RequirePermission permission={PERMISSIONS.SUBSCRIPTIONS_MAINTAIN} />
                     </div>
                 )}
+
+                {/* 🔴 A STATUS THAT DECIDES WHO IS DEBITED, SAID NOWHERE (the manual's reading of Maintenance, 6 Oct): a
+                    debit order run collects at a bank only while its row is ACTIVE (`AcbRuns.unambiguousBanks`, the
+                    run's NO_SUBSCRIPTION_ROW otherwise), and two ACTIVE rows for one bank stop the run. */}
+                <p id="subscription-status-meaning" className="mx-5 mt-4 text-sm text-ink-muted">
+                    Debit orders are collected at a bank only while its row is <strong className="font-medium text-ink">ACTIVE</strong>.
+                    Any other status leaves that bank&rsquo;s members out of the debit order run, and a bank with two ACTIVE rows
+                    stops the run until one is changed.
+                </p>
 
                 {/* 🔴 IT WAS A BARE `Error: {String(err)}` BANNER WITH NO WAY OUT. Two things
                     changed: the sentence is written for the person reading it rather than a
@@ -272,10 +317,12 @@ export default function Subscriptions() {
                                         <>
                                             <td className={`${BODY_CELL} text-ink`}>{editData.bankName}</td>
                                             <td className={BODY_CELL}>
-                                                <input type="number" aria-label={`ACB debit day for ${editName}`} className={inputCls} value={editData.acbDebitDay ?? ''} onChange={(e) => handleField('acbDebitDay', parseInt(e.target.value))} onClick={e => e.stopPropagation()} />
+                                                <input type="number" min="1" max="31" step="1" required aria-label={`ACB debit day for ${editName}`} aria-invalid={Boolean(fieldErrors.acbDebitDay)} aria-describedby={fieldErrors.acbDebitDay ? 'subscription-day-error' : undefined} className={inputCls} value={editData.acbDebitDay ?? ''} onChange={(e) => handleField('acbDebitDay', e.target.value)} onClick={e => e.stopPropagation()} />
+                                                {fieldErrors.acbDebitDay && <p id="subscription-day-error" role="alert" className="mt-1 text-xs text-status-suspended">{fieldErrors.acbDebitDay}</p>}
                                             </td>
                                             <td className={BODY_CELL}>
-                                                <input type="number" step="0.01" aria-label={`Subscription amount for ${editName}`} className={inputCls} value={editData.subscriptionAmount ?? ''} onChange={(e) => handleField('subscriptionAmount', parseFloat(e.target.value))} onClick={e => e.stopPropagation()} />
+                                                <input type="number" step="0.01" min="0.01" required aria-label={`Subscription amount for ${editName}`} aria-invalid={Boolean(fieldErrors.subscriptionAmount)} aria-describedby={fieldErrors.subscriptionAmount ? 'subscription-amount-error' : undefined} className={inputCls} value={editData.subscriptionAmount ?? ''} onChange={(e) => handleField('subscriptionAmount', e.target.value)} onClick={e => e.stopPropagation()} />
+                                                {fieldErrors.subscriptionAmount && <p id="subscription-amount-error" role="alert" className="mt-1 text-xs text-status-suspended">{fieldErrors.subscriptionAmount}</p>}
                                             </td>
                                             <td className={BODY_CELL}>
                                                 <select aria-label={`Core banking for ${editName}`} className={inputCls} value={editData.isCoreBanking === true ? 'true' : 'false'} onChange={(e) => handleField('isCoreBanking', e.target.value === 'true')} onClick={e => e.stopPropagation()}>
@@ -284,7 +331,7 @@ export default function Subscriptions() {
                                                 </select>
                                             </td>
                                             <td className={BODY_CELL}>
-                                                <select aria-label={`Status for ${editName}`} className={inputCls} value={editData.status || ''} onChange={(e) => handleField('status', e.target.value)} onClick={e => e.stopPropagation()}>
+                                                <select aria-label={`Status for ${editName}`} aria-describedby="subscription-status-meaning" className={inputCls} value={editData.status || ''} onChange={(e) => handleField('status', e.target.value)} onClick={e => e.stopPropagation()}>
                                                     <option value="ACTIVE">ACTIVE</option>
                                                     <option value="PENDING">PENDING</option>
                                                     <option value="CANCELLED">CANCELLED</option>
