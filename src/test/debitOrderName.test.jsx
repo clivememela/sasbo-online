@@ -57,15 +57,19 @@ const everyEntry = (items) => items.flatMap((item) => [item, ...everyEntry(item.
 await warmSplitPages()
 
 /**
- * The routes that lead to the module and through it. ⏳ ONE IS MISSING ON PURPOSE: the module's own page, `/admin/acb`
- * (`Acb.jsx`), is retitled with its new cards by the Debit Order Deductions screens' work, not here -- it joins this
- * list in the commit that brings that work together with this one.
+ * The routes that lead to the module and through it -- the module's own page, `/admin/acb` (`Acb.jsx`), retitled with
+ * its new cards by the Debit Order Deductions screens' work, and the four screens that work added.
  */
 const ROUTES = [
   '/home',
   '/admin',
+  '/admin/acb',
   '/admin/acb/runs',
   '/admin/acb/debits',
+  '/admin/acb/endings',
+  '/admin/acb/unpaid-counts',
+  '/admin/acb/settings',
+  '/admin/acb/letters',
   '/admin/monthly-menu',
   '/admin/maintenance',
   '/admin/maintenance/subscriptions',

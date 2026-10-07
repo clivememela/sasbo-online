@@ -40,6 +40,9 @@ export const CANCELLABLE = new Set([RUN_STATUS.PREPARED, RUN_STATUS.APPROVED]);
 export const EXCLUSION_LABEL = Object.freeze({
   NOT_DEBIT_ORDER: 'Not a debit-order member',
   STATUS_NOT_ACTIVE: 'Not Active',
+  // "Cannot present more then 3 unpaid debits" (Stephne, DOD-03): left out until the ending is confirmed or a new
+  // count is captured.
+  UNPAID_LIMIT_REACHED: 'At three unpaids, so not debited again',
   NO_BANK_ON_RECORD: 'Bank name matches no bank on record',
   NO_SUBSCRIPTION_ROW: 'SASBO does not collect at this bank',
   DAY_OUT_OF_WINDOW: 'Debit day outside the 20th to the 31st',
@@ -47,9 +50,6 @@ export const EXCLUSION_LABEL = Object.freeze({
   // General on purpose: the server files a missing membership number, a missing surname and -- since 00.5 -- a
   // missing or unknown account type all under this reason, and the row's detail says which.
   SNAPSHOT_INCOMPLETE: 'A detail the file needs is missing or invalid',
-  // "Cannot present more then 3 unpaid debits" (Stephne, DOD-03): left out until the ending is confirmed or a new
-  // count is captured.
-  UNPAID_LIMIT_REACHED: 'At three unpaids, so not debited again',
 });
 
 /** Why the bank declined a file, from the server's short list (D29, SD3-H). */

@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { Search } from "lucide-react";
+import { Link } from "react-router-dom";
 import PageTitle from "../../components/common/PageTitle.jsx";
 import Criteria, { CRITERION, CRITERION_WIDE } from "../../components/common/Criteria.jsx";
 import DataState from "../../components/common/DataState.jsx";
@@ -21,7 +22,6 @@ import { ACCOUNT_TYPE_OPTIONS } from '../../config/memberConstants.js';
 import AcbUnpaids from './AcbUnpaids.jsx';
 import AcbHeldOver from './AcbHeldOver.jsx';
 import AcbHeldLetters from './AcbHeldLetters.jsx';
-import AcbTerminationReport from './AcbTerminationReport.jsx';
 import { PagerFor } from './acbPaging.jsx';
 import { DEBIT_DAYS, asPage, debitDayReplaced, debitsRuns, maskedAccount, ordinal } from './acbRunRules.js';
 import DodGuard from './DodGuard.jsx';
@@ -390,9 +390,11 @@ function DebitsScreen() {
 
                 {runsState === 'ready' && runs.next && <AcbHeldOver run={runs.next} />}
                 {prepares && runsState === 'ready' && runs.returned && <AcbHeldLetters run={runs.returned} />}
-                {/* 03.5: who three unpaids would terminate -- read from every sent month, not from one run; each ending
-                    confirmed by a staff member (Stephne, DOD-22). Also its own screen, Endings to confirm. */}
-                {prepares && <AcbTerminationReport />}
+                {/* 03.5's termination report MOVED to its own screen, Endings to confirm: confirming each ending is a task
+                    of its own (Stephne, DOD-22). */}
+                <p className="mt-6 text-sm text-ink-muted">
+                    Members at three unpaids are on <Link className="font-medium text-brand-ink underline" to="/admin/acb/endings">Endings to confirm</Link>.
+                </p>
 
                 {/* The member search -- for a member outside the unpaid list. card.html's criteria row. */}
                 <div className="mt-8">

@@ -593,6 +593,10 @@ export const UNREACHABLE = [
     ['pages/acb/AcbRunReturns.jsx#DateField@report date', 'DOD_PREPARE'],
     ['pages/acb/AcbSuspend.jsx#Modal@suspend member', 'DOD_PREPARE'],
     ['pages/acb/AcbTerminationReport.jsx#Modal@confirm the ending', 'DOD_PREPARE'],
+    ['pages/acb/DodCodes.jsx#Modal@change a bank code', 'DOD_SETTINGS'],
+    ['pages/acb/DodCalendar.jsx#Modal@add a non-working day', 'DOD_SETTINGS'],
+    ['pages/acb/DodCalendar.jsx#Modal@a settings step', 'DOD_SETTINGS'],
+    ['pages/acb/DodCalendar.jsx#DateField@the day', 'DOD_SETTINGS'],
   ].map(([site, permission]) => ({
     site, why: `behind ${permission}: the browser run signs nobody in until sign-in's stub session is wired into surfaces.mjs`,
   })),

@@ -62,7 +62,9 @@ describe('Home, on the real menu', () => {
     as(ORGANISER, <Home />)
     await user.click(screen.getByRole('button', { name: 'Table' }))
     const row = screen.getByRole('link', { name: /^Debit Order Deductions/ }).closest('tr')
-    expect(within(row).queryByText(/Under it/)).not.toBeInTheDocument()
+    const under = within(row).getByText(/^Under it:/)
+    expect(under).toHaveTextContent('Under it: Settings, Letters')
+    expect(under).not.toHaveTextContent(/Debits|Runs|Endings|Unpaid counts/)
   })
 
   it('the must-pass: the administrator reads the module\'s screens under it', async () => {
@@ -70,7 +72,8 @@ describe('Home, on the real menu', () => {
     as([PERMISSIONS.DOD_PREPARE], <Home />)
     await user.click(screen.getByRole('button', { name: 'Table' }))
     const row = screen.getByRole('link', { name: /^Debit Order Deductions/ }).closest('tr')
-    expect(within(row).getByText(/Under it: Debits, Runs/)).toBeInTheDocument()
+    expect(within(row).getByText(/^Under it:/))
+      .toHaveTextContent('Under it: Debits, Runs, Endings to confirm, Unpaid counts, Settings, Letters')
   })
 
   it('every permission the menu names is one the server publishes (contracts/permissions.md)', () => {

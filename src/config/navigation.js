@@ -20,6 +20,18 @@ import {
 /** Any of the three Debit Order permissions -- what reading a run or its unpaids takes (`contracts/dod-api.md` §1). */
 const DOD_READ = ['DOD_PREPARE', 'DOD_FILE', 'DOD_SETTINGS'];
 
+/**
+ * The October build's Debit Order screens, under the module in both places the rail lists it. No icons: the rail draws
+ * none below the top level, and this file is on every first load. The endings and the counts are never shown to an
+ * organiser (Stephne, DOD-14); Settings is shown, marked, to anyone it would refuse; the letters are specimens, open.
+ */
+const DOD_SCREENS = [
+  { title: "Endings to confirm", href: "/admin/acb/endings", permission: DOD_READ, hideWithout: true },
+  { title: "Unpaid counts", href: "/admin/acb/unpaid-counts", permission: 'DOD_PREPARE', hideWithout: true },
+  { title: "Settings", href: "/admin/acb/settings", permission: 'DOD_SETTINGS' },
+  { title: "Letters", href: "/admin/acb/letters" },
+];
+
 export const navItems = [
   {
     title: "Home",
@@ -136,6 +148,7 @@ export const navItems = [
             permission: DOD_READ,
             hideWithout: true,
           },
+          ...DOD_SCREENS,
         ]
       },
       {
@@ -216,6 +229,7 @@ export const navItems = [
         permission: DOD_READ,
         hideWithout: true,
       },
+      ...DOD_SCREENS,
       /*{
         title: "Credits",
         desc: "Manage Credits",

@@ -45,6 +45,11 @@ const Admin = lazy(() => import('./pages/admin/Admin.jsx'));
 const Acb = lazy(() => import('./pages/admin/Acb.jsx'));
 const AcbDebits = lazy(() => import('./pages/acb/AcbDebits.jsx'));
 const AcbRuns = lazy(() => import('./pages/acb/AcbRuns.jsx'));
+// Debit Order Deductions, the October build: four screens of their own, each its own chunk.
+const DodEndings = lazy(() => import('./pages/acb/DodEndings.jsx'));
+const DodUnpaidCounts = lazy(() => import('./pages/acb/DodUnpaidCounts.jsx'));
+const DodSettings = lazy(() => import('./pages/acb/DodSettings.jsx'));
+const DodLetters = lazy(() => import('./pages/acb/DodLetters.jsx'));
 const DailyMenu = lazy(() => import('./pages/admin/DailyMenu.jsx'));
 // Month end `04.1`: the page is renamed "Month end" and its address is not (MD38) -- the Monthly Menu's address is
 // written in five places, two of them tools' route lists (BR47). `04.3`-`04.8`: ONE route, and one chunk, for the six
@@ -86,6 +91,10 @@ function App() {
         <Route path="admin/acb" element={<Acb />} />
         <Route path="admin/acb/debits" element={<AcbDebits />} />
         <Route path="admin/acb/runs" element={<AcbRuns />} />
+        <Route path="admin/acb/endings" element={<DodEndings />} />
+        <Route path="admin/acb/unpaid-counts" element={<DodUnpaidCounts />} />
+        <Route path="admin/acb/settings" element={<DodSettings />} />
+        <Route path="admin/acb/letters" element={<DodLetters />} />
         <Route path="admin/daily-menu" element={<DailyMenu />} />
         <Route path="admin/monthly-menu" element={<MonthlyMenu />} />
         <Route path="admin/monthly-menu/:statistic" element={<MonthEndStatistic />} />

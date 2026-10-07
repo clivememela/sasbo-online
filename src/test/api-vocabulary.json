@@ -42,12 +42,12 @@
     "exclusionReasons": [
       {"name": "NOT_DEBIT_ORDER", "listed": false},
       {"name": "STATUS_NOT_ACTIVE", "listed": false},
+      {"name": "UNPAID_LIMIT_REACHED", "listed": true},
       {"name": "NO_BANK_ON_RECORD", "listed": true},
       {"name": "NO_SUBSCRIPTION_ROW", "listed": true},
       {"name": "DAY_OUT_OF_WINDOW", "listed": true},
       {"name": "ACCOUNT_SHAPE_INVALID", "listed": true},
-      {"name": "SNAPSHOT_INCOMPLETE", "listed": true},
-      {"name": "UNPAID_LIMIT_REACHED", "listed": true}
+      {"name": "SNAPSHOT_INCOMPLETE", "listed": true}
     ],
     "refusalCodes": [
       {"code": "RUN_ALREADY_EXISTS", "status": 409},

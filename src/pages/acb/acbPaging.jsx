@@ -14,6 +14,8 @@ export function usePagedRead(read, { size = 50, label = 'acb.read' } = {}) {
   const [page, setPage] = useState(1);
   const [state, setState] = useState('loading');
   const [data, setData] = useState(() => asPage(null));
+  // The failure itself, so a sheet can say a refusal of the caller in its own words (`readFailure`).
+  const [error, setError] = useState(null);
   const left = useRef(false);
   useEffect(() => () => { left.current = true; }, []);
 
@@ -31,7 +33,9 @@ export function usePagedRead(read, { size = 50, label = 'acb.read' } = {}) {
       })
       .catch((err) => {
         reportError(label, err);
-        if (current()) setState('error');
+        if (!current()) return;
+        setError(err);
+        setState('error');
       });
   }, [read, size, label]);
 
@@ -44,7 +48,7 @@ export function usePagedRead(read, { size = 50, label = 'acb.read' } = {}) {
     if (pageNumber === page) load(pageNumber);
     else setPage(pageNumber);
   };
-  return { data, state, goTo, retry: () => goTo(page) };
+  return { data, state, error, goTo, retry: () => goTo(page) };
 }
 
 /** The foot of a server-paged sheet: what it shows, of how many, and the way to the next page. */

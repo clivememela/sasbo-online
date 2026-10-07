@@ -204,6 +204,59 @@ const acbTermination = [members[0], members[7], members[2], members[3]].map((m, 
   unpaidMonths: i < 2 ? ['2026-07', '2026-08', '2026-09'] : ['2026-08', '2026-09'],
   openingUnpaids: i === 1 ? 1 : 0, status: i === 0 ? 'Terminated' : 'Active',
 }));
+/*
+ * The October build's Debit Order shapes (`contracts/dod-api.md` v2), synthetic like everything here: run 40's two debit
+ * days and one returns report, Synthetic Bank's move to the 27th, Stephne's codes sheet as V70 seeds it, the unpaid
+ * counts captured by hand, and a one-page specimen PDF.
+ */
+const acbDebitDays = [
+  { actionDate: '2026-09-21', lines: 12, unpaid: 2, batches: 1 },
+  { actionDate: '2026-09-25', lines: 18, unpaid: 4, batches: 0 },
+];
+const acbBatches = [{
+  id: 7, runId: 40, actionDate: '2026-09-21', reportDate: '2026-09-22', source: 'MANUAL', entries: 2, recorded: 2,
+  alreadyRecorded: 0, lettersQueued: 2, recordedBy: 'system', recordedAt: '2026-09-22T08:15:00Z', lines: null,
+}];
+const acbMove = {
+  bankName: banks[0], newDay: 27, toMove: 45, alreadyOnDay: 0, byCurrentDay: { 20: 12, 25: 32, none: 1 },
+  liveRuns: [{ runId: 41, actionMonth: '2026-10', status: 'PREPARED' }], moved: null,
+};
+const acbCodes = {
+  bankCodes: [
+    ['2', 'NOT_PROVIDED_FOR', 'Not Provided For', 'YES', 18, false], ['4', 'PAYMENT_STOPPED', 'Payment Stopped', 'NO', 16, false],
+    ['6', 'ACCOUNT_FROZEN', 'Debit returned', 'UNKNOWN', 13, true], ['15', 'ACCOUNT_CLOSED', 'Account Closed', 'UNKNOWN', 15, true],
+    ['18', 'ACCOUNT_HOLDER_DECEASED', 'Deceased', 'UNKNOWN', null, true], ['26', 'INVALID_ACCOUNT_NUMBER', 'Invalid Account Number', 'UNKNOWN', 19, true],
+    ['30', 'NO_AUTHORITY_TO_DEBIT', 'No Authority To Debit', 'NO', 30, true],
+  ].map(([bankCode, reason, wording, reDebit, suspensionCode, provisional]) => ({
+    bankCode, reason, wording, reDebit, reDebitSource: reDebit === 'UNKNOWN' ? null : 'Stephne, DOD-03', suspensionCode,
+    suspensionName: suspensionCode == null ? null : wording, provisional, note: provisional ? 'Friday item 9' : null,
+    source: 'Suspension codes sheet', updatedBy: 'system', updatedAt: '2026-10-07T06:00:00Z', version: 1,
+  })),
+  suspensionCodes: [[11, 'Not paid on payroll'], [13, 'Debit returned'], [15, 'Account closed'], [16, 'Payment stopped'],
+    [18, 'Insufficient funds'], [19, 'Invalid account'], [30, 'No authority to debit']].map(([code, name]) => ({ code, name, bankCodes: [] })),
+};
+const acbCalendar = {
+  name: 'za-statutory', knownUntil: '2028-12-31', endingSoon: false, year: 2026, bankClosuresCount: true,
+  holidays: [
+    { date: '2026-09-24', name: 'Heritage Day', source: 'STATUTORY', kind: 'PUBLIC_HOLIDAY' },
+    { date: '2026-10-23', name: 'Synthetic bank closure', source: 'ADDED', kind: 'BANK_CLOSED' },
+    { date: '2026-12-16', name: 'Day of Reconciliation', source: 'STATUTORY', kind: 'PUBLIC_HOLIDAY' },
+    { date: '2026-12-25', name: 'Christmas Day', source: 'STATUTORY', kind: 'PUBLIC_HOLIDAY' },
+  ],
+};
+const SPECIMEN_PDF = Buffer.from([
+  '%PDF-1.4',
+  '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj',
+  '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
+  '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj',
+  '4 0 obj<</Length 52>>stream',
+  'BT /F1 18 Tf 72 760 Td (Synthetic specimen letter) Tj ET',
+  'endstream endobj',
+  '5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj',
+  'trailer<</Root 1 0 R>>',
+  '%%EOF',
+  '',
+].join(String.fromCharCode(10)), 'latin1');
 let acbPreparedReads = 0;
 
 /** The A.C.B. run shapes a prefix match cannot answer; `false` when the path is not one of them. */
@@ -238,6 +291,16 @@ const acbRunAnswer = (req, path) => {
   }
   if (/^\/api\/acb\/runs\/\d+\/lines$/.test(path)) return reply(200, acbPage(acbLines, 50));
   if (/^\/api\/acb\/runs\/\d+\/exclusions$/.test(path)) return reply(200, acbPage(acbExclusions, 50));
+  // Debit Order Deductions, the October build (`contracts/dod-api.md` v2): a run's debit days and its returns reports,
+  // a bank's debit-day move previewed, and a letter's specimen as the PDF bytes it is.
+  m = /^\/api\/acb\/runs\/(\d+)\/debit-days$/.exec(path);
+  if (m) return reply(200, { runId: Number(m[1]), days: acbDebitDays });
+  if (/^\/api\/acb\/runs\/\d+\/returns\/batches$/.test(path)) return reply(200, acbPage(acbBatches, 20));
+  m = /^\/api\/acb\/banks\/(\d+)\/debit-day-move$/.exec(path);
+  if (m) return reply(200, { ...acbMove, bankId: Number(m[1]) });
+  if (/^\/api\/acb\/letters\/specimen\/[A-Z_]+$/.test(path)) {
+    return { status: 200, raw: SPECIMEN_PDF, type: 'application/pdf', headers: { 'content-disposition': 'inline; filename="specimen.pdf"' } };
+  }
   m = /^\/api\/acb\/runs\/(\d+)$/.exec(path);
   if (!m) return false;
   const id = Number(m[1]);
@@ -654,15 +717,20 @@ const API = {
     rates: [{ effectiveFrom: '2026-01-01', amount: 174, source: 'From January -- confirmed by SASBO 2026-09-21 (Q43)' }],
     januaryNotice: null,
   },
-  // The holiday calendar the Runs screen reads (D30): V47's, far from its end, so no notice.
-  '/api/acb/holidays': {
-    name: 'za-statutory', knownUntil: '2027-12-31', endingSoon: false, year: 2026,
-    holidays: [
-      { date: '2026-09-24', name: 'Heritage Day', source: 'STATUTORY' },
-      { date: '2026-12-16', name: 'Day of Reconciliation', source: 'STATUTORY' },
-      { date: '2026-12-25', name: 'Christmas Day', source: 'STATUTORY' },
-    ],
-  },
+  // The non-working days the Runs screen and Settings read (D30; dod-api v2 §7.2): far from its end, so no notice.
+  '/api/acb/holidays': acbCalendar,
+  // Debit Order Deductions, the October build: Settings, Unpaid counts and Letters. A shape a prefix cannot answer --
+  // a debit-day move, a specimen's bytes -- is `acbRunAnswer`'s; these keys are what `stubDrift` reads.
+  '/api/acb/calendar/known-until': acbCalendar,
+  '/api/acb/calendar/settings': acbCalendar,
+  '/api/acb/codes': acbCodes,
+  '/api/acb/banks': { banks: [{ bankId: 3, name: banks[0], defaultDay: 25, debitOrderMembers: 45, byDay: { 20: 12, 25: 32, none: 1 } }] },
+  '/api/acb/unpaid-counts': acbPage(members.slice(0, 3).map((m, i) => ({
+    memberId: m.id, membershipNumber: m.membershipNumber, surname: m.surname, unpaidCount: i + 1, countedOn: '2026-10-07',
+    source: 'Synthetic re-debit list', enteredBy: 'system', enteredAt: '2026-10-07T07:30:00Z',
+  })), 50),
+  '/api/acb/opening-position': { members: 0, enteredBy: null, enteredAt: null, locked: false, lockedSince: null, disagreements: [] },
+  '/api/acb/letters/specimen': {},
   '/api/banks': bankRows,
   '/api/banks/branches': bankRows,
   // `Locations` searches `/api/branches?...` and hands each result to `LocationListing`,

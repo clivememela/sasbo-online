@@ -10,6 +10,8 @@ import { pageFixtures } from '../../test/msw/pageFixtures'
 import { refusal } from '../../test/msw/dodApi'
 import { setupUser } from '../../test/user'
 import { expectNoA11yViolations } from '../../test/assertions'
+import { TestAuthProvider } from '../../test/authTestUtils'
+import { PERMISSIONS } from '../../auth/permissions'
 
 /**
  * Three unpaid presentations end a membership (Q27) once a staff member confirms each one (DOD-22), and the member
@@ -31,6 +33,10 @@ const report = (members) => ({
 
 const answer = (body, status = 200) =>
   server.use(http.get('*/api/acb/termination-report', () => HttpResponse.json(body, { status })), ...pageFixtures)
+
+/** Confirming is an administrator's (DOD_PREPARE); the report itself is any Debit Order reader's. */
+const asAdministrator = (permissions = [PERMISSIONS.DOD_PREPARE]) =>
+  renderWithProviders(<TestAuthProvider permissions={permissions}><AcbTerminationReport /></TestAuthProvider>)
 
 const rowOf = async (surname) => {
   const table = await screen.findByRole('table', { name: 'Members the termination rule reaches, or is one away from' })
@@ -55,7 +61,7 @@ describe('the endings to confirm', () => {
       candidate({ memberId: 8, membershipNumber: 'SYN-0008', surname: 'Sampleton', unpaidCount: 2, terminate: false,
         unpaidMonths: ['2026-09', '2026-10'], twelveMonthTotal: 2, thirdUnpaidOn: null }),
     ]))
-    const { container } = renderWithProviders(<AcbTerminationReport />)
+    const { container } = asAdministrator()
 
     const due = await rowOf('Testperson')
     expect(within(due).getByText('three — the ending is to confirm')).toBeInTheDocument()
@@ -72,7 +78,7 @@ describe('the endings to confirm', () => {
   it('confirming asks first, says the ending is dated today and a letter is prepared, and shows the server\'s answer', async () => {
     answer(report([candidate()]))
     const user = setupUser()
-    renderWithProviders(<AcbTerminationReport />)
+    asAdministrator()
     await user.click(within(await rowOf('Testperson')).getByRole('button', { name: /^Confirm the ending/ }))
     const dialog = await screen.findByRole('dialog', { name: 'End Testperson’s membership?' })
     expect(dialog).toHaveTextContent('Their third unpaid was on 26 Oct 2026. The membership ends today, the day you confirm it')
@@ -93,7 +99,7 @@ describe('the endings to confirm', () => {
     server.use(http.post('*/api/acb/termination-report/:memberId/terminate', () =>
       refusal(409, 'TERMINATION_NOT_DUE', 'The rule no longer reaches this member: a debit has since been paid.')))
     const user = setupUser()
-    renderWithProviders(<AcbTerminationReport />)
+    asAdministrator()
     await user.click(within(await rowOf('Testperson')).getByRole('button', { name: /^Confirm the ending/ }))
     const dialog = await screen.findByRole('dialog', { name: 'End Testperson’s membership?' })
     await user.click(within(dialog).getByRole('button', { name: 'Confirm the ending' }))
@@ -101,9 +107,18 @@ describe('the endings to confirm', () => {
     expect(within(dialog).queryByRole('button', { name: 'Confirm the ending' })).not.toBeInTheDocument()
   })
 
+  it('the CFO reads the report, and is told an administrator confirms each ending -- no action of her own', async () => {
+    answer(report([candidate()]))
+    asAdministrator([PERMISSIONS.DOD_FILE])
+    const row = await rowOf('Testperson')
+    expect(within(row).getByText('three — the ending is to confirm')).toBeInTheDocument()
+    expect(within(row).queryByRole('button', { name: /Confirm the ending/ })).toBeNull()
+    expect(screen.getByText('An administrator confirms each ending.')).toBeInTheDocument()
+  })
+
   it('shows a member already ended by status, with no action', async () => {
     answer(report([candidate({ status: 'Terminated' })]))
-    renderWithProviders(<AcbTerminationReport />)
+    asAdministrator()
     const row = await rowOf('Testperson')
     expect(within(row).getByText('Terminated')).toBeInTheDocument()
     expect(within(row).queryByRole('button', { name: /Confirm the ending/ })).toBeNull()
@@ -111,13 +126,13 @@ describe('the endings to confirm', () => {
 
   it('says so when nobody is at two unpaids', async () => {
     answer(report([]))
-    renderWithProviders(<AcbTerminationReport />)
+    asAdministrator()
     expect(await screen.findByText('Nobody at two unpaids')).toBeInTheDocument()
   })
 
   it('says so when the report cannot be read -- never an empty list', async () => {
     answer({ status: 500, message: 'boom' }, 500)
-    renderWithProviders(<AcbTerminationReport />)
+    asAdministrator()
     expect(await screen.findByText('We could not load the termination report.')).toBeInTheDocument()
     expect(screen.queryByText('Nobody at two unpaids')).toBeNull()
   })

@@ -12,6 +12,8 @@ import { dodService } from '../../services/dodService.js';
 import { PagerFor, usePagedRead } from './acbPaging.jsx';
 import { LETTER_STATUS_LABEL, monthLabel } from './acbRunRules.js';
 import { writeOutcome } from './dodRules.js';
+import { useAuth } from '../../auth/useAuth';
+import { PERMISSIONS } from '../../auth/permissions';
 
 const PAGE_SIZE = 50;
 
@@ -27,6 +29,8 @@ const TERMINATED = 'Terminated';
  * The server's word decides: a confirmed ending shows the status and letter it answered, never the one asked for.
  */
 export default function AcbTerminationReport() {
+  // Confirming is an administrator's (DOD_PREPARE); anyone else who may read the runs sees the report without it.
+  const confirms = useAuth().can(PERMISSIONS.DOD_PREPARE);
   const [about, setAbout] = useState({ countingFrom: null, blindness: null });
   const read = useCallback((page, size) => acbRunService.terminationReport(page, size).then((report) => {
     setAbout({ countingFrom: report?.countingFrom ?? null, blindness: report?.blindness ?? null });
@@ -75,7 +79,7 @@ export default function AcbTerminationReport() {
     { key: 'status', header: 'Status', priority: 'essential', cell: (member) => <StatusChip status={member.status} /> },
     {
       key: 'act', header: 'Ending', priority: 'essential',
-      cell: (member) => (member.terminate && member.status !== TERMINATED ? (
+      cell: (member) => (confirms && member.terminate && member.status !== TERMINATED ? (
         <Button variant="danger" onClick={() => setConfirming(member)}
           aria-label={`Confirm the ending of ${member.surname || member.membershipNumber}’s membership`}>
           Confirm the ending
@@ -95,6 +99,7 @@ export default function AcbTerminationReport() {
           once a staff member confirms it.{about.countingFrom ? ` Counted from ${monthLabel(about.countingFrom)}.` : ''}
         </p>
         {about.blindness && <p className="mt-1 text-sm text-ink-muted">{about.blindness}</p>}
+        {!confirms && <p className="mt-1 text-sm text-ink-muted">An administrator confirms each ending.</p>}
       </div>
       {notice && (
         <div className="px-6 pt-4">

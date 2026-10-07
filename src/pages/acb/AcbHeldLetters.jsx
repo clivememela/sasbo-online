@@ -23,8 +23,8 @@ export const HANDLED_NOTE_LIMIT = 300;
  * answer that never came is never repeated -- the dialog stops offering the write and the list is read
  * again (R4-5).
  *
- * The send is the server's to allow: until administrators sign in to this system it refuses every
- * caller (B1), and the dialog says the server's own sentence.
+ * The send is the server's to allow -- DOD_PREPARE since sign-in (`contracts/dod-api.md` §1.1), and nothing reaches a
+ * member until the letters review switches sending on -- and a refusal is said in the dialog in the server's sentence.
  */
 export default function AcbHeldLetters({ run }) {
   const read = useCallback((page, size) => acbRunService.heldLetters(run.id, page, size), [run.id]);
