@@ -40,6 +40,9 @@ export const CANCELLABLE = new Set([RUN_STATUS.PREPARED, RUN_STATUS.APPROVED]);
 export const EXCLUSION_LABEL = Object.freeze({
   NOT_DEBIT_ORDER: 'Not a debit-order member',
   STATUS_NOT_ACTIVE: 'Not Active',
+  // "Cannot present more then 3 unpaid debits" (Stephne, DOD-03): left out until the ending is confirmed or a new
+  // count is captured.
+  UNPAID_LIMIT_REACHED: 'At three unpaids, so not debited again',
   NO_BANK_ON_RECORD: 'Bank name matches no bank on record',
   NO_SUBSCRIPTION_ROW: 'SASBO does not collect at this bank',
   DAY_OUT_OF_WINDOW: 'Debit day outside the 20th to the 31st',
@@ -88,6 +91,8 @@ export const UNPAID_REASON_LABEL = Object.freeze({
   ACCOUNT_CLOSED: 'Account Closed',
   NO_AUTHORITY_TO_DEBIT: 'No Authority To Debit',
   AUTHORISATION_CANCELLED: 'Authorisation Cancelled',
+  // The bank's 18 on SASBO's sheet: no letter, and no SASBO code on record yet (Friday item 1).
+  ACCOUNT_HOLDER_DECEASED: 'Deceased',
   OTHER: 'Unrecognised bank code',
 });
 
@@ -118,11 +123,14 @@ export const LETTER_STATUS_LABEL = Object.freeze({
   HANDLED: 'Dealt with by hand',
 });
 
-/** The union's three letters. */
+/** The union's letters -- the server's `letterTemplates`, each with the name an administrator reads. */
 export const LETTER_TEMPLATE_LABEL = Object.freeze({
   RETURN_DEBIT: 'Return debit',
   ACCOUNT_CLOSED: 'Account closed',
   RE_DEBIT: 'Re-debit',
+  PAYMENT_STOPPED: 'Payment stopped',
+  NO_AUTHORITY: 'No authority to debit',
+  MEMBERSHIP_ENDED: 'Membership ended',
 });
 
 /** Why a letter is held (Q46, SD3-C). */

@@ -5,9 +5,14 @@ import { http, HttpResponse } from 'msw'
 
 import AcbDebits from './AcbDebits'
 import { renderWithProviders } from '../../test/renderWithProviders'
+import { TestAuthProvider } from '../../test/authTestUtils'
+import { PERMISSIONS } from '../../auth/permissions'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+
+/** Manage Re-Debits is behind the Debit Order permissions (dod-api §1): these tests are an administrator's (DOD-12). */
+const ADMINISTRATOR = [PERMISSIONS.DOD_PREPARE]
 
 /**
  * 🔒 `04.1`, R-SEC-B, R-PERF-D. The screen called `memberService.getMembers()` on mount and filtered
@@ -45,7 +50,7 @@ beforeEach(() => {
 describe('AcbDebits, the member search', () => {
   it('🔒 asks the server, with the query and a page size in the body -- and never lists every member', async () => {
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     await user.type(screen.getByLabelText('Surname'), 'Testperson')
     await user.type(screen.getByLabelText('Identity number'), '9001010000080')
     await user.click(screen.getByRole('button', { name: /^Search$/ }))
@@ -61,7 +66,7 @@ describe('AcbDebits, the member search', () => {
 
   it('the count is the server\'s total, and the next page is asked of the server', async () => {
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     await user.type(screen.getByLabelText('Surname'), 'Testperson')
     await user.click(screen.getByRole('button', { name: /^Search$/ }))
     expect(await screen.findByText('30 members found')).toBeInTheDocument()
@@ -75,7 +80,7 @@ describe('AcbDebits, the member search', () => {
 
   it('🔒 a search with nothing in it asks nothing, and says what to type', async () => {
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     await user.click(screen.getByRole('button', { name: /^Search$/ }))
 
     expect(await screen.findByText(/Type a surname, a membership number or an identity number/)).toBeInTheDocument()
@@ -86,7 +91,7 @@ describe('AcbDebits, the member search', () => {
   it('a search that fails says so -- never "0 members found"', async () => {
     server.use(http.post('*/api/acb/members/search', () => HttpResponse.json({ status: 500, error: 'boom' }, { status: 500 })))
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     await user.type(screen.getByLabelText('Surname'), 'Testperson')
     await user.click(screen.getByRole('button', { name: /^Search$/ }))
 
@@ -98,7 +103,7 @@ describe('AcbDebits, the member search', () => {
     server.use(http.post('*/api/acb/members/search', () =>
       HttpResponse.json({ content: [], page: 0, size: 25, totalElements: 0, totalPages: 0 })))
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     await user.type(screen.getByLabelText('Surname'), 'Nobodyhasthissurname')
     await user.click(screen.getByRole('button', { name: /^Search$/ }))
 

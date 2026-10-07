@@ -1,4 +1,4 @@
-// @vitest-environment jsdom -- the A.C.B. Runs screen: the list, preparing a run, and its refusals
+// @vitest-environment jsdom -- Debit Order Runs: the list, preparing a run, and its refusals
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, screen, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
@@ -10,9 +10,11 @@ import { server } from '../../test/msw/server'
 import { setupUser } from '../../test/user'
 import { deferred } from '../../test/deferred'
 import { expectNoA11yViolations } from '../../test/assertions'
+import { TestAuthProvider } from '../../test/authTestUtils'
+import { PERMISSIONS } from '../../auth/permissions'
 
 /**
- * `01.5` -- A.C.B. -> Runs.
+ * `01.5` -- Debit Order Deductions -> Debit Order Runs.
  *
  * The rules under test are the screen's, not the server's: a 202 is followed by polling and never
  * by a second POST; a write that may have landed says so and re-reads; a refusal names what the
@@ -51,6 +53,9 @@ beforeEach(() => {
   )
 })
 
+/** The runs are behind the Debit Order permissions (dod-api §1): these tests are an administrator's, who prepares runs. */
+const asAdministrator = (ui) => renderWithProviders(<TestAuthProvider permissions={[PERMISSIONS.DOD_PREPARE]}>{ui}</TestAuthProvider>)
+
 const openPrepare = async (user) => {
   await user.click(await screen.findByRole('button', { name: /^Prepare / }))
   return screen.findByRole('dialog', { name: /^Prepare the .* run\?$/ })
@@ -59,7 +64,7 @@ const openPrepare = async (user) => {
 describe('the rate (Q43)', () => {
   it('says beside Prepare what the chosen month will charge, and since when', async () => {
     const user = setupUser()
-    renderWithProviders(<AcbRuns />)
+    asAdministrator(<AcbRuns />)
     await screen.findByRole('button', { name: 'Open the October 2026 run' })
     await user.selectOptions(screen.getByLabelText('Action month'), '2026-10')
     expect(await screen.findByText(/^October 2026 charges R\s?174,00 a member — the rate since January 2026\.$/)).toBeInTheDocument()
@@ -67,7 +72,7 @@ describe('the rate (Q43)', () => {
 
   it('shows the January notice when the server gives one -- a notice, never a refusal', async () => {
     server.use(http.get('*/api/acb/rates', () => HttpResponse.json({ ...RATES, januaryNotice: '2027-01 will charge R 174.00, the rate since 2026-01.' })))
-    renderWithProviders(<AcbRuns />)
+    asAdministrator(<AcbRuns />)
     expect(await screen.findByText('2027-01 will charge R 174.00, the rate since 2026-01.')).toBeInTheDocument()
   })
 })
@@ -77,7 +82,7 @@ describe('a month the bank declined (D29, SD3-H)', () => {
     const declined = { ...SUMMARY, id: 40, status: 'DECLINED', declinedReason: 'WRONG_DEBIT_DATE', calendarAgrees: true }
     server.use(http.get('*/api/acb/runs', () => HttpResponse.json(pageOf([declined]))))
     const user = setupUser()
-    renderWithProviders(<AcbRuns />)
+    asAdministrator(<AcbRuns />)
     await screen.findByRole('button', { name: 'Open the October 2026 run' })
     await user.selectOptions(screen.getByLabelText('Action month'), '2026-10')
     const dialog = await openPrepare(user)
@@ -87,7 +92,7 @@ describe('a month the bank declined (D29, SD3-H)', () => {
 
   it('the must-pass twin: a month with no decline says nothing in the dialog', async () => {
     const user = setupUser()
-    renderWithProviders(<AcbRuns />)
+    asAdministrator(<AcbRuns />)
     await screen.findByRole('button', { name: 'Open the October 2026 run' })
     await user.selectOptions(screen.getByLabelText('Action month'), '2026-10')
     const dialog = await openPrepare(user)
@@ -98,19 +103,19 @@ describe('a month the bank declined (D29, SD3-H)', () => {
 describe('the holiday calendar (D30)', () => {
   it('from sixty days before its end, the screen names the date it is known until (SD3-G)', async () => {
     server.use(http.get('*/api/acb/holidays', () => HttpResponse.json({ ...CALENDAR, endingSoon: true })))
-    renderWithProviders(<AcbRuns />)
+    asAdministrator(<AcbRuns />)
     expect(await screen.findByText(/The holiday calendar is known until 31 Dec 2027\./)).toBeInTheDocument()
   })
 
   it('the must-pass twin: a calendar far from its end adds nothing to the screen', async () => {
-    renderWithProviders(<AcbRuns />)
+    asAdministrator(<AcbRuns />)
     expect(await screen.findByRole('button', { name: 'Open the October 2026 run' })).toBeInTheDocument()
     expect(screen.queryByText(/holiday calendar/i)).not.toBeInTheDocument()
   })
 
   it('a calendar that cannot be read leaves the list as it was -- preparing still refuses a month it does not reach', async () => {
     server.use(http.get('*/api/acb/holidays', () => HttpResponse.json({ status: 500, message: 'boom' }, { status: 500 })))
-    renderWithProviders(<AcbRuns />)
+    asAdministrator(<AcbRuns />)
     expect(await screen.findByRole('button', { name: 'Open the October 2026 run' })).toBeInTheDocument()
     expect(screen.queryByText(/could not load the runs/i)).not.toBeInTheDocument()
   })
@@ -119,7 +124,7 @@ describe('the holiday calendar (D30)', () => {
 describe('the list', () => {
   it('shows each run with its state and control total, and opens one', async () => {
     const user = setupUser()
-    const { container } = renderWithProviders(<AcbRuns />)
+    const { container } = asAdministrator(<AcbRuns />)
     const open = await screen.findByRole('button', { name: 'Open the October 2026 run' })
     expect(screen.getByText('Prepared')).toBeInTheDocument()
     expect(screen.getByText(/5\s?220,00/)).toBeInTheDocument()
@@ -131,7 +136,7 @@ describe('the list', () => {
 
   it('an empty list is the first screen, and says what to do -- it is not a failure', async () => {
     server.use(http.get('*/api/acb/runs', () => HttpResponse.json(EMPTY)))
-    renderWithProviders(<AcbRuns />)
+    asAdministrator(<AcbRuns />)
     expect(await screen.findByText('No runs yet')).toBeInTheDocument()
     expect(screen.queryByText(/could not load the runs/i)).not.toBeInTheDocument()
   })
@@ -139,7 +144,7 @@ describe('the list', () => {
   it('a failed list says so, and its retry goes BACK TO LOADING before the rows arrive', async () => {
     server.use(http.get('*/api/acb/runs', () => HttpResponse.json({ status: 500, message: 'boom' }, { status: 500 })))
     const user = setupUser()
-    renderWithProviders(<AcbRuns />)
+    asAdministrator(<AcbRuns />)
     expect(await screen.findByText('We could not load the runs.')).toBeInTheDocument()
 
     const held = deferred()
@@ -172,7 +177,7 @@ describe('preparing a run', () => {
       }),
     )
     const user = setupUser()
-    renderWithProviders(<AcbRuns pollDelaysMs={[0, 0, 0, 0, 0, 0]} />)
+    asAdministrator(<AcbRuns pollDelaysMs={[0, 0, 0, 0, 0, 0]} />)
     const dialog = await openPrepare(user)
     await user.click(within(dialog).getByRole('button', { name: 'Prepare' }))
 
@@ -197,7 +202,7 @@ describe('preparing a run', () => {
     )
     const list = vi.spyOn(acbRunService, 'list')
     const user = setupUser()
-    renderWithProviders(<AcbRuns pollDelaysMs={[0]} />)
+    asAdministrator(<AcbRuns pollDelaysMs={[0]} />)
     try {
       await user.click(within(await openPrepare(user)).getByRole('button', { name: 'Prepare' }))
       expect(await screen.findByRole('button', { name: 'Open the January 2027 run' })).toBeInTheDocument()
@@ -217,7 +222,7 @@ describe('preparing a run', () => {
       http.get('*/api/acb/runs/42', () => HttpResponse.json(runOf({ id: 42, status: 'PREPARING' }))),
     )
     const user = setupUser()
-    renderWithProviders(<AcbRuns pollDelaysMs={[0, 0]} />)
+    asAdministrator(<AcbRuns pollDelaysMs={[0, 0]} />)
     await user.click(within(await openPrepare(user)).getByRole('button', { name: 'Prepare' }))
     expect(await screen.findByText(/is still preparing\. Check back/)).toBeInTheDocument()
   })
@@ -228,7 +233,7 @@ describe('preparing a run', () => {
       details: { runId: '41', actionMonth: '2026-10', status: 'PREPARED', version: '1' },
     }, { status: 409 })))
     const user = setupUser()
-    renderWithProviders(<AcbRuns />)
+    asAdministrator(<AcbRuns />)
     await user.click(within(await openPrepare(user)).getByRole('button', { name: 'Prepare' }))
 
     expect(await screen.findByText(/already exists and is prepared\. To prepare the month again, cancel it first\./)).toBeInTheDocument()
@@ -244,7 +249,7 @@ describe('preparing a run', () => {
       http.get('*/api/acb/runs', () => { lists += 1; return HttpResponse.json(pageOf([SUMMARY])) }),
     )
     const user = setupUser()
-    renderWithProviders(<AcbRuns />)
+    asAdministrator(<AcbRuns />)
     await user.click(within(await openPrepare(user)).getByRole('button', { name: 'Prepare' }))
 
     expect(await screen.findByText(/could not be confirmed\. It may have been started/)).toBeInTheDocument()
@@ -258,11 +263,43 @@ describe('preparing a run', () => {
       status: 422, message: 'No subscription rate is in force for 2026-10.', code: 'RATE_NOT_IN_FORCE', details: {},
     }, { status: 422 })))
     const user = setupUser()
-    renderWithProviders(<AcbRuns />)
+    asAdministrator(<AcbRuns />)
     const dialog = await openPrepare(user)
     await user.click(within(dialog).getByRole('button', { name: 'Prepare' }))
 
     expect(await within(dialog).findByText(/was not prepared\. Nothing was written — No subscription rate/)).toBeInTheDocument()
     expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+})
+
+describe('who may see the runs (dod-api §1; Stephne, DOD-09, DOD-14)', () => {
+  it('nobody signed in is asked to sign in, and the screen asks the server for nothing', async () => {
+    const requests = []
+    const listener = ({ request }) => requests.push(request.url)
+    server.events.on('request:start', listener)
+    try {
+      renderWithProviders(<AcbRuns />, { initialEntries: ['/admin/acb/runs'] })
+      expect(screen.getByRole('heading', { level: 1, name: 'Debit Order Runs' })).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent('Sign in to prepare debit order runs.')
+      expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login?next=%2Fadmin%2Facb%2Fruns')
+    } finally {
+      server.events.removeListener('request:start', listener)
+    }
+    expect(requests).toEqual([])
+  })
+
+  it('a signed-in organiser is told whom to ask -- no organiser holds a Debit Order permission', () => {
+    renderWithProviders(
+      <TestAuthProvider permissions={[PERMISSIONS.MEMBERS_VIEW, PERMISSIONS.MEMBERS_CAPTURE]}><AcbRuns /></TestAuthProvider>,
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('You need permission to prepare debit order runs.')
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  })
+
+  it('the Chief Financial Officer reads the runs, but preparing is an administrator\'s', async () => {
+    renderWithProviders(<TestAuthProvider permissions={[PERMISSIONS.DOD_FILE]}><AcbRuns /></TestAuthProvider>)
+    expect(await screen.findByRole('button', { name: 'Open the October 2026 run' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Prepare / })).not.toBeInTheDocument()
+    expect(screen.getByText('An administrator prepares each month’s run; you can follow it here.')).toBeInTheDocument()
   })
 })

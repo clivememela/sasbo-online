@@ -5,9 +5,14 @@ import { http, HttpResponse } from 'msw'
 
 import AcbDebits from './AcbDebits'
 import { renderWithProviders } from '../../test/renderWithProviders'
+import { TestAuthProvider } from '../../test/authTestUtils'
+import { PERMISSIONS } from '../../auth/permissions'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+
+/** Manage Re-Debits is behind the Debit Order permissions (dod-api §1): these tests are an administrator's (DOD-12). */
+const ADMINISTRATOR = [PERMISSIONS.DOD_PREPARE]
 
 /**
  * R4-4 (T2-I): a member's SECOND unpaid presented again in one run goes on the same file (Q38) only with
@@ -57,7 +62,7 @@ const openThePermission = async (user) => {
 
 describe('R4-4: a second re-debit in one run needs the member\'s permission', () => {
   it('lists the held-over re-debit of the next run, with the month it was unpaid for', async () => {
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     expect(await screen.findByRole('heading', { name: 'Second re-debits held over — October 2026' })).toBeInTheDocument()
     const table = await screen.findByRole('table', { name: "Re-debits held over for the member's permission" })
     expect(await within(table).findByText('August 2026')).toBeInTheDocument()
@@ -65,7 +70,7 @@ describe('R4-4: a second re-debit in one run needs the member\'s permission', ()
 
   it('🔒 the confirm cannot be pressed without the note, and says why -- blank and spaces alike', async () => {
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     const dialog = await openThePermission(user)
     const record = within(dialog).getByRole('button', { name: 'Record permission' })
 
@@ -79,7 +84,7 @@ describe('R4-4: a second re-debit in one run needs the member\'s permission', ()
 
   it('the must-pass: with the note it records against the unpaid\'s own run and line, and the list says so', async () => {
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     const dialog = await openThePermission(user)
     await user.type(within(dialog).getByLabelText('Who agreed, when, and how'), 'The member, by phone, 21 September')
     const record = within(dialog).getByRole('button', { name: 'Record permission' })
@@ -96,7 +101,7 @@ describe('R4-4: a second re-debit in one run needs the member\'s permission', ()
 
   it('a note longer than the server keeps is not sent, and the button says so', async () => {
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     const dialog = await openThePermission(user)
     await user.click(within(dialog).getByLabelText('Who agreed, when, and how'))
     await user.paste('x'.repeat(301))
@@ -107,7 +112,7 @@ describe('R4-4: a second re-debit in one run needs the member\'s permission', ()
     server.use(http.post('*/api/acb/runs/:id/lines/:lineId/permission', () =>
       HttpResponse.json({ status: 400, message: 'The member’s permission is kept to 300 characters.', code: 'REQUEST_MALFORMED', details: {} }, { status: 400 })))
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     const dialog = await openThePermission(user)
     await user.type(within(dialog).getByLabelText('Who agreed, when, and how'), 'The member, by phone')
     await user.click(within(dialog).getByRole('button', { name: 'Record permission' }))
@@ -120,7 +125,7 @@ describe('R4-4: a second re-debit in one run needs the member\'s permission', ()
   it('an answer that never came is not repeated: the dialog stops offering the write, and closing reads the list again', async () => {
     server.use(http.post('*/api/acb/runs/:id/lines/:lineId/permission', () => HttpResponse.error()))
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     const dialog = await openThePermission(user)
     await user.type(within(dialog).getByLabelText('Who agreed, when, and how'), 'The member, by phone')
     await user.click(within(dialog).getByRole('button', { name: 'Record permission' }))

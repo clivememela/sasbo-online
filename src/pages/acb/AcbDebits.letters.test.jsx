@@ -5,9 +5,14 @@ import { http, HttpResponse } from 'msw'
 
 import AcbDebits from './AcbDebits'
 import { renderWithProviders } from '../../test/renderWithProviders'
+import { TestAuthProvider } from '../../test/authTestUtils'
+import { PERMISSIONS } from '../../auth/permissions'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+
+/** Manage Re-Debits is behind the Debit Order permissions (dod-api §1): these tests are an administrator's (DOD-12). */
+const ADMINISTRATOR = [PERMISSIONS.DOD_PREPARE]
 
 /**
  * R4-5 (T2-I): a held letter is SENT once the member has an address, or MARKED HANDLED with a note
@@ -74,7 +79,7 @@ describe('EH-E, R3-7: a send that failed', () => {
   })
 
   it('is listed with why it did not go -- never a message -- and offers Send again', async () => {
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     const failed = await rowOf('Failperson')
     expect(within(failed).getByText('Sending failed')).toBeInTheDocument()
     expect(within(failed).queryByText(/MailSendException/)).not.toBeInTheDocument()
@@ -84,23 +89,23 @@ describe('EH-E, R3-7: a send that failed', () => {
     expect(within(await rowOf('Testperson')).getByRole('button', { name: 'Send Testperson’s letter' })).toHaveTextContent(/^Send$/)
   })
 
-  it('asks before sending it again -- and the sign-in it waits for is said inside the dialog (B1)', async () => {
+  it('asks before sending it again -- and a refusal is said inside the dialog (dod-api §6, LETTER_NO_ADDRESS)', async () => {
     server.use(http.post('*/api/acb/runs/:id/letters/:letterId/send', () => HttpResponse.json({
-      status: 403, code: 'IDENTITY_REQUIRED', details: {},
-      message: 'Sending a letter to a member waits until administrators sign in to this system. Nothing has been sent.',
-    }, { status: 403 })))
+      status: 409, code: 'LETTER_NO_ADDRESS', details: { letterId: '21' },
+      message: 'The member still has no address this letter can go to. Nothing has been sent.',
+    }, { status: 409 })))
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     await user.click(within(await rowOf('Failperson')).getByRole('button', { name: /again$/ }))
     const dialog = await screen.findByRole('dialog', { name: 'Send this letter again?' })
     await user.click(within(dialog).getByRole('button', { name: 'Send again' }))
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/The letter was not sent .*sign in/)
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/The letter was not sent .*no address/)
   })
 })
 
 describe('R4-5: the held letters', () => {
   it('lists each held letter; one with no address yet cannot be sent, and says so', async () => {
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     const waiting = await rowOf('Sampleton')
     expect(within(waiting).getByText('Return debit')).toBeInTheDocument()
     expect(within(waiting).getByText('No email address on record')).toBeInTheDocument()
@@ -111,7 +116,7 @@ describe('R4-5: the held letters', () => {
 
   it('marking handled needs a note of how, and records it', async () => {
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     await user.click(within(await rowOf('Sampleton')).getByRole('button', { name: /Mark .* as handled/ }))
     const dialog = await screen.findByRole('dialog', { name: 'Mark this letter handled' })
     const mark = within(dialog).getByRole('button', { name: 'Mark handled' })
@@ -127,13 +132,13 @@ describe('R4-5: the held letters', () => {
     await waitFor(() => expect(letterReads).toBe(2))
   })
 
-  it('a send the server refuses is said inside the dialog -- today, the sign-in it waits for (B1)', async () => {
+  it('a send the server refuses is said inside the dialog -- a role changed since the page loaded (OB29)', async () => {
     server.use(http.post('*/api/acb/runs/:id/letters/:letterId/send', () => HttpResponse.json({
-      status: 403, code: 'IDENTITY_REQUIRED', details: {},
-      message: 'Sending a letter to a member waits until administrators sign in to this system. Nothing has been sent.',
+      code: 'PERMISSION_REQUIRED', permission: 'DOD_PREPARE',
+      message: 'Sending a letter waits until administrators sign in with permission to prepare debit order runs.',
     }, { status: 403 })))
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     await user.click(within(await rowOf('Testperson')).getByRole('button', { name: /^Send/ }))
     const dialog = await screen.findByRole('dialog', { name: 'Send this letter?' })
     await user.click(within(dialog).getByRole('button', { name: 'Send' }))
@@ -148,7 +153,7 @@ describe('R4-5: the held letters', () => {
     let sends = 0
     server.use(http.post('*/api/acb/runs/:id/letters/:letterId/send', () => { sends += 1; return HttpResponse.error() }))
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     await user.click(within(await rowOf('Testperson')).getByRole('button', { name: /^Send/ }))
     const dialog = await screen.findByRole('dialog', { name: 'Send this letter?' })
     await user.click(within(dialog).getByRole('button', { name: 'Send' }))
@@ -162,7 +167,7 @@ describe('R4-5: the held letters', () => {
 
   it('the must-pass: a send that is answered closes the dialog, says so, and reads the list again', async () => {
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     await user.click(within(await rowOf('Testperson')).getByRole('button', { name: /^Send/ }))
     const dialog = await screen.findByRole('dialog', { name: 'Send this letter?' })
     await user.click(within(dialog).getByRole('button', { name: 'Send' }))

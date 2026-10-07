@@ -13,6 +13,10 @@ import { formatDate, formatInt, formatZar } from '../../lib/format.js';
 import { acbRefusalOf, acbRunService } from '../../services/acbRunService.js';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import AcbRunPanel from './AcbRunPanel.jsx';
+import DodGuard from './DodGuard.jsx';
+import { DOD_READ } from './dodRules.js';
+import { useAuth } from '../../auth/useAuth';
+import { PERMISSIONS } from '../../auth/permissions';
 import {
   CANCELLABLE, POLL_DELAYS_MS, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, asPage, calendarNotice, declinedMonthWarning,
   monthLabel, pollRun, preparableMonths, rateNote,
@@ -22,12 +26,17 @@ import {
 const PAGE_SIZE = 12;
 
 /**
- * A.C.B. -> Runs (`01.5`): every month's debit-order run, preparing a new one, and the run itself.
+ * Debit Order Deductions -> Debit Order Runs (`01.5`; the screen's name, Stephne, DOD-37: "For now Yes."): every
+ * month's debit order run, preparing a new one, and the run itself with its next steps.
  *
- * 🔑 PREPARING IS THE DRY RUN. Nothing leaves the building until a run is approved, and approving
- * waits until administrators sign in (register B1) -- so this screen prepares, shows who would be
- * debited and who is left out and why, and cancels. `planning/branches/acb/screens.md` §1 is the
- * arrangement; the Card world's by rule: page head, criteria row, sheet, pager, the record below.
+ * 🔒 BEHIND ANY OF THE THREE DEBIT ORDER PERMISSIONS (`contracts/dod-api.md` §1): the server refuses the runs to
+ * anyone else, and no organiser holds one (Stephne, DOD-14). The page head stays for everyone; the screen below it
+ * is a sentence saying how to get in, and asks the server for nothing.
+ *
+ * 🔑 PREPARING IS THE DRY RUN: it works out who would be debited, on which date, and who is left out and why;
+ * nothing leaves the building until the Chief Financial Officer downloads an approved run's file.
+ * `planning/branches/acb/screens.md` §1 is the arrangement; the Card world's by rule: page head, criteria row,
+ * sheet, pager, the record below.
  *
  * 🔴 202, THEN POLL -- AND NEVER A SECOND POST. The server answers a prepare at once with the run
  * `PREPARING` and does the work as a job. This screen re-reads that run with backoff, stops when it
@@ -38,6 +47,19 @@ const PAGE_SIZE = 12;
  * `pollDelaysMs` is a test seam; the route renders with the real backoff.
  */
 export default function AcbRuns({ pollDelaysMs = POLL_DELAYS_MS }) {
+  return (
+    <Page>
+      <PageTitle title="Debit Order Runs" subtitle="Every month's debit order run, and what became of it" />
+      <DodGuard permissions={DOD_READ}>
+        <RunsScreen pollDelaysMs={pollDelaysMs} />
+      </DodGuard>
+    </Page>
+  );
+}
+
+function RunsScreen({ pollDelaysMs }) {
+  const { can } = useAuth();
+  const prepares = can(PERMISSIONS.DOD_PREPARE);
   const [page, setPage] = useState(1);
   const [listState, setListState] = useState('loading');
   const [runs, setRuns] = useState(() => asPage(null));
@@ -111,8 +133,9 @@ export default function AcbRuns({ pollDelaysMs = POLL_DELAYS_MS }) {
     setPanelKey((k) => k + 1);
   }, []);
 
-  /** The run changed (cancelled, or settled after preparing): re-read the list and the run. */
-  const runChanged = useCallback(() => {
+  /** The run changed -- a step taken, or settled after preparing: re-read the list and the run, and say what happened. */
+  const runChanged = useCallback((said) => {
+    if (said) setNotice(said);
     reloadRuns();
     setPanelKey((k) => k + 1);
   }, [reloadRuns]);
@@ -209,25 +232,27 @@ export default function AcbRuns({ pollDelaysMs = POLL_DELAYS_MS }) {
   const end = runs.page * PAGE_SIZE + runs.content.length;
 
   return (
-    <Page>
-      <PageTitle title="A.C.B. Runs" subtitle="Every month's debit order run, and what became of it" />
-
+    <>
       <div className="mt-4 empty:hidden">
         <DialogNotice notice={notice} onDismiss={() => setNotice(null)} />
       </div>
 
-      <Criteria className="mt-6" label="Prepare a run">
-        <SelectInput
-          className={CRITERION_WIDE}
-          label="Action month"
-          value={month}
-          onChange={(value) => setMonth(value)}
-          options={months}
-        />
-        <Button variant="primary" onClick={() => { setPrepareNotice(null); setConfirming(true); }}>
-          Prepare {monthLabel(month)}
-        </Button>
-      </Criteria>
+      {prepares ? (
+        <Criteria className="mt-6" label="Prepare a run">
+          <SelectInput
+            className={CRITERION_WIDE}
+            label="Action month"
+            value={month}
+            onChange={(value) => setMonth(value)}
+            options={months}
+          />
+          <Button variant="primary" onClick={() => { setPrepareNotice(null); setConfirming(true); }}>
+            Prepare {monthLabel(month)}
+          </Button>
+        </Criteria>
+      ) : (
+        <p className="mt-6 text-sm text-ink-muted">An administrator prepares each month’s run; you can follow it here.</p>
+      )}
       {rateNote(rates, month) && <p className="mt-2 text-sm text-ink-muted">{rateNote(rates, month)}</p>}
       {rates?.januaryNotice && <p className="mt-2 text-sm text-status-suspended">{rates.januaryNotice}</p>}
       {calendarSays && <p className="mt-2 text-sm text-ink-muted">{calendarSays}</p>}
@@ -280,6 +305,6 @@ export default function AcbRuns({ pollDelaysMs = POLL_DELAYS_MS }) {
         {declinedWarning && <p className="text-sm text-status-suspended">{declinedWarning}</p>}
         <DialogNotice notice={prepareNotice} onDismiss={() => setPrepareNotice(null)} />
       </ConfirmDialog>
-    </Page>
+    </>
   );
 }

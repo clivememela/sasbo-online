@@ -1,6 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { useAuth } from "../../auth/useAuth";
+import { entryAccess, lockedNote } from "../../config/navAccess";
 
 /**
  * One row of the rail -- card.html's `.nav__item`: 36px, 14px medium, an 18px icon, a
@@ -27,6 +29,12 @@ const INDENT = ["pl-10", "pl-14", "pl-[4.5rem]"];
 
 export default function SidebarItem({ item, isActive, expandedItems, onToggle, onClick, selectedCardHref, depth = 0 }) {
   const location = useLocation();
+  const auth = useAuth();
+  // `permission` / `hideWithout` (navAccess.js): an entry a signed-in user may never see is not drawn at all; one they
+  // cannot use yet is drawn, with the word for the way in.
+  const access = entryAccess(item, auth);
+  if (access === "hidden") return null;
+  const note = access === "locked" ? lockedNote(auth.status) : null;
   const Icon = item.icon;
   const hasSubItems = item.subItems && item.subItems.length > 0;
   const isExpanded = expandedItems?.[item.href];
@@ -92,6 +100,8 @@ export default function SidebarItem({ item, isActive, expandedItems, onToggle, o
               />
             )}
             <span className="truncate">{item.title}</span>
+            {/* The space is the accessible name's ("Settings Sign in"); a flex row draws no whitespace-only item. */}
+            {note && <>{' '}<span className="ml-auto shrink-0 text-xs font-normal text-ink-muted">{note}</span></>}
           </Link>
         ) : (
           <span className={cn(linkClass, "text-ink-muted")} title="Not available yet">

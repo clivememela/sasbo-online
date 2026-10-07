@@ -37,9 +37,9 @@ import { formatInt } from '../../lib/format';
  * which the ledger allows, rather than another box beside it. Quiet, like "Updated today": both
  * are readings of this month's traffic, not of what the register holds.
  *
- * 🔑 THE FIGURES ARE DATA (month end `02.4`, BR9). The register and the first screen are two
- * instruments -- the register counts the list it holds, the first screen reads the server's
- * summary -- and ONE strip draws both: `figures` is the list of `{ label, value, dot?, quiet?,
+ * 🔑 THE FIGURES ARE DATA (month end `02.4`, BR9). The register and Month end's figures are two
+ * instruments -- the register counts the list it holds, the figures read the server's summary
+ * (`MonthEndFigures.jsx`; on Home until 5 Oct) -- and ONE strip draws both: `figures` is the list of `{ label, value, dot?, quiet?,
  * breakdown?, definition? }` it rules, in order. The register's props (`total`, `active`, ...) are
  * still accepted and become that list through `registerFigures`, so its call site and its tests read
  * exactly as they did. `definition` is a figure's second line saying what it counted (ME-10) -- shown,
@@ -140,8 +140,8 @@ export default function FigureStrip({ figures, label = 'Register summary', state
               index < shown.length - 1 && 'border-r border-line',
             )}
           >
-            {/* A label longer than its column takes a second line rather than crossing the hairline beside it: the
-                first screen's six share a desk's width with the rail, and "Members on record" is wider than a sixth.
+            {/* A label longer than its column takes a second line rather than crossing the hairline beside it: Month
+                end's six share a desk's width with the rail, and "Members on record" is wider than a sixth.
                 Every label sits on its value (`self-end`), so the strip's rows read level (index.css, the subgrid). */}
             <dt className="flex items-center gap-[7px] self-end text-[11.5px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
               {figure.dot && <i className={cn('size-[7px] rounded-full', figure.dot)} aria-hidden="true" />}

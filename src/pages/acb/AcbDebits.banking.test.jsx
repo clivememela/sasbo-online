@@ -5,9 +5,14 @@ import { http, HttpResponse } from 'msw'
 
 import AcbDebits from './AcbDebits'
 import { renderWithProviders } from '../../test/renderWithProviders'
+import { TestAuthProvider } from '../../test/authTestUtils'
+import { PERMISSIONS } from '../../auth/permissions'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+
+/** Manage Re-Debits is behind the Debit Order permissions (dod-api §1): these tests are an administrator's (DOD-12). */
+const ADMINISTRATOR = [PERMISSIONS.DOD_PREPARE]
 
 /**
  * 🔴 THREE FINDINGS FROM P9's INDEPENDENT REVIEW, ON THE SCREEN THAT CHANGES A MEMBER'S DEBIT ORDER.
@@ -45,7 +50,7 @@ const FOUND = {
 
 async function openTheBankingDialog() {
   const user = setupUser()
-  renderWithProviders(<AcbDebits />)
+  renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
   await user.type(screen.getByLabelText('Surname'), 'Testperson')
   await user.click(screen.getByRole('button', { name: /^Search$/ }))
   const [choose] = await screen.findAllByRole('button', { name: /load banking details/i })

@@ -24,7 +24,7 @@ export const HEADING = `!!document.querySelector('main h1')`;
 const TEXT = (s) => `document.body.innerText.toLowerCase().includes(${JSON.stringify(s.toLowerCase())})`;
 const STATE = (s) => `!!document.querySelector('[data-state="${s}"]')`;
 /** The Debits screen's search results, by the table's own caption: the unpaid table above has rows before any search. */
-const SEARCH_ROWS = `[...document.querySelectorAll('main table')].some((t) => t.querySelector('caption')?.textContent === 'Members matching the ACB search' && t.querySelectorAll('tr[data-row]').length > 1)`;
+const SEARCH_ROWS = `[...document.querySelectorAll('main table')].some((t) => t.querySelector('caption')?.textContent === 'Members matching the debit order search' && t.querySelectorAll('tr[data-row]').length > 1)`;
 const PANEL = '[data-testid="member-panel"]';
 const PANEL_OPEN = `!!document.querySelector('${PANEL}[data-open="true"] .mcard')`;
 export const ANY_DIALOG = `!!document.querySelector('[role="dialog"]')`;
@@ -418,7 +418,7 @@ export const SURFACES = [
     present: { PREPARED: TEXT('is prepared:') }, covers: [] },
   { name: 'acb-run-open', route: '/admin/acb/runs', ready: ROWS,
     steps: [step('open a run', clickByText('main button', '/^October 2026$/'), TEXT('Left out'))],
-    present: { RUN: TEXT('October 2026 run'), APPROVE_WHY: TEXT('open when administrators sign in') }, covers: [] },
+    present: { RUN: TEXT('October 2026 run'), NO_SECOND_APPROVAL: TEXT('no second approval') }, covers: [] },
   { name: 'acb-run-failed', route: '/admin/acb/runs', ready: ROWS, intercept: { url: '*/api/acb/runs/41', mode: 'fail' },
     steps: [step('open a run that will not load', clickByText('main button', '/^October 2026$/'), STATE('error'))],
     present: { FAILED: STATE('error') }, covers: ['pages/acb/AcbRunPanel.jsx#DataState@run'] },
@@ -583,6 +583,23 @@ export const UNREACHABLE = [
     why: 'rendered `disabled` -- a date nobody can open' },
   { site: 'components/form/AddressAutocomplete.jsx#aria-expanded@suggestions',
     why: 'its suggestions come from Google Places; the stub cannot answer Google and a measurement sends nothing to it (R-SEC-H)' },
+  // Debit Order Deductions, October build: every new site is behind a Debit Order permission. They become surfaces once
+  // sign-in's stub session (a surface's `session: [...]`, planted by surfaces.mjs) is merged: dod-client's report lists
+  // each row's surface-to-be and the serve-dist answers it needs.
+  ...[
+    ['pages/acb/AcbRunSteps.jsx#Modal@step', 'DOD_PREPARE or DOD_FILE'],
+    ['pages/acb/AcbRunSteps.jsx#Modal@decline', 'DOD_FILE'],
+    ['pages/acb/AcbRunReturns.jsx#Modal@record returns', 'DOD_PREPARE'],
+    ['pages/acb/AcbRunReturns.jsx#DateField@report date', 'DOD_PREPARE'],
+    ['pages/acb/AcbSuspend.jsx#Modal@suspend member', 'DOD_PREPARE'],
+    ['pages/acb/AcbTerminationReport.jsx#Modal@confirm the ending', 'DOD_PREPARE'],
+    ['pages/acb/DodCodes.jsx#Modal@change a bank code', 'DOD_SETTINGS'],
+    ['pages/acb/DodCalendar.jsx#Modal@add a non-working day', 'DOD_SETTINGS'],
+    ['pages/acb/DodCalendar.jsx#Modal@a settings step', 'DOD_SETTINGS'],
+    ['pages/acb/DodCalendar.jsx#DateField@the day', 'DOD_SETTINGS'],
+  ].map(([site, permission]) => ({
+    site, why: `behind ${permission}: the browser run signs nobody in until sign-in's stub session is wired into surfaces.mjs`,
+  })),
 ];
 
 /* ── the guard: the catalogue against the source ─────────────────────────────────────────────────── */

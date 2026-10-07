@@ -1,10 +1,17 @@
 // @vitest-environment jsdom -- the maintenance menu's cards, and where each one goes
 import { describe, expect, it } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 
+import App from '../../App'
+// The route's chunk, in the registry before the test, so the wait below times the page and not this box's first import
+// of it (`splitPages.js` records why).
+import '../maintainance/Subscriptions.jsx'
 import Maintenance from './Maintenance'
 import { navItems } from '../../config/navigation'
+import { menuPaths } from '../home/homeModules'
 import { renderWithProviders } from '../../test/renderWithProviders'
+import { server } from '../../test/msw/server'
+import { smokeHandlers } from '../../test/msw/smokeLayer'
 
 /**
  * 🗣️ SASBO, 18 Sep 2026: "in maintenance there was an option where we could edit the member" -- gone since the menus
@@ -50,6 +57,29 @@ describe('the Maintenance menu', () => {
     // Written twice -- a card here, a leaf in the rail -- so both halves are asserted by name, not only by count.
     expect(screen.getByRole('link', { name: /^Workplaces/ })).toHaveAttribute('href', '/admin/maintenance/workplaces')
     expect(sidebarMaintenance().find((entry) => entry.title === 'Workplaces')?.href).toBe('/admin/maintenance/workplaces')
+  })
+
+  it('🗣️ Subscriptions is reached through Maintenance alone -- off the rail\'s top level, and so off Home (the 5 Oct Show & Tell)', () => {
+    // Only staff change the amounts, so it is a table Maintenance keeps, not a module of its own: the one way to it in
+    // the menu is Admin Menu > Maintenance, and Home -- the rail's top level read across -- no longer offers it.
+    expect(menuPaths('/admin/maintenance/subscriptions')).toEqual([['Admin Menu', 'Maintenance', 'Subscriptions']])
+    expect(navItems.some((item) => item.href === '/admin/maintenance/subscriptions')).toBe(false)
+
+    renderWithProviders(<Maintenance />)
+    expect(screen.getByRole('link', { name: /Subscriptions/ })).toHaveAttribute('href', '/admin/maintenance/subscriptions')
+  })
+
+  it('on Subscriptions itself, the rail and the crumbs say where it lives: Admin Menu › Maintenance › Subscriptions', async () => {
+    server.use(...smokeHandlers)
+    renderWithProviders(<App />, { initialEntries: ['/admin/maintenance/subscriptions'] })
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Subscriptions' }, { timeout: 5000 })).toBeInTheDocument()
+    const rail = screen.getByRole('navigation', { name: 'Main' })
+    // One entry, under Maintenance, open on arrival and marked as the page -- not a second one at the top of the rail.
+    expect(within(rail).getByRole('link', { name: 'Subscriptions' })).toHaveAttribute('aria-current', 'page')
+    expect(within(rail).getByRole('button', { name: 'Collapse Maintenance' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' }))
+      .toHaveTextContent(/^Home\s*Admin Menu\s*Maintenance\s*Subscriptions$/)
   })
 
   it('says the same in the sidebar as on the page -- every entry a link, to the same place', () => {

@@ -11,10 +11,15 @@ import reportError from '../../lib/reportError.js';
 import { formatDate, formatInt, formatZar } from '../../lib/format.js';
 import { acbRefusalOf, acbRunService } from '../../services/acbRunService.js';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
+import { useAuth } from '../../auth/useAuth';
 import {
-  CANCELLABLE, DECLINE_REASON_LABEL, EXCLUSION_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, maskedAccount,
-  monthLabel,
+  DECLINE_REASON_LABEL, EXCLUSION_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, maskedAccount, monthLabel,
 } from './acbRunRules.js';
+import AcbRunSteps, { cancellable } from './AcbRunSteps.jsx';
+import AcbRunReturns from './AcbRunReturns.jsx';
+
+/** The runs whose file went to the bank: their returns are recorded, or read, by debit day. */
+const SENT = new Set([RUN_STATUS.SUBMITTED, RUN_STATUS.RETURNED, RUN_STATUS.CLOSED]);
 
 const PAGE_SIZE = 50;
 
@@ -31,6 +36,7 @@ const PAGE_SIZE = 50;
  * 🔒 The account shows its last four digits -- all the server ever sends.
  */
 export default function AcbRunPanel({ runId, onChanged, onClose }) {
+  const { can } = useAuth();
   const [runState, setRunState] = useState('loading');
   const [run, setRun] = useState(null);
   const [runError, setRunError] = useState(null);
@@ -77,7 +83,7 @@ export default function AcbRunPanel({ runId, onChanged, onClose }) {
       await acbRunService.cancel(run.id, run.version, 'Cancelled from the Runs screen');
       if (left.current) return;
       setConfirming(false);
-      onChanged();
+      onChanged({ tone: 'ok', message: `The ${monthLabel(run.actionMonth)} run is cancelled. The month can be prepared again.` });
     } catch (err) {
       reportError('AcbRunPanel.cancel', err);
       if (left.current) return;
@@ -160,6 +166,7 @@ export default function AcbRunPanel({ runId, onChanged, onClose }) {
           ? <Fact term="File made on" value={formatDate(run.creationDate)} />
           : <Fact term="Make the file by" value={formatDate(run.makeBy)} />}
         <Fact term="Purge date" value={formatDate(run.purgeDate)} />
+        {run.approvedBy && <Fact term="Approved by" value={run.approvedBy} />}
       </dl>
 
       {run.totalsAgree === false && (
@@ -183,20 +190,14 @@ export default function AcbRunPanel({ runId, onChanged, onClose }) {
         </p>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        {run.status === RUN_STATUS.PREPARED && (
-          <Button variant="primary" disabled aria-describedby="acb-approve-why">Approve</Button>
-        )}
-        {CANCELLABLE.has(run.status) && (
+      <AcbRunSteps run={run} onChanged={onChanged} />
+      {cancellable(run, can) && (
+        <div className="mt-3">
           <Button variant="danger" onClick={() => { setCancelNotice(null); setConfirming(true); }}>Cancel this run</Button>
-        )}
-      </div>
-      {run.status === RUN_STATUS.PREPARED && (
-        <p id="acb-approve-why" className="mt-2 text-sm text-ink-muted">
-          Approving a run, and downloading its bank file, open when administrators sign in to this system.
-        </p>
+        </div>
       )}
 
+      {SENT.has(run.status) && <AcbRunReturns run={run} onChanged={onChanged} />}
       {!preparing && <RunLines runId={run.id} />}
       {!preparing && <RunExclusions runId={run.id} summary={run.exclusions ?? []} />}
 
@@ -239,6 +240,8 @@ function RunLines({ runId }) {
       ),
     },
     { key: 'membershipNumber', header: 'Membership no.', priority: 'secondary' },
+    // The number after the slash of the bank report's trace number: how a returns report names a debit.
+    { key: 'fileSequence', header: 'Trace no.', priority: 'detail', cell: (line) => line.fileSequence ?? '—' },
     { key: 'bankName', header: 'Bank', priority: 'detail' },
     { key: 'account', header: 'Account', priority: 'secondary', cell: (line) => maskedAccount(line.accountLastFour) },
     { key: 'actionDate', header: 'Action date', priority: 'essential', cell: (line) => formatDate(line.actionDate) },

@@ -5,9 +5,14 @@ import { http, HttpResponse } from 'msw'
 
 import AcbDebits from './AcbDebits'
 import { renderWithProviders } from '../../test/renderWithProviders'
+import { TestAuthProvider } from '../../test/authTestUtils'
+import { PERMISSIONS } from '../../auth/permissions'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+
+/** Manage Re-Debits is behind the Debit Order permissions (dod-api §1): these tests are an administrator's (DOD-12). */
+const ADMINISTRATOR = [PERMISSIONS.DOD_PREPARE]
 
 /**
  * R4-1 and R4-3 (`04.1`): the newest run whose file went to the bank leads the screen with EVERY unpaid;
@@ -62,32 +67,30 @@ const rowOf = async (surname) => {
 }
 
 describe('the unpaids of the latest returned run', () => {
-  it('03.5 an unpaid decided Suspend shows Suspend member -- refused until sign-in, and saying so', async () => {
+  it('03.5 an unpaid decided Suspend offers Suspend member to the administrator who records it (Stephne, DOD-12)', async () => {
     server.use(http.get('*/api/acb/runs/:id/unpaids', () => HttpResponse.json(pageOf([
       unpaid(),
       unpaid({ id: 4, memberId: 8, membershipNumber: 'SYN-0008', surname: 'Sampleton', unpaidCode: '4',
         unpaidReason: 'PAYMENT_STOPPED', decision: 'SUSPEND', suggestedDecision: null }),
     ]))))
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
 
-    const suspend = within(await rowOf('Sampleton')).getByRole('button', { name: /^Suspend .*Sampleton as a member$/ })
-    expect(suspend).toBeDisabled()
-    expect(suspend).toHaveAccessibleDescription(/opens when administrators sign in to this system/)
+    expect(within(await rowOf('Sampleton')).getByRole('button', { name: /^Suspend .*Sampleton as a member$/ })).toBeEnabled()
     // The must-pass twin: an undecided unpaid has no such button.
     expect(within(await rowOf('Testperson')).queryByRole('button', { name: /as a member/ })).toBeNull()
   })
 
   it('lists every unpaid with its reason, code and letter -- the run named', async () => {
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     expect(await screen.findByRole('heading', { name: 'Unpaid debits — September 2026' })).toBeInTheDocument()
     const stopped = await rowOf('Sampleton')
     expect(within(stopped).getByText('Payment Stopped')).toBeInTheDocument()
-    expect(within(stopped).getByText('code 4')).toBeInTheDocument()
+    expect(within(stopped).getByText('bank code 4')).toBeInTheDocument()
     expect(within(stopped).getByText('Waiting to send')).toBeInTheDocument()
   })
 
   it('Q40, Q44: an undecided unpaid comes with the decision its code suggests already chosen', async () => {
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     const noFunds = await rowOf('Testperson')
     expect(within(noFunds).getByRole('combobox', { name: /Decision on/ })).toHaveValue('RE_PRESENT')
     const stopped = await rowOf('Sampleton')
@@ -98,7 +101,7 @@ describe('the unpaids of the latest returned run', () => {
 describe('R4-1: confirming records the decision, and the screen says so', () => {
   it('confirming the suggestion records it, and the row and the notice say what the server recorded', async () => {
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     const row = await rowOf('Testperson')
     await user.click(within(row).getByRole('button', { name: /Confirm the decision/ }))
 
@@ -112,7 +115,7 @@ describe('R4-1: confirming records the decision, and the screen says so', () => 
 
   it('the administrator\'s choice wins over the suggestion', async () => {
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     const row = await rowOf('Testperson')
     await user.selectOptions(within(row).getByRole('combobox', { name: /Decision on/ }), 'SUSPEND')
     await user.click(within(row).getByRole('button', { name: /Confirm the decision/ }))
@@ -124,7 +127,7 @@ describe('R4-1: confirming records the decision, and the screen says so', () => 
   it('🔒 an answer that does not carry the decision is not a recording: the list is read again', async () => {
     server.use(http.post('*/api/acb/runs/:id/lines/:lineId/decision', () => HttpResponse.json(unpaid())))
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     const row = await rowOf('Testperson')
     await user.click(within(row).getByRole('button', { name: /Confirm the decision/ }))
 
@@ -139,7 +142,7 @@ describe('R4-3: a failed save says so and records nothing', () => {
     server.use(http.post('*/api/acb/runs/:id/lines/:lineId/decision', () =>
       HttpResponse.json({ status: 400, message: 'The decision was malformed.', code: 'REQUEST_MALFORMED', details: {} }, { status: 400 })))
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     const row = await rowOf('Testperson')
     await user.click(within(row).getByRole('button', { name: /Confirm the decision/ }))
 
@@ -155,7 +158,7 @@ describe('R4-3: a failed save says so and records nothing', () => {
       HttpResponse.json({ status: 409, message: 'The decision on this unpaid is already SUSPEND.', code: 'UNPAID_ALREADY_RECORDED',
         details: { lineId: '3' } }, { status: 409 })))
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     const row = await rowOf('Testperson')
     await user.click(within(row).getByRole('button', { name: /Confirm the decision/ }))
 
@@ -166,7 +169,7 @@ describe('R4-3: a failed save says so and records nothing', () => {
   it('an answer that never came does not say it was not recorded -- and reads the list again', async () => {
     server.use(http.post('*/api/acb/runs/:id/lines/:lineId/decision', () => HttpResponse.error()))
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     const row = await rowOf('Testperson')
     await user.click(within(row).getByRole('button', { name: /Confirm the decision/ }))
 
@@ -185,7 +188,7 @@ describe('the Invalid Accounts list (Q11) and the banking sheet', () => {
       return HttpResponse.json(pageOf([unpaid({ unpaidCode: '8', unpaidReason: 'INVALID_ACCOUNT_NUMBER', suggestedDecision: null })]))
     }))
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     await rowOf('Testperson')
     await user.selectOptions(screen.getByLabelText('Reason'), 'INVALID_ACCOUNT_NUMBER')
 
@@ -204,7 +207,7 @@ describe('the Invalid Accounts list (Q11) and the banking sheet', () => {
       })),
     )
     const user = setupUser()
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     expect(within(await rowOf('Sampleton')).queryByRole('button', { name: /Banking details/ })).not.toBeInTheDocument()
     await user.click(within(await rowOf('Testperson')).getByRole('button', { name: /Banking details for/ }))
 
@@ -216,14 +219,14 @@ describe('the Invalid Accounts list (Q11) and the banking sheet', () => {
 describe('when there is no run to decide on', () => {
   it('says no run has gone to the bank yet -- not an empty list of unpaids', async () => {
     server.use(http.get('*/api/acb/runs', () => HttpResponse.json(pageOf([{ ...RUN, id: 41, actionMonth: '2026-10', status: 'PREPARED' }], 12))))
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     expect(await screen.findByText(/No run has gone to the bank yet/)).toBeInTheDocument()
     expect(screen.queryByRole('table', { name: 'Unpaid debits and their decisions' })).not.toBeInTheDocument()
   })
 
   it('a runs list that fails says so, with a retry', async () => {
     server.use(http.get('*/api/acb/runs', () => HttpResponse.json({ status: 500, error: 'boom' }, { status: 500 })))
-    renderWithProviders(<AcbDebits />)
+    renderWithProviders(<TestAuthProvider permissions={ADMINISTRATOR}><AcbDebits /></TestAuthProvider>)
     expect(await screen.findByText('The runs could not be loaded')).toBeInTheDocument()
     expect(screen.queryByText(/No run has gone to the bank yet/)).not.toBeInTheDocument()
   })

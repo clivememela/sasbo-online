@@ -17,6 +17,22 @@ import {
   LucideConstruction, LucideCopyCheck, UserRoundPen
 } from "lucide-react";
 
+/** Any of the three Debit Order permissions -- what reading a run or its unpaids takes (`contracts/dod-api.md` §1). */
+const DOD_READ = ['DOD_PREPARE', 'DOD_FILE', 'DOD_SETTINGS'];
+
+/**
+ * The October build's Debit Order screens, under the module in both places the rail lists it. No icons: the rail draws
+ * none below the top level, and this file is on every first load. The endings and the counts are never shown to an
+ * organiser (Stephne, DOD-14); Settings and the letters are shown, marked, to anyone they would refuse (the letters'
+ * preview is DOD_PREPARE's on the server).
+ */
+const DOD_SCREENS = [
+  { title: "Endings to confirm", href: "/admin/acb/endings", permission: DOD_READ, hideWithout: true },
+  { title: "Unpaid counts", href: "/admin/acb/unpaid-counts", permission: 'DOD_PREPARE', hideWithout: true },
+  { title: "Settings", href: "/admin/acb/settings", permission: 'DOD_SETTINGS' },
+  { title: "Letters", href: "/admin/acb/letters", permission: 'DOD_PREPARE' },
+];
+
 export const navItems = [
   {
     title: "Home",
@@ -104,23 +120,38 @@ export const navItems = [
         icon: LucideCalendarRange,
         href: "/admin/monthly-menu",
       },
+      // 🗣️ THE MODULE ONCE CALLED "A.C.B." -- "Debit Order Deductions" is SASBO's name for it (the 5 Oct Show & Tell,
+      // handover §A; the status report SASBO saw uses it), and Stephne's DOD answer settles the rest: "ACB" becomes
+      // "Debit Order" everywhere, and the screens keep their names for now (Runs, Debits). 📐 The rail and the crumbs
+      // print "Debit Orders": a 256px rail row cuts the whole name off mid-word, and this file ships on every page's
+      // first load. The whole name is Home's (`homeModules.js`) and Admin Membership's. The address stays `/admin/acb`
+      // -- deep links and the decks use it. Written twice, here and on the rail's top level below.
+      // ⏳ "Debit Orders" IS PROVISIONAL: the wording of the shorter labels is asked of SASBO at Friday's meeting (DOD
+      // item 16, `answers/DOD.md`), so both entries change on her answer.
       {
-        title: "A.C.B",
+        title: "Debit Orders",
         href:'/admin/acb',
         icon: LucideFile,
+        // 🔒 `permission` / `hideWithout` (navAccess.js): the runs and the unpaids need a Debit Order permission, and are
+        // never shown to an organiser (Stephne, DOD-14). Strings, not `PERMISSIONS`: this file is on every first load.
         subItems: [
           {
             title: "Debits",
             desc: "Manage Re-Debits",
             href: "/admin/acb/debits",
             icon: LucidePiggyBank,
+            permission: DOD_READ,
+            hideWithout: true,
           },
           {
             title: "Runs",
             desc: "Debit Order Runs",
             href: "/admin/acb/runs",
             icon: LucideCalendarRange,
+            permission: DOD_READ,
+            hideWithout: true,
           },
+          ...DOD_SCREENS,
         ]
       },
       {
@@ -181,7 +212,7 @@ export const navItems = [
     ]
   },
   {
-    title: "A.C.B",
+    title: "Debit Orders",
     href:'/admin/acb',
     icon: LucideFile,
     subItems: [
@@ -190,13 +221,18 @@ export const navItems = [
         desc: "Manage Re-Debits",
         href: "/admin/acb/debits",
         icon: LucidePiggyBank,
+        permission: DOD_READ,
+        hideWithout: true,
       },
       {
         title: "Runs",
         desc: "Debit Order Runs",
         href: "/admin/acb/runs",
         icon: LucideCalendarRange,
+        permission: DOD_READ,
+        hideWithout: true,
       },
+      ...DOD_SCREENS,
       /*{
         title: "Credits",
         desc: "Manage Credits",
@@ -317,13 +353,10 @@ export const navItems = [
     href: '/recruiters',
     desc: 'Capture/Print Recruiters'
   },
+  // 🗣️ SUBSCRIPTIONS IS NOT ON THIS LEVEL ANY MORE -- the 5 Oct Show & Tell (handover §A): only staff change the
+  // amounts, so it lives under Admin Menu > Maintenance alone, and it came off Home's quick view with this entry (Home
+  // is this list read across). Its address is unchanged; `Maintenance.test.jsx` holds where it is reached from.
   {
-    title: 'Subscriptions',
-    icon: LucideMails,
-    href: '/admin/maintenance/subscriptions',
-    desc: 'Maintain Subscription Table'
-  },
-  { 
     title: "Reports", 
     icon: ChartNoAxesCombined, 
     href: "/reports",

@@ -145,7 +145,7 @@ describe('the reason a status changed', () => {
 
   it('with no code, the reason in words -- and a reason the browser does not know, as the server wrote it', () => {
     expect(statusReasonText(status(1, { code: null, codeName: null, reason: 'REINSTATED' }))).toBe('Reinstated')
-    expect(statusReasonText(status(1, { code: null, codeName: null, reason: 'SUBS_IN_ARREARS' }))).toBe('Three unpaid debit orders (A.C.B.)')
+    expect(statusReasonText(status(1, { code: null, codeName: null, reason: 'SUBS_IN_ARREARS' }))).toBe('Three unpaid debit orders (Debit Order Deductions)')
     expect(statusReasonText(status(1, { code: null, codeName: null, reason: 'SOMETHING_NEW' }))).toBe('SOMETHING_NEW')
     expect(statusReasonText(status(1, { code: null, codeName: null, reason: null }))).toBeNull()
   })

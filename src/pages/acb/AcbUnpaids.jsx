@@ -1,16 +1,20 @@
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useState } from 'react';
 import Sheet from '../../components/common/Sheet.jsx';
 import DialogNotice from '../../components/common/DialogNotice.jsx';
 import Table from '../../components/table/Table.jsx';
 import { Button, SelectInput } from '../../components/form';
+import { useAuth } from '../../auth/useAuth';
+import { PERMISSIONS } from '../../auth/permissions';
 import reportError from '../../lib/reportError.js';
 import { formatZar } from '../../lib/format.js';
 import { acbRefusalOf, acbRunService } from '../../services/acbRunService.js';
-import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import { PagerFor, usePagedRead } from './acbPaging.jsx';
 import {
   BANKING_REASONS, DECISION_LABEL, LETTER_STATUS_LABEL, REFUSAL, RUN_STATUS, RUN_STATUS_LABEL, UNPAID_REASON_LABEL, monthLabel,
 } from './acbRunRules.js';
+import { DOD_REFUSAL, RE_DEBIT_LABEL, UNPAID_LIMIT, callerRefusal, noRepresentWhy } from './dodRules.js';
+import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
+import AcbSuspend from './AcbSuspend.jsx';
 
 const PAGE_SIZE = 50;
 const EVERY_REASON = 'ALL';
@@ -20,8 +24,6 @@ const REASONS = [
   ...Object.entries(UNPAID_REASON_LABEL).map(([value, label]) => ({ value, label })),
 ];
 
-const DECISIONS = Object.entries(DECISION_LABEL).map(([value, label]) => ({ value, label }));
-
 /** The member as the list reads them -- surname first. */
 const listName = (line) => [line.surname, line.initials].filter(Boolean).join(', ') || line.membershipNumber || '—';
 
@@ -29,17 +31,16 @@ const listName = (line) => [line.surname, line.initials].filter(Boolean).join(',
 const nameOf = (line) => [line.initials, line.surname].filter(Boolean).join(' ') || line.membershipNumber || 'this member';
 
 /**
- * The unpaids of the newest run whose file went to the bank (`04.1`) -- EVERY unpaid, whatever its code
- * (D8 as widened) -- each with its code, its reason, where its letter is, and its DECISION: present it
- * again in the next run, or suspend it (Q7, Q9). Undecided, the decision its code suggests is already
- * chosen (Q40, Q44) and stays the administrator's to change; *Confirm* records it, and a recorded
- * decision stands -- the server refuses a second. A filter to *Invalid Account Number* is the legacy
- * *Invalid Accounts* list (Q11), and the two reasons whose cure is the member's banking offer the
- * banking sheet.
+ * The unpaids of the newest run whose file went to the bank (`04.1`) -- EVERY unpaid, whatever its code (D8 as
+ * widened) -- each with the bank's code and SASBO's, whether it may be re-debited and on whose word, the member's
+ * unpaids so far, where its letter is, and its DECISION: present it again in the next run, or suspend (Q7, Q9).
+ * Undecided, the decision the server suggests is already chosen -- Present again only where the code allows it and
+ * the member is below three (dod-api §3) -- and stays the administrator's to change; *Confirm* records it, and a
+ * recorded decision stands. A decision of Suspend then suspends the member, with SASBO's suspension code.
  *
- * 🔒 The screen's word for a recorded decision is the server's answer, never the choice it sent (the
- * design arc's `06.4` rule): until the answer arrives the row says nothing new, and an answer that does
- * not carry the decision is treated as one that never came.
+ * 🔒 Deciding and suspending are an administrator's (DOD_PREPARE, Stephne, DOD-12); anyone else who may read the
+ * unpaids sees them without the controls. The screen's word for a recorded decision is the server's answer, never the
+ * choice it sent (the design arc's `06.4` rule).
  */
 export default function AcbUnpaids({ run, onBanking }) {
   const [reason, setReason] = useState(EVERY_REASON);
@@ -64,13 +65,15 @@ export default function AcbUnpaids({ run, onBanking }) {
 }
 
 function UnpaidList({ run, reason, onBanking }) {
+  const prepares = useAuth().can(PERMISSIONS.DOD_PREPARE);
   const read = useCallback((page, size) => acbRunService.unpaids(run.id, reason, page, size), [run.id, reason]);
   const { data, state, goTo, retry } = usePagedRead(read, { size: PAGE_SIZE, label: 'AcbUnpaids.read' });
-  const suspendWhy = useId();
 
   // The administrator's choice per line, before it is confirmed; and the server's answer per line, after.
   const [chosen, setChosen] = useState({});
   const [answered, setAnswered] = useState({});
+  const [suspended, setSuspended] = useState({});
+  const [suspending, setSuspending] = useState(null);
   const [busyLine, setBusyLine] = useState(null);
   const [notice, setNotice] = useState(null);
 
@@ -106,6 +109,12 @@ function UnpaidList({ run, reason, onBanking }) {
         const now = RUN_STATUS_LABEL[refusal.details.status] ?? refusal.details.status;
         setNotice({ message: `This run no longer takes decisions${now ? ` — it is ${String(now).toLowerCase()}` : ''}. Nothing was recorded.` });
         retry();
+      } else if (refusal?.code === DOD_REFUSAL.RE_DEBIT_NOT_ALLOWED || refusal?.code === DOD_REFUSAL.UNPAID_LIMIT_REACHED) {
+        // The code or the count changed since the list was read: the server's sentence, and the list as it now stands.
+        setNotice({ message: `${nameOf(line)}’s unpaid cannot be presented again: ${err.message} Nothing was recorded.` });
+        retry();
+      } else if (callerRefusal(err)) {
+        setNotice({ message: `${callerRefusal(err)} Nothing was recorded.` });
       } else if (writeMayHaveLanded(err)) {
         setNotice({ message: `The decision for ${nameOf(line)} could not be confirmed. It may have been recorded — the list is read again, so check it before deciding again.` });
         retry();
@@ -117,6 +126,11 @@ function UnpaidList({ run, reason, onBanking }) {
     }
   };
 
+  const decisionOptions = (line) => [
+    { value: 'RE_PRESENT', label: DECISION_LABEL.RE_PRESENT, disabled: Boolean(noRepresentWhy(line)) },
+    { value: 'SUSPEND', label: DECISION_LABEL.SUSPEND },
+  ];
+
   const rows = data.content.map((line) => answered[line.id] ?? line);
   const columns = [
     {
@@ -125,6 +139,9 @@ function UnpaidList({ run, reason, onBanking }) {
         <span>
           {listName(line)}
           <span className="ml-2 text-xs text-ink-muted">{line.membershipNumber}</span>
+          {line.memberUnpaidCount != null && (
+            <span className="block text-xs text-ink-muted">{line.memberUnpaidCount} of {UNPAID_LIMIT} unpaids</span>
+          )}
         </span>
       ),
     },
@@ -133,9 +150,28 @@ function UnpaidList({ run, reason, onBanking }) {
       cell: (line) => (
         <span>
           {UNPAID_REASON_LABEL[line.unpaidReason] ?? line.unpaidReason ?? '—'}
-          {line.unpaidCode && <span className="ml-2 text-xs text-ink-muted tabular-nums">code {line.unpaidCode}</span>}
+          {line.unpaidCode && (
+            <span className="block text-xs text-ink-muted tabular-nums">
+              bank code {line.unpaidCode}
+              {line.suspensionCode != null && ` · SASBO code ${line.suspensionCode}`}
+              {line.suspensionCode === null && ' · no SASBO code on record'}
+            </span>
+          )}
         </span>
       ),
+    },
+    {
+      key: 'reDebit', header: 'Re-debit', priority: 'essential',
+      cell: (line) => (RE_DEBIT_LABEL[line.reDebit] ? (
+        <span>
+          {RE_DEBIT_LABEL[line.reDebit]}
+          {(line.reDebitSource || line.codeProvisional) && (
+            <span className="block text-xs text-ink-muted">
+              {[line.reDebitSource, line.codeProvisional ? 'provisional' : null].filter(Boolean).join(' · ')}
+            </span>
+          )}
+        </span>
+      ) : '—'),
     },
     { key: 'amount', header: 'Amount', priority: 'secondary', cell: (line) => formatZar(line.amount) },
     {
@@ -148,35 +184,50 @@ function UnpaidList({ run, reason, onBanking }) {
         <span className="font-medium text-ink">
           {DECISION_LABEL[line.decision] ?? line.decision}
           <span className="ml-2 text-xs font-normal text-ink-muted">recorded{line.permissionNote ? ' · permission on record' : ''}</span>
-          {/* 03.5: the decision is recorded; moving the member to Suspended waits for sign-in (B1), as Approve does. */}
-          {line.decision === 'SUSPEND' && (
-            <Button className="ml-3" disabled aria-describedby={suspendWhy}
-              aria-label={`Suspend ${nameOf(line)} as a member`}>
+          {/* A reactivated or rejoined member pays only the current month (Stephne, DOD-26, DOD-27). */}
+          {line.reDebitWithdrawn && (
+            <span className="block text-xs font-normal text-ink-muted">
+              Never presented: the member {line.reDebitWithdrawn === 'REJOINED' ? 'joined again' : 'was reactivated'}
+            </span>
+          )}
+          {line.decision === 'SUSPEND' && (suspended[line.id] ? (
+            <span className="block text-xs font-normal text-ink-muted">
+              Member suspended{suspended[line.id].suspensionCode != null ? ` · SASBO code ${suspended[line.id].suspensionCode}` : ''}
+            </span>
+          ) : prepares && (
+            <Button className="ml-3" onClick={() => setSuspending(line)} aria-label={`Suspend ${nameOf(line)} as a member`}>
               Suspend member
             </Button>
-          )}
+          ))}
         </span>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          <SelectInput
-            className="w-40"
-            aria-label={`Decision on ${nameOf(line)}’s unpaid`}
-            value={decisionOf(line)}
-            placeholder="Choose"
-            onChange={(value) => setChosen((previous) => ({ ...previous, [line.id]: value }))}
-            options={DECISIONS}
-            disabled={busyLine != null}
-          />
-          <Button
-            variant="primary"
-            onClick={() => confirm(line)}
-            loading={busyLine === line.id}
-            disabled={busyLine != null || !decisionOf(line)}
-            aria-label={`Confirm the decision on ${nameOf(line)}’s unpaid`}
-          >
-            Confirm
-          </Button>
+      ) : prepares ? (
+        <div className="grid gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <SelectInput
+              className="w-40"
+              aria-label={`Decision on ${nameOf(line)}’s unpaid`}
+              value={decisionOf(line)}
+              placeholder="Choose"
+              onChange={(value) => setChosen((previous) => ({ ...previous, [line.id]: value }))}
+              options={decisionOptions(line)}
+              disabled={busyLine != null}
+            />
+            <Button
+              variant="primary"
+              onClick={() => confirm(line)}
+              loading={busyLine === line.id}
+              disabled={busyLine != null || !decisionOf(line)}
+              aria-label={`Confirm the decision on ${nameOf(line)}’s unpaid`}
+            >
+              Confirm
+            </Button>
+          </div>
+          {noRepresentWhy(line) && <span className="text-xs text-ink-muted">{noRepresentWhy(line)}</span>}
         </div>
+      ) : (
+        <span className="text-ink-muted">
+          Undecided{line.suggestedDecision ? ` · suggested: ${DECISION_LABEL[line.suggestedDecision]}` : ''}
+        </span>
       )),
     },
     {
@@ -211,10 +262,20 @@ function UnpaidList({ run, reason, onBanking }) {
         dense
       />
       <PagerFor data={data} state={state} goTo={goTo} noun="unpaids" size={PAGE_SIZE} />
-      {rows.some((line) => line.decision === 'SUSPEND') && (
-        <p id={suspendWhy} className="border-t border-line px-6 py-3 text-sm text-ink-muted">
-          Moving a member decided Suspend to the Suspended status opens when administrators sign in to this system.
-        </p>
+      {suspending && (
+        <AcbSuspend
+          run={run}
+          line={suspending}
+          onClose={(refused) => {
+            setSuspending(null);
+            if (refused) retry();
+          }}
+          onSuspended={(answer) => {
+            setSuspended((previous) => ({ ...previous, [suspending.id]: answer }));
+            setNotice({ tone: 'ok', message: `${nameOf(suspending)} is suspended${answer?.suspensionCode != null ? `, SASBO code ${answer.suspensionCode}` : ''}.` });
+            setSuspending(null);
+          }}
+        />
       )}
     </>
   );
