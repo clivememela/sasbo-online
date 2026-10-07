@@ -35,8 +35,8 @@
     "runStatuses": ["PREPARING", "PREPARED", "APPROVED", "SUBMITTED", "RETURNED", "CLOSED", "DECLINED", "FAILED", "CANCELLED"],
     "lineOutcomes": ["PENDING", "PAID", "UNPAID"],
     "unpaidDecisions": ["RE_PRESENT", "SUSPEND"],
-    "unpaidReasons": ["NOT_PROVIDED_FOR", "PAYMENT_STOPPED", "ACCOUNT_FROZEN", "INVALID_ACCOUNT_NUMBER", "ACCOUNT_CLOSED", "NO_AUTHORITY_TO_DEBIT", "AUTHORISATION_CANCELLED", "OTHER"],
-    "letterTemplates": ["RETURN_DEBIT", "ACCOUNT_CLOSED", "RE_DEBIT"],
+    "unpaidReasons": ["NOT_PROVIDED_FOR", "PAYMENT_STOPPED", "ACCOUNT_FROZEN", "INVALID_ACCOUNT_NUMBER", "ACCOUNT_CLOSED", "NO_AUTHORITY_TO_DEBIT", "AUTHORISATION_CANCELLED", "ACCOUNT_HOLDER_DECEASED", "OTHER"],
+    "letterTemplates": ["RETURN_DEBIT", "ACCOUNT_CLOSED", "RE_DEBIT", "PAYMENT_STOPPED", "NO_AUTHORITY", "MEMBERSHIP_ENDED"],
     "letterStatuses": ["QUEUED", "RENDERED", "SENT", "FAILED", "HANDLED"],
     "declineReasons": ["WRONG_DEBIT_DATE", "LAYOUT", "OTHER"],
     "exclusionReasons": [
@@ -46,7 +46,8 @@
       {"name": "NO_SUBSCRIPTION_ROW", "listed": true},
       {"name": "DAY_OUT_OF_WINDOW", "listed": true},
       {"name": "ACCOUNT_SHAPE_INVALID", "listed": true},
-      {"name": "SNAPSHOT_INCOMPLETE", "listed": true}
+      {"name": "SNAPSHOT_INCOMPLETE", "listed": true},
+      {"name": "UNPAID_LIMIT_REACHED", "listed": true}
     ],
     "refusalCodes": [
       {"code": "RUN_ALREADY_EXISTS", "status": 409},
@@ -88,6 +89,21 @@
       {"code": "TERMINATION_NOT_DUE", "status": 409},
       {"code": "UNPAID_NOT_SUSPENDED", "status": 409},
       {"code": "MEMBER_TERMINATED", "status": 409},
+      {"code": "RE_DEBIT_NOT_ALLOWED", "status": 422},
+      {"code": "UNPAID_LIMIT_REACHED", "status": 409},
+      {"code": "RETURNS_BATCH_INVALID", "status": 422},
+      {"code": "UNPAID_COUNTS_INVALID", "status": 422},
+      {"code": "SUSPENSION_CODE_REQUIRED", "status": 422},
+      {"code": "SUSPENSION_CODE_UNKNOWN", "status": 422},
+      {"code": "MEMBER_NOT_FOUND", "status": 404},
+      {"code": "MEMBER_NOT_SUSPENDED", "status": 409},
+      {"code": "MEMBER_NOT_ENDED", "status": 409},
+      {"code": "CODE_NOT_FOUND", "status": 404},
+      {"code": "CODE_ALREADY_LISTED", "status": 409},
+      {"code": "CODE_VERSION_CONFLICT", "status": 409},
+      {"code": "BANK_NOT_FOUND", "status": 404},
+      {"code": "DEBIT_DAY_INVALID", "status": 400},
+      {"code": "MOVE_COUNT_CHANGED", "status": 409},
       {"code": "IDENTITY_REQUIRED", "status": 403}
     ]
   },
