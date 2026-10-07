@@ -8,7 +8,7 @@ const { saved } = vi.hoisted(() => ({ saved: [] }))
 vi.mock('../../lib/saveFile.js', () => ({ default: (file, fallback) => saved.push({ file, fallback }) }))
 
 import MonthEndRegionPacks from './MonthEndRegionPacks'
-import { MAIL_OFF } from './monthEndSendRules'
+import { MAIL_OFF, PACKS_UNAVAILABLE } from './monthEndSendRules'
 import { PERMISSIONS } from '../../auth/permissions'
 import { TestAuthProvider } from '../../test/authTestUtils'
 import { renderWithProviders } from '../../test/renderWithProviders'
@@ -138,6 +138,28 @@ describe('the states of the list', () => {
     openPage({ path: '/admin/monthly-menu/region-packs?month=2026-07' })
 
     expect(await screen.findByText(monthEndExamples.refusals.MONTH_NOT_TAKEN.body.message)).toBeInTheDocument()
+  })
+
+  it('🔴 a server that cannot place members in regions (available: false): every Produce shut, saying why', async () => {
+    server.use(packsAnswer({ ...regionPacks(), available: false }))
+    openPage()
+
+    const durban = await cardFound('Durban')
+    expect(screen.getByText(PACKS_UNAVAILABLE)).toBeInTheDocument()
+    const produce = within(durban).getByRole('button', { name: 'Produce the pack' })
+    expect(produce).toBeDisabled()
+    expect(produce).toHaveAccessibleDescription(PACKS_UNAVAILABLE)
+    expect(within(card('Johannesburg (first set)')).getByRole('button', { name: 'Produce again' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Produce the 6 still to produce' })).toHaveAccessibleDescription(PACKS_UNAVAILABLE)
+    // The pack made before stays to download.
+    expect(within(card('Johannesburg (first set)')).getByRole('button', { name: 'Download PDF' })).toBeEnabled()
+  })
+
+  it('areas no recipient covers are said, with their members -- in no region\'s pack until one takes them', async () => {
+    server.use(packsAnswer({ ...regionPacks(), uncovered: { areas: ['Q'], members: 12 } }))
+    openPage()
+
+    expect(await screen.findByText('Area Q has 12 members on record whom no recipient’s pack covers.')).toBeInTheDocument()
   })
 
   it('no recipient in the caller\'s part of SASBO: an empty list, said as one', async () => {
@@ -415,7 +437,7 @@ describe('e-mailing a pack -- refused cleanly where no mail is set up (MEN-04; n
     const calls = []
     server.use(
       packsAnswer(regionPacks({ mail: true, rows: produced })),
-      http.post('*/api/month-end/:month/region-packs/email', async ({ request }) => {
+      http.post('*/api/month-end/:month/region-packs/send', async ({ request }) => {
         const body = await request.json()
         calls.push(body)
         return HttpResponse.json({ month: '2026-08', results: body.sets.map((code) => (code === 'DBN'

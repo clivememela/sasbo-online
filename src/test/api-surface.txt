@@ -80,7 +80,7 @@ GET /api/month-end/{month}/new-and-deleted
 POST /api/month-end/{month}/pack
 GET /api/month-end/{month}/recruitment
 GET /api/month-end/{month}/region-packs
-POST /api/month-end/{month}/region-packs/email
+POST /api/month-end/{month}/region-packs/send
 POST /api/month-end/{month}/region-packs/{set}
 GET /api/month-end/{month}/representatives
 GET /api/month-end/{month}/suspensions

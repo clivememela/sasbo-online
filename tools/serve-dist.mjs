@@ -565,7 +565,7 @@ const sendPack = (month, set) => ({
 });
 const sendFile = (month, kind, code, name, id) => ({
   id, month, takeNumber: 1, kind, recipientCode: code, recipientName: name, layout: kind === 'BANK' ? 'SHEET' : 'OLD_MUTUAL_FUNERAL',
-  fullList: true, fileName: `${code}_${month.slice(2).replace('-', '')}.xlsx`, format: 'XLSX', protection: 'EXCEL_AES_256',
+  fullList: true, fileName: `${code}FULL_${month.slice(2).replace('-', '')}31.xlsx`, format: 'XLSX', protection: 'EXCEL_AES_256',
   rows: 412, newRows: 0, deletedRows: 0, leftOut: 0, bytes: 2048, sha256: 'invented', producedAt: '2026-10-01T07:20:00Z',
   producedBy: SEND_BY, downloads: 0, lastDeliveredAt: null,
 });
@@ -579,13 +579,14 @@ const sendFiles = (month) => ({
       preview: { rows: 9, newRows: 6, deletedRows: 3 }, files: [] },
   ],
   providers: [
-    { provider: sendRecipient('OLD_MUTUAL', 'Old Mutual funeral benefit', { layout: 'OLD_MUTUAL_FUNERAL', provisional: false, delivery: 'DOWNLOAD' }),
+    { provider: sendRecipient('OM_FUNERAL', 'Old Mutual funeral benefit', { layout: 'OLD_MUTUAL_FUNERAL', provisional: true, delivery: 'DOWNLOAD' }),
       preview: { rows: 1310, newRows: 0, deletedRows: 0 }, files: [] },
-    { provider: sendRecipient('LAW_CALL', 'Law Call', { layout: 'PROVISIONAL_MEMBER_LIST', provisional: true, delivery: 'SFTP' }),
+    { provider: sendRecipient('LAW_CALL', 'Law Call (Azoza)', { layout: 'PROVISIONAL_MEMBER_LIST', provisional: true, delivery: 'SFTP' }),
       preview: { rows: 1310, newRows: 0, deletedRows: 0 }, files: [] },
-    { provider: sendRecipient('CRITICARE', 'Criticare', { layout: 'CRITICARE_LISTING', provisional: false, delivery: 'DOWNLOAD', active: false }),
+    { provider: sendRecipient('CRITICARE', 'Criticare', { layout: 'PROVISIONAL_MEMBER_LIST', provisional: true, delivery: 'DOWNLOAD', active: false }),
       preview: { rows: 0, newRows: 0, deletedRows: 0 }, files: [] },
   ],
+  noTableCode: { rows: 3, newRows: 1, deletedRows: 0 },
 });
 const SEND_SUSPENDED = [
   { memberId: 9101, membershipNumber: 'M-095990', name: 'T Invented', bank: 'INVENTED BANK', workplace: 'R/A 900001 INVENTED BRANCH',
@@ -614,11 +615,11 @@ const sendShape = (req, path) => {
     if (refused) return refused;
     if (m[2] === 'files') return { status: 200, body: sendFiles(m[1]) };
     if (m[2] === 'deliveries') return { status: 200, body: { month: m[1], page: 0, size: 50, total: 0, items: [] } };
-    return { status: 200, body: { month: m[1], take: SEND_TAKE(m[1]), mail: { configured: false }, unplaced: 3,
-      sets: SEND_SETS.map((set) => ({ set, pack: set.code === 'JHB' ? sendPack(m[1], set) : null, deliveries: [] })) } };
+    return { status: 200, body: { month: m[1], take: SEND_TAKE(m[1]), mail: { configured: false }, available: true,
+      unplaced: 3, uncovered: { areas: [], members: 0 }, sets: SEND_SETS.map((set) => ({ set, pack: set.code === 'JHB' ? sendPack(m[1], set) : null, deliveries: [] })) } };
   }
-  m = /^\/api\/month-end\/([^/]+)\/region-packs\/(email|[A-Z0-9]+)$/.exec(path);
-  if (req.method === 'POST' && m && m[2] === 'email') {
+  m = /^\/api\/month-end\/([^/]+)\/region-packs\/(send|[A-Z0-9]+)$/.exec(path);
+  if (req.method === 'POST' && m && m[2] === 'send') {
     return { status: 200, body: { month: m[1], results: SEND_SETS.map((set) => ({ setCode: set.code, outcome: 'REFUSED',
       code: 'MAIL_NOT_CONFIGURED', message: 'This server has no mail set up, so nothing was e-mailed.', delivery: null })) } };
   }

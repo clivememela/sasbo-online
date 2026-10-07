@@ -26,6 +26,7 @@ export const SEND_REFUSAL = /* @__PURE__ */ Object.freeze({
 export const DELIVERY_REASON = /* @__PURE__ */ Object.freeze({
   MAIL_NOT_CONFIGURED: 'no mail is set up on this server',
   RECIPIENT_HAS_NO_ADDRESS: 'no e-mail address is on record for the recipient',
+  PACK_NOT_PRODUCED: 'its pack is not produced yet',
   MAIL_ATTACHMENT_TOO_LARGE: 'the files were too large to e-mail together',
   MAIL_FAILED: 'the mail server refused it or could not be reached',
   SFTP_NOT_CONFIGURED: 'SFTP is not set up on this server',
@@ -72,6 +73,30 @@ export const whyNoEmail = (set, mailOn) => (!mailOn ? MAIL_OFF : !set?.email ? N
 
 /** The choice a recipient opens on: both, where the system can e-mail them; a download otherwise. */
 export const defaultDelivery = (set, mailOn) => (whyNoEmail(set, mailOn) ? DELIVERY.DOWNLOAD : DELIVERY.BOTH);
+
+/**
+ * Said where the server cannot make a pack at all (`available: false`): it does not hold SASBO's workplaces in full, so
+ * no member can be placed in a region. Every Produce is shut with this sentence (`contracts/monthend-api.md` §2).
+ */
+export const PACKS_UNAVAILABLE = 'This server does not hold SASBO’s workplaces in full, so no member can be placed in a '
+  + 'region and no pack can be made here.';
+
+/** Areas with members that no recipient's pack covers -- each is in no region's pack until a recipient takes it. */
+export const uncoveredSaid = (uncovered) => {
+  const areas = uncovered?.areas ?? [];
+  if (!areas.length) return '';
+  const members = uncovered.members ?? 0;
+  return `${areasSaid(areas)} ${areas.length === 1 ? 'has' : 'have'} ${formatInt(members)} member${members === 1 ? '' : 's'} `
+    + 'on record whom no recipient’s pack covers.';
+};
+
+/** Payroll members in no bank's file: no workplace, or a workplace with no table code (`noTableCode`, §3). */
+export const noTableCodeSaid = (noTableCode) => {
+  const rows = noTableCode?.rows ?? 0;
+  if (!rows) return '';
+  return `${formatInt(rows)} member${rows === 1 ? ' who pays' : 's who pay'} by payroll deduction ${rows === 1 ? 'is' : 'are'} `
+    + 'in no bank’s file: no workplace, or a workplace with no table code, is on record for them.';
+};
 
 /** The areas a recipient's pack covers -- `Areas A, F, K and X` -- or the whole region where the set names none. */
 export const areasSaid = (letters = []) =>

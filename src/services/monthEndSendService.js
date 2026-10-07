@@ -55,9 +55,12 @@ export const downloadRegionPack = (id, format) => {
 export const emailRegionPack = (id, formats) =>
   post(apiUrl(`/api/month-end/region-packs/${encodeURIComponent(id)}/email`), { formats });
 
-/** `sets` null is every active recipient in the caller's scope. Never fails as a whole: each set answers for itself. */
+/**
+ * `sets` null is every active recipient in the caller's scope. Once one pack exists it never fails as a whole: each
+ * set answers for itself; where none has a pack it is `PACK_NOT_PRODUCED`, and nothing is sent.
+ */
 export const emailRegionPacks = (month, sets, formats) =>
-  post(apiUrl(`/api/month-end/${encodeURIComponent(month)}/region-packs/email`), { sets, formats });
+  post(apiUrl(`/api/month-end/${encodeURIComponent(month)}/region-packs/send`), { sets, formats });
 
 export const getFiles = (month) => read(apiUrl(`/api/month-end/${encodeURIComponent(month)}/files`));
 

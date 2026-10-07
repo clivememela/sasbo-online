@@ -86,7 +86,9 @@ export const regionPacks = ({ mail = false, rows } = {}) => ({
   month: '2026-08',
   take: AUGUST_TAKE,
   mail: { configured: mail },
+  available: true,
   unplaced: 3,
+  uncovered: { areas: [], members: 0 },
   sets: rows ?? SETS.map((set) => (set.code === 'JHB'
     ? { set, pack: regionPack(set), deliveries: [delivery()] }
     : { set, pack: null, deliveries: [] })),
@@ -113,7 +115,7 @@ export const monthEndFile = (extra = {}) => ({
   recipientName: 'Absa',
   layout: 'ABSA_FIXED_WIDTH',
   fullList: true,
-  fileName: 'ABSA_260831.zip',
+  fileName: 'ABSAFULL_260831.zip',
   format: 'ZIP',
   protection: 'AES_256_ZIP',
   rows: 412,
@@ -131,11 +133,11 @@ export const monthEndFile = (extra = {}) => ({
 
 export const ABSA = bank('ABSA', 'Absa', [24, 78, 90], true, 'ABSA_FIXED_WIDTH')
 export const NEDBANK = bank('NEDBANK', 'Nedbank', [13, 14, 35, 36, 109, 114], false, 'SHEET')
-export const OLD_MUTUAL = provider('OLD_MUTUAL', 'Old Mutual funeral benefit', 'OLD_MUTUAL_FUNERAL', 'DOWNLOAD')
-export const LAW_CALL = provider('LAW_CALL', 'Law Call', 'PROVISIONAL_MEMBER_LIST', 'SFTP', { provisional: true })
-export const CRITICARE = provider('CRITICARE', 'Criticare', 'CRITICARE_LISTING', 'DOWNLOAD', { active: false })
+export const OM_FUNERAL = provider('OM_FUNERAL', 'Old Mutual funeral benefit', 'OLD_MUTUAL_FUNERAL', 'DOWNLOAD', { provisional: true })
+export const LAW_CALL = provider('LAW_CALL', 'Law Call (Azoza)', 'PROVISIONAL_MEMBER_LIST', 'SFTP', { provisional: true })
+export const CRITICARE = provider('CRITICARE', 'Criticare', 'PROVISIONAL_MEMBER_LIST', 'DOWNLOAD', { provisional: true, active: false })
 
-/** The month's files (§3): Absa's made once, Nedbank's not yet; Old Mutual and Law Call active, Criticare suspended. */
+/** The month's files (§3): Absa's made once, Nedbank's not yet; Old Mutual's and Law Call's lists on, Criticare's off. */
 export const monthFiles = ({ sftp = false } = {}) => ({
   month: '2026-08',
   take: AUGUST_TAKE,
@@ -145,10 +147,11 @@ export const monthFiles = ({ sftp = false } = {}) => ({
     { bank: NEDBANK, preview: { rows: 9, newRows: 6, deletedRows: 3 }, files: [] },
   ],
   providers: [
-    { provider: OLD_MUTUAL, preview: { rows: 1310, newRows: 0, deletedRows: 0 }, files: [] },
+    { provider: OM_FUNERAL, preview: { rows: 1310, newRows: 0, deletedRows: 0 }, files: [] },
     { provider: LAW_CALL, preview: { rows: 1310, newRows: 0, deletedRows: 0 }, files: [] },
     { provider: CRITICARE, preview: { rows: 0, newRows: 0, deletedRows: 0 }, files: [] },
   ],
+  noTableCode: { rows: 0, newRows: 0, deletedRows: 0 },
 })
 
 /** The one-time password a produced file is answered with -- invented, and shaped as the server's (16 characters). */

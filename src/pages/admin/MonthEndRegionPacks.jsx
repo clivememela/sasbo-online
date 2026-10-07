@@ -15,8 +15,8 @@ import {
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import { instantLabel } from './monthEndRules.js';
 import {
-  DELIVERY, DELIVERY_CHOICES, FORMATS, MAIL_OFF, SEND_REFUSAL, areasSaid, defaultDelivery, downloads, emails,
-  formatLabel, formatsSaid, howSaid, outcomeSaid, packSaid, regionPacksOf, takeSaid, whyNoEmail,
+  DELIVERY, DELIVERY_CHOICES, FORMATS, MAIL_OFF, PACKS_UNAVAILABLE, SEND_REFUSAL, areasSaid, defaultDelivery, downloads,
+  emails, formatLabel, formatsSaid, howSaid, outcomeSaid, packSaid, regionPacksOf, takeSaid, uncoveredSaid, whyNoEmail,
 } from './monthEndSendRules.js';
 import { ActionNotice, NoMonthTaken, SendState, TakenMonthCriteria } from './MonthEndSendParts.jsx';
 import useTakenMonth, { useMonthAnswer } from './useTakenMonth.js';
@@ -56,8 +56,10 @@ const produceAllLabel = (toProduce, of) => {
 
 /** The id of the page's own line that says this server sends no mail -- what a shut e-mail control is described by. */
 const MAIL_OFF_ID = 'region-packs-mail-off';
+/** The id of the line that says no pack can be made on this server -- what a shut Produce is described by. */
+const UNAVAILABLE_ID = 'region-packs-unavailable';
 
-function RecipientCard({ row, choice, onChoose, mailOn, busy, locked, notice, actions }) {
+function RecipientCard({ row, choice, onChoose, mailOn, canProduce, busy, locked, notice, actions }) {
   const { set, pack, deliveries = [] } = row;
   const id = `pack-${set.code}`;
   const noEmail = whyNoEmail(set, mailOn);
@@ -122,7 +124,8 @@ function RecipientCard({ row, choice, onChoose, mailOn, busy, locked, notice, ac
 
         <div className="flex flex-wrap items-center gap-2">
           {!pack ? (
-            <Button variant="primary" onClick={actions.produce} loading={busy === 'produce'} disabled={working}>
+            <Button variant="primary" onClick={actions.produce} loading={busy === 'produce'} disabled={working || !canProduce}
+              aria-describedby={canProduce ? undefined : UNAVAILABLE_ID}>
               Produce the pack
             </Button>
           ) : (
@@ -141,8 +144,8 @@ function RecipientCard({ row, choice, onChoose, mailOn, busy, locked, notice, ac
                   E-mail {formatsSaid(choice.formats) || 'the pack'}
                 </Button>
               )}
-              <Button variant="ghost" onClick={actions.again} loading={busy === 'again'} disabled={working}
-                aria-describedby={`${id}-again`}>
+              <Button variant="ghost" onClick={actions.again} loading={busy === 'again'} disabled={working || !canProduce}
+                aria-describedby={canProduce ? `${id}-again` : UNAVAILABLE_ID}>
                 Produce again
               </Button>
               <span id={`${id}-again`} className="sr-only">
@@ -189,6 +192,8 @@ function RegionPacks({ month, noneTaken }) {
   if (!answer) return <SendState state="error" error={read.failure} onRetry={read.reload} />;
 
   const rows = answer.sets;
+  // Where the server cannot place members in regions, no pack can be made: every Produce is shut, and says why.
+  const canProduce = answer.available !== false;
   const say = (code, notice) => setNotices((was) => ({ ...was, [code]: notice }));
   const choiceOf = ({ set }) => ({
     delivery: whyNoEmail(set, mailOn) ? DELIVERY.DOWNLOAD : chosen[set.code]?.delivery ?? defaultDelivery(set, mailOn),
@@ -299,6 +304,8 @@ function RegionPacks({ month, noneTaken }) {
             + 'members: the new, the deleted and the suspended.'}
         </p>
         {!mailOn && <p id={MAIL_OFF_ID} data-mail="off">{MAIL_OFF}</p>}
+        {!canProduce && <p id={UNAVAILABLE_ID} data-packs="unavailable">{PACKS_UNAVAILABLE}</p>}
+        {uncoveredSaid(answer.uncovered) && <p>{uncoveredSaid(answer.uncovered)}</p>}
         {answer.unplaced > 0 && (
           <p>{`${formatInt(answer.unplaced)} member${answer.unplaced === 1 ? ' has' : 's have'} no workplace on record, so `
             + `${answer.unplaced === 1 ? 'is' : 'are'} in no region’s pack.`}</p>
@@ -311,7 +318,8 @@ function RegionPacks({ month, noneTaken }) {
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="primary" onClick={produceAll} disabled={!toProduce || Boolean(bulk)}
+            <Button variant="primary" onClick={produceAll} disabled={!toProduce || Boolean(bulk) || !canProduce}
+              aria-describedby={canProduce ? undefined : UNAVAILABLE_ID}
               loading={bulk?.what === 'Producing'}>
               {produceAllLabel(toProduce, rows.length)}
             </Button>
@@ -331,6 +339,7 @@ function RegionPacks({ month, noneTaken }) {
               choice={choiceOf(row)}
               onChoose={(change) => setChosen((was) => ({ ...was, [row.set.code]: { ...choiceOf(row), ...change } }))}
               mailOn={mailOn}
+              canProduce={canProduce}
               busy={busy[row.set.code]}
               locked={Boolean(bulk)}
               notice={notices[row.set.code]}

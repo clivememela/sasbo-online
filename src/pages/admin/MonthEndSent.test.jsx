@@ -52,7 +52,7 @@ describe('what was sent', () => {
       delivery({ id: 88, at: '2026-10-01T06:59:00Z', recipientCode: 'PE', recipientName: 'Port Elizabeth',
         address: null, outcome: 'REFUSED', code: 'RECIPIENT_HAS_NO_ADDRESS' }),
       delivery({ id: 87, at: '2026-10-01T06:50:00Z', kind: 'BANK_FILE', recipientCode: 'ABSA', recipientName: 'Absa',
-        channel: 'DOWNLOAD', formats: [], address: null, fileName: 'ABSA_260831.zip', packId: null, fileId: 7 }),
+        channel: 'DOWNLOAD', formats: [], address: null, fileName: 'ABSAFULL_260831.zip', packId: null, fileId: 7 }),
     ])))
     openPage()
 

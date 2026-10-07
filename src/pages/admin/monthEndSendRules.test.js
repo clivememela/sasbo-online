@@ -3,10 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { committedSurface, committedVocabulary } from '../../test/apiContractScan'
 import { STATISTICS } from './monthEndRules'
 import {
-  DELIVERY, DELIVERY_REASON, FORMATS, MAIL_OFF, SEND_REFUSAL, SENDING_READS, SFTP_OFF, areasSaid, defaultDelivery,
-  deliveriesOf, downloads, emails, fileSaid, filesOf, formatLabel, formatsSaid, howSaid, kindSaid, layoutSaid,
-  leftOutSaid, outcomeSaid, packSaid, passwordWarning, previewSaid, protectionSaid, receivesSaid, regionPacksOf,
-  sentence, takeSaid, whyNoEmail, wordsSaid,
+  DELIVERY, DELIVERY_REASON, FORMATS, MAIL_OFF, PACKS_UNAVAILABLE, SEND_REFUSAL, SENDING_READS, SFTP_OFF, areasSaid,
+  defaultDelivery, deliveriesOf, downloads, emails, fileSaid, filesOf, formatLabel, formatsSaid, howSaid, kindSaid,
+  layoutSaid, leftOutSaid, noTableCodeSaid, outcomeSaid, packSaid, passwordWarning, previewSaid, protectionSaid,
+  receivesSaid, regionPacksOf, sentence, takeSaid, uncoveredSaid, whyNoEmail, wordsSaid,
 } from './monthEndSendRules'
 import {
   delivery, monthEndFile, monthFiles, packSet, regionPack, regionPacks, suspendedPage,
@@ -73,6 +73,17 @@ describe('a recipient\'s pack -- MEN-04: download, e-mail, or both, chosen each 
     expect(formatLabel('CSV')).toBe('CSV')
   })
 
+  it('what no pack can hold: areas no recipient covers, payroll members in no bank\'s file -- counted, and nothing where none', () => {
+    expect(uncoveredSaid({ areas: ['Q'], members: 12 })).toBe('Area Q has 12 members on record whom no recipient’s pack covers.')
+    expect(uncoveredSaid({ areas: ['Q', 'Z'], members: 1 })).toBe('Areas Q and Z have 1 member on record whom no recipient’s pack covers.')
+    expect(uncoveredSaid({ areas: [], members: 0 })).toBe('')
+    expect(uncoveredSaid(undefined)).toBe('')
+    expect(noTableCodeSaid({ rows: 1 })).toBe('1 member who pays by payroll deduction is in no bank’s file: no workplace, or '
+      + 'a workplace with no table code, is on record for them.')
+    expect(noTableCodeSaid({ rows: 0 })).toBe('')
+    expect(PACKS_UNAVAILABLE).toMatch(/no pack can be made here/)
+  })
+
   it('the areas a pack covers -- or the whole region where the set names none (MEN-02: Johannesburg twice)', () => {
     expect(areasSaid(['A', 'F', 'K', 'X'])).toBe('Areas A, F, K and X')
     expect(areasSaid(['H'])).toBe('Area H')
@@ -137,7 +148,7 @@ describe('the banks\' and providers\' files -- MEN-05 (POPIA), MEN-32 to MEN-35'
   })
 
   it('a file says its name, its rows, who made it and how often it was downloaded -- and counts what it left out', () => {
-    expect(fileSaid(monthEndFile())).toBe('ABSA_260831.zip: 412 rows, produced on 1 October 2026 at 09:20 by Head Office '
+    expect(fileSaid(monthEndFile())).toBe('ABSAFULL_260831.zip: 412 rows, produced on 1 October 2026 at 09:20 by Head Office '
       + 'Administrator (demo.headoffice). Downloaded 1 time, last on 1 October 2026 at 09:21.')
     expect(leftOutSaid(2)).toBe('2 members could not be put in this layout and are left out.')
     expect(leftOutSaid(1)).toBe('1 member could not be put in this layout and is left out.')

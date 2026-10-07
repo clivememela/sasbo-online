@@ -14,8 +14,8 @@ import {
 } from '../../services/monthEndSendService.js';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import {
-  SEND_REFUSAL, SFTP_OFF, fileSaid, filesOf, layoutSaid, leftOutSaid, passwordWarning, previewSaid, protectionSaid,
-  receivesSaid, sentence, takeSaid,
+  SEND_REFUSAL, SFTP_OFF, fileSaid, filesOf, layoutSaid, leftOutSaid, noTableCodeSaid, passwordWarning, previewSaid,
+  protectionSaid, receivesSaid, sentence, takeSaid,
 } from './monthEndSendRules.js';
 import { ActionNotice, NoMonthTaken, SendState, TakenMonthCriteria } from './MonthEndSendParts.jsx';
 import useTakenMonth, { useMonthAnswer } from './useTakenMonth.js';
@@ -263,6 +263,7 @@ function MonthFiles({ month, noneTaken }) {
           {`${takeSaid(answer.month, answer.take)}. Every file that leaves SASBO is password-protected, and each `
             + 'password is shown once, when its file is produced.'}
         </p>
+        {noTableCodeSaid(answer.noTableCode) && <p>{noTableCodeSaid(answer.noTableCode)}</p>}
         {read.failure && <p role="alert">{`The files could not be read again: ${messageOf(read.failure)}`}</p>}
       </div>
       {list('BANK', answer.banks, 'Banks', 'No bank’s file is set up.')}

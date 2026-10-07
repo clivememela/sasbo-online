@@ -44,7 +44,7 @@ const filesAnswer = (answer = monthFiles()) =>
   http.get('*/api/month-end/:month/files', (info) => (typeof answer === 'function' ? answer(info) : HttpResponse.json(answer)))
 
 /** The bank file Absa is answered with on a produce: a new file, beside August's first. */
-const NEW_ABSA = monthEndFile({ id: 8, fileName: 'ABSA_260831_2.zip', downloads: 0, lastDeliveredAt: null })
+const NEW_ABSA = monthEndFile({ id: 8, fileName: 'ABSAFULL_260831_2.zip', downloads: 0, lastDeliveredAt: null })
 
 const openPage = ({ permissions = [PERMISSIONS.MONTH_END_SEND], path = '/admin/monthly-menu/files' } = {}) =>
   renderWithProviders(<TestAuthProvider permissions={permissions}><MonthEndFiles /></TestAuthProvider>, { initialEntries: [path] })
@@ -113,7 +113,7 @@ describe('what each bank and provider receives (MEN-32 to MEN-35)', () => {
     const absa = await rowFound('Absa')
     expect(absa).toHaveTextContent('Table codes 24, 78, 90')
     expect(within(absa).getByText(/^The full list, as Absa’s fixed-width text file\. Now: 412 members\.$/)).toBeInTheDocument()
-    expect(absa).toHaveTextContent('ABSA_260831.zip: 412 rows, produced on 1 October 2026 at 09:20 by Head Office Administrator (demo.headoffice). '
+    expect(absa).toHaveTextContent('ABSAFULL_260831.zip: 412 rows, produced on 1 October 2026 at 09:20 by Head Office Administrator (demo.headoffice). '
       + 'Downloaded 1 time, last on 1 October 2026 at 09:21. Password-protected, in a ZIP with a password: open it with 7-Zip, WinZip or WinRAR. '
       + '2 members could not be put in this layout and are left out.')
     expect(within(absa).getByRole('button', { name: 'Produce the file again' })).toBeEnabled()
@@ -123,14 +123,23 @@ describe('what each bank and provider receives (MEN-32 to MEN-35)', () => {
     expect(within(nedbank).getByRole('button', { name: 'Produce the file' })).toBeEnabled()
   })
 
+  it('payroll members in no bank\'s file are counted and said -- never named', async () => {
+    server.use(filesAnswer({ ...monthFiles(), noTableCode: { rows: 3, newRows: 1, deletedRows: 0 } }))
+    openPage()
+
+    expect(await screen.findByText('3 members who pay by payroll deduction are in no bank’s file: no workplace, or a '
+      + 'workplace with no table code, is on record for them.')).toBeInTheDocument()
+  })
+
   it('the providers: Old Mutual\'s list, Law Call\'s by SFTP -- not set up, so said -- and Criticare suspended, not dropped', async () => {
     server.use(filesAnswer())
     openPage()
 
-    const lawCall = await rowFound('Law Call')
+    const lawCall = await rowFound('Law Call (Azoza)')
     expect(lawCall).toHaveTextContent('A member list, provisional until SASBO confirms it. Now: 1 310 members.')
     expect(within(lawCall).getByText(SFTP_OFF)).toBeInTheDocument()
-    expect(row('Old Mutual funeral benefit')).toHaveTextContent('Old Mutual’s funeral benefit list. Now: 1 310 members.')
+    expect(row('Old Mutual funeral benefit')).toHaveTextContent('Old Mutual’s funeral benefit list, provisional until SASBO '
+      + 'confirms it. Now: 1 310 members.')
     const criticare = row('Criticare')
     expect(criticare).toHaveTextContent('Suspended for now: nothing is made for it, and it can be used again.')
     expect(within(criticare).queryByRole('button')).not.toBeInTheDocument()
@@ -146,12 +155,12 @@ describe('🔴 the one-time password (MEN-05, POPIA)', () => {
     openPage()
 
     await user.click(within(await rowFound('Absa')).getByRole('button', { name: 'Produce the file again' }))
-    const panel = await screen.findByRole('group', { name: 'The password for ABSA_260831_2.zip' })
+    const panel = await screen.findByRole('group', { name: 'The password for ABSAFULL_260831_2.zip' })
     expect(within(panel).getByText(INVENTED_ONE_TIME)).toHaveAttribute('data-one-time-password')
     expect(panel).toHaveTextContent('Give this password to the bank by phone — it will not be shown again.')
     expect(panel).toHaveTextContent(PASSWORD_NOTE)
     await waitFor(() => expect(panel).toHaveFocus())
-    expect(within(row('Absa')).getByRole('status')).toHaveTextContent('ABSA_260831_2.zip is produced. Its password is below, this once.')
+    expect(within(row('Absa')).getByRole('status')).toHaveTextContent('ABSAFULL_260831_2.zip is produced. Its password is below, this once.')
     expect(within(panel).getByRole('button', { name: 'Download the file' })).toBeEnabled()
   })
 
@@ -161,7 +170,7 @@ describe('🔴 the one-time password (MEN-05, POPIA)', () => {
     openPage()
 
     await user.click(within(await rowFound('Absa')).getByRole('button', { name: 'Produce the file again' }))
-    const panel = await screen.findByRole('group', { name: 'The password for ABSA_260831_2.zip' })
+    const panel = await screen.findByRole('group', { name: 'The password for ABSAFULL_260831_2.zip' })
     await user.click(within(panel).getByRole('button', { name: 'Copy the password' }))
     expect(await within(panel).findByText('Copied. Paste it nowhere the file goes.')).toBeInTheDocument()
     expect(await navigator.clipboard.readText()).toBe(INVENTED_ONE_TIME)
@@ -173,7 +182,7 @@ describe('🔴 the one-time password (MEN-05, POPIA)', () => {
     openPage()
 
     await user.click(within(await rowFound('Absa')).getByRole('button', { name: 'Produce the file again' }))
-    const panel = await screen.findByRole('group', { name: 'The password for ABSA_260831_2.zip' })
+    const panel = await screen.findByRole('group', { name: 'The password for ABSAFULL_260831_2.zip' })
     const stored = [...Object.values(localStorage), ...Object.values(sessionStorage)].join(' ')
     expect(stored).not.toContain(INVENTED_ONE_TIME)
     await user.click(within(panel).getByRole('button', { name: 'Hide the password' }))
@@ -226,20 +235,20 @@ describe('downloading and sending a file', () => {
     server.use(filesAnswer(), http.get('*/api/month-end/files/:id', ({ params }) => {
       asked.push(params.id)
       return new HttpResponse(new Blob(['PK invented']), {
-        headers: { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="ABSA_260831.zip"' },
+        headers: { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="ABSAFULL_260831.zip"' },
       })
     }))
     const user = setupUser()
     openPage()
 
-    await user.click(within(await rowFound('Absa')).getByRole('button', { name: 'Download ABSA_260831.zip' }))
-    expect(await within(row('Absa')).findByText('ABSA_260831.zip is downloaded.')).toBeInTheDocument()
+    await user.click(within(await rowFound('Absa')).getByRole('button', { name: 'Download ABSAFULL_260831.zip' }))
+    expect(await within(row('Absa')).findByText('ABSAFULL_260831.zip is downloaded.')).toBeInTheDocument()
     expect(asked).toEqual(['7'])
-    expect(saved.map(({ file, fallback }) => [file.filename, fallback])).toEqual([['ABSA_260831.zip', 'ABSA_260831.zip']])
+    expect(saved.map(({ file, fallback }) => [file.filename, fallback])).toEqual([['ABSAFULL_260831.zip', 'ABSAFULL_260831.zip']])
   })
 
   it('Law Call by SFTP: shut while SFTP is not set up -- and, where the server refuses it, said and shut for the visit', async () => {
-    const lawCallFile = monthEndFile({ id: 9, kind: 'PROVIDER', recipientCode: 'LAW_CALL', recipientName: 'Law Call',
+    const lawCallFile = monthEndFile({ id: 9, kind: 'PROVIDER', recipientCode: 'LAW_CALL', recipientName: 'Law Call (Azoza)',
       layout: 'PROVISIONAL_MEMBER_LIST', fileName: 'LAW_CALL_260831.zip' })
     const withFile = (sftp) => {
       const answer = monthFiles({ sftp })
@@ -248,18 +257,18 @@ describe('downloading and sending a file', () => {
     }
     server.use(filesAnswer(withFile(false)))
     const first = openPage()
-    expect(within(await rowFound('Law Call')).getByRole('button', { name: 'Send LAW_CALL_260831.zip by SFTP' })).toBeDisabled()
+    expect(within(await rowFound('Law Call (Azoza)')).getByRole('button', { name: 'Send LAW_CALL_260831.zip by SFTP' })).toBeDisabled()
     first.unmount()
 
     // The read said SFTP was set up; the server refused all the same.
     server.use(filesAnswer(withFile(true)), monthEndRefusal('SFTP_NOT_CONFIGURED', 'POST /api/month-end/files/{id}/sftp'))
     const user = setupUser()
     openPage()
-    const lawCall = await rowFound('Law Call')
+    const lawCall = await rowFound('Law Call (Azoza)')
     expect(within(lawCall).getByText('Delivered by SFTP.')).toBeInTheDocument()
     await user.click(within(lawCall).getByRole('button', { name: 'Send LAW_CALL_260831.zip by SFTP' }))
-    expect(await within(row('Law Call')).findByRole('alert')).toHaveTextContent(monthEndExamples.refusals.SFTP_NOT_CONFIGURED.body.message)
-    await waitFor(() => expect(within(row('Law Call')).getByRole('button', { name: 'Send LAW_CALL_260831.zip by SFTP' })).toBeDisabled())
-    expect(within(row('Law Call')).getByText(SFTP_OFF)).toBeInTheDocument()
+    expect(await within(row('Law Call (Azoza)')).findByRole('alert')).toHaveTextContent(monthEndExamples.refusals.SFTP_NOT_CONFIGURED.body.message)
+    await waitFor(() => expect(within(row('Law Call (Azoza)')).getByRole('button', { name: 'Send LAW_CALL_260831.zip by SFTP' })).toBeDisabled())
+    expect(within(row('Law Call (Azoza)')).getByText(SFTP_OFF)).toBeInTheDocument()
   })
 })

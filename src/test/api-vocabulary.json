@@ -173,7 +173,8 @@
       {"code": "MEMBER_ALREADY_CAPTURED", "status": 409},
       {"code": "NO_DEDUCTION_REASON_REQUIRED", "status": 400},
       {"code": "NO_DEDUCTION_REASON_UNKNOWN", "status": 400},
-      {"code": "SUSPENDED_PAGE_INVALID", "status": 400}
+      {"code": "SUSPENDED_PAGE_INVALID", "status": 400},
+      {"code": "PACK_NOT_PRODUCED", "status": 409}
     ]
   }
 }
