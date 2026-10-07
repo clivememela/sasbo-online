@@ -7,7 +7,7 @@ import { OrganizerReport } from './OrganizerReport'
 import { PERMISSIONS } from '../../auth/permissions'
 import { TestAuthProvider } from '../../test/authTestUtils'
 import { expectNoA11yViolations } from '../../test/assertions'
-import { monthEndBody, monthEndExamples } from '../../test/msw/monthEndExamples'
+import { monthEndBody, monthEndExamples, monthEndRefusal } from '../../test/msw/monthEndExamples'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { setupUser } from '../../test/user'
@@ -16,9 +16,10 @@ import { setupUser } from '../../test/user'
  * 💾 5 OCT SHOW & TELL: THE VISIT FORMS SAVING AND SUBMITTING. An organiser who may capture visits saves the form as a
  * draft -- the R/A number and what a visit keeps, under the server's names -- saves it again from the version they
  * hold, and submits it; the visit is then on record and the form read-only, to print. My visits lists their drafts and
- * submissions, to open. A refusal is said where it belongs, and a draft saved since in another tab is offered as it
- * now is. Nobody signed in keeps the one-step Save visit; a signed-in user without the permission is told what they
- * need. Every answer is the server's golden one or built from it; nothing here is SASBO's.
+ * submissions, to open, a page at a time. A refusal is said where it belongs, and a draft saved since in another tab is
+ * offered as it now is; a draft not wanted is discarded, once asked. Nobody signed in keeps the one-step Save visit; a
+ * signed-in user without the permission is told what they need. Every answer is the server's golden one or built from
+ * it; nothing here is SASBO's.
  */
 
 const CREATED = monthEndBody('POST /api/workplaces/visit-drafts')
@@ -47,6 +48,12 @@ const draftsAnswer = ({ mine = { ...MINE, drafts: [] } } = {}) => [
   http.post('*/api/workplaces/visit-drafts/:id/submit', async ({ request }) => {
     await record(request)
     return HttpResponse.json({ ...SUBMITTED, id: 1, version: writes.at(-1).body.version + 1 })
+  }),
+  // A discard has no body: the version it names is in the address.
+  http.delete('*/api/workplaces/visit-drafts/:id', ({ request }) => {
+    const url = new URL(request.url)
+    writes.push({ method: 'DELETE', path: url.pathname, version: url.searchParams.get('version') })
+    return new HttpResponse(null, { status: 204 })
   }),
 ]
 
@@ -259,6 +266,104 @@ describe('My visits', () => {
 
     await user.click(screen.getByRole('button', { name: 'Keep editing' }))
     expect(field('Organiser Name')).toHaveValue('INVENTED TYPING')
+  })
+})
+
+describe('Discard draft (October build review)', () => {
+  async function aSavedDraft(user) {
+    fill({ 'R / A Number': '900001' })
+    await user.click(screen.getByRole('button', { name: 'Save draft' }))
+    await screen.findByText('Draft saved for INVENTED MAIN STREET (R/A 900001).')
+  }
+
+  it('🔒 review: asks first, then discards the draft at the version the form holds -- and the form starts again', async () => {
+    server.use(...draftsAnswer())
+    const user = setupUser()
+    renderWithProviders(capturer(<OrganizerReport />))
+    expect(screen.queryByRole('button', { name: 'Discard draft' })).not.toBeInTheDocument()
+    await aSavedDraft(user)
+
+    await user.click(screen.getByRole('button', { name: 'Discard draft' }))
+    expect(screen.getByText(/Discard the draft for INVENTED MAIN STREET \(R\/A 900001\)\?/)).toBeInTheDocument()
+    expect(writes).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Discard it' }))
+
+    expect(await screen.findByText('Draft discarded for INVENTED MAIN STREET (R/A 900001).')).toBeInTheDocument()
+    expect(writes[1]).toEqual({ method: 'DELETE', path: '/api/workplaces/visit-drafts/1', version: '0' })
+    expect(field('R / A Number')).toHaveValue('')
+    expect(screen.queryByRole('button', { name: 'Discard draft' })).not.toBeInTheDocument()
+  })
+
+  it('Keep the draft discards nothing; a draft submitted elsewhere is refused, said, and offered as it now is', async () => {
+    server.use(monthEndRefusal('VISIT_ALREADY_SUBMITTED', 'DELETE /api/workplaces/visit-drafts/{id}'), ...draftsAnswer())
+    const user = setupUser()
+    renderWithProviders(capturer(<OrganizerReport />))
+    await aSavedDraft(user)
+
+    await user.click(screen.getByRole('button', { name: 'Discard draft' }))
+    await user.click(screen.getByRole('button', { name: 'Keep the draft' }))
+    expect(screen.queryByRole('button', { name: 'Discard it' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Discard draft' }))
+    await user.click(screen.getByRole('button', { name: 'Discard it' }))
+
+    expect(await screen.findByText(monthEndExamples.refusals.VISIT_ALREADY_SUBMITTED.body.message, { exact: false }))
+      .toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open it as it is now' })).toBeInTheDocument()
+    expect(field('R / A Number')).toHaveValue('900001')
+    expect(writes.filter((write) => write.method === 'DELETE')).toEqual([])
+  })
+})
+
+describe('My visits, every state (October build review)', () => {
+  it('review: failing to load says so, and Try again asks once more', async () => {
+    let calls = 0
+    server.use(http.get('*/api/workplaces/visit-drafts', () => {
+      calls += 1
+      return calls === 1 ? HttpResponse.json({ message: 'boom' }, { status: 500 }) : HttpResponse.json(MINE)
+    }), ...draftsAnswer({ mine: MINE }))
+    const user = setupUser()
+    renderWithProviders(capturer(<OrganizerReport />))
+
+    const mine = await screen.findByRole('region', { name: 'My visits' })
+    expect(await within(mine).findByText('Your visits could not be loaded.')).toBeInTheDocument()
+    await user.click(within(mine).getByRole('button', { name: /Try again/ }))
+
+    expect(await within(mine).findByRole('button', { name: 'Open: INVENTED MAIN STREET, R/A 900001' })).toBeInTheDocument()
+    expect(calls).toBe(2)
+  })
+
+  it('review: an empty list says which -- no drafts saved, no visits submitted', async () => {
+    server.use(...draftsAnswer())
+    const user = setupUser()
+    renderWithProviders(capturer(<OrganizerReport />))
+
+    const mine = await screen.findByRole('region', { name: 'My visits' })
+    expect(await within(mine).findByText('No drafts saved yet.')).toBeInTheDocument()
+    await user.click(within(mine).getByRole('button', { name: 'Submitted' }))
+    expect(await within(mine).findByText('No visits submitted yet.')).toBeInTheDocument()
+  })
+
+  it('🔒 review: past the newest twenty, a pager -- Next asks for the next page, and every visit can be opened', async () => {
+    const pages = []
+    const harbour = { ...MINE.drafts[0], id: 999003, workplaceName: 'INVENTED HARBOUR', raNumber: 900003 }
+    server.use(http.get('*/api/workplaces/visit-drafts', ({ request }) => {
+      const page = Number(new URL(request.url).searchParams.get('page'))
+      pages.push(page)
+      return HttpResponse.json({ ...MINE, page, size: 20, totalElements: 21, totalPages: 2,
+        drafts: page === 0 ? MINE.drafts : [harbour] })
+    }), ...draftsAnswer({ mine: MINE }))
+    const user = setupUser()
+    renderWithProviders(capturer(<OrganizerReport />))
+
+    const mine = await screen.findByRole('region', { name: 'My visits' })
+    await within(mine).findByRole('button', { name: 'Open: INVENTED MAIN STREET, R/A 900001' })
+    expect(within(mine).getByText(/Page 1 of 2/)).toBeInTheDocument()
+    await user.click(within(mine).getByRole('button', { name: /Next/ }))
+
+    expect(await within(mine).findByRole('button', { name: 'Open: INVENTED HARBOUR, R/A 900003' })).toBeInTheDocument()
+    expect(within(mine).getByText(/Page 2 of 2/)).toBeInTheDocument()
+    expect(pages).toEqual([0, 1])
   })
 })
 

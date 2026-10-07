@@ -14,9 +14,11 @@ import {
 import useFocusOn from '../../hooks/useFocusOn.js';
 import { formatDateLong, formatInt } from '../../lib/format.js';
 import reportError from '../../lib/reportError.js';
-import { messageOf, writeFailure } from '../../services/parseApiError.js';
+import { messageOf, writeFailure, writeMayHaveLanded } from '../../services/parseApiError.js';
 import { workplaceService } from '../../services/workplaceService.js';
-import { createDraft, getDraft, recordVisit, submitDraft, updateDraft } from '../../services/workplaceVisitService.js';
+import {
+    createDraft, discardDraft, getDraft, recordVisit, submitDraft, updateDraft,
+} from '../../services/workplaceVisitService.js';
 import MyVisitDrafts from './MyVisitDrafts.jsx';
 import { DRAFT_FIELDS, DRAFT_STATUS, draftOf, formFieldsOf } from './visitDraft.js';
 
@@ -195,7 +197,8 @@ const Section = ({ title, children }) => (
  * (`VISITS_CAPTURE`) saves the form as a draft, comes back to it from My visits, and submits it: the visit then goes on
  * SASBO's record and the form is read-only, to be printed. Nobody signed in keeps the one-step Save visit the form had,
  * while sign-in is open -- everything that works today still works (contracts/signin.md) -- with a line saying that
- * signing in brings drafts and submitting; a signed-in user without the permission is told what they need.
+ * signing in brings drafts and submitting; a signed-in user without the permission is told what they need. A draft
+ * that is not wanted is discarded (October build review), once the organiser has said so; a submitted visit never is.
  */
 export const OrganizerReport = ({ filters, embedded = false }) => {
     /*
@@ -216,6 +219,7 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
     const [baseline, setBaseline] = useState(() => formData);
     const [busy, setBusy] = useState(null);
     const [opening, setOpening] = useState(null);
+    const [discarding, setDiscarding] = useState(false);
     const [listed, setListed] = useState(0);
     const noticeRef = useFocusOn(notice, notice?.tone === 'error');
     const { status: authStatus, can } = useAuth();
@@ -292,6 +296,7 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
         setDraft(saved);
         setErrors({});
         setOpening(null);
+        setDiscarding(false);
         setNotice(text ? { tone: 'ok', text } : null);
     };
 
@@ -418,6 +423,40 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
         setErrors({});
         setNotice(null);
         setOpening(null);
+        setDiscarding(false);
+    };
+
+    /**
+     * DISCARD DRAFT (October build review): the draft the form holds is deleted at the version it holds, once the
+     * organiser has said so, and the form starts again. Saved since or submitted elsewhere, it is offered as it now is
+     * (`refused`); a submitted visit is SASBO's record, and the server never discards one.
+     */
+    const handleDiscard = async () => {
+        if (busy || readOnly || !draft?.id) return;
+        setBusy('discard');
+        try {
+            await discardDraft(draft.id, draft.version);
+            const gone = draft;
+            startAgain();
+            setListed((n) => n + 1);
+            setNotice({ tone: 'ok', text: `Draft discarded for ${gone.workplaceName} (R/A ${gone.raNumber}).` });
+        } catch (error) {
+            setDiscarding(false);
+            const code = error?.body?.code;
+            if (code === VISIT_DRAFT_STALE || code === VISIT_ALREADY_SUBMITTED || code === VISIT_DRAFT_NOT_FOUND) {
+                refused(error, 'The draft');
+            } else {
+                reportError('LocationVisit.discard', error);
+                setNotice({
+                    tone: 'error',
+                    text: writeMayHaveLanded(error)
+                        ? 'Discarding the draft could not be confirmed. Reload My visits and check before trying again.'
+                        : `The draft was not discarded. ${messageOf(error)}`.trim(),
+                });
+            }
+        } finally {
+            setBusy(null);
+        }
     };
 
     // One object per render, so a keystroke reaches all 31 fields -- which is what a
@@ -547,6 +586,24 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
                         </div>
                     )}
 
+                    {discarding && draft && (
+                        <div role="alert" className="no-print mt-4 rounded-md border border-line-strong bg-surface-2 p-3 text-sm text-ink">
+                            <p>
+                                Discard the draft for {draft.workplaceName} (R/A {draft.raNumber})? A discarded draft cannot
+                                be brought back.
+                            </p>
+                            <div className="mt-2 flex gap-2">
+                                <Button size="sm" variant="danger" loading={busy === 'discard'} onClick={handleDiscard}>
+                                    Discard it
+                                </Button>
+                                <Button size="sm" variant="ghost" disabled={busy === 'discard'}
+                                    onClick={() => setDiscarding(false)}>
+                                    Keep the draft
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
                     {!capture && (
                         <p className="no-print mt-4 text-sm text-ink-muted">
                             {signedIn ? (
@@ -571,12 +628,18 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
                         <Button type="button" variant="default" onClick={() => window.print()}>Print form</Button>
                         {capture && !readOnly && (
                             <>
+                                {draft?.id && (
+                                    <Button type="button" variant="ghost" disabled={Boolean(busy) || discarding}
+                                        onClick={() => setDiscarding(true)}>
+                                        Discard draft
+                                    </Button>
+                                )}
                                 <Button type="submit" variant="default" loading={busy === 'save'}
-                                    disabled={busy === 'submit' || (draft && !changed)}>
+                                    disabled={busy === 'submit' || busy === 'discard' || (draft && !changed)}>
                                     Save draft
                                 </Button>
                                 <Button type="button" variant="primary" loading={busy === 'submit'}
-                                    disabled={busy === 'save'} onClick={handleSubmitVisit}>
+                                    disabled={busy === 'save' || busy === 'discard'} onClick={handleSubmitVisit}>
                                     Submit visit
                                 </Button>
                             </>

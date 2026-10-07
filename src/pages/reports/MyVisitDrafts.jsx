@@ -2,7 +2,8 @@ import { useEffect, useId, useState } from 'react';
 
 import { Button } from '../../components/form';
 import DataState from '../../components/common/DataState.jsx';
-import { formatDateLong, formatInt } from '../../lib/format.js';
+import Pager from '../../components/common/Pager.jsx';
+import { formatDateLong } from '../../lib/format.js';
 import reportError from '../../lib/reportError.js';
 import { DRAFT_PAGE_SIZE, getMyDrafts } from '../../services/workplaceVisitService.js';
 import { DRAFT_STATUS } from './visitDraft.js';
@@ -11,8 +12,9 @@ import { DRAFT_STATUS } from './visitDraft.js';
  * MY VISITS -- the drafts I saved and the visits I submitted (October build, 5 Oct Show & Tell: the visit forms saving
  * and submitting). A draft opens into the form to be finished; a submitted visit opens read-only, to be printed.
  *
- * Only ever the signed-in organiser's own: the server answers no one else's. Newest saved first, twenty at a time --
- * an organiser's month is about twenty visits, and the count says when there are more.
+ * Only ever the signed-in organiser's own: the server answers no one else's. Newest saved first, twenty a page -- an
+ * organiser's month is about twenty visits -- with a pager past the first (October build review: only the newest
+ * twenty could be opened). A new tab, or a save, starts again at the first page.
  *
  * FOUR STATES: loading; failed, with Try again; empty -- in words that say which list is empty; ready.
  */
@@ -38,32 +40,39 @@ export default function MyVisitDrafts({ refreshKey = 0, openId, onOpen }) {
   const headingId = useId();
   const [status, setStatus] = useState(DRAFT_STATUS.DRAFT);
   const [attempt, setAttempt] = useState(0);
+  // The page shown, for the list it was turned on: another tab or another save is another list, from its first page.
+  const [paging, setPaging] = useState({ list: '', page: 0 });
   const [read, setRead] = useState({});
-  const question = `${status}|${refreshKey}|${attempt}`;
+  const list = `${status}|${refreshKey}`;
+  const page = paging.list === list ? paging.page : 0;
+  const question = `${list}|${page}|${attempt}`;
 
   useEffect(() => {
     let current = true;
-    const asked = `${status}|${refreshKey}|${attempt}`;
-    getMyDrafts(status, 0, DRAFT_PAGE_SIZE)
+    const shown = `${status}|${refreshKey}`;
+    const asked = `${shown}|${page}|${attempt}`;
+    getMyDrafts(status, page, DRAFT_PAGE_SIZE)
       .then((body) => {
         if (!current) return;
         const answer = Array.isArray(body?.drafts) ? body : null;
-        setRead({ asked, answer, failure: answer ? null : NOT_AVAILABLE });
+        setRead({ asked, list: shown, answer, failure: answer ? null : NOT_AVAILABLE });
       })
       .catch((error) => {
         if (!current) return;
         reportError('MyVisitDrafts.read', error);
-        setRead({ asked, failure: error });
+        setRead({ asked, list: shown, failure: error });
       });
     return () => {
       current = false;
     };
-  }, [status, refreshKey, attempt]);
+  }, [status, refreshKey, page, attempt]);
 
   const tab = TABS.find((entry) => entry.status === status);
   const pending = read.asked !== question;
   const answer = pending ? null : read.answer;
   const view = pending ? 'loading' : read.failure ? 'error' : answer.drafts.length ? 'ready' : 'empty';
+  // The pager stands on the page answered last for this list while the next one loads, so it does not flicker away.
+  const paged = pending ? (read.list === list ? read.answer : null) : answer;
 
   return (
     <section aria-labelledby={headingId} className="no-print mt-5 max-w-4xl rounded-lg bg-surface p-5 shadow-(--shadow-1)">
@@ -100,11 +109,6 @@ export default function MyVisitDrafts({ refreshKey = 0, openId, onOpen }) {
               </li>
             ))}
           </ul>
-          {answer.totalElements > answer.drafts.length && (
-            <p className="mt-2 text-sm text-ink-muted">
-              The {formatInt(answer.drafts.length)} most recent of {formatInt(answer.totalElements)} are shown.
-            </p>
-          )}
         </>
       ) : (
         <DataState
@@ -116,6 +120,20 @@ export default function MyVisitDrafts({ refreshKey = 0, openId, onOpen }) {
           message={read.failure?.message}
           error={read.failure}
           onRetry={() => setAttempt((n) => n + 1)}
+        />
+      )}
+      {paged?.totalPages > 1 && (
+        <Pager
+          className="-mx-5 -mb-5 mt-3 rounded-b-lg"
+          page={page + 1}
+          totalPages={paged.totalPages}
+          onPageChange={(next) => setPaging({ list, page: next - 1 })}
+          count={paged.totalElements}
+          start={page * DRAFT_PAGE_SIZE + 1}
+          end={page * DRAFT_PAGE_SIZE + paged.drafts.length}
+          noun="visits"
+          loading={pending}
+          error={view === 'error'}
         />
       )}
     </section>
