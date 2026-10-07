@@ -23,6 +23,7 @@ import { formalName } from '../../lib/names.js';
 import { formatDate, formatZar } from '../../lib/format.js';
 import { writeFailure } from '../../services/parseApiError.js';
 import useFocusOn from '../../hooks/useFocusOn.js';
+import { bankPlacesOf, channelRowsFromMembers } from './channelFigures.js';
 
 const PAGE_SIZE = 20;
 
@@ -208,15 +209,7 @@ export function Recruiters() {
     const AREAS = useMemo(() => [...new Set(banksData.map(b => b?.area).filter(Boolean))].sort(), [banksData]);
     const BRANCHES = useMemo(() => [...new Set(banksData.map(b => b?.branchName).filter(Boolean))].sort(), [banksData]);
 
-    const BANK_META = useMemo(() => {
-        const meta = {};
-        banksData.forEach(b => {
-            if (b?.bankName) {
-                meta[b.bankName] = { province: b.provinceCommitteeName, area: b.area };
-            }
-        });
-        return meta;
-    }, [banksData]);
+    const BANK_META = useMemo(() => bankPlacesOf(banksData), [banksData]);
 
     const ROLES = useMemo(() => roles.map(r => ({ ...r })), [roles]);
     const STRUCTURES_TREE = structures;
@@ -233,58 +226,9 @@ export function Recruiters() {
     }, [structures]);
     const RECRUITMENT_CHANNELS = useMemo(() => recruitmentChannels.filter(r => r.enabled).sort((a, b) => a.name.localeCompare(b.name)), [recruitmentChannels]);
 
-    const repList = useMemo(() => {
-        const memberMap = {};
-        members.forEach(m => {
-            const repId = m.recruitmentRepresentativeId;
-            if (repId == null) return;
-            if (!memberMap[repId]) memberMap[repId] = {
-                bankSet: new Set(),
-                branchSet: new Set(),
-                provinceSet: new Set(),
-                areaSet: new Set(),
-                count: 0
-            };
-            memberMap[repId].bankSet.add(m.bankName ?? '');
-            memberMap[repId].branchSet.add(m.branch ?? '');
-            const meta = BANK_META[m.bankName] || {};
-            if (meta.province) memberMap[repId].provinceSet.add(meta.province);
-            if (meta.area) memberMap[repId].areaSet.add(meta.area);
-            memberMap[repId].count++;
-        });
-
-        return reps.map(r => {
-            const d = memberMap[r.id] || {
-                bankSet: new Set(),
-                branchSet: new Set(),
-                provinceSet: new Set(),
-                areaSet: new Set(),
-                count: 0
-            };
-            return {
-                id: r.id,
-                name: r.name,
-                email: r.email || '',
-                phone: r.phone || '',
-                memberId: r.memberId || null,
-                roleId: r.roleId || null,
-                isElectedRep: r.isElectedRep || false,
-                electionDate: r.electionDate || null,
-                recruiterTypeId: r.recruiterTypeId || null,
-                structureIds: r.structureIds || [],
-                banks: [...d.bankSet].filter(Boolean).join(', '),
-                branches: [...d.branchSet].filter(Boolean).join(', '),
-                provinces: [...d.provinceSet].join(', '),
-                areas: [...d.areaSet].join(', '),
-                count: d.count,
-            };
-        }).sort((a, b) => {
-            const nameA = a.name || "";
-            const nameB = b.name || "";
-            // Numeric collation, so "Synthetic Channel 2" comes before "Synthetic Channel 10" (`06.3` critique).
-            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' })
-        });
-    }, [members, reps, BANK_META]);
+    // 🔴 RC15: each channel's members are those recruited THROUGH it (`channelFigures.js`) -- the count used to match the
+    // member's recruiter's id against the channel's id.
+    const repList = useMemo(() => channelRowsFromMembers(members, reps, BANK_META), [members, reps, BANK_META]);
 
     const filtered = useMemo(() => {
         const q = v => (v || '').trim().toLowerCase();
