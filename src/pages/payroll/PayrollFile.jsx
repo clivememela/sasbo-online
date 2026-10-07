@@ -272,8 +272,9 @@ function FileReady({ file, setFile, vocabulary, readAgain }) {
               </Button>
             ))}
           </div>
-          {/* The file as it arrived -- the one place every administrator reaches it (PAY-32); kept a year (PAY-39). */}
-          {file.entry === 'UPLOAD' && file.status !== PURGED && (
+          {/* The file as it arrived -- the one place every administrator reaches it (PAY-32); kept a year (PAY-39). Its
+              lines are unmasked, so only PAYROLL_PROCESS downloads it, and the server records each download (draft 3). */}
+          {canProcess && file.entry === 'UPLOAD' && file.status !== PURGED && (
             <Button
               onClick={() => downloads.run('original', () => downloadOriginal(file.id), file.originalName
                 ?? reportName('Payroll file', (file.format ?? 'xlsx').toLowerCase()))}
