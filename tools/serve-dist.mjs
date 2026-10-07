@@ -465,9 +465,27 @@ const envelope = (code, message, details) => {
   return { status: example.status, body: { ...example.body, ...(message && { message }), ...(details && { details }) } };
 };
 // Every refusal a month end route answers here, looked up now: one the golden file lacks stops the start by name.
-['REQUEST_MALFORMED', 'MONTH_NOT_BEGUN', 'MONTH_NOT_TAKEN', 'SUMMARY_AREA_UNKNOWN', 'IDENTITY_REQUIRED', 'PACK_NOT_FOUND',
+// (IDENTITY_REQUIRED left month end with the server's slice 2: the take and the listings are held by a permission.)
+['REQUEST_MALFORMED', 'MONTH_NOT_BEGUN', 'MONTH_NOT_TAKEN', 'SUMMARY_AREA_UNKNOWN', 'PACK_NOT_FOUND',
   'HISTORY_PAGE_INVALID', 'MEMBER_NOT_FOUND']
   .forEach((code) => envelope(code));
+const listingExample = golden('GET /api/month-end/{month}/listings/new-members');
+
+/**
+ * A route held by a permission, as the server's security answers it (signin-server-notes.md §4) -- before anything
+ * else is read: nobody signed in is `401 SIGN_IN_REQUIRED`, a signed-in user without the permission `403
+ * PERMISSION_REQUIRED`. `null` for a caller who may. The caller is the surface's planted session (`surfaceSession.mjs`).
+ */
+const heldBy = (req, path, permission) => {
+  const user = userForToken(req.headers.authorization);
+  if (!user) {
+    return { status: 401, body: { status: 401, error: 'Unauthorized', message: 'Please sign in to use this part of SASBO Online.', path, code: 'SIGN_IN_REQUIRED' } };
+  }
+  if (!user.permissions.includes(permission)) {
+    return { status: 403, body: { status: 403, error: 'Forbidden', message: 'You do not have permission to do this. Ask a user administrator if your work needs it.', path, code: 'PERMISSION_REQUIRED', details: { permission }, permission } };
+  }
+  return null;
+};
 const AREAS = new Set(golden('GET /api/reference/areas').rows.map((row) => row.letter));
 const REGIONS = new Set(golden('GET /api/reference/regions').rows.map((row) => row.code));
 
@@ -558,13 +576,18 @@ const monthEndShape = (req, path, query) => {
     packReads = 0;
     return { status: 202, body: packOf('PREPARING') };
   }
+  // The take (MONTH_END_TAKE) answers the month as it now stands, as the server's MonthEndMonthDto; nothing is stored.
   if (req.method === 'POST' && m && m[2] === 'take') {
-    return monthRefused(m[1]) ?? envelope('IDENTITY_REQUIRED', null, { month: m[1] });
+    const held = heldBy(req, path, 'MONTH_END_TAKE') ?? monthRefused(m[1]);
+    if (held) return held;
+    const taken = MONTHS.taken.find((record) => record.month === m[1]);
+    return { status: 200, body: taken ?? { month: m[1], state: 'TAKEN', takenAt: '2026-10-07T08:00:00Z', takenBy: 'Surface Tester (surface.tester)' } };
   }
+  // A listing (MEMBERS_VIEW) answers the golden listing's shape for the month and listing asked -- no member in it.
   m = /^\/api\/month-end\/([^/]+)\/listings\/([^/]+)$/.exec(path);
   if (req.method === 'GET' && m) {
-    return envelope('IDENTITY_REQUIRED', 'A listing names members, so it waits until administrators sign in to this '
-      + 'system. The statistics beside it are counts, and are open.', { listing: m[2] });
+    return heldBy(req, path, 'MEMBERS_VIEW') ?? monthRefused(m[1])
+      ?? { status: 200, body: { ...listingExample, month: m[1], listing: m[2] } };
   }
   m = /^\/api\/month-end\/packs\/(\d+)(?:\/([^/]+))?$/.exec(path);
   if (req.method === 'GET' && m) {
