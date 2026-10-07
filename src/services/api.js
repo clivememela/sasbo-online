@@ -22,20 +22,15 @@ export function apiUrl(path) {
 }
 
 /**
- * Is this request one to THIS application's API: the configured API origin (or this page's own, when none is
- * configured and Vite proxies `/api`) and a path under `/api/`? Decided on the resolved URL, the way the browser will
- * send it -- so a path that only looks local, or a lookalike host, is not mistaken for ours.
+ * Is this request one to THIS application's API? Exactly what `apiUrl` builds: the configured API origin followed by
+ * `/api/` -- or, with no origin configured (Vite proxies `/api`), a path starting `/api/`. The origin ends where `/api/`
+ * begins, so a lookalike host (`api.example.evil`) or another origin's `/api/` cannot pass, and a protocol-relative
+ * `//host/api/` does not start with `/api/`.
  */
-export function isApiRequest(input) {
-  const here = globalThis.location?.href;
-  try {
-    const url = new URL(typeof input === 'string' ? input : input?.url ?? String(input), here);
-    const ours = API_BASE_URL || (here ? new URL(here).origin : '');
-    return Boolean(ours) && url.origin === ours && url.pathname.startsWith('/api/');
-  } catch {
-    return false;
-  }
-}
+const API_PREFIX = `${API_BASE_URL}/api/`;
+
+export const isApiRequest = (input) =>
+  (typeof input === 'string' ? input : input?.url ?? String(input)).startsWith(API_PREFIX);
 
 /** The two refusals that mean "this session is over" (signin.md). `SIGN_IN_FAILED` is a wrong password, not an ending. */
 const SESSION_OVER = new Set(SESSION_ENDING);

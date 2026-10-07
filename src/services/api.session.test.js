@@ -59,7 +59,7 @@ describe('the session\'s token on API requests', () => {
     expect(seen).toEqual(['Bearer chosen-by-the-caller'])
   })
 
-  it('decides "the API" on the resolved address, so a lookalike host is not mistaken for it', () => {
+  it('decides "the API" by the exact prefix apiUrl builds, so a lookalike host is not mistaken for it', () => {
     expect(isApiRequest(`${API}/api/members`)).toBe(true)
     expect(isApiRequest(new Request(`${API}/api/auth/me`))).toBe(true)
     expect(isApiRequest('http://api.test.invalid.evil.example/api/members')).toBe(false)
