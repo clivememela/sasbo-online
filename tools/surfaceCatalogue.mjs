@@ -4,6 +4,15 @@
  * Its own module so the suite can hold the catalogue against `src/` on every run
  * (`src/test/stateGatedSurfaces.structural.test.js`) without launching a browser; the browser run is `surfaces.mjs`.
  * A dialog added tomorrow is a red suite tomorrow, not a surface nobody opened.
+ *
+ * 🔑 A SURFACE BEHIND A PERMISSION IS REACHED SIGNED IN: `session: ['USERS_ADMIN', …]` (the names of
+ * `src/auth/permissions.js`). `surfaces.mjs` plants `sessionStorage['sasbo.session']` before the page's scripts run --
+ * the contract's `{token, expiresAt, user}`, the user holding exactly those permissions -- and `serve-dist.mjs` answers
+ * `GET /api/auth/me` with that same user and `GET /api/auth/mode` with `open` (`surfaceSession.mjs` is the one
+ * definition both read). `session: []` is a signed-in user with no permission, for a refusal worth measuring; a surface
+ * with no `session` is measured signed out, and any session a previous surface planted is removed first.
+ * The stub answers sign-in's other routes too, but nothing else of an October stream: a screen's own reads still need
+ * their stubs in `serve-dist.mjs`, or its surface measures an empty page.
  */
 import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -168,6 +177,7 @@ const IN_DIALOG = '[role="dialog"] button';
 /**
  * `covers` names the source sites a surface drives, as `<path under src>#<kind>@<which>`. The guard counts distinct
  * `@which` per `path#kind` against the sites in the source. `widths` narrows a surface that only exists at one.
+ * `session` signs the surface in with those permissions (this file's head).
  */
 export const SURFACES = [
   // ── the register (A27's class) ────────────────────────────────────────────────────────────────
@@ -554,6 +564,40 @@ export const SURFACES = [
     ready: TEXT('That month was not taken'), present: { REFUSED: STATE('error') } },
   { name: 'month-end-statistic-unknown', route: '/admin/monthly-menu/no-such-statistic', ready: HEADING,
     present: { NOT_FOUND: TEXT('No such statistic') } },
+
+  // ── sign-in's Maintenance screens (contracts/signin.md), signed in through `session` ──────────
+  // `serve-dist.mjs` answers invented users over the server's seeded positions, their roles, the permission catalogue
+  // and several pages of the record (`adminAnswer`). A new user's temporary password is one invented string.
+  { name: 'users', route: '/admin/maintenance/users', session: ['USERS_ADMIN'], ready: ROWS,
+    present: { ROWS, CREATE: TEXT('Create a user'), SCOPE: TEXT('Areas: A, B') } },
+  { name: 'users-refused', route: '/admin/maintenance/users', session: [], ready: HEADING,
+    present: { REFUSED: TEXT('You need permission to manage users') } },
+  { name: 'users-create', route: '/admin/maintenance/users', session: ['USERS_ADMIN'], ready: ROWS,
+    steps: [step('open Create a user', clickByText('main button', '/Create a user/'), dialogNamed('/^Create a user$/')),
+      step('choose an area scope', `(() => { const r = [...document.querySelectorAll('[role="dialog"] input[type="radio"]')].find((n) => n.value === 'AREA'); if (!r) return false; r.click(); return true; })()`,
+        TEXT('Area A'))],
+    present: { DIALOG: dialogNamed('/^Create a user$/'), AREAS: TEXT('Area A') }, covers: ['pages/users/UserDialog.jsx#Modal@user'] },
+  { name: 'users-temporary-password', route: '/admin/maintenance/users', session: ['USERS_ADMIN'], ready: ROWS,
+    steps: [step('open Create a user', clickByText('main button', '/Create a user/'), dialogNamed('/^Create a user$/')),
+      step('type a name', typeIntoLabelled('[role="dialog"]', '/^Name/', 'Mo Synthetic')),
+      step('type a username', typeIntoLabelled('[role="dialog"]', '/^Username/', 'mo.synthetic')),
+      step('choose a position', chooseOption('[role="dialog"]', '/^Position/', 'HEAD_OFFICE_ADMINISTRATOR'), `!!document.querySelector('[role="dialog"] select')`),
+      step('create the user', clickByText('[role="dialog"] button', '/^Create user$/'), TEXT('It is shown only this once'))],
+    present: { ONCE: TEXT('It is shown only this once'), PASSWORD: TEXT('surface-temporary-password') } },
+  { name: 'positions-change', route: '/admin/maintenance/positions', session: ['USERS_ADMIN'], ready: ROWS,
+    steps: [step('open a position', clickNth('main [data-row-action]', 0), ANY_DIALOG)],
+    present: { DIALOG: dialogNamed('/^Change System Administrator$/') }, covers: ['pages/users/Positions.jsx#Modal@position'] },
+  // The SECOND role: the first is the System Administrator's, `fixed`, whose dialog says so instead of a checklist.
+  { name: 'roles-change', route: '/admin/maintenance/roles', session: ['USERS_ADMIN'], ready: ROWS,
+    steps: [step('open a role', clickNth('main [data-row-action]', 1), ANY_DIALOG)],
+    present: { DIALOG: dialogNamed('/^Change Head Office Administrator$/'), CATALOGUE: TEXT('Read the record of who did what') },
+    covers: ['pages/users/Roles.jsx#Modal@role'] },
+  { name: 'audit-from', route: '/admin/maintenance/audit', session: ['AUDIT_VIEW'], ready: ROWS,
+    steps: [step('open From', mouseDownOn('main input[aria-haspopup="dialog"]', '/^From/'), DATE_PICKER_OPEN)],
+    present: { DATE_PICKER_OPEN }, covers: ['pages/users/Audit.jsx#DateField@From'] },
+  { name: 'audit-to', route: '/admin/maintenance/audit', session: ['AUDIT_VIEW'], ready: ROWS,
+    steps: [step('open To', mouseDownOn('main input[aria-haspopup="dialog"]', '/^To/'), DATE_PICKER_OPEN)],
+    present: { DATE_PICKER_OPEN }, covers: ['pages/users/Audit.jsx#DateField@To'] },
 
   // ── the shell ─────────────────────────────────────────────────────────────────────────────────
   { name: 'shell-drawer', route: '/home', widths: [390], ready: HEADING,

@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom'
 import './assets/styles/index.css'
 import App from './App.jsx'
 import { ThemeProvider } from './context/ThemeContext'
+import { AuthProvider } from './auth/AuthContext'
+import { installSessionFetch } from './services/api'
 
 /**
  * R-ROB-J. A GLOBAL `error` listener, narrowed to the one message it was added for.
@@ -31,6 +33,9 @@ window.addEventListener('error', (event) => {
   event.preventDefault()
 })
 
+// Before the first render, so not one request -- the sign-in mode's included -- leaves without the session's token.
+installSessionFetch()
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
@@ -40,7 +45,9 @@ createRoot(document.getElementById('root')).render(
             with no address field anywhere on them. It is on the three routes that use it
             now: see `components/form/MapsScope.jsx` and its three usages in `App.jsx`
             (R-SEC-D / R-PERF-G). */}
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
   </StrictMode>,

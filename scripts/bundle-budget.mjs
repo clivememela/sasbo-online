@@ -92,6 +92,19 @@ const CEILINGS = {
   // 03.1, which cut it from 506 KiB to 287 by splitting every route. The ceiling is
   // deliberately BELOW the pre-split figure -- its job is to notice a route quietly
   // becoming a static import again, which would show up here and nowhere else.
+  //
+  // 2026-10-07, MEASURED, the ceiling unmoved: sign-in (contracts/signin.md) puts its shell in the entry, as OB17a allows
+  // and no more -- a first load that cannot know who is signed in is not leaner, only broken. Run 37665352812 at 644e967:
+  // entry js 335.45 KiB, 4.98 over main's 330.47 at cbd11dc (run 37017335321); vite's index 338.40 -> 343.50 kB, +5,100 B.
+  // Module by module, each esbuild-minified alone at both SHAs (Rollup's hoisting makes the sum differ by 10 B):
+  //   session.js +1,407 (the tab's session, read by api.js and the provider) · AuthContext +1,259 (who is signed in; its
+  //   server talk is the lazy authServer) · api.js +914, and its 319 on main came out of a lazy chunk of its own (the one
+  //   fetch wrapper that puts the token on every API request) · App +493 (the lazy routes of /change-password and the
+  //   four Maintenance screens) · AppLayout +347 (required mode's way to /login; a temporary password's to
+  //   /change-password) · lazyAccount +281 (ONE import() for the header's account, the rail's foot and the session
+  //   notice) · navigation +262 (the entries' permission names, as literals) · Main +160 · main.jsx +123 (the provider,
+  //   the wrapper) · useAuth +118 · next.js +115 · Header -271 and Sidebar -437 (the inert "Administrator" chip and the
+  //   dead "Log out" link, gone for the lazy account). Every screen stays lazy.
   entryJs: 350 * KB,
   // 600 -> 640 on 2026-09-09: see the re-measured table above. 6% over the 602.24
   // actual, for the reason the header gives -- a limit equal to the measurement
@@ -310,7 +323,25 @@ const CEILINGS = {
   // runner: clivememela/sasbo-online run 36988020502 at b0f9a4d, javascript 790.75 KiB, 0.10 over 790.65 at 0eb0d56
   // (run 36903903677). +100 B by vite's sizes, in one chunk there already: HomeFigures 5.90 -> 6.00 kB (the sentence,
   // and the choice between it and "today"). Nothing from src/test/ is imported.
-  js: 790.76 * KB,
+  //
+  // 790.76 -> 843.77 on 2026-10-07, MEASURED, under OB17 (the October build's rule for every client stream: javascript,
+  // css and all assets rise to the figures measured on the stream's staging run, and no further; the entry is OB17a's,
+  // above): sign-in -- the session and its token on every API request, /login and /change-password made real, and
+  // Maintenance's Users, Positions, Roles and Who did what (contracts/signin.md). Measured on a team runner:
+  // clivememela/sasbo-online run 37665352812 at 644e967, javascript 843.76 KiB, 53.88 over 789.88 at cbd11dc (run
+  // 37017335321). +55,190 B by vite's sizes, chunk by chunk:
+  //   the new screens, every one lazy: Users 12.33 kB · usersRules 6.72 (what the four Maintenance screens share)
+  //   · Positions 5.26 · Roles 4.93 · ChangePassword 4.71 · Audit 4.17 · signInRules 3.94 (what /login and
+  //   /change-password share) · AccountControls 3.66 (the header's account, the rail's foot, the session notice)
+  //   · adminLists 1.42 · authServer 0.56 · authVocabulary 0.50 · authService 0.34 · their icons key-round 0.35, eye 0.25,
+  //   log-in 0.23, plus 0.15.
+  //   index +5.10 (the entry -- OB17a's paragraph above) · Maintenance +1.75 (the four entries) · Auth -0.65 (/login
+  //   made real; its fake Sign Up gone).
+  //   Shared chunks Rollup split out once a second screen used them: CheckboxGroup 0 -> 1.23 (Roles' permissions) as
+  //   Members -1.14 · LoadFailureFrame 0 -> 0.35 · useDebounce 0 -> 0.20 · options -0.34 · api 0.29 -> 0 (into the
+  //   entry) · thirty-one chunks within 0.15 kB each (their import stubs, re-hashed).
+  // Nothing from src/test/ is imported by the product.
+  js: 843.77 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
@@ -320,7 +351,11 @@ const CEILINGS = {
   // 80 -> 80.64 on 2026-10-01, MEASURED (MO25): 80.63 KiB on the same run, +720 B over 79.92 -- MO24's card rows' `end`
   // rule, the first screen's phone block and five utilities the build had not shipped (+590 B), and A.1's opened row's
   // rule (+130 B). The hundredth over the printed figure covers its rounding, as the javascript's does.
-  css: 80.64 * KB,
+  //
+  // 80.64 -> 81.14 on 2026-10-07, MEASURED (OB17): 81.13 KiB on run 37665352812 at 644e967, +0.50 over 80.63 at cbd11dc
+  // (vite's index.css 82.56 -> 83.08 kB, +520 B) -- the utilities sign-in's screens use that no screen had before (the
+  // account chip, the password field, the users' dialogs and lists).
+  css: 81.14 * KB,
   // 900 -> 925.12 on 2026-09-30, MEASURED, on the owner's word (MO14), the first time `all assets` was over: the same
   // pair as the javascript's, 866.48 KiB (run 36773278932) -> 925.11 KiB (run 36773289808). The javascript's +59,631 B
   // and the stylesheet's +409 B (296 of them the History tab's: its column widths, gutter bleed, alignment and one line
@@ -337,7 +372,10 @@ const CEILINGS = {
   //
   // 934.77 -> 934.87 on 2026-10-02, MEASURED (MO33): 934.86 KiB on run 36988020502 -- the javascript's +0.10 above,
   // the stylesheet unmoved at 80.63.
-  total: 934.87 * KB,
+  //
+  // 934.87 -> 988.39 on 2026-10-07, MEASURED (OB17): 988.38 KiB on run 37665352812 at 644e967, 54.39 over 933.99 at
+  // cbd11dc -- the javascript's +53.88 and the stylesheet's +0.50 above, index.html unmoved at 3.19 kB.
+  total: 988.39 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to

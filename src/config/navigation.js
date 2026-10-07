@@ -7,7 +7,6 @@ import {
   Users,
   ChartNoAxesCombined,
   Archive,
-  LogOutIcon,
   NotebookPen,
   Form,
   MapPinnedIcon,
@@ -16,6 +15,26 @@ import {
   LucidePiggyBank, LucidePresentation, LucideCalendarRange,
   LucideConstruction, LucideCopyCheck, UserRoundPen
 } from "lucide-react";
+
+/**
+ * Sign-in's four Maintenance entries (the 5 Oct Show & Tell: "an administrator creating users with a position and an
+ * area", roles kept as data, "a record of who did what"). Written once, for the rail here and for `Maintenance.jsx`'s
+ * cards, and `Maintenance.test.jsx` holds the two together. Each names the `permission` its screen needs -- the key the
+ * menu rule (`navAccess.js`, OB18) reads to mark an entry for a person who may not use it; the screen itself says what
+ * is needed either way.
+ *
+ * 🔑 NO ICONS, NO DESCRIPTIONS AND NO IMPORT OF `permissions.js`, BECAUSE THIS FILE IS IN THE FIRST LOAD (OB17a). The
+ * rail shows neither an icon nor a description at its third level; `Maintenance.jsx` (lazy) gives its cards both. The
+ * names are `PERMISSIONS`' own, held to it by `Maintenance.test.jsx` -- importing the catalogue here put all of it,
+ * labels and all, into every first paint.
+ */
+export const SIGN_IN_ENTRIES = [
+  { title: 'Users', href: '/admin/maintenance/users', permission: 'USERS_ADMIN' },
+  { title: 'Positions', href: '/admin/maintenance/positions', permission: 'USERS_ADMIN' },
+  { title: 'Roles', href: '/admin/maintenance/roles', permission: 'USERS_ADMIN' },
+  // Short enough for the rail's third level, which truncates; SASBO's own words ("a record of who did what", 5 Oct).
+  { title: 'Who did what', href: '/admin/maintenance/audit', permission: 'AUDIT_VIEW' },
+];
 
 export const navItems = [
   {
@@ -165,6 +184,7 @@ export const navItems = [
             href: '/admin/maintenance/workplaces',
             desc: 'Find a workplace by its name or R/A number',
           },
+          ...SIGN_IN_ENTRIES,
         ],
       },
       // { title: "BankBranch", icon: Landmark, color: 'text-red-600 dark:text-red-400'},
@@ -335,8 +355,4 @@ export const navItems = [
       { title: "Location Listing", icon: MapPinnedIcon, href: "/reports/locations" }
     ]
   }
-];
-
-export const authItems = [
-  { title: "Log out", icon: LogOutIcon, href: "/login" },
 ];
