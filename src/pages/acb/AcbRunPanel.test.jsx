@@ -1,4 +1,4 @@
-// @vitest-environment jsdom -- one A.C.B. run: its facts, its sheets, cancelling it, and the partial state
+// @vitest-environment jsdom -- one debit order run: its facts, its sheets, cancelling it, and the partial state
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
@@ -8,6 +8,9 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { setupUser } from '../../test/user'
 import { deferred } from '../../test/deferred'
+import { TestAuthProvider } from '../../test/authTestUtils'
+import { PERMISSIONS } from '../../auth/permissions'
+import { dodHandlers } from '../../test/msw/dodApi'
 
 const pageOf = (content) => ({ content, page: 0, size: 50, totalElements: content.length, totalPages: content.length ? 1 : 0 })
 
@@ -34,6 +37,8 @@ const EXCLUDED = { memberId: 12, membershipNumber: 'SYN-0012', surname: 'Synthet
 
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
+  // The contract's answers underneath -- a sent run reads its debit days and reports -- and this file's run on top.
+  server.use(...dodHandlers())
   server.use(
     http.get('*/api/acb/runs/41', () => HttpResponse.json(RUN)),
     http.get('*/api/acb/runs/41/lines', () => HttpResponse.json(pageOf([LINE]))),
@@ -41,8 +46,13 @@ beforeEach(() => {
   )
 })
 
-const renderPanel = (onChanged = vi.fn()) => {
-  renderWithProviders(<AcbRunPanel runId={41} onChanged={onChanged} onClose={() => {}} />)
+/** Whoever prepares runs, unless a test says otherwise: the run's steps and its cancel are theirs (dod-api §2). */
+const renderPanel = (onChanged = vi.fn(), permissions = [PERMISSIONS.DOD_PREPARE]) => {
+  renderWithProviders(
+    <TestAuthProvider permissions={permissions}>
+      <AcbRunPanel runId={41} onChanged={onChanged} onClose={() => {}} />
+    </TestAuthProvider>,
+  )
   return onChanged
 }
 
@@ -110,11 +120,17 @@ describe('the run', () => {
     expect(screen.queryByText(/A public holiday was added/)).not.toBeInTheDocument()
   })
 
-  it('approve is shown, refused, and says why -- the API does not yet know who is asking', async () => {
+  it('approve is offered to whoever prepares runs, and says there is no second approval (Stephne, DOD-10)', async () => {
     renderPanel()
-    const approve = await screen.findByRole('button', { name: 'Approve' })
-    expect(approve).toBeDisabled()
-    expect(approve).toHaveAccessibleDescription(/open when administrators sign in/)
+    expect(await screen.findByRole('button', { name: 'Approve' })).toBeEnabled()
+    expect(screen.getByText(/There is no second approval: whoever prepared the run may approve it/)).toBeInTheDocument()
+  })
+
+  it('the must-pass twin: someone who only reads runs is offered no approve and no cancel', async () => {
+    renderPanel(vi.fn(), [PERMISSIONS.DOD_SETTINGS])
+    expect(await screen.findByText('An administrator approves the run. There is no second approval.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel this run' })).not.toBeInTheDocument()
   })
 
   it('a run that cannot be loaded says so, and its retry goes back to loading', async () => {
