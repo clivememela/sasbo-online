@@ -78,14 +78,15 @@ export const locationService = {
   },
 
   /**
-   * The members at one branch, a page at a time -- `GET /api/workplaces/{id}/members?page=&size=`, answered
-   * `{ workplaceId, members, page, size, totalElements, totalPages }`. Needs `MEMBERS_VIEW`, and lists only a branch in
-   * the caller's region or area (`WORKPLACE_OUT_OF_SCOPE`). The numbers come masked: the employee number as its last
-   * four digits, the ID, e-mail and cell as whether there is one.
+   * The members at every branch of a batch print, in ONE request (October build review: one read for the batch, not
+   * one a branch) -- `GET /api/workplaces/members?ids=` with the workplaces' ids the listings answered, fifty at most --
+   * answered `{ branches: [{ workplaceId, outOfScope, members, totalElements }], unknown, perBranch }`. Needs
+   * `MEMBERS_VIEW`; a branch outside the caller's region or area comes back `outOfScope` with no member. The numbers
+   * come masked: the employee number as its last four digits, the ID, e-mail and cell as whether there is one.
    */
-  getBranchMembers: (workplaceId, page = 0, size = 200) => {
-    const query = new URLSearchParams({ page: String(page), size: String(size) });
-    return requestJson((signal) => fetch(apiUrl(`/api/workplaces/${encodeURIComponent(workplaceId)}/members?${query}`), {
+  getMembersOf: (workplaceIds) => {
+    const query = new URLSearchParams({ ids: workplaceIds.join(',') });
+    return requestJson((signal) => fetch(apiUrl(`/api/workplaces/members?${query}`), {
       credentials: 'include',
       signal,
     }));

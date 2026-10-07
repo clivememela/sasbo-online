@@ -18,25 +18,23 @@ const SEPARATORS = /[\s,;]+/;
 const RA_NUMBER = /^\d{1,9}$/;
 
 export function parseRaNumbers(text) {
-  const numbers = [];
-  const repeated = [];
-  const notNumbers = [];
-  const seen = new Set();
+  // Sets, kept in the order first typed: a pasted column of thousands is read in one pass, never searched per token.
+  const numbers = new Set();
+  const repeated = new Set();
+  const notNumbers = new Set();
   for (const token of String(text ?? '').split(SEPARATORS)) {
     if (!token) continue;
     if (!RA_NUMBER.test(token) || Number(token) < 1) {
-      if (!notNumbers.includes(token)) notNumbers.push(token);
+      notNumbers.add(token);
       continue;
     }
     const number = String(Number(token));
-    if (seen.has(number)) {
-      if (!repeated.includes(number)) repeated.push(number);
-      continue;
-    }
-    seen.add(number);
-    numbers.push(number);
+    if (numbers.has(number)) repeated.add(number);
+    else numbers.add(number);
   }
-  return { numbers, repeated, notNumbers, tooMany: numbers.length > MAX_RA_NUMBERS };
+  return {
+    numbers: [...numbers], repeated: [...repeated], notNumbers: [...notNumbers], tooMany: numbers.size > MAX_RA_NUMBERS,
+  };
 }
 
 /**

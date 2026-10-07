@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Printer, Search } from 'lucide-react';
 
@@ -6,10 +6,11 @@ import { Button, TextInput } from '../../components/form';
 import DataState from '../../components/common/DataState.jsx';
 import PageTitle from '../../components/common/PageTitle';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
+import RequirePermission from '../../auth/RequirePermission.jsx';
+import { PERMISSIONS } from '../../auth/permissions';
 import { useAuth } from '../../auth/useAuth';
 import { LIST_EMPTY_REASON } from '../../config/monthEnd.js';
 import { formatDateLong, formatInt, today } from '../../lib/format.js';
-import { createLimiter } from '../../lib/limiter.js';
 import { MAX_RA_NUMBERS, groupByBank, parseRaNumbers } from '../../lib/raNumbers.js';
 import reportError from '../../lib/reportError.js';
 import { locationService } from '../../services/locationService.js';
@@ -29,8 +30,13 @@ import WorkplaceListing from './WorkplaceListing.jsx';
  *
  * One R/A number is a batch of one: the single listing an organiser printed before is this screen with one number.
  *
- * The members under each branch are read branch by branch, a few at a time, and need `MEMBERS_VIEW`; Print waits until
- * every branch has its members or the sentence that says why not, so a sheet never prints half-loaded.
+ * The members under the branches are read in ONE request for the whole batch (October build review: not one a branch,
+ * fifty requests at once against a server sized for a handful) and need `MEMBERS_VIEW`; an answer that arrives after its
+ * listings have gone -- the numbers shown again, the page left -- is dropped. Print waits until every branch has its
+ * members or the sentence that says why not, so a sheet never prints half-loaded.
+ *
+ * 🔒 The listings are held by `REPORTS_PRINT` ("organisers' reports, batch print, location listings"): a signed-in user
+ * without it is told what they need; nobody signed in keeps the page while sign-in is open (contracts/signin.md).
  */
 
 /** What the page says of the numbers as they are typed: how many will print, what repeats, what is not a number. */
@@ -62,14 +68,17 @@ function areaOf(user, listings) {
 const NOT_AVAILABLE = Object.assign(new Error('The listings are not available from this server yet.'),
   { retryable: false });
 
+const MEMBERS_NOT_AVAILABLE = Object.assign(new Error('The members could not be read from this server.'),
+  { retryable: false });
+
 export function BatchPrint() {
-  const { user } = useAuth();
+  const { user, status: authStatus, can } = useAuth();
   const [text, setText] = useState('');
   const [read, setRead] = useState({ state: 'idle' });
-  const [settled, setSettled] = useState({});
   const [attempt, setAttempt] = useState(0);
-  // One queue for the page: every branch's members wait in it, four at a time.
-  const limiter = useMemo(() => createLimiter(4), []);
+  const [membersRead, setMembersRead] = useState({});
+  const [membersAttempt, setMembersAttempt] = useState(0);
+  const printHeld = authStatus === 'signed-in' && !can(PERMISSIONS.REPORTS_PRINT);
 
   const parsed = useMemo(() => parseRaNumbers(text), [text]);
   const tooMany = parsed.tooMany
@@ -78,7 +87,6 @@ export function BatchPrint() {
 
   const show = async (numbers) => {
     setRead({ state: 'loading' });
-    setSettled({});
     try {
       const body = await locationService.getListings(numbers);
       if (!Array.isArray(body?.listings)) throw NOT_AVAILABLE;
@@ -96,15 +104,58 @@ export function BatchPrint() {
     show(parsed.numbers);
   };
 
-  const onSettled = useCallback((id) => {
-    setSettled((prev) => (prev[id] ? prev : { ...prev, [id]: true }));
-  }, []);
-
   const body = read.state === 'ready' ? read.body : null;
   const groups = useMemo(() => groupByBank(body?.listings), [body]);
   const listings = body?.listings ?? [];
-  const ready = listings.length > 0 && listings.every((listing) => settled[listing.workplace.id]);
+  const ids = useMemo(() => (body?.listings ?? []).map((listing) => listing.workplace.id), [body]);
+
+  // The members of every branch shown, in one read -- asked only of a user who may see them, and answered to the
+  // listings that asked: an answer for listings since replaced is dropped (`current`), never shown under others.
+  const membersQuestion = can(PERMISSIONS.MEMBERS_VIEW) && ids.length ? `${attempt}|${ids.join(',')}|${membersAttempt}` : null;
+  useEffect(() => {
+    if (!membersQuestion) return undefined;
+    let current = true;
+    (async () => {
+      try {
+        const answer = await locationService.getMembersOf(ids);
+        if (!Array.isArray(answer?.branches)) throw MEMBERS_NOT_AVAILABLE;
+        if (current) {
+          setMembersRead({ asked: membersQuestion, byId: new Map(answer.branches.map((branch) => [branch.workplaceId, branch])) });
+        }
+      } catch (error) {
+        if (!current) return;
+        reportError('BatchPrint.members', error);
+        setMembersRead({ asked: membersQuestion, failure: error });
+      }
+    })();
+    return () => {
+      current = false;
+    };
+  }, [membersQuestion, ids]);
+
+  const membersPending = Boolean(membersQuestion) && membersRead.asked !== membersQuestion;
+  /** The batch's members as one branch sees them -- see `BranchMembers`; nothing where they are not to be read. */
+  const membersOf = (id) => {
+    if (!membersQuestion) return undefined;
+    if (membersPending) return { state: 'loading' };
+    if (membersRead.failure) {
+      return { state: 'error', error: membersRead.failure, onRetry: () => setMembersAttempt((n) => n + 1) };
+    }
+    return { state: 'ready', branch: membersRead.byId.get(id) };
+  };
+  const ready = listings.length > 0 && !membersPending;
   const printedOn = formatDateLong(today());
+
+  if (printHeld) {
+    return (
+      <Page>
+        <PageTitle title="Batch print" />
+        <div className="mt-5 max-w-3xl">
+          <RequirePermission permission={PERMISSIONS.REPORTS_PRINT} />
+        </div>
+      </Page>
+    );
+  }
 
   return (
     <Page>
@@ -203,7 +254,7 @@ export function BatchPrint() {
                   </p>
                 </div>
                 {group.listings.map((listing) => (
-                  <WorkplaceListing key={listing.workplace.id} listing={listing} limiter={limiter} onSettled={onSettled} />
+                  <WorkplaceListing key={listing.workplace.id} listing={listing} members={membersOf(listing.workplace.id)} />
                 ))}
               </section>
             ))}

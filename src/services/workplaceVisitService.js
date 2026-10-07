@@ -92,7 +92,20 @@ export const submitDraft = (id, version) =>
     signal,
   }));
 
+/**
+ * Discards a draft -- `DELETE /api/workplaces/visit-drafts/{id}?version=` -- from the version the person saw: 204, no
+ * body. A submitted visit is never discarded (`VISIT_ALREADY_SUBMITTED`); one saved since is `VISIT_DRAFT_STALE`.
+ */
+export const discardDraft = (id, version) => {
+  const query = new URLSearchParams({ version: String(version) });
+  return requestJsonWrite((signal) => fetch(apiUrl(`/api/workplaces/visit-drafts/${encodeURIComponent(id)}?${query}`), {
+    method: 'DELETE',
+    credentials: 'include',
+    signal,
+  }), { parseBody: false });
+};
+
 /** Every function above, gathered, for everything that iterates the service layer -- these very functions, never copies. */
 export const workplaceVisitService = {
-  getVisits, recordVisit, getMyDrafts, getDraft, createDraft, updateDraft, submitDraft,
+  getVisits, recordVisit, getMyDrafts, getDraft, createDraft, updateDraft, submitDraft, discardDraft,
 };

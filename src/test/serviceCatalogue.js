@@ -111,7 +111,8 @@ const ARGS = {
   'workplaceVisitService.updateDraft': ['7', { raNumber: 900001, visitedOn: '2026-09-10', version: 0 }],
   'workplaceVisitService.submitDraft': ['7', 0],
   'locationService.getListings': [['900001', '900002']],
-  'locationService.getBranchMembers': ['7', 0, 200],
+  'locationService.getMembersOf': [['7', '8']],
+  'workplaceVisitService.discardDraft': ['7', 0],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS

@@ -1,14 +1,12 @@
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useId } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import DataState from '../../components/common/DataState.jsx';
 import TableScroller from '../../components/table/TableScroller.jsx';
 import { useAuth } from '../../auth/useAuth';
 import { PERMISSIONS } from '../../auth/permissions';
-import { WORKPLACE_OUT_OF_SCOPE, committeeLine } from '../../config/monthEnd.js';
+import { committeeLine } from '../../config/monthEnd.js';
 import { EMPTY, MONTHS, formatInt, parseDate } from '../../lib/format.js';
-import reportError from '../../lib/reportError.js';
-import { locationService } from '../../services/locationService.js';
 
 /**
  * ONE BRANCH'S LOCATION LISTING, from SASBO's workplaces (October build, 5 Oct Show & Tell): the branch, the members
@@ -16,13 +14,10 @@ import { locationService } from '../../services/locationService.js';
  * layout for a workplace found by its R/A number, which knows no IBT number, cost code, telephone or address -- the
  * workplaces carry none -- and does know its area, region and committee.
  *
- * 🔒 THE MEMBERS ARE A READ OF THEIR OWN, AND NEED `MEMBERS_VIEW` ("listings that show members", held until sign-in):
- * a user who may not see them is told so in one sentence, under the branch, and the rest of the listing still prints.
+ * 🔒 THE MEMBERS NEED `MEMBERS_VIEW` ("listings that show members", held until sign-in), and are read for the whole batch
+ * at once by the page (`BatchPrint`): a user who may not see them is told so in one sentence, under the branch, and the
+ * rest of the listing still prints.
  */
-
-/** The most of a branch's members one listing prints: five of the server's largest pages. */
-export const MEMBERS_PAGE_SIZE = 200;
-export const MEMBERS_MAX_PAGES = 5;
 
 /** `2024-03-01` as a listing prints it: `Mar 2024`. */
 const monthOf = (iso) => {
@@ -38,54 +33,19 @@ const flag = (on) => (on ? 'Y' : '');
 /** A subscription, two decimals; nothing where none is on record. */
 const amountOf = (value) => (value == null || value === '' ? '' : Number(value).toFixed(2));
 
-const NOT_A_PAGE = Object.assign(new Error('The members could not be read from this server.'), { retryable: false });
+const NOT_ANSWERED = Object.assign(new Error('The members at this branch could not be read from this server.'),
+  { retryable: false });
 
 /**
- * The members at one branch, every page of them up to the ceiling, or the sentence that says why they are not shown.
- * `limiter` queues the reads of a batch print so twenty branches never ask at once; `onSettled(id, total)` tells the
- * page this branch is ready to print -- with the members' total, or `null` where none could be listed.
+ * The members at one branch, from the batch print's ONE read of every branch's members (October build review: one
+ * read for the batch, not one a branch), or the sentence that says why they are not shown. `members` is that read as
+ * this branch sees it: `{ state: 'loading' }`; `{ state: 'ready', branch }` -- the server's `{ workplaceId, outOfScope,
+ * members, totalElements }`, or none where the answer left the branch out; or `{ state: 'error', error, onRetry }`.
  */
-export function BranchMembers({ workplace, limiter, onSettled }) {
+export function BranchMembers({ workplace, members }) {
   const { status: authStatus, can } = useAuth();
   const location = useLocation();
   const allowed = can(PERMISSIONS.MEMBERS_VIEW);
-  const [attempt, setAttempt] = useState(0);
-  const [read, setRead] = useState({});
-  const question = `${workplace.id}|${attempt}`;
-
-  useEffect(() => {
-    if (!allowed) {
-      onSettled?.(workplace.id, null);
-      return undefined;
-    }
-    let current = true;
-    const asked = `${workplace.id}|${attempt}`;
-    const ask = limiter ?? ((task) => task());
-    (async () => {
-      try {
-        const members = [];
-        let total = 0;
-        for (let page = 0; page < MEMBERS_MAX_PAGES; page += 1) {
-          const body = await ask(() => locationService.getBranchMembers(workplace.id, page, MEMBERS_PAGE_SIZE));
-          if (!Array.isArray(body?.members)) throw NOT_A_PAGE;
-          members.push(...body.members);
-          total = Number.isFinite(body.totalElements) ? body.totalElements : members.length;
-          if (members.length >= total || body.members.length < MEMBERS_PAGE_SIZE) break;
-        }
-        if (!current) return;
-        setRead({ asked, members, total });
-        onSettled?.(workplace.id, total);
-      } catch (error) {
-        if (!current) return;
-        reportError('BranchMembers.read', error);
-        setRead({ asked, failure: error });
-        onSettled?.(workplace.id, null);
-      }
-    })();
-    return () => {
-      current = false;
-    };
-  }, [allowed, workplace.id, attempt, limiter, onSettled]);
 
   if (!allowed) {
     const next = encodeURIComponent(`${location.pathname}${location.search}`);
@@ -103,12 +63,13 @@ export function BranchMembers({ workplace, limiter, onSettled }) {
     );
   }
 
-  const pending = read.asked !== question;
-  if (pending) {
+  if (!members || members.state === 'loading') {
     return <DataState state="loading" layout="row" compact className="my-4 p-0" title="Loading the members at this branch…" />;
   }
-  if (read.failure) {
-    const outside = read.failure?.body?.code === WORKPLACE_OUT_OF_SCOPE;
+  const branch = members.state === 'ready' ? members.branch : null;
+  if (!branch || branch.outOfScope) {
+    const outside = Boolean(branch?.outOfScope);
+    const failure = members.error ?? NOT_ANSWERED;
     return (
       <DataState
         state="error"
@@ -116,13 +77,13 @@ export function BranchMembers({ workplace, limiter, onSettled }) {
         compact
         className="my-4 p-0"
         title={outside ? 'This branch is outside your region or area.' : 'The members at this branch could not be loaded.'}
-        message={outside ? null : read.failure?.message}
-        error={outside ? { retryable: false } : read.failure}
-        onRetry={outside ? undefined : () => setAttempt((n) => n + 1)}
+        message={outside ? null : failure.message}
+        error={outside ? { retryable: false } : failure}
+        onRetry={outside ? undefined : members.onRetry}
       />
     );
   }
-  if (read.members.length === 0) {
+  if (branch.members.length === 0) {
     return <p className="my-4 text-sm text-ink-muted">No members are on record at this branch.</p>;
   }
   return (
@@ -144,7 +105,7 @@ export function BranchMembers({ workplace, limiter, onSettled }) {
             </tr>
           </thead>
           <tbody>
-            {read.members.map((member) => (
+            {branch.members.map((member) => (
               <tr key={member.id} className="border-b border-line text-ink">
                 <td className="whitespace-nowrap px-2 py-1.5 tabular-nums">{member.membershipNumber}</td>
                 <td className="whitespace-nowrap px-2 py-1.5 font-semibold">{nameOf(member)}</td>
@@ -160,9 +121,9 @@ export function BranchMembers({ workplace, limiter, onSettled }) {
           </tbody>
         </table>
       </TableScroller>
-      {read.total > read.members.length && (
+      {branch.totalElements > branch.members.length && (
         <p className="text-sm text-ink-muted">
-          The first {formatInt(read.members.length)} of {formatInt(read.total)} members are listed.
+          The first {formatInt(branch.members.length)} of {formatInt(branch.totalElements)} members are listed.
         </p>
       )}
     </>
@@ -172,17 +133,15 @@ export function BranchMembers({ workplace, limiter, onSettled }) {
 /** A visit's month, as the branch list prints its ten: `Aug 2026`. */
 const lastVisitedOf = (visits) => (visits?.length ? visits.map((visit) => monthOf(visit.visitedOn)).join(', ') : EMPTY);
 
-export default function WorkplaceListing({ listing, limiter, onSettled }) {
+/**
+ * One branch's listing. `members` is the batch's one read of the members as this branch sees it ({@link BranchMembers});
+ * the Membership line is the branch's whole count from it, or nothing where the members are not shown.
+ */
+export default function WorkplaceListing({ listing, members }) {
   const headingId = useId();
-  const [membership, setMembership] = useState(null);
   const w = listing.workplace;
-
-  // One identity for the life of the listing: the members' read depends on it, and a new function each render would
-  // read them again each render.
-  const settled = useCallback((id, total) => {
-    setMembership(total);
-    onSettled?.(id, total);
-  }, [onSettled]);
+  const branch = members?.state === 'ready' ? members.branch : null;
+  const membership = branch && !branch.outOfScope ? branch.totalElements : null;
 
   return (
     <article aria-labelledby={headingId} className="print-branch mt-4 rounded-lg bg-surface p-6 shadow-(--shadow-1)">
@@ -207,7 +166,7 @@ export default function WorkplaceListing({ listing, limiter, onSettled }) {
           </div>
         ))}
       </dl>
-      <BranchMembers workplace={w} limiter={limiter} onSettled={settled} />
+      <BranchMembers workplace={w} members={members} />
       <dl className="space-y-1 border-t border-line pt-4 text-sm">
         {[
           ['Complement', w.staffComplement == null ? EMPTY : formatInt(w.staffComplement)],

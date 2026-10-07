@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { http, HttpResponse } from 'msw'
 
 import {
-  VISIT_PAGE_SIZE, createDraft, getDraft, getMyDrafts, getVisits, recordVisit, submitDraft, updateDraft,
+  VISIT_PAGE_SIZE, createDraft, discardDraft, getDraft, getMyDrafts, getVisits, recordVisit, submitDraft, updateDraft,
   workplaceVisitService,
 } from './workplaceVisitService'
 import { server } from '../test/msw/server'
@@ -64,10 +64,10 @@ describe('workplaceVisitService', () => {
     await expect(getVisits(999999)).rejects.toMatchObject({ status: 400, retryable: false, body: { code: 'WORKPLACE_UNKNOWN' } })
   })
 
-  // October build: the visit drafts' five joined the two -- each the very function, never a copy.
-  it('is the seven methods its service gathers, for everything that iterates the service layer', () => {
+  // October build: the visit drafts' six joined the two -- each the very function, never a copy.
+  it('is the eight methods its service gathers, for everything that iterates the service layer', () => {
     expect(workplaceVisitService).toEqual({
-      getVisits, recordVisit, getMyDrafts, getDraft, createDraft, updateDraft, submitDraft,
+      getVisits, recordVisit, getMyDrafts, getDraft, createDraft, updateDraft, submitDraft, discardDraft,
     })
   })
 })

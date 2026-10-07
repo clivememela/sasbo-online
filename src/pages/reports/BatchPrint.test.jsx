@@ -10,9 +10,10 @@ import { PERMISSIONS } from '../../auth/permissions'
 import { TestAuthProvider } from '../../test/authTestUtils'
 import { deferred } from '../../test/deferred'
 import { expectNoA11yViolations } from '../../test/assertions'
-import { monthEndBody, monthEndRefusal } from '../../test/msw/monthEndExamples'
+import { monthEndBody } from '../../test/msw/monthEndExamples'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
+import { locationService } from '../../services/locationService'
 import { setupUser } from '../../test/user'
 import { REPO_ROOT } from '../../test/apiContractScan.js'
 
@@ -23,9 +24,10 @@ import { REPO_ROOT } from '../../test/apiContractScan.js'
  *
  * So these hold: the numbers are read as typed, before anything is asked; ONE request carries them all, each once; a
  * number that is no workplace is named and the rest still print; the listings stand in sections a bank each, every
- * section beginning a new sheet with its own heading (the bank, the day, the organiser's area); the members under each
- * branch need MEMBERS_VIEW and say so otherwise; and Print waits until every branch is ready. Every answer is the
- * server's golden one or built from its invented workplaces -- nothing here is SASBO's.
+ * section beginning a new sheet with its own heading (the bank, the day, the organiser's area); the members under the
+ * branches need MEMBERS_VIEW, say so otherwise, and are read in ONE request for the batch (October build review); and
+ * Print waits until every branch is ready. Every answer is the server's golden one or built from its invented
+ * workplaces -- nothing here is SASBO's.
  */
 
 const GOLDEN = monthEndBody('GET /api/workplaces/listings')
@@ -43,18 +45,39 @@ const TWO_BANKS = {
   reason: null,
 }
 
-/** Every batch asked for, as the numbers it named. */
+/** Every batch asked for, as the numbers it named; every members read, as the workplaces' ids it named. */
 let asked
+let membersAsked
+
+/** The server's golden members of the invented main street, as one branch of a batch's answer. */
+const GOLDEN_MEMBERS = monthEndBody('GET /api/workplaces/members')
+const [MAIN_STREETS_MEMBERS] = GOLDEN_MEMBERS.branches
 
 const listingsAnswer = (body = GOLDEN) => http.get('*/api/workplaces/listings', ({ request }) => {
   asked.push(new URL(request.url).searchParams.get('raNumbers'))
   return HttpResponse.json(body)
 })
 
-const membersAnswer = (gate) => http.get('*/api/workplaces/:id/members', async () => {
+/**
+ * The batch's members as the server answers them: each id asked, a branch with the golden branch's members -- or, for an
+ * id in `outOfScope`, marked outside the caller's area with none. `surname` renames the member, to tell answers apart.
+ */
+const answerMembers = async (request, gate, { outOfScope = [], surname } = {}) => {
+  const ids = new URL(request.url).searchParams.get('ids')
+  membersAsked.push(ids)
   if (gate) await gate.promise
-  return HttpResponse.json(monthEndBody('GET /api/workplaces/{id}/members'))
-})
+  const members = MAIN_STREETS_MEMBERS.members.map((member) => (surname ? { ...member, surname } : member))
+  return HttpResponse.json({
+    ...GOLDEN_MEMBERS,
+    unknown: [],
+    branches: ids.split(',').map(Number).map((workplaceId) => (outOfScope.includes(workplaceId)
+      ? { workplaceId, outOfScope: true, members: [], totalElements: 0 }
+      : { ...MAIN_STREETS_MEMBERS, workplaceId, members })),
+  })
+}
+
+const membersAnswer = (gate, options) => http.get('*/api/workplaces/members', ({ request }) =>
+  answerMembers(request, gate, options))
 
 const ORGANISER = {
   id: 7, username: 'invented.organiser', displayName: 'Invented Organiser',
@@ -77,6 +100,7 @@ async function showListingsFor(user, typed) {
 
 beforeEach(() => {
   asked = []
+  membersAsked = []
   vi.spyOn(console, 'error').mockImplementation(() => {})
   vi.spyOn(window, 'print').mockImplementation(() => {})
   vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-07T08:00:00+02:00') })
@@ -210,11 +234,11 @@ describe('the members at each branch -- MEMBERS_VIEW, or a sentence', () => {
     expect(screen.getAllByRole('link', { name: 'Sign in' })[0])
       .toHaveAttribute('href', '/login?next=%2Freports%2Flocations%2Fprint')
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
-    // Ready a moment after the listings render: each branch says, in its own effect, that it has nothing to read.
     const print = await screen.findByRole('button', { name: 'Print listings' })
     expect(print).toBeEnabled()
     await user.click(print)
     expect(window.print).toHaveBeenCalledTimes(1)
+    expect(membersAsked).toEqual([])
   })
 
   it('🔒 signed in with MEMBERS_VIEW: the members under each branch, masked -- and Print waits until they are in', async () => {
@@ -236,16 +260,94 @@ describe('the members at each branch -- MEMBERS_VIEW, or a sentence', () => {
     expect(screen.getAllByText('Membership:')[0].nextSibling).toHaveTextContent('1')
   })
 
+  it('🔒 review: ONE members read for the whole batch -- every branch\'s id in it, never a request a branch', async () => {
+    server.use(listingsAnswer(TWO_BANKS), membersAnswer())
+    const user = setupUser()
+    renderWithProviders(signedIn(<BatchPrint />))
+
+    await showListingsFor(user, '900001 900003 900002')
+    await waitFor(() => expect(screen.getAllByRole('table')).toHaveLength(3))
+
+    expect(membersAsked).toEqual(['1,3,2'])
+  })
+
   it('a branch outside the organiser\'s area says so, with no Try again -- and still lets the batch print', async () => {
-    server.use(listingsAnswer(), monthEndRefusal('WORKPLACE_OUT_OF_SCOPE', 'GET /api/workplaces/{id}/members'))
+    server.use(listingsAnswer(), membersAnswer(null, { outOfScope: [3] }))
     const user = setupUser()
     renderWithProviders(signedIn(<BatchPrint />))
 
     await showListingsFor(user, '900001 900003')
 
-    expect(await screen.findAllByText('This branch is outside your region or area.')).toHaveLength(2)
+    expect(await screen.findByText('This branch is outside your region or area.')).toBeInTheDocument()
+    expect(screen.getAllByRole('table')).toHaveLength(1)
     expect(screen.queryByRole('button', { name: /Try again/ })).not.toBeInTheDocument()
     expect(await screen.findByRole('button', { name: 'Print listings' })).toBeEnabled()
+  })
+
+  it('review: the members failing for another reason say so under each branch -- Try again asks once more, and the batch still prints', async () => {
+    let calls = 0
+    server.use(listingsAnswer(), http.get('*/api/workplaces/members', ({ request }) => {
+      calls += 1
+      return calls === 1 ? HttpResponse.json({ message: 'boom' }, { status: 500 }) : answerMembers(request)
+    }))
+    const user = setupUser()
+    renderWithProviders(signedIn(<BatchPrint />))
+
+    await showListingsFor(user, '900001 900003')
+
+    expect(await screen.findAllByText('The members at this branch could not be loaded.')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Print listings' })).toBeEnabled()
+    await user.click(screen.getAllByRole('button', { name: /Try again/ })[0])
+
+    await waitFor(() => expect(screen.getAllByRole('table')).toHaveLength(2))
+    expect(calls).toBe(2)
+  })
+
+  it('🔒 review: an answer for listings since replaced is dropped -- never shown under the listings shown now', async () => {
+    const first = deferred()
+    const second = deferred()
+    let calls = 0
+    server.use(listingsAnswer(), http.get('*/api/workplaces/members', ({ request }) => {
+      calls += 1
+      return calls === 1 ? answerMembers(request, first, { surname: 'STALE-ANSWER' }) : answerMembers(request, second)
+    }))
+    const reads = vi.spyOn(locationService, 'getMembersOf')
+    const user = setupUser()
+    renderWithProviders(signedIn(<BatchPrint />))
+
+    try {
+      await showListingsFor(user, '900001 900003')
+      await screen.findByRole('button', { name: 'Preparing the listings…' })
+      await user.click(screen.getByRole('button', { name: 'Show listings' }))
+      await waitFor(() => expect(membersAsked).toHaveLength(2))
+
+      second.resolve()
+      await waitFor(() => expect(screen.getAllByRole('table')).toHaveLength(2))
+      first.resolve()
+      // The first read settled, and the page has had its turn to take it: awaited after the page's own await of it.
+      await reads.mock.results[0].value
+      await screen.findByRole('button', { name: 'Print listings' })
+
+      expect(screen.getAllByText('Example')).toHaveLength(2)
+      expect(screen.queryByText('STALE-ANSWER')).not.toBeInTheDocument()
+    } finally {
+      first.resolve()
+      second.resolve()
+    }
+  })
+
+  it('🔒 review: signed in without REPORTS_PRINT, the page says what is needed -- and asks nothing', () => {
+    server.use(listingsAnswer())
+    renderWithProviders(
+      <TestAuthProvider permissions={[PERMISSIONS.MEMBERS_VIEW]} user={{ ...ORGANISER, permissions: [PERMISSIONS.MEMBERS_VIEW] }}>
+        <BatchPrint />
+      </TestAuthProvider>,
+    )
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Batch print' })).toBeInTheDocument()
+    expect(screen.getByText(/You need permission to print organisers' reports\./)).toBeInTheDocument()
+    expect(screen.queryByLabelText('R/A numbers')).not.toBeInTheDocument()
+    expect(asked).toEqual([])
   })
 
   it('a11y: the printed listings, signed out, have no axe violations', async () => {
