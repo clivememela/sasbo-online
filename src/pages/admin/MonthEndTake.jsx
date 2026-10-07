@@ -162,14 +162,17 @@ export default function MonthEndTake({ month, state, onTaken }) {
   );
 }
 
+/** The auth context's word for a caller who has signed in (contracts/signin.md) -- not a member's status. */
+const SIGNED_IN = 'signed-in';
+
 /** Why the take is shut, beneath the month -- for someone who has not signed in, or may not take the month. */
 export function MonthEndTakeWhy({ state }) {
-  const { status, can } = useAuth();
+  const { status: signIn, can } = useAuth();
   const open = state?.state === 'OPEN';
   if ((!open && state?.state !== 'TAKEN') || can(PERMISSIONS.MONTH_END_TAKE)) return null;
   return (
     <p id={WHY_ID} className="mt-1 max-w-prose text-sm text-ink-muted">
-      {status === 'signed-in' ? TAKE_NEEDS_PERMISSION : open ? TAKE_WAITS : TAKE_AGAIN_WAITS}
+      {signIn === SIGNED_IN ? TAKE_NEEDS_PERMISSION : open ? TAKE_WAITS : TAKE_AGAIN_WAITS}
     </p>
   );
 }

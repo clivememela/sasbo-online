@@ -637,7 +637,7 @@ const sendShape = (req, path) => {
   m = /^\/api\/month-end\/([^/]+)\/files\/(banks|providers)\/([A-Z0-9_]+)$/.exec(path);
   if (req.method === 'POST' && m) {
     const kind = m[2] === 'banks' ? 'BANK' : 'PROVIDER';
-    return { status: 201, body: { file: sendFile(m[1], kind, m[3], m[3], 7001), password: 'Stub-0000-0000-0000',
+    return { status: 201, body: { file: sendFile(m[1], kind, m[3], m[3], 7001), password: '<shown once>',
       passwordNote: 'This password is shown once and is not kept. Give it by telephone, never in the e-mail that carries the file.' } };
   }
   m = /^\/api\/month-end\/files\/(\d+)(\/sftp)?$/.exec(path);

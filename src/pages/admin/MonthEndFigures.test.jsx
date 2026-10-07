@@ -104,7 +104,10 @@ const cellsOf = (tr) => [...tr.querySelectorAll('td[data-col]')].map((cell) => c
 /** The rest of the page: the statistics, which never wait on the figures and are never spoiled by them. */
 const expectTheRestOfThePage = () => {
   expect(screen.getByRole('link', { name: /^New and deleted members/ })).toBeInTheDocument()
-  expect(screen.getAllByRole('link')).toHaveLength(STATISTICS.length)
+  // Every statistic's link -- beside the October build's sending screens and lapsed suspensions, which are not counted.
+  const statistic = (link) => STATISTICS.some(({ key }) =>
+    new URL(link.getAttribute('href'), 'http://localhost').pathname === `/admin/monthly-menu/${key}`)
+  expect(screen.getAllByRole('link').filter(statistic)).toHaveLength(STATISTICS.length)
 }
 
 /*
@@ -185,7 +188,8 @@ describe('the month\'s figures, on the Month end page (02.3; the 5 Oct Show & Te
     await screen.findByText('INVENTED GROUP CORE')
 
     expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
-      .toEqual([FIGURES, 'Statistics', 'The statistics pack', 'Listings of members'])
+      .toEqual([FIGURES, 'Statistics', 'The statistics pack', 'Sending the month', 'Suspensions that have lapsed',
+        'Listings of members'])
     // The month is chosen above them, once: the figures carry no month control of their own.
     expect(screen.getAllByRole('combobox', { name: 'Month' })).toHaveLength(1)
     expect(within(figuresRegion()).queryByRole('combobox', { name: 'Month' })).not.toBeInTheDocument()
