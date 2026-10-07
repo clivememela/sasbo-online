@@ -5,6 +5,7 @@ import DataState from '../../components/common/DataState.jsx';
 import { formatDateLong, formatInt } from '../../lib/format.js';
 import reportError from '../../lib/reportError.js';
 import { DRAFT_PAGE_SIZE, getMyDrafts } from '../../services/workplaceVisitService.js';
+import { DRAFT_STATUS } from './visitDraft.js';
 
 /**
  * MY VISITS -- the drafts I saved and the visits I submitted (October build, 5 Oct Show & Tell: the visit forms saving
@@ -20,8 +21,8 @@ const NOT_AVAILABLE = Object.assign(new Error('Your visits are not available fro
   { retryable: false });
 
 const TABS = [
-  { status: 'DRAFT', label: 'Drafts', empty: 'No drafts saved yet.' },
-  { status: 'SUBMITTED', label: 'Submitted', empty: 'No visits submitted yet.' },
+  { status: DRAFT_STATUS.DRAFT, label: 'Drafts', empty: 'No drafts saved yet.' },
+  { status: DRAFT_STATUS.SUBMITTED, label: 'Submitted', empty: 'No visits submitted yet.' },
 ];
 
 /** When a draft was last saved, as a person reads it: the day, and the time in SASBO's zone. */
@@ -35,7 +36,7 @@ const savedAt = (instant) => {
 
 export default function MyVisitDrafts({ refreshKey = 0, openId, onOpen }) {
   const headingId = useId();
-  const [status, setStatus] = useState('DRAFT');
+  const [status, setStatus] = useState(DRAFT_STATUS.DRAFT);
   const [attempt, setAttempt] = useState(0);
   const [read, setRead] = useState({});
   const question = `${status}|${refreshKey}|${attempt}`;
@@ -89,7 +90,7 @@ export default function MyVisitDrafts({ refreshKey = 0, openId, onOpen }) {
                   <p className="text-ink-muted">
                     {draft.visitedOn ? `Visit of ${formatDateLong(draft.visitedOn)}` : 'No day chosen yet'}
                     {' · '}
-                    {draft.status === 'SUBMITTED' ? `submitted ${savedAt(draft.submittedAt)}` : `saved ${savedAt(draft.updatedAt)}`}
+                    {draft.status === DRAFT_STATUS.SUBMITTED ? `submitted ${savedAt(draft.submittedAt)}` : `saved ${savedAt(draft.updatedAt)}`}
                   </p>
                 </div>
                 <Button size="sm" onClick={() => onOpen?.(draft)} disabled={draft.id === openId}

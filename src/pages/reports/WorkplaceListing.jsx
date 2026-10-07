@@ -46,7 +46,7 @@ const NOT_A_PAGE = Object.assign(new Error('The members could not be read from t
  * page this branch is ready to print -- with the members' total, or `null` where none could be listed.
  */
 export function BranchMembers({ workplace, limiter, onSettled }) {
-  const { status, can } = useAuth();
+  const { status: authStatus, can } = useAuth();
   const location = useLocation();
   const allowed = can(PERMISSIONS.MEMBERS_VIEW);
   const [attempt, setAttempt] = useState(0);
@@ -91,7 +91,7 @@ export function BranchMembers({ workplace, limiter, onSettled }) {
     const next = encodeURIComponent(`${location.pathname}${location.search}`);
     return (
       <p role="status" className="my-4 rounded-md border border-line bg-surface-2 px-4 py-3 text-sm text-ink">
-        {status === 'signed-in' ? (
+        {authStatus === 'signed-in' ? (
           'You need permission to see the members at this branch. Ask your administrator if you should have it.'
         ) : (
           <>

@@ -18,7 +18,7 @@ import { messageOf, writeFailure } from '../../services/parseApiError.js';
 import { workplaceService } from '../../services/workplaceService.js';
 import { createDraft, getDraft, recordVisit, submitDraft, updateDraft } from '../../services/workplaceVisitService.js';
 import MyVisitDrafts from './MyVisitDrafts.jsx';
-import { DRAFT_FIELDS, draftOf, formFieldsOf } from './visitDraft.js';
+import { DRAFT_FIELDS, DRAFT_STATUS, draftOf, formFieldsOf } from './visitDraft.js';
 
 /**
  * 🔴 THESE THREE LIVE AT MODULE SCOPE, AND UNTIL NOW THEY DID NOT -- WHICH BROKE TYPING.
@@ -222,7 +222,7 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
     const location = useLocation();
     const capture = can(PERMISSIONS.VISITS_CAPTURE);
     const signedIn = authStatus === 'signed-in';
-    const readOnly = draft?.status === 'SUBMITTED';
+    const readOnly = draft?.status === DRAFT_STATUS.SUBMITTED;
     const changed = formData !== baseline;
 
     // `useCallback` with no dependencies: `setFormData`'s updater form reads the previous
@@ -391,7 +391,7 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
         if (!draft?.id) return;
         try {
             const fresh = await getDraft(draft.id);
-            show(fresh, fresh.status === 'SUBMITTED'
+            show(fresh, fresh.status === DRAFT_STATUS.SUBMITTED
                 ? 'This visit has been submitted: it is shown as it was submitted, read-only.'
                 : 'The draft is shown as it was last saved.');
         } catch (error) {
@@ -405,7 +405,7 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
             setOpening(chosen);
             return;
         }
-        show(chosen, chosen.status === 'SUBMITTED'
+        show(chosen, chosen.status === DRAFT_STATUS.SUBMITTED
             ? `Showing the visit submitted for ${chosen.workplaceName}: read-only, to print.`
             : `Opened the draft for ${chosen.workplaceName} (R/A ${chosen.raNumber}).`);
     };
@@ -539,7 +539,7 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
                                 The form has changes that are not saved. Open {opening.workplaceName} anyway, and lose them?
                             </p>
                             <div className="mt-2 flex gap-2">
-                                <Button size="sm" onClick={() => show(opening, `Opened the ${opening.status === 'SUBMITTED' ? 'visit' : 'draft'} for ${opening.workplaceName}.`)}>
+                                <Button size="sm" onClick={() => show(opening, `Opened the ${opening.status === DRAFT_STATUS.SUBMITTED ? 'visit' : 'draft'} for ${opening.workplaceName}.`)}>
                                     Open anyway
                                 </Button>
                                 <Button size="sm" variant="ghost" onClick={() => setOpening(null)}>Keep editing</Button>

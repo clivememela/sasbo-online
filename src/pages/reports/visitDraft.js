@@ -10,6 +10,13 @@
  * the desk. Each field goes under the server's name (`DRAFT_FIELDS`), so a refusal that names one is said at the field.
  */
 
+/**
+ * A draft's status, as the server spells it (`WorkplaceVisitDraftRepository.DRAFT` / `SUBMITTED`): changed until it
+ * is submitted, then SASBO's record and read-only. Named once here -- it is not a member's status, which shares the
+ * field's name and nothing else.
+ */
+export const DRAFT_STATUS = Object.freeze({ DRAFT: 'DRAFT', SUBMITTED: 'SUBMITTED' });
+
 /** Each field a draft keeps: the server's name, and the form's field it comes from. */
 export const DRAFT_FIELDS = Object.freeze({
   raNumber: 'raNumber',
