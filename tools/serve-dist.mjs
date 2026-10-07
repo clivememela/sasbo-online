@@ -452,7 +452,8 @@ const historyAnswer = (memberId, path, query) => {
  *                    pack's workbook is an attachment of the spreadsheet's type: a small stub body, never a workbook.
  */
 const MONTHS = golden('GET /api/month-end/months');
-const MONTH_STATISTICS = ['new-and-deleted', 'membership', 'leavers', 'branches', 'recruitment', 'representatives'];
+const MONTH_STATISTICS = ['new-and-deleted', 'membership', 'leavers', 'branches', 'recruitment', 'representatives',
+  'suspensions'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October',
   'November', 'December'];
 const monthName = (month) => `${MONTH_NAMES[Number(month.slice(5)) - 1]} ${month.slice(0, 4)}`;
@@ -538,6 +539,115 @@ const packOf = (status) => ({
 });
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
+/**
+ * SENDING THE MONTH (the October build, `contracts/monthend-api.md` §1-4, R5) -- invented, as everything here is: the
+ * seven pack sets with their example.org addresses, two banks and three providers, a server with NO MAIL and NO SFTP set
+ * up (as the demonstration link is), and two suspended members. A produced file is answered with an invented password.
+ * Every route is held by a permission, so a browser run reaches these only once it signs somebody in.
+ */
+const SEND_BY = 'Head Office Administrator (demo.headoffice)';
+const SEND_TAKE = (month) => {
+  const taken = MONTHS.taken.find((record) => record.month === month);
+  return taken ? { takeNumber: taken.takeNumber ?? 1, takenAt: taken.takenAt, takenBy: taken.takenBy } : null;
+};
+const SEND_SETS = [['BLM', 'Bloemfontein', []], ['CPT', 'Cape Town', []], ['DBN', 'Durban', []],
+  ['JHB', 'Johannesburg (first set)', ['A', 'F', 'K', 'X']], ['JHB2', 'Johannesburg (second set)', ['H', 'N', 'P']],
+  ['PE', 'Port Elizabeth', []], ['PTA', 'Pretoria', []]].map(([code, label, areaLetters]) => ({
+  code, label, regionCode: code === 'JHB2' ? 'JHB' : code, regionName: code === 'JHB2' ? 'JHB' : code, areaLetters,
+  position: 'Regional Secretary', email: `regional.secretary.${code.toLowerCase()}@example.org`, active: true, version: 0,
+  updatedBy: 'system', updatedAt: '2026-10-07T08:00:00Z',
+}));
+const sendPack = (month, set) => ({
+  id: 4000 + SEND_SETS.indexOf(set), month, takeNumber: 1, setCode: set.code, setLabel: set.label,
+  regionCode: set.regionCode, areaLetters: set.areaLetters, position: set.position, producedAt: '2026-10-01T06:58:00Z',
+  producedBy: SEND_BY, counts: { joined: 34, left: 12, suspended: 5 },
+  files: ['PDF', 'XLSX'].map((format) => ({ format, name: `sasbo-month-end-${month}-${set.code}.${format.toLowerCase()}`, bytes: 1024, sha256: 'invented' })),
+});
+const sendFile = (month, kind, code, name, id) => ({
+  id, month, takeNumber: 1, kind, recipientCode: code, recipientName: name, layout: kind === 'BANK' ? 'SHEET' : 'OLD_MUTUAL_FUNERAL',
+  fullList: true, fileName: `${code}_${month.slice(2).replace('-', '')}.xlsx`, format: 'XLSX', protection: 'EXCEL_AES_256',
+  rows: 412, newRows: 0, deletedRows: 0, leftOut: 0, bytes: 2048, sha256: 'invented', producedAt: '2026-10-01T07:20:00Z',
+  producedBy: SEND_BY, downloads: 0, lastDeliveredAt: null,
+});
+const sendRecipient = (code, name, extra) => ({ code, name, active: true, version: 0, updatedBy: 'system', updatedAt: '2026-10-07T08:00:00Z', ...extra });
+const sendFiles = (month) => ({
+  month, take: SEND_TAKE(month), sftp: { configured: false, state: 'NOT_CONFIGURED' },
+  banks: [
+    { bank: sendRecipient('ABSA', 'Absa', { tableCodes: [24, 78, 90], fullList: true, layout: 'ABSA_FIXED_WIDTH' }),
+      preview: { rows: 412, newRows: 0, deletedRows: 0 }, files: [] },
+    { bank: sendRecipient('NEDBANK', 'Nedbank', { tableCodes: [13, 14, 35, 36, 109, 114], fullList: false, layout: 'SHEET' }),
+      preview: { rows: 9, newRows: 6, deletedRows: 3 }, files: [] },
+  ],
+  providers: [
+    { provider: sendRecipient('OLD_MUTUAL', 'Old Mutual funeral benefit', { layout: 'OLD_MUTUAL_FUNERAL', provisional: false, delivery: 'DOWNLOAD' }),
+      preview: { rows: 1310, newRows: 0, deletedRows: 0 }, files: [] },
+    { provider: sendRecipient('LAW_CALL', 'Law Call', { layout: 'PROVISIONAL_MEMBER_LIST', provisional: true, delivery: 'SFTP' }),
+      preview: { rows: 1310, newRows: 0, deletedRows: 0 }, files: [] },
+    { provider: sendRecipient('CRITICARE', 'Criticare', { layout: 'CRITICARE_LISTING', provisional: false, delivery: 'DOWNLOAD', active: false }),
+      preview: { rows: 0, newRows: 0, deletedRows: 0 }, files: [] },
+  ],
+});
+const SEND_SUSPENDED = [
+  { memberId: 9101, membershipNumber: 'M-095990', name: 'T Invented', bank: 'INVENTED BANK', workplace: 'R/A 900001 INVENTED BRANCH',
+    area: 'A', paymentType: 'Payroll Deduction', suspensionCode: 11, suspensionName: 'NOT ON PAYROLL',
+    noDeductionReason: 'Unpaid leave', suspendedOn: '2026-06-02', lapsesOn: '2026-09-02', lapsed: true },
+  { memberId: 9102, membershipNumber: 'M-095989', name: 'S Synthetic', bank: 'INVENTED INSURER', workplace: 'R/A 900002 INVENTED HARBOUR',
+    area: 'B', paymentType: 'Debit Order', suspensionCode: 13, suspensionName: 'DEBIT RETURNED', noDeductionReason: null,
+    suspendedOn: '2026-09-15', lapsesOn: '2026-12-15', lapsed: false },
+];
+const suspendedPage = (lapsedOnly) => {
+  const items = SEND_SUSPENDED.filter((member) => !lapsedOnly || member.lapsed);
+  return { asAt: '2026-10-07', lapseMonths: 3, page: 0, size: 50, total: items.length, totalPages: 1,
+    lapsed: items.filter((member) => member.lapsed).length, undated: 0, items };
+};
+// Every refusal the sending routes answer here, looked up now: one the golden file lacks stops the start by name.
+['MAIL_NOT_CONFIGURED', 'SFTP_NOT_CONFIGURED'].forEach((code) => envelope(code));
+
+/** The sending routes by their shape; `false` for a path that is not one of them. */
+const sendShape = (req, path) => {
+  let m = /^\/api\/month-end\/suspensions\/(members|lapsed)$/.exec(path);
+  if (req.method === 'GET' && m) return { status: 200, body: suspendedPage(m[1] === 'lapsed') };
+  m = /^\/api\/month-end\/([^/]+)\/(region-packs|files|deliveries)$/.exec(path);
+  if (req.method === 'GET' && m) {
+    const refused = monthRefused(m[1]) ?? (SEND_TAKE(m[1]) ? null : envelope('MONTH_NOT_TAKEN',
+      'Packs and files are made only from a taken month.', { month: m[1], open: MONTHS.openMonth }));
+    if (refused) return refused;
+    if (m[2] === 'files') return { status: 200, body: sendFiles(m[1]) };
+    if (m[2] === 'deliveries') return { status: 200, body: { month: m[1], page: 0, size: 50, total: 0, items: [] } };
+    return { status: 200, body: { month: m[1], take: SEND_TAKE(m[1]), mail: { configured: false }, unplaced: 3,
+      sets: SEND_SETS.map((set) => ({ set, pack: set.code === 'JHB' ? sendPack(m[1], set) : null, deliveries: [] })) } };
+  }
+  m = /^\/api\/month-end\/([^/]+)\/region-packs\/(email|[A-Z0-9]+)$/.exec(path);
+  if (req.method === 'POST' && m && m[2] === 'email') {
+    return { status: 200, body: { month: m[1], results: SEND_SETS.map((set) => ({ setCode: set.code, outcome: 'REFUSED',
+      code: 'MAIL_NOT_CONFIGURED', message: 'This server has no mail set up, so nothing was e-mailed.', delivery: null })) } };
+  }
+  if (req.method === 'POST' && m) {
+    const set = SEND_SETS.find((candidate) => candidate.code === m[2]);
+    return set ? { status: 201, body: sendPack(m[1], set) } : envelope('MONTH_NOT_TAKEN', null, { month: m[1] });
+  }
+  m = /^\/api\/month-end\/region-packs\/(\d+)\/(pdf|xlsx|email)$/.exec(path);
+  if (m && req.method === 'POST' && m[2] === 'email') return envelope('MAIL_NOT_CONFIGURED', null, { pack: m[1] });
+  if (m && req.method === 'GET' && m[2] !== 'email') {
+    return { status: 200, type: m[2] === 'pdf' ? 'application/pdf' : XLSX,
+      headers: { 'content-disposition': `attachment; filename="sasbo-stub-pack-${m[1]}.${m[2]}"` },
+      raw: Buffer.from(`INVENTED STUB PACK ${m[1]} -- serve-dist.mjs, not a ${m[2]}\n`, 'utf8') };
+  }
+  m = /^\/api\/month-end\/([^/]+)\/files\/(banks|providers)\/([A-Z0-9_]+)$/.exec(path);
+  if (req.method === 'POST' && m) {
+    const kind = m[2] === 'banks' ? 'BANK' : 'PROVIDER';
+    return { status: 201, body: { file: sendFile(m[1], kind, m[3], m[3], 7001), password: 'Stub-0000-0000-0000',
+      passwordNote: 'This password is shown once and is not kept. Give it by telephone, never in the e-mail that carries the file.' } };
+  }
+  m = /^\/api\/month-end\/files\/(\d+)(\/sftp)?$/.exec(path);
+  if (m && req.method === 'POST' && m[2]) return envelope('SFTP_NOT_CONFIGURED', null, { file: m[1] });
+  if (m && req.method === 'GET' && !m[2]) {
+    return { status: 200, type: XLSX, headers: { 'content-disposition': `attachment; filename="sasbo-stub-file-${m[1]}.xlsx"` },
+      raw: Buffer.from(`INVENTED STUB FILE ${m[1]} -- serve-dist.mjs, not a workbook\n`, 'utf8') };
+  }
+  return false;
+};
+
 /** Month end's own routes, each refusal carrying the path it was asked at, as the server's envelope does. */
 const monthEndOwnAnswer = (req, path, query) => {
   const answer = monthEndShape(req, path, query);
@@ -547,6 +657,8 @@ const monthEndOwnAnswer = (req, path, query) => {
 /** Month end's own routes by their shape; `false` for a path that is not one of them. */
 const monthEndShape = (req, path, query) => {
   if (req.method === 'GET' && path === '/api/month-end/months') return { status: 200, body: MONTHS };
+  const sent = sendShape(req, path);
+  if (sent) return sent;
   let m = /^\/api\/month-end\/([^/]+)\/([a-z-]+)$/.exec(path);
   if (req.method === 'GET' && m && MONTH_STATISTICS.includes(m[2])) return statisticAnswer(m[2], m[1], query);
   if (req.method === 'POST' && m && m[2] === 'pack') {
@@ -639,6 +751,13 @@ const API = {
   '/api/month-end/months': MONTHS,
   '/api/month-end/packs': packExample,
   '/api/month-end': MONTHS,
+  // The October build's sending and suspended routes: answered by `sendShape` first, keyed here so `stubDrift` reads
+  // the services' paths as covered by name.
+  '/api/month-end/region-packs': { status: 'answered by sendShape' },
+  '/api/month-end/files': { status: 'answered by sendShape' },
+  '/api/month-end/suspensions/members': suspendedPage(false),
+  '/api/month-end/suspensions/lapsed': suspendedPage(true),
+  '/api/reference/no-deduction-reasons': golden('GET /api/reference/no-deduction-reasons'),
   // The runs list; one run and its sheets are answered per shape by `acbRunAnswer`.
   '/api/acb/runs': acbPage(acbRuns, 12),
   // The Debits screen's member search (`04.1`) -- a POST, answered by `acbRunAnswer` first; the key is what

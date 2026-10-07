@@ -53,6 +53,14 @@ export const getDeletionCodes = () =>
 export const getSuspensionCodes = () =>
   requestJson((signal) => fetch(apiUrl('/api/reference/suspension-codes'), { credentials: 'include', signal }));
 
+/**
+ * The reasons for no payroll deduction (contracts/monthend-api.md R1; Stephne, MEN-17): `{ rows, ceiling, nameLimit,
+ * noteLimit }`, each row under one of SASBO's suspension codes by its number. Every reason, active or not; a drop-down
+ * offers the active ones.
+ */
+export const getNoDeductionReasons = () =>
+  requestJson((signal) => fetch(apiUrl('/api/reference/no-deduction-reasons'), { credentials: 'include', signal }));
+
 /** How many rows each list holds here, and why none where none is (ME-18, ME-19) -- the workplaces' among them. */
 export const getStatus = () =>
   requestJson((signal) => fetch(apiUrl('/api/reference/status'), { credentials: 'include', signal }));
@@ -67,5 +75,6 @@ export const referenceService = {
   getCommittees,
   getDeletionCodes,
   getSuspensionCodes,
+  getNoDeductionReasons,
   getStatus,
 };

@@ -2740,6 +2740,385 @@
           "monthly"
         ]
       }
+    },
+    "GET /api/month-end/{month}/suspensions" : {
+      "request" : "GET /api/month-end/2026-08/suspensions",
+      "status" : 200,
+      "body" : {
+        "statistic" : "suspensions",
+        "legacy" : [
+          "mem_count"
+        ],
+        "month" : "2026-08",
+        "state" : "TAKEN",
+        "takenAt" : "2026-09-29T08:00:00Z",
+        "takenBy" : "seed",
+        "area" : null,
+        "region" : null,
+        "workplacesServed" : "ALL",
+        "sheets" : [
+          {
+            "key" : "by-employer",
+            "title" : "Suspended members, by bank and code",
+            "legacyTitle" : "BANK / BRANCH MEMBER COUNT",
+            "columns" : [
+              {
+                "key" : "code11",
+                "label" : "11 NOT ON PAYROLL",
+                "kind" : "COUNT"
+              },
+              {
+                "key" : "code13",
+                "label" : "13 DEBIT RETURNED",
+                "kind" : "COUNT"
+              },
+              {
+                "key" : "code19",
+                "label" : "19 INVALID ACCOUNT",
+                "kind" : "COUNT"
+              },
+              {
+                "key" : "noCode",
+                "label" : "No code on record",
+                "kind" : "COUNT"
+              },
+              {
+                "key" : "total",
+                "label" : "Total",
+                "kind" : "COUNT"
+              }
+            ],
+            "rows" : [
+              {
+                "key" : "G1",
+                "label" : "INVENTED GROUP CORE",
+                "level" : "GROUP",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              },
+              {
+                "key" : "E1",
+                "label" : "INVENTED BANK",
+                "level" : "ROW",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              },
+              {
+                "key" : "G2",
+                "label" : "INVENTED GROUP OTHER",
+                "level" : "GROUP",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              },
+              {
+                "key" : "E2",
+                "label" : "INVENTED INSURER",
+                "level" : "ROW",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              },
+              {
+                "key" : "~NO_WORKPLACE",
+                "label" : "No workplace on record",
+                "level" : "ROW",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "total" : {
+              "key" : "~TOTAL",
+              "label" : "Total",
+              "level" : "TOTAL",
+              "fewerThanFive" : false,
+              "withheld" : false,
+              "complementOutOfDate" : false,
+              "cells" : [
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "key" : "by-code",
+            "title" : "Suspended members, by suspension code",
+            "legacyTitle" : "SUMMARY OF SUSPENDED MEMBERS",
+            "columns" : [
+              {
+                "key" : "members",
+                "label" : "Members",
+                "kind" : "COUNT"
+              }
+            ],
+            "rows" : [
+              {
+                "key" : "11",
+                "label" : "11 NOT ON PAYROLL",
+                "level" : "ROW",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0
+                ]
+              },
+              {
+                "key" : "13",
+                "label" : "13 DEBIT RETURNED",
+                "level" : "ROW",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0
+                ]
+              },
+              {
+                "key" : "19",
+                "label" : "19 INVALID ACCOUNT",
+                "level" : "ROW",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0
+                ]
+              },
+              {
+                "key" : "~NO_CODE",
+                "label" : "No code on record",
+                "level" : "ROW",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0
+                ]
+              }
+            ],
+            "total" : {
+              "key" : "~TOTAL",
+              "label" : "Total",
+              "level" : "TOTAL",
+              "fewerThanFive" : false,
+              "withheld" : false,
+              "complementOutOfDate" : false,
+              "cells" : [
+                0
+              ]
+            }
+          },
+          {
+            "key" : "no-deduction",
+            "title" : "No payroll deduction, by reason",
+            "legacyTitle" : null,
+            "columns" : [
+              {
+                "key" : "members",
+                "label" : "Members",
+                "kind" : "COUNT"
+              }
+            ],
+            "rows" : [
+              {
+                "key" : "1",
+                "label" : "Unpaid leave",
+                "level" : "ROW",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0
+                ]
+              },
+              {
+                "key" : "2",
+                "label" : "Maternity leave",
+                "level" : "ROW",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0
+                ]
+              },
+              {
+                "key" : "3",
+                "label" : "Paternity leave",
+                "level" : "ROW",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0
+                ]
+              },
+              {
+                "key" : "4",
+                "label" : "Insufficient funds",
+                "level" : "ROW",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0
+                ]
+              },
+              {
+                "key" : "5",
+                "label" : "Sick leave",
+                "level" : "ROW",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0
+                ]
+              },
+              {
+                "key" : "~NO_REASON",
+                "label" : "No reason from the list",
+                "level" : "ROW",
+                "fewerThanFive" : false,
+                "withheld" : false,
+                "complementOutOfDate" : false,
+                "cells" : [
+                  0
+                ]
+              }
+            ],
+            "total" : {
+              "key" : "~TOTAL",
+              "label" : "Total",
+              "level" : "TOTAL",
+              "fewerThanFive" : false,
+              "withheld" : false,
+              "complementOutOfDate" : false,
+              "cells" : [
+                0
+              ]
+            }
+          }
+        ],
+        "notes" : [
+          "August 2026 was taken on 2026-09-29: these figures are the month as it stood then.",
+          "A bank is the employer through the member's workplace, as in every month-end figure.",
+          "A membership of one to four at a named group or employer is shown as fewer than five, and one row beside it is not shown until you sign in, so that it cannot be worked out by subtraction."
+        ]
+      }
+    },
+    "GET /api/reference/no-deduction-reasons" : {
+      "request" : "GET /api/reference/no-deduction-reasons",
+      "status" : 200,
+      "body" : {
+        "rows" : [
+          {
+            "id" : 1,
+            "name" : "Unpaid leave",
+            "suspensionCode" : 11,
+            "suspensionName" : "NOT ON PAYROLL",
+            "ordinal" : 1,
+            "active" : true,
+            "provisional" : true,
+            "version" : 0,
+            "updatedBy" : "migration",
+            "updatedAt" : "2026-10-06T00:00:00Z"
+          },
+          {
+            "id" : 2,
+            "name" : "Maternity leave",
+            "suspensionCode" : 12,
+            "suspensionName" : null,
+            "ordinal" : 2,
+            "active" : true,
+            "provisional" : false,
+            "version" : 0,
+            "updatedBy" : "migration",
+            "updatedAt" : "2026-10-06T00:00:00Z"
+          },
+          {
+            "id" : 3,
+            "name" : "Paternity leave",
+            "suspensionCode" : 11,
+            "suspensionName" : "NOT ON PAYROLL",
+            "ordinal" : 3,
+            "active" : true,
+            "provisional" : true,
+            "version" : 0,
+            "updatedBy" : "migration",
+            "updatedAt" : "2026-10-06T00:00:00Z"
+          },
+          {
+            "id" : 4,
+            "name" : "Insufficient funds",
+            "suspensionCode" : 11,
+            "suspensionName" : "NOT ON PAYROLL",
+            "ordinal" : 4,
+            "active" : true,
+            "provisional" : true,
+            "version" : 0,
+            "updatedBy" : "migration",
+            "updatedAt" : "2026-10-06T00:00:00Z"
+          },
+          {
+            "id" : 5,
+            "name" : "Sick leave",
+            "suspensionCode" : 21,
+            "suspensionName" : null,
+            "ordinal" : 5,
+            "active" : true,
+            "provisional" : false,
+            "version" : 0,
+            "updatedBy" : "migration",
+            "updatedAt" : "2026-10-06T00:00:00Z"
+          }
+        ],
+        "ceiling" : 50,
+        "nameLimit" : 60,
+        "noteLimit" : 500
+      }
     }
   },
   "refusals" : {
@@ -3193,6 +3572,194 @@
         "code" : "PACK_NOT_FOUND",
         "details" : {
           "pack" : "999999"
+        }
+      }
+    },
+    "MAIL_NOT_CONFIGURED" : {
+      "request" : "POST /api/month-end/region-packs/41/email",
+      "status" : 409,
+      "body" : {
+        "timestamp" : "2026-09-29T08:00:00",
+        "status" : 409,
+        "error" : "Conflict",
+        "message" : "This server has no mail set up, so nothing was e-mailed. Downloading the pack still works.",
+        "path" : "/api/month-end/region-packs/41/email",
+        "code" : "MAIL_NOT_CONFIGURED",
+        "details" : {
+          "pack" : "41"
+        }
+      }
+    },
+    "RECIPIENT_HAS_NO_ADDRESS" : {
+      "request" : "POST /api/month-end/region-packs/41/email",
+      "status" : 409,
+      "body" : {
+        "timestamp" : "2026-09-29T08:00:00",
+        "status" : 409,
+        "error" : "Conflict",
+        "message" : "No e-mail address is on record for this recipient. Download the pack instead.",
+        "path" : "/api/month-end/region-packs/41/email",
+        "code" : "RECIPIENT_HAS_NO_ADDRESS",
+        "details" : {
+          "set" : "PE"
+        }
+      }
+    },
+    "MAIL_ATTACHMENT_TOO_LARGE" : {
+      "request" : "POST /api/month-end/region-packs/41/email",
+      "status" : 409,
+      "body" : {
+        "timestamp" : "2026-09-29T08:00:00",
+        "status" : 409,
+        "error" : "Conflict",
+        "message" : "The files are too large to e-mail together. Send one format, or download them.",
+        "path" : "/api/month-end/region-packs/41/email",
+        "code" : "MAIL_ATTACHMENT_TOO_LARGE",
+        "details" : {
+          "bytes" : "23068672"
+        }
+      }
+    },
+    "MAIL_FAILED" : {
+      "request" : "POST /api/month-end/region-packs/41/email",
+      "status" : 502,
+      "body" : {
+        "timestamp" : "2026-09-29T08:00:00",
+        "status" : 502,
+        "error" : "Bad Gateway",
+        "message" : "The mail server refused the e-mail or could not be reached. Nothing was sent.",
+        "path" : "/api/month-end/region-packs/41/email",
+        "code" : "MAIL_FAILED",
+        "details" : {
+          "pack" : "41"
+        }
+      }
+    },
+    "SFTP_NOT_CONFIGURED" : {
+      "request" : "POST /api/month-end/files/8/sftp",
+      "status" : 409,
+      "body" : {
+        "timestamp" : "2026-09-29T08:00:00",
+        "status" : 409,
+        "error" : "Conflict",
+        "message" : "SFTP is not set up on this server, so nothing was sent. Download the file and deliver it by hand.",
+        "path" : "/api/month-end/files/8/sftp",
+        "code" : "SFTP_NOT_CONFIGURED",
+        "details" : {
+          "file" : "8"
+        }
+      }
+    },
+    "SFTP_FAILED" : {
+      "request" : "POST /api/month-end/files/8/sftp",
+      "status" : 502,
+      "body" : {
+        "timestamp" : "2026-09-29T08:00:00",
+        "status" : 502,
+        "error" : "Bad Gateway",
+        "message" : "The SFTP server refused the file or could not be reached. Nothing was sent.",
+        "path" : "/api/month-end/files/8/sftp",
+        "code" : "SFTP_FAILED",
+        "details" : {
+          "file" : "8"
+        }
+      }
+    },
+    "TAKE_REASON_REQUIRED" : {
+      "request" : "POST /api/month-end/2026-08/take",
+      "status" : 400,
+      "body" : {
+        "timestamp" : "2026-09-29T08:00:00",
+        "status" : 400,
+        "error" : "Bad Request",
+        "message" : "Say why the month is taken again: the reason is kept with the take. Nothing has been taken.",
+        "path" : "/api/month-end/2026-08/take",
+        "code" : "TAKE_REASON_REQUIRED",
+        "details" : {
+          "month" : "2026-08"
+        }
+      }
+    },
+    "TAKE_REASON_INVALID" : {
+      "request" : "POST /api/month-end/2026-08/take",
+      "status" : 400,
+      "body" : {
+        "timestamp" : "2026-09-29T08:00:00",
+        "status" : 400,
+        "error" : "Bad Request",
+        "message" : "The reason is longer than 500 characters, or holds a character that cannot be kept. Nothing has been taken.",
+        "path" : "/api/month-end/2026-08/take",
+        "code" : "TAKE_REASON_INVALID",
+        "details" : {
+          "field" : "reason",
+          "limit" : "500"
+        }
+      }
+    },
+    "MEMBER_ALREADY_CAPTURED" : {
+      "request" : "POST /api/members",
+      "status" : 409,
+      "body" : {
+        "timestamp" : "2026-09-29T08:00:00",
+        "status" : 409,
+        "error" : "Conflict",
+        "message" : "This person is already on record as member M-100123, who has left. Reinstate them with Change status on that record rather than capturing them again.",
+        "path" : "/api/members",
+        "code" : "MEMBER_ALREADY_CAPTURED",
+        "details" : {
+          "membershipNumber" : "M-100123",
+          "memberId" : "123",
+          "matched" : "IDENTITY_NUMBER",
+          "status" : "Resigned",
+          "canReinstate" : "true"
+        }
+      }
+    },
+    "NO_DEDUCTION_REASON_REQUIRED" : {
+      "request" : "POST /api/members/7/status",
+      "status" : 400,
+      "body" : {
+        "timestamp" : "2026-09-29T08:00:00",
+        "status" : 400,
+        "error" : "Bad Request",
+        "message" : "Code 11 needs a reason for no payroll deduction: choose one from the list, or type it in the note.",
+        "path" : "/api/members/7/status",
+        "code" : "NO_DEDUCTION_REASON_REQUIRED",
+        "details" : {
+          "code" : "11",
+          "reasons" : "1,3,4"
+        }
+      }
+    },
+    "NO_DEDUCTION_REASON_UNKNOWN" : {
+      "request" : "POST /api/members/7/status",
+      "status" : 400,
+      "body" : {
+        "timestamp" : "2026-09-29T08:00:00",
+        "status" : 400,
+        "error" : "Bad Request",
+        "message" : "That reason for no payroll deduction is not on the list any more.",
+        "path" : "/api/members/7/status",
+        "code" : "NO_DEDUCTION_REASON_UNKNOWN",
+        "details" : {
+          "noDeductionReasonId" : "99"
+        }
+      }
+    },
+    "SUSPENDED_PAGE_INVALID" : {
+      "request" : "GET /api/month-end/suspensions/members",
+      "status" : 400,
+      "body" : {
+        "timestamp" : "2026-09-29T08:00:00",
+        "status" : 400,
+        "error" : "Bad Request",
+        "message" : "There is no such page of the suspended members.",
+        "path" : "/api/month-end/suspensions/members",
+        "code" : "SUSPENDED_PAGE_INVALID",
+        "details" : {
+          "page" : "9",
+          "size" : "50",
+          "ceiling" : "100"
         }
       }
     }

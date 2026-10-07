@@ -19,8 +19,14 @@ import { requestJson, requestJsonWrite } from './parseApiError';
  *
  * 🔑 ONE TYPED ROUTE A STATISTIC (MD41), each a named export with its path written at its call site, where the API
  * contract scan and the stub server's drift check can read it -- and so a screen ships the reads it imports and no
- * other. The listings (`/{month}/listings/{listing}`) and the take (`/{month}/take`) are NOT here: both refuse every
- * caller until sign-in exists, so the screen says so without asking (the Month end page, 04.1).
+ * other. The listings (`/{month}/listings/{listing}`) are NOT here: they refuse every caller, so the page says so
+ * without asking (04.1). Since the October build (`contracts/monthend-api.md` R4, R5):
+ *
+ *   `takeMonth(month, { replaces, reason })`  the take, held by `MONTH_END_TAKE` -- a take again names the take it
+ *                                 replaces and says why (Stephne, MEN-10, MEN-11);
+ *   `getSuspendedMembers(query)`  everyone suspended now, the oldest suspension first, a page at a time -- and
+ *   `getLapsedSuspensions(query)` those three months on (MEN-18). Both name members: held by `MEMBERS_VIEW` and
+ *                                 `MONTH_END_VIEW`, and scoped by the caller's region or area.
  *
  * The month travels encoded: it arrives from an address a person can type, and a path segment is not the place for
  * whatever they typed. A malformed month is the server's to refuse (`REQUEST_MALFORMED`), in its own words.
@@ -67,7 +73,11 @@ export const getRepresentatives = (month, place) =>
 export const getVisits = (month, place) =>
   read(apiUrl(`/api/month-end/${encodeURIComponent(month)}/visits`) + placeQuery(place));
 
-/** The seven reads by the statistic's route name -- the key the screen's address carries. */
+/** R5: the suspended, by bank and code, by code, and by the reason for no payroll deduction (Stephne, MEN-18). */
+export const getSuspensions = (month, place) =>
+  read(apiUrl(`/api/month-end/${encodeURIComponent(month)}/suspensions`) + placeQuery(place));
+
+/** The eight reads by the statistic's route name -- the key the screen's address carries. */
 export const STATISTIC_READS = Object.freeze({
   'new-and-deleted': getNewAndDeleted,
   membership: getMembership,
@@ -76,7 +86,35 @@ export const STATISTIC_READS = Object.freeze({
   recruitment: getRecruitment,
   representatives: getRepresentatives,
   visits: getVisits,
+  suspensions: getSuspensions,
 });
+
+/** The suspended lists' query: a page, and an employer (its id) or a suspension code (its number) where one is chosen. */
+const suspendedQuery = ({ page = 0, size = 50, employer, code } = {}) => {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  if (employer) query.set('employer', String(employer));
+  if (code) query.set('code', String(code));
+  return query;
+};
+
+export const getSuspendedMembers = (filters) =>
+  read(apiUrl(`/api/month-end/suspensions/members?${suspendedQuery(filters)}`));
+
+export const getLapsedSuspensions = (filters) =>
+  read(apiUrl(`/api/month-end/suspensions/lapsed?${suspendedQuery(filters)}`));
+
+/**
+ * R4: takes the month -- or, with `replaces` (the month's newest take, `takeId`), takes it again, which needs `reason`.
+ * A write, at the write ceiling.
+ */
+export const takeMonth = (month, { replaces, reason } = {}) =>
+  requestJsonWrite((signal) => fetch(apiUrl(`/api/month-end/${encodeURIComponent(month)}/take`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ ...(replaces != null && { replaces }), ...(reason && { reason }) }),
+    signal,
+  }));
 
 /** 04.10: ask for the month's statistics pack -- a write, at the write ceiling; it sends no body. */
 export const askPack = (month) =>
@@ -106,6 +144,10 @@ export const monthEndService = {
   getRecruitment,
   getRepresentatives,
   getVisits,
+  getSuspensions,
+  getSuspendedMembers,
+  getLapsedSuspensions,
+  takeMonth,
   askPack,
   getPack,
 };

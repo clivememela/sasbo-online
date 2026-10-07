@@ -161,7 +161,19 @@
       {"code": "MONTH_NOT_TAKEN", "status": 404},
       {"code": "IDENTITY_REQUIRED", "status": 403},
       {"code": "PACK_BUSY", "status": 409},
-      {"code": "PACK_NOT_FOUND", "status": 404}
+      {"code": "PACK_NOT_FOUND", "status": 404},
+      {"code": "MAIL_NOT_CONFIGURED", "status": 409},
+      {"code": "RECIPIENT_HAS_NO_ADDRESS", "status": 409},
+      {"code": "MAIL_ATTACHMENT_TOO_LARGE", "status": 409},
+      {"code": "MAIL_FAILED", "status": 502},
+      {"code": "SFTP_NOT_CONFIGURED", "status": 409},
+      {"code": "SFTP_FAILED", "status": 502},
+      {"code": "TAKE_REASON_REQUIRED", "status": 400},
+      {"code": "TAKE_REASON_INVALID", "status": 400},
+      {"code": "MEMBER_ALREADY_CAPTURED", "status": 409},
+      {"code": "NO_DEDUCTION_REASON_REQUIRED", "status": 400},
+      {"code": "NO_DEDUCTION_REASON_UNKNOWN", "status": 400},
+      {"code": "SUSPENDED_PAGE_INVALID", "status": 400}
     ]
   }
 }
