@@ -418,8 +418,11 @@ const CEILINGS = {
   //   (the rail draws an icon it already had, so Printer leaves the first load for a shared chunk of the three lazy
   //   screens that draw it -- OB17a: the entry only shrinks) · workplaceVisitService +0.22 (discardDraft) · the rest
   //   +/-0.05 of shared-chunk names. Nothing from src/test/ is imported by the product.
-  // INTEGRATION: the base plus every stream's rise above, until the integration run measures it (OB17).
-  js: 883.88 * KB,
+  // INTEGRATION, MEASURED (OB17): the batch's javascript is 882.06 KiB on clivememela/sasbo-online run 37676718704
+  // at be7b1ab, every paragraph above merged; the ceiling is that figure. The entry chunk measured 336.29, +5.82 over
+  // main's 330.47: the streams' own figures sum to +5.36 (sign-in's shell +4.98, OB17a); the other +0.46 is, by
+  // elimination, the merged preload map naming every stream's lazy chunks.
+  js: 882.07 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
@@ -443,8 +446,9 @@ const CEILINGS = {
   //
   // 81.00 -> 81.19 on 2026-10-07, MEASURED (OB17): 81.18 KiB on run 37667621360, +190 B over 80.99 -- the utilities
   // the review's fixes are the first to use (My visits' pager set flush to its panel, Discard draft's confirmation).
-  // INTEGRATION: the base plus every stream's rise above, until the integration run measures it (OB17).
-  css: 81.84 * KB,
+  // INTEGRATION, MEASURED (OB17): the batch's css is 81.84 KiB on clivememela/sasbo-online run 37676718704
+  // at be7b1ab, every paragraph above merged; the ceiling is that figure.
+  css: 81.85 * KB,
   // 900 -> 925.12 on 2026-09-30, MEASURED, on the owner's word (MO14), the first time `all assets` was over: the same
   // pair as the javascript's, 866.48 KiB (run 36773278932) -> 925.11 KiB (run 36773289808). The javascript's +59,631 B
   // and the stylesheet's +409 B (296 of them the History tab's: its column widths, gutter bleed, alignment and one line
@@ -483,8 +487,9 @@ const CEILINGS = {
   //
   // 958.35 -> 961.57 on 2026-10-07, MEASURED (OB17): 961.56 KiB on run 37667621360 -- the javascript's +3.03 and the
   // stylesheet's +0.19 above, and nothing else.
-  // INTEGRATION: the base plus every stream's rise above, until the integration run measures it (OB17).
-  total: 1029.29 * KB,
+  // INTEGRATION, MEASURED (OB17): the batch's all assets is 1027.46 KiB on clivememela/sasbo-online run 37676718704
+  // at be7b1ab, every paragraph above merged; the ceiling is that figure.
+  total: 1027.47 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to
