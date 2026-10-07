@@ -89,12 +89,16 @@ export default function MonthlyMenu({ pollDelaysMs }) {
           <Button disabled aria-describedby="month-end-take-why">Take {monthLabel(month)} again</Button>
         )}
       </Criteria>
+      {/* A month never taken is refused by what is made from a taken month -- its statistics and its pack
+          (`MONTH_NOT_TAKEN`) -- while the figures beneath, since the 5 Oct move, work it out now. So the sentence names
+          the two that refuse, and says what the figures are; the page never says one thing above its own figures. */}
       {state && (
         <p className="mt-2 max-w-prose text-sm text-ink-muted" data-month-state={state.state}>
           {{
             OPEN: `${monthLabel(month)} is the open month: its figures are read live, as they stand now, until it is taken.`,
             TAKEN: `${monthLabel(month)}: ${takenSentence(state)} Its figures are the month as it stood then.`,
-            NOT_TAKEN: `${monthLabel(month)} was not taken, and a past month is read only from what was taken.`,
+            NOT_TAKEN: `${monthLabel(month)} was not taken: its statistics and its pack are made only from a taken month, `
+              + 'and its figures below are worked out now.',
             NOT_BEGUN: `${monthLabel(month)} has not begun yet.`,
           }[state.state]}
         </p>

@@ -189,6 +189,9 @@ describe('the month\'s figures, on the Month end page (02.3; the 5 Oct Show & Te
     // The month is chosen above them, once: the figures carry no month control of their own.
     expect(screen.getAllByRole('combobox', { name: 'Month' })).toHaveLength(1)
     expect(within(figuresRegion()).queryByRole('combobox', { name: 'Month' })).not.toBeInTheDocument()
+    // One name each: the region and its heading name the section, and the strip within it is its totals -- not the
+    // section's name a third time (review-home).
+    expect(within(figuresRegion()).getByTestId('figure-strip')).toHaveAttribute('aria-label', 'The month’s totals')
   })
 
   it('🔴 MD55: with no month in the address the figures follow the page\'s own -- the newest month taken, asked for by name once the months are read', async () => {
@@ -328,6 +331,12 @@ describe('the month\'s figures, on the Month end page (02.3; the 5 Oct Show & Te
     expect(await screen.findByText('Grouped by where each member works today.')).toBeInTheDocument()
     expect(screen.queryByText(/^As taken:/)).not.toBeInTheDocument()
     expect(asked[0].get('month')).toBe('2026-07')
+    // 🔴 AND THE PAGE ABOVE THEM AGREES, ON ONE RENDER (review-home). It said "a past month is read only from what was
+    // taken" -- the statistics' and the pack's refusal, true of them -- directly above figures that work the month out
+    // now. It names what refuses, and what the figures are.
+    expect(screen.getByText('July 2026 was not taken: its statistics and its pack are made only from a taken month, '
+      + 'and its figures below are worked out now.')).toHaveAttribute('data-month-state', 'NOT_TAKEN')
+    expect(screen.queryByText(/a past month is read only from what was taken/)).not.toBeInTheDocument()
   })
 
   it('loading: no figure is printed before one was read -- and the rest of the page is there already', async () => {
