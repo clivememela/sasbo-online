@@ -61,7 +61,7 @@ export const dodService = {
   })),
 
   // ---- letters (dod-api §6) ---------------------------------------------------------------------------------------
-  /** A specimen PDF of one letter, invented from the address to the account (public). */
+  /** A specimen PDF of one letter, invented from the address to the account (DOD_PREPARE). */
   letterSpecimen: (template) => download(apiUrl(`/api/acb/letters/specimen/${template}`)),
 
   // ---- settings (dod-api §7) --------------------------------------------------------------------------------------

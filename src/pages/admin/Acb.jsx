@@ -68,6 +68,7 @@ const cards = [
         desc: "A specimen of each letter to members, with invented details",
         href: "/admin/acb/letters",
         icon: LucideMails,
+        permission: 'DOD_PREPARE',
     },
     {
         title: "Credits",

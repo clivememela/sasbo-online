@@ -12,7 +12,8 @@ import { expectNoA11yViolations } from '../../test/assertions'
 /**
  * The module once called A.C.B. is "Debit Order Deductions" (the 5 Oct Show & Tell; Stephne, DOD-39), and its screens
  * keep their names (DOD-37). Its cards carry the rail's access keys (OB18): an organiser never sees the runs, the
- * unpaids, the endings or the counts (DOD-14); Settings is shown, marked; the letters are open.
+ * unpaids, the endings or the counts (DOD-14); Settings and the letters are shown, marked (the letters' preview is
+ * DOD_PREPARE's on the server).
  */
 
 const as = (permissions, ui) => renderWithProviders(<TestAuthProvider permissions={permissions}>{ui}</TestAuthProvider>)
@@ -30,18 +31,18 @@ describe('Debit Order Deductions, the module\'s page', () => {
     await expectNoA11yViolations(container)
   })
 
-  it('an organiser sees none of the screens that show unpaids -- the settings marked, the letters open', () => {
+  it('an organiser sees none of the screens that show unpaids -- the settings and the letters marked', () => {
     as([PERMISSIONS.MEMBERS_VIEW, PERMISSIONS.MEMBERS_CAPTURE], <Acb />)
     for (const name of ['Runs', 'Debits', 'Endings to confirm', 'Unpaid counts']) {
       expect(screen.queryByRole('link', { name: new RegExp(`^${name}`) })).not.toBeInTheDocument()
     }
     expect(screen.getByRole('link', { name: /^Settings.*No access/ })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /^Letters/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^Letters.*No access/ })).toBeInTheDocument()
   })
 
   it('nobody signed in sees every screen, each guarded one marked "Sign in"', () => {
     renderWithProviders(<Acb />)
-    for (const name of ['Runs', 'Debits', 'Endings to confirm', 'Unpaid counts', 'Settings']) {
+    for (const name of ['Runs', 'Debits', 'Endings to confirm', 'Unpaid counts', 'Settings', 'Letters']) {
       expect(screen.getByRole('link', { name: new RegExp(`^${name}.*Sign in`) })).toBeInTheDocument()
     }
   })
