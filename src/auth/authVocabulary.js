@@ -12,6 +12,7 @@ export const AUTH_REFUSAL = Object.freeze({
   SIGN_IN_REQUIRED: 'SIGN_IN_REQUIRED',
   SESSION_EXPIRED: 'SESSION_EXPIRED',
   PASSWORD_RULES: 'PASSWORD_RULES',
+  PASSWORD_CHANGE_REQUIRED: 'PASSWORD_CHANGE_REQUIRED',
   PERMISSION_REQUIRED: 'PERMISSION_REQUIRED',
   USERNAME_TAKEN: 'USERNAME_TAKEN',
   SCOPE_INVALID: 'SCOPE_INVALID',
@@ -23,7 +24,7 @@ export const AUTH_REFUSAL = Object.freeze({
  * `sasbo.signin.mode` (`open` until SASBO's users exist, then `required` -- the owner decides when), and the refusals
  * that end a session: defined in `session.js`, which is in the first load where this file is not.
  */
-export { SESSION_ENDING, SIGN_IN_MODES } from './session';
+export { PASSWORD_CHANGE_REQUIRED, SESSION_ENDING, SIGN_IN_MODES } from './session';
 
 /** How far a user sees (permissions.md, "Scope"): everything, some regions, or some areas. */
 export const SCOPE_TYPES = Object.freeze(['ALL', 'REGION', 'AREA']);

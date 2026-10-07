@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { committedVocabulary } from '../test/apiContractScan'
-import { AUTH_REFUSAL, SCOPE_TYPES, SESSION_ENDING, SIGN_IN_MODES, refusalOf } from './authVocabulary'
+import { AUTH_REFUSAL, PASSWORD_CHANGE_REQUIRED, SCOPE_TYPES, SESSION_ENDING, SIGN_IN_MODES, refusalOf } from './authVocabulary'
 import { PERMISSIONS, PERMISSION_LABELS } from './permissions'
 
 /**
@@ -37,6 +37,12 @@ describe('the sign-in vocabulary is the server\'s', () => {
       expect(Object.values(AUTH_REFUSAL)).toContain(code)
     }
     expect(SESSION_ENDING).not.toContain(AUTH_REFUSAL.SIGN_IN_FAILED)
+  })
+
+  it('a temporary password is the server\'s 403 PASSWORD_CHANGE_REQUIRED -- not a missing permission', () => {
+    const published = new Map(auth.refusalCodes.map(({ code, status }) => [code, status]))
+    expect(published.get(PASSWORD_CHANGE_REQUIRED)).toBe(403)
+    expect(AUTH_REFUSAL.PASSWORD_CHANGE_REQUIRED).toBe(PASSWORD_CHANGE_REQUIRED)
   })
 
   it('the two modes and the three kinds of scope are exactly the server\'s', () => {

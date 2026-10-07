@@ -98,6 +98,13 @@ describe('the shell, signed in', () => {
     expect(sessionStorage.getItem(SESSION_KEY)).toBeNull()
   })
 
+  it('a 403 PASSWORD_CHANGE_REQUIRED from any request sends the person to change it, with a way back', async () => {
+    storeSession()
+    // The session was a temporary password's all along; the server says so on the first request that asks.
+    renderShell({ me: () => refusal(403, 'PASSWORD_CHANGE_REQUIRED', 'Please change your temporary password before you go on.') })
+    expect(await screen.findByText('The change-password screen at /change-password?next=%2Fhome')).toBeInTheDocument()
+  })
+
   it('a temporary password is changed before anything else is opened', async () => {
     storeSession(userWith({ mustChangePassword: true }))
     renderShell({ user: userWith({ mustChangePassword: true }) })

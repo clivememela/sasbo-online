@@ -116,6 +116,20 @@ describe('a session the server ends', () => {
     expect(readSession()?.token).toBe('the-new-token')
   })
 
+  it('a 403 PASSWORD_CHANGE_REQUIRED keeps the session and marks its user as on a temporary password', async () => {
+    storeSession()
+    recordAuthorization(`${API}/api/admin/users`, () => refusal(403, 'PASSWORD_CHANGE_REQUIRED', 'Please change your temporary password before you go on.'))
+    await fetch(`${API}/api/admin/users`)
+    expect(readSession()).toMatchObject({ token: TOKEN, user: { mustChangePassword: true } })
+  })
+
+  it('a 403 PERMISSION_REQUIRED leaves the user as they were -- only the temporary password is a change of state', async () => {
+    storeSession()
+    recordAuthorization(`${API}/api/admin/users`, () => refusal(403, 'PERMISSION_REQUIRED'))
+    await fetch(`${API}/api/admin/users`)
+    expect(readSession().user.mustChangePassword).toBe(false)
+  })
+
   it('an anonymous refusal clears nothing, and is announced as no session having ended', async () => {
     const ended = []
     const stop = onSessionEnded((event) => ended.push(event))

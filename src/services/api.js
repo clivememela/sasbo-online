@@ -1,4 +1,4 @@
-import { SESSION_ENDING, endSession, readSession } from '../auth/session';
+import { PASSWORD_CHANGE_REQUIRED, SESSION_ENDING, endSession, readSession, requirePasswordChange } from '../auth/session';
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
@@ -66,7 +66,8 @@ const INSTALLED = Symbol.for('sasbo.sessionFetch');
  * own `Authorization` keeps it. Everything else passes through untouched, with no session or without.
  *
  * It also reads each API `401`: `SESSION_EXPIRED` or `SIGN_IN_REQUIRED` ends the session (`endSession`), before the caller
- * sees the response, so the screen that asked and the shell agree about who is signed in.
+ * sees the response, so the screen that asked and the shell agree about who is signed in. A `403
+ * PASSWORD_CHANGE_REQUIRED` marks the session's user as on a temporary password, which sends them to /change-password.
  *
  * Installed once, from `main.jsx` -- and from `src/test/setup.js` after MSW has patched `fetch`, so this is the outer
  * layer there too and the suite's handlers see the header. Returns the uninstall.
@@ -88,6 +89,8 @@ export function installSessionFetch() {
     if (response.status === 401) {
       const code = await refusalCode(response);
       if (SESSION_OVER.has(code)) endSession(code, token);
+    } else if (response.status === 403 && token && await refusalCode(response) === PASSWORD_CHANGE_REQUIRED) {
+      requirePasswordChange(token);
     }
     return response;
   };

@@ -24,6 +24,8 @@ export const MODE_KEY = 'sasbo.mode';
  */
 export const SESSION_ENDING = Object.freeze(['SESSION_EXPIRED', 'SIGN_IN_REQUIRED']);
 export const SIGN_IN_MODES = Object.freeze(['open', 'required']);
+/** A 403 meaning "this user is still on a temporary password" (signin-server-notes.md §3) -- not a missing permission. */
+export const PASSWORD_CHANGE_REQUIRED = 'PASSWORD_CHANGE_REQUIRED';
 
 let memory = null;
 let cachedText;
@@ -111,6 +113,17 @@ export const endSession = (code, token) => {
     return;
   }
   endListeners.forEach((listener) => listener({ code, hadSession: Boolean(token) }));
+};
+
+/**
+ * The server says the session's user must change a temporary password first (`PASSWORD_CHANGE_REQUIRED`). The stored
+ * user is marked so, and the shell sends them to /change-password with a way back -- the same door a sign-in with
+ * `mustChangePassword` opens. Only for the session that request carried, as `endSession`.
+ */
+export const requirePasswordChange = (token) => {
+  const current = readSession();
+  if (!token || current?.token !== token || current.user.mustChangePassword) return;
+  saveSession({ ...current, user: { ...current.user, mustChangePassword: true } });
 };
 
 export const onSessionEnded = (listener) => {
