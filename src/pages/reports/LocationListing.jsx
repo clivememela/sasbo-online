@@ -1,5 +1,6 @@
 import React from 'react';
 import TableScroller from "../../components/table/TableScroller.jsx";
+import { EMPTY, MONTHS, parseDate } from "../../lib/format.js";
 import { cn } from "../../lib/utils";
 
 /**
@@ -40,7 +41,7 @@ const SAMPLE_LISTING = Object.freeze({
     bankManagerEmail: "branch.manager@example.invalid",
     alternativeContact: "",
     alternativeContactEmail: "",
-    compliments: "4",
+    complement: "4",
     membership: "4",
     lastVisited: "Mar 2025 , Oct 2024 , Nov 2023 , Nov 2021 , Jul 2021 , Jan 2021 , Jul 2019 , Jun 2017 , Aug 2016 , Nov 2015",
 });
@@ -64,11 +65,72 @@ const SAMPLE_LISTING = Object.freeze({
  * `grid-cols-1` it would be asking a phone for three columns it does not have.
  */
 
+/*
+ * 🔴 EVERY RESULT CARD PRINTED BLANK -- found by the October build's manual pass (7 Oct 2026). The card read only the
+ * sample's own keys (`bank`, `ibtNo`, `raNo` ...), and `Locations` hands it the server's `BankBranch` rows from
+ * `GET /api/branches`, whose keys are the entity's (`bankName`, `branchCode`, `randomAccessNumber` ...): not one
+ * matched, so every label stood beside nothing. A record is now read in either shape -- the listing's own key first,
+ * then the server's -- and what neither carries is the em dash, missing rather than blank.
+ *
+ * Each label's server field is the one the Bank / Branch screens already show under the same meaning: the branch code
+ * is the IBT number; `membersCount` is the membership (at or under the staff complement in 67 of the 68 seeded rows,
+ * where `branchMemberComplement` is another figure); `lastVisitedDate` is the last visit, printed as its month as the
+ * legacy listing printed its visits. Nothing the server does not send is invented: the cost code, the area
+ * representative, the BEC and Memnet counts and the alternative contact have no field there yet, and say so.
+ */
+
+/** The branch's address: the listing's own line, else the server's address parts, else its postal address. */
+const addressOf = (record) => {
+    if (typeof record.address === 'string' && record.address.trim()) return record.address;
+    const where = record.physicalAddress;
+    if (typeof where === 'string' && where.trim()) return where;
+    const street = [where?.streetNumber, where?.streetName].filter(Boolean).join(' ');
+    const parts = [where?.complexOrBuilding, street, where?.suburbName ?? where?.suburb?.name,
+        where?.cityName ?? where?.city?.name, where?.provinceName ?? where?.province?.name, where?.postalCode]
+        .map((part) => String(part ?? '').trim()).filter(Boolean);
+    return parts.length ? parts.join(', ') : record.postalAddress;
+};
+
+/** A day as the listing prints a visit -- its month -- or the text as it came, where it is not a day. */
+const visitedOf = (value) => {
+    const date = parseDate(value);
+    return date ? `${MONTHS[date.m - 1]} ${date.y}` : value;
+};
+
+/** The first value that is there; the em dash where none is. */
+const either = (...values) => {
+    const found = values.find((value) => value != null && String(value).trim() !== '');
+    return found ?? EMPTY;
+};
+
+/** A record in the listing's own shape, or a `GET /api/branches` row, as the card prints it. */
+const cardOf = (record) => ({
+    ...record,
+    bank: either(record.bank, record.bankName),
+    ibtNo: either(record.ibtNo, record.branchCode),
+    raNo: either(record.raNo, record.randomAccessNumber),
+    costCode: either(record.costCode),
+    telNo: either(record.telNo, record.phoneNumber),
+    faxNo: either(record.faxNo, record.fax),
+    branch: either(record.branch, record.branchName),
+    address: either(addressOf(record)),
+    areaRepName: either(record.areaRepName),
+    becMembers: either(record.becMembers),
+    memnetMembers: either(record.memnetMembers),
+    bankManager: either(record.bankManager, record.managerName),
+    bankManagerEmail: either(record.bankManagerEmail, record.email),
+    alternativeContact: either(record.alternativeContact),
+    alternativeContactEmail: either(record.alternativeContactEmail),
+    complement: either(record.complement, record.branchStaffComplement),
+    membership: either(record.membership, record.membersCount),
+    lastVisited: either(visitedOf(record.lastVisited ?? record.lastVisitedDate)),
+});
+
 const LocationListing = ({ data, filters }) => {
     // A caller either hands over a record or asks for the worked example. These are NOT
     // merged: filling a real branch's gaps from the sample would print invented members
     // under a real branch heading, which is worse than printing nothing.
-    const listingData = data ?? {
+    const listingData = data ? cardOf(data) : {
         ...SAMPLE_LISTING,
         bank: filters?.bankName || SAMPLE_LISTING.bank,
         branch: filters?.branch || SAMPLE_LISTING.branch,
@@ -183,7 +245,10 @@ const LocationListing = ({ data, filters }) => {
                     ['Bank Manager Email', listingData.bankManagerEmail],
                     ['Alternative Contact', listingData.alternativeContact],
                     ['Alternative Contact Email', listingData.alternativeContactEmail],
-                    ['Compliments', listingData.compliments],
+                    // 🗣️ "COMPLEMENT", the staff of the branch -- spelt "Compliments" here until the owner promised
+                    // the fix at the 5 Oct Show & Tell. A branch record from `/api/branches` carries it as its staff
+                    // complement (`cardOf`).
+                    ['Complement', listingData.complement],
                     ['Membership', listingData.membership],
                     ['Last Visited', listingData.lastVisited],
                 ].map(([label, value]) => (

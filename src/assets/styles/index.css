@@ -612,6 +612,9 @@
 
   @page { margin: 14mm; }
 
+  /* The batch print's sheets (see `.print-batch` below): SASBO's paper, whatever the printer's default. */
+  @page batch-print { size: A4; margin: 12mm; }
+
   html, body {
     background: #fff !important;
     color: #111 !important;
@@ -663,6 +666,20 @@
 
   .print-area thead { display: table-header-group; }
   .print-area tr { break-inside: avoid; }
+
+  /* 🖨️ THE ORGANISERS' BATCH PRINT (October build, 5 Oct Show & Tell: "separate them by bank ... if it's a new bank,
+     start it [on a new page]"). Each bank is a section that BEGINS A NEW SHEET with its own heading -- the bank, the day
+     it was printed, the organiser's area -- and neither that heading nor a branch's is left at the foot of a sheet
+     without what follows it. A4, by a NAMED page, so no other print in the application changes size. */
+  .print-batch { page: batch-print; }
+  .print-bank + .print-bank { break-before: page; }
+  .print-bank-header,
+  .print-branch-head { break-after: avoid; }
+  .print-branch {
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin-top: 6mm !important;
+  }
 
   /* 🖨️ THE MEMBER RECORD. It prints from inside a Radix dialog, which is a
      portalled fixed overlay with its own scroller and a scrim -- none of which

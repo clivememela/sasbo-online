@@ -332,6 +332,20 @@ const statusChanged = golden('POST /api/members/{id}/status');
 const visitsPage = golden('GET /api/workplaces/{id}/visits');
 const visitRecorded = monthEndExamples.answers?.['POST /api/workplaces/{id}/visits'];
 if (visitRecorded?.status !== 201) throw new Error(`${MONTH_END_EXAMPLES} has no answer for POST /api/workplaces/{id}/visits`);
+/*
+ * October build: the organisers' batch print and the members at a branch, and the visit drafts -- each the server's
+ * golden answer, whatever is asked: they measure the screens, not the rules.
+ */
+const listingsBatch = golden('GET /api/workplaces/listings');
+const branchMembers = golden('GET /api/workplaces/{id}/members');
+// The batch's members in one read (October build review): each id asked, a branch with the golden branch's members.
+const batchMembers = golden('GET /api/workplaces/members');
+const myDrafts = golden('GET /api/workplaces/visit-drafts');
+const oneDraft = golden('GET /api/workplaces/visit-drafts/{id}');
+const draftSavedAgain = golden('PUT /api/workplaces/visit-drafts/{id}');
+const draftSubmitted = golden('POST /api/workplaces/visit-drafts/{id}/submit');
+const draftCreated = monthEndExamples.answers?.['POST /api/workplaces/visit-drafts'];
+if (draftCreated?.status !== 201) throw new Error(`${MONTH_END_EXAMPLES} has no answer for POST /api/workplaces/visit-drafts`);
 
 /*
  * THE WORKPLACES. The golden page holds two rows -- right for the suite, too few to measure a sheet with -- so they
@@ -741,6 +755,22 @@ const monthEndAnswer = (req, path, query) => {
   const visits = /^\/api\/workplaces\/(\d+)\/visits$/.exec(path);
   if (visits && req.method === 'GET') return { status: 200, body: { ...visitsPage, workplaceId: Number(visits[1]) } };
   if (visits && req.method === 'POST') return { status: 201, body: visitRecorded.body };
+  // October build: a branch's members and the visit drafts -- a prefix match would answer them with the workplaces' page.
+  const branch = /^\/api\/workplaces\/(\d+)\/members$/.exec(path);
+  if (branch && req.method === 'GET') return { status: 200, body: { ...branchMembers, workplaceId: Number(branch[1]) } };
+  if (path === '/api/workplaces/members' && req.method === 'GET') {
+    const ids = (query.get('ids') ?? '').split(',').filter((id) => /^\d+$/.test(id)).map(Number);
+    const [one] = batchMembers.branches;
+    return { status: 200, body: { ...batchMembers, unknown: [], branches: ids.map((workplaceId) => ({ ...one, workplaceId })) } };
+  }
+  if (path === '/api/workplaces/visit-drafts') {
+    return req.method === 'POST' ? { status: 201, body: draftCreated.body } : { status: 200, body: myDrafts };
+  }
+  const draft = /^\/api\/workplaces\/visit-drafts\/(\d+)(\/submit)?$/.exec(path);
+  if (draft && draft[2] && req.method === 'POST') return { status: 200, body: draftSubmitted };
+  if (draft && !draft[2] && req.method === 'PUT') return { status: 200, body: draftSavedAgain };
+  if (draft && !draft[2] && req.method === 'GET') return { status: 200, body: oneDraft };
+  if (draft && !draft[2] && req.method === 'DELETE') return { status: 204, raw: '' };
   if (req.method === 'GET' && path === '/api/workplaces') {
     const page = Number(query.get('page') ?? 0);
     const size = Number(query.get('size') ?? WORKPLACE_PAGE);
@@ -787,6 +817,10 @@ const API = {
   '/api/reference/suspension-codes': golden('GET /api/reference/suspension-codes'),
   '/api/reference/status': golden('GET /api/reference/status'),
   '/api/workplaces': workplacePage(0, WORKPLACE_PAGE),
+  // October build: the batch print by R/A number, and my visit drafts (one draft, a save and a submission are answered
+  // per shape by `monthEndAnswer`). The keys are what `stubDrift` reads, so each service path is covered by name.
+  '/api/workplaces/listings': listingsBatch,
+  '/api/workplaces/visit-drafts': myDrafts,
   // Month end `04.1`-`04.10`. Every path under these three is answered by `monthEndOwnAnswer` first -- a statistic, a
   // pack and a month each by its shape; the keys are what `stubDrift` reads, so the services' paths are covered by
   // name. The longer two stop the shorter one answering the months or a pack by prefix.
@@ -829,7 +863,7 @@ const API = {
     becMembers: '4', memnetMembers: '9', bankManager: 'Synthetic Manager',
     bankManagerEmail: 'manager.synthetic@example.invalid',
     alternativeContact: 'Synthetic Alternate', alternativeContactEmail: 'alt.synthetic@example.invalid',
-    compliments: '-', membership: '28', lastVisited: '2026-08-01',
+    complement: '-', membership: '28', lastVisited: '2026-08-01',
     members: members.slice(0, 14).map((m) => ({
       memNo: m.membershipNumber, name: `${m.title} ${m.initials} ${m.surname}`,
       bankAt: m.bankName, subscr: m.monthlySubscription, empNum: m.employeeNumber,

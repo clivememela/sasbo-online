@@ -46,8 +46,13 @@ const field = (label) => within(form()).getByLabelText(label)
 const saidAt = (label) => document.getElementById(field(label).getAttribute('aria-describedby')?.split(' ').find((id) =>
   document.getElementById(id)?.getAttribute('role') === 'alert'))?.textContent
 
+/**
+ * Each value set in its field, whole. Typed a key at a time, every character re-rendered the form's 31 fields, and a
+ * test that fills a whole visit ran past the 20 s timeout on a loaded runner (seen 7 Oct on a contended box, main's own
+ * form and this file alike) -- a flake by construction. What a key does to a field is `TextInput`'s to test, not this.
+ */
 async function fill(user, values) {
-  for (const [label, value] of Object.entries(values)) await user.type(field(label), value)
+  for (const [label, value] of Object.entries(values)) fireEvent.change(field(label), { target: { value } })
 }
 
 async function chooseToday(user) {
@@ -60,14 +65,14 @@ async function fillAVisit(user) {
   await fill(user, {
     'Organiser Name': 'INVENTED ORGANISER',
     'R / A Number': '900002',
-    Compliment: '40',
+    Complement: '40',
     Membership: '12',
     'No of Non-Members': '3',
     'No of New Members Recruited': '2',
     'No of Non-Members Interviewed': '5',
     'Branch Rep Name': 'INVENTED REPRESENTATIVE',
   })
-  await user.type(within(form()).getAllByLabelText('Cell Phone & E-Mail')[0], 'rep@example.invalid')
+  fireEvent.change(within(form()).getAllByLabelText('Cell Phone & E-Mail')[0], { target: { value: 'rep@example.invalid' } })
   // A native time control, which takes a time whole rather than a key at a time.
   fireEvent.change(field('Time In'), { target: { value: '09:30' } })
   fireEvent.change(field('Time Out'), { target: { value: '11:00' } })
@@ -153,11 +158,11 @@ describe('Save visit -- what it says when it cannot', () => {
     server.use(workplacesSearched(), visitRecorded())
     const user = setupUser()
     renderWithProviders(<OrganizerReport />)
-    await fill(user, { Compliment: 'forty', 'No of Non-Members': '1.5', Membership: '12' })
+    await fill(user, { Complement: 'forty', 'No of Non-Members': '1.5', Membership: '12' })
 
     await user.click(screen.getByRole('button', { name: 'Save visit' }))
 
-    expect(saidAt('Compliment')).toBe('A whole number, or leave it empty.')
+    expect(saidAt('Complement')).toBe('A whole number, or leave it empty.')
     expect(saidAt('No of Non-Members')).toBe('A whole number, or leave it empty.')
     expect(saidAt('Date of Visit')).toBe('Choose the day of the visit.')
     expect(saidAt('R / A Number')).toBe('The R/A number says which workplace was visited.')
@@ -196,7 +201,7 @@ describe('Save visit -- what it says when it cannot', () => {
     expect(refusal.details.field).toBe('visitedOn')
     await waitFor(() => expect(saidAt('Date of Visit')).toBe(refusal.message))
     expect(field('Organiser Name')).toHaveValue('INVENTED ORGANISER')
-    expect(field('Compliment')).toHaveValue('40')
+    expect(field('Complement')).toHaveValue('40')
     expect(screen.queryByText(/^Visit saved/)).not.toBeInTheDocument()
   })
 

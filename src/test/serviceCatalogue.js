@@ -133,6 +133,14 @@ const ARGS = {
   'recruitmentChannelService.candidates': [{ q: 'Synthetic', excludeChannel: 7 }],
   'recruitmentChannelService.addMember': ['7', '41'],
   'recruitmentChannelService.removeMember': ['7', '41'],
+  'workplaceVisitService.getMyDrafts': ['DRAFT', 0, 20],
+  'workplaceVisitService.getDraft': ['7'],
+  'workplaceVisitService.createDraft': [{ raNumber: 900001, visitedOn: '2026-09-10' }],
+  'workplaceVisitService.updateDraft': ['7', { raNumber: 900001, visitedOn: '2026-09-10', version: 0 }],
+  'workplaceVisitService.submitDraft': ['7', 0],
+  'locationService.getListings': [['900001', '900002']],
+  'locationService.getMembersOf': [['7', '8']],
+  'workplaceVisitService.discardDraft': ['7', 0],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS

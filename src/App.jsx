@@ -76,6 +76,8 @@ const Forms = lazy(() =>
   import('./pages/forms/Forms.jsx').then((m) => ({ default: m.Forms })));
 const Locations = lazy(() =>
   import('./pages/reports/Locations.jsx').then((m) => ({ default: m.Locations })));
+const BatchPrint = lazy(() =>
+  import('./pages/reports/BatchPrint.jsx').then((m) => ({ default: m.BatchPrint })));
 const Recruiters = lazy(() =>
   import('./pages/members/Recruiters.jsx').then((m) => ({ default: m.Recruiters })));
 
@@ -109,6 +111,7 @@ function App() {
         <Route path="reports/organizer-report" element={<OrganizerReport />} />
         <Route path="reports/forms" element={<Forms />} />
         <Route path="reports/locations" element={<Locations />} />
+        <Route path="reports/locations/print" element={<BatchPrint />} />
         <Route path="archives" element={<ArchivesPage />} />
         <Route path="archives/affiliations-other-trade-unions" element={<AffiliationsOtherTradeUnions />} />
         <Route path="archives/finance-houses" element={<FinanceHouses />} />

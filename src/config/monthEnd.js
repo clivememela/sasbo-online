@@ -51,6 +51,18 @@ export const WORKPLACE_PAGE_INVALID = 'WORKPLACE_PAGE_INVALID';
  */
 export const MEMBER_CHANGED_SINCE = 'MEMBER_CHANGED_SINCE';
 
+/**
+ * October build. The organisers' batch print's numbers could not be read (the screen reads them first, so this is the
+ * server's word on what slipped past); a branch outside the caller's region or area -- its members are not listed, and
+ * a visit to it is not captured; and the visit drafts' three: saved since in another tab (open it again), submitted
+ * already (read-only now), and not one of yours.
+ */
+export const RA_NUMBERS_INVALID = 'RA_NUMBERS_INVALID';
+export const WORKPLACE_OUT_OF_SCOPE = 'WORKPLACE_OUT_OF_SCOPE';
+export const VISIT_DRAFT_STALE = 'VISIT_DRAFT_STALE';
+export const VISIT_ALREADY_SUBMITTED = 'VISIT_ALREADY_SUBMITTED';
+export const VISIT_DRAFT_NOT_FOUND = 'VISIT_DRAFT_NOT_FOUND';
+
 /** The refusal codes the screens branch on (ME-13) -- each one the server publishes. */
 export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   REQUEST_MALFORMED: 'REQUEST_MALFORMED',
@@ -63,6 +75,11 @@ export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   HISTORY_PAGE_INVALID,
   VISIT_INVALID,
   MEMBER_CHANGED_SINCE,
+  RA_NUMBERS_INVALID,
+  WORKPLACE_OUT_OF_SCOPE,
+  VISIT_DRAFT_STALE,
+  VISIT_ALREADY_SUBMITTED,
+  VISIT_DRAFT_NOT_FOUND,
 });
 
 /**

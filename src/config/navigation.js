@@ -357,7 +357,10 @@ export const navItems = [
       // confused the people filling it in. The route keeps its old name so no bookmark or tool breaks.
       { title: "Location Visit", icon: NotebookPen, href: "/reports/organizer-report" },
       { title: "Forms", icon: Form, href: "/reports/forms" },
-      { title: "Location Listing", icon: MapPinnedIcon, href: "/reports/locations" }
+      { title: "Location Listing", icon: MapPinnedIcon, href: "/reports/locations" },
+      // October build (5 Oct Show & Tell): the organisers' batch print -- every R/A number at once, a bank a page. An
+      // icon the rail already draws: this file is in the first load, and a new icon there is weight on every screen.
+      { title: "Batch print", icon: LucideFile, href: "/reports/locations/print" }
     ]
   }
 ];

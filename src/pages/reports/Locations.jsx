@@ -1,4 +1,5 @@
 import {useState} from "react";
+import { Link } from "react-router-dom";
 import {Search, X, Printer} from "lucide-react";
 import LocationListing from "./LocationListing.jsx";
 import {locationService} from "../../services/locationService.js";
@@ -83,6 +84,14 @@ export function Locations() {
                     </Button>
                 )}
             </Criteria>
+            {/* October build (5 Oct Show & Tell): the organisers' batch print -- every R/A number at once. */}
+            <p className="no-print mt-3 text-sm text-ink-muted">
+                Printing for several branches?{' '}
+                <Link to="/reports/locations/print" className="font-medium text-brand-ink underline">
+                    Type all their R/A numbers at once
+                </Link>{' '}
+                and print every listing together, each bank on a new page.
+            </p>
 
             {searched && searchState === 'ready' && results.length > 0 && (
                 <p className="mt-4 flex items-center gap-2 text-sm text-ink-muted">
