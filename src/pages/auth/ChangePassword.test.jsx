@@ -6,6 +6,8 @@ import { http, HttpResponse } from 'msw'
 
 import ChangePassword from './ChangePassword'
 import { AuthProvider } from '../../auth/AuthContext'
+// The provider's server conversations are a lazy chunk; in the registry before any test, so a wait times the screen.
+import '../../auth/authServer'
 import { readSession } from '../../auth/session'
 import { expectNoA11yViolations } from '../../test/assertions'
 import { authHandlers, refusal, storeSession, userWith } from '../../test/authFixtures'

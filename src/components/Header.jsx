@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, Menu, Search } from "lucide-react";
 import Breadcrumbs from "./common/Breadcrumbs";
@@ -6,10 +6,8 @@ import Button from "./form/Button";
 import { MENU_BUTTON_ID, SIDEBAR_ID } from "./shellIds";
 import { cn } from "../lib/utils";
 import useMediaQuery from "../hooks/useMediaQuery";
-
 // LAZY (OB17a): who is signed in, and the way in or out, arrive with the page's own chunk -- see `AccountControls`.
-const HeaderAccount = lazy(() =>
-  import("./account/AccountControls").then((m) => ({ default: m.HeaderAccount })));
+import { HeaderAccount } from "./account/lazyAccount";
 
 /**
  * THE TOPBAR. card.html's `.topbar`, and it is 60px.

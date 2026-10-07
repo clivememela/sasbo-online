@@ -10,6 +10,8 @@ import AppLayout from '../layouts/AppLayout'
 import '../components/common/SessionNotice'
 import '../components/account/AccountControls'
 import { AuthProvider } from './AuthContext'
+// The provider's server conversations are a lazy chunk too.
+import './authServer'
 import { SESSION_KEY } from './session'
 import { expectNoA11yViolations } from '../test/assertions'
 import { authHandlers, refusal, storeSession, TOKEN, userWith } from '../test/authFixtures'

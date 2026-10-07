@@ -1,16 +1,13 @@
 import { createContext, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 
 import reportError from '../lib/reportError';
-import { getMe, getMode, signOut as postSignOut } from '../services/authService';
-import { ERROR_KINDS } from '../services/parseApiError';
-import {
-  SIGN_IN_MODES, clearSession, isFresh, onSessionEnded, readMode, readSession, saveMode, saveSession, subscribeSession,
-} from './session';
+import { clearSession, onSessionEnded, readMode, readSession, subscribeSession } from './session';
 
 /**
  * Who is signed in, and what they may do -- `{ status, mode, user, can(permission), signOut, sessionEnded,
  * dismissSessionEnded }`. Signing in and changing a password are `authActions.js`'s, loaded with the pages that do them;
- * this file is in the first load, so it holds only what the shell needs to know who is there.
+ * the provider's own server conversations are `authServer.js`'s, loaded a moment after the shell. This file is in the
+ * first load, so it holds only what the shell needs to know who is there.
  *
  * The DEFAULT VALUE is the anonymous caller, deliberately -- unlike `ThemeContext`, which has none. A screen that asks
  * `useAuth()` outside a provider (every test that mounts one page) gets "nobody is signed in" rather than a throw, which
@@ -30,6 +27,10 @@ const AuthContext = createContext(ANONYMOUS);
 
 const noSessionOnTheServer = () => null;
 
+// LAZY (OB17a): the mode, the user read again and signing out -- see `authServer.js`.
+const server = () => import('./authServer');
+const unreachable = (error) => reportError('AuthProvider.server', error);
+
 /**
  * The real caller, from the session `api.js` sends (`session.js`), read as an external store: a session the server ends
  * mid-request is gone from the header in the same render as from the next request, and one a sign-in saves is here at once.
@@ -45,52 +46,35 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     let current = true;
-    getMode()
+    server()
+      .then((s) => s.askMode())
       .then((answer) => {
-        if (!current || !SIGN_IN_MODES.includes(answer?.mode)) return;
-        saveMode(answer.mode);
-        setMode(answer.mode);
+        if (current && answer) setMode(answer);
       })
-      .catch((error) => {
-        // Unreachable is not reported, so it raises no offline banner of its own: the screen's own reads say so if the
-        // server is down, and a page stubbed without this one route (a deck slide) must not show a false alarm.
-        if (error?.kind !== ERROR_KINDS.NETWORK) reportError('AuthProvider.mode', error);
-      });
+      .catch(unreachable);
     return () => {
       current = false;
     };
   }, []);
 
-  // A session found in the tab is read again from the server, once: a role may have changed since sign-in, and a
-  // revoked session ends here rather than at the first screen that asks. A `401` is ended by `api.js`; any other
-  // failure keeps the session -- a network blip is not a sign-out. A sign-in's own answer is not asked for again.
+  // A session found in the tab is read again from the server, once a page load (`authServer.refreshUser`).
   const token = session?.token;
   useEffect(() => {
-    if (!token || isFresh(token)) return undefined;
-    let current = true;
-    getMe()
-      .then((answer) => {
-        const stored = readSession();
-        if (current && answer?.user && stored?.token === token) saveSession({ ...stored, user: answer.user });
-      })
-      .catch((error) => reportError('AuthProvider.me', error));
-    return () => {
-      current = false;
-    };
+    if (token) server().then((s) => s.refreshUser(token)).catch(unreachable);
   }, [token]);
 
   useEffect(() => onSessionEnded(({ hadSession }) => {
     if (hadSession) setEnded(true);
   }), []);
 
-  // The request goes WITH the token, so the server can revoke it; the tab forgets it whatever the answer.
   const signOut = useCallback(async () => {
     try {
-      if (readSession()) await postSignOut();
+      await (await server()).signOutNow();
     } catch (error) {
-      reportError('AuthProvider.signOut', error);
-    } finally {
+      // The module itself did not arrive: the tab still forgets the session.
+      unreachable(error);
       clearSession();
+    } finally {
       setEnded(false);
     }
   }, []);

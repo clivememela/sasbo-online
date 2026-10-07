@@ -1,4 +1,4 @@
-import { lazy, Suspense, useSyncExternalStore } from "react";
+import { Suspense, useSyncExternalStore } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "./Header";
 import ErrorBoundary from "./common/ErrorBoundary";
@@ -6,9 +6,8 @@ import RoutePending from "./common/RoutePending";
 import { MAIN_CONTENT_ID } from "./shellIds";
 import OfflineBanner from "./common/OfflineBanner";
 import { useAuth } from "../auth/useAuth";
-
 // LAZY: it says something only after a session has ended, so the first load does not carry it (OB17a).
-const SessionNotice = lazy(() => import("./common/SessionNotice"));
+import { SessionNotice } from "./account/lazyAccount";
 import { PAGE_GUTTER } from "./common/Sheet.jsx";
 import { cn } from "../lib/utils";
 import { getLastNetworkFailureAt, onNetworkFailure } from "../lib/reportError";

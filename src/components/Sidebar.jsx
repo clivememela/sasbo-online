@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { lazy, memo, Suspense, useEffect, useRef, useState } from "react";
+import { memo, Suspense, useEffect, useRef, useState } from "react";
 import Logo from "./common/Logo";
 import SidebarItem from "./common/SidebarItem";
 import ThemeToggle from "./common/ThemeToggle";
@@ -9,10 +9,8 @@ import { navItems } from "../config/navigation";
 import { MENU_BUTTON_ID, SIDEBAR_ID } from "./shellIds";
 import { cn } from "../lib/utils";
 import useMediaQuery from "../hooks/useMediaQuery";
-
 // LAZY (OB17a): the foot's Sign in or Sign out, from the same lazy module as the header's account (`AccountControls`).
-const RailAccount = lazy(() =>
-  import("./account/AccountControls").then((m) => ({ default: m.RailAccount })));
+import { RailAccount } from "./account/lazyAccount";
 
 /*
  * The chain of hrefs from the rail's root to `target`, and the SHORTEST one when a route

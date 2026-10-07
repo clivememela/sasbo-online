@@ -6,6 +6,9 @@ import { cn } from '../../lib/utils';
 import { useAuth } from '../../auth/useAuth';
 import { loginPath } from '../../auth/next';
 
+// The ended-session notice rides this chunk too (`lazyAccount.js`): one module, asked for once.
+export { default as SessionNotice } from '../common/SessionNotice';
+
 /**
  * WHO IS SIGNED IN, AND THE WAY IN OR OUT -- the header's account chip and the rail's foot (contracts/signin.md, "The
  * client"). One LAZY module for both (OB17a): the first load carries the shell and the session, and these arrive with
