@@ -7,6 +7,7 @@ import { memberService } from '../services/memberService'
 import { memberHistoryService } from '../services/memberHistoryService'
 import { memberStatusService } from '../services/memberStatusService'
 import { monthEndService } from '../services/monthEndService'
+import { payrollService } from '../services/payrollService'
 import { recruiterService } from '../services/recruiterService'
 import { recruitmentChannelService } from '../services/recruitmentChannelService'
 import { referenceService } from '../services/referenceService'
@@ -38,6 +39,7 @@ export const SERVICE_MODULES = [
   { name: 'memberHistoryService', module: memberHistoryService },
   { name: 'memberStatusService', module: memberStatusService },
   { name: 'monthEndService', module: monthEndService },
+  { name: 'payrollService', module: payrollService },
   { name: 'recruiterService', module: recruiterService },
   { name: 'recruitmentChannelService', module: recruitmentChannelService },
   { name: 'referenceService', module: referenceService },
@@ -105,6 +107,31 @@ const ARGS = {
   'memberHistoryService.getMemberHistory': ['7', 0, 50],
   'workplaceVisitService.getVisits': ['7', 0, 20],
   'workplaceVisitService.recordVisit': ['7', { visitedOn: '2026-09-10', complementFound: 40 }],
+  'payrollService.getFiles': [{ employerId: 1, period: '2026-09' }, 0, 20],
+  'payrollService.getFile': ['12'],
+  'payrollService.getRows': ['12', 'MATCHED', 0, 20],
+  'payrollService.getDiscrepancies': ['12', { type: 'AMOUNT_DIFFERS', status: 'OPEN' }, 0, 20],
+  'payrollService.getDiscrepancy': ['77'],
+  'payrollService.getQueries': ['12'],
+  'payrollService.uploadFile': [{
+    file: new File(['STAFF NO,SURNAME,AMOUNT\nSYN-1,Synthetic,174.00\n'], 'synthetic.csv', { type: 'text/csv' }),
+    employerId: 1,
+    period: '2026-09',
+  }],
+  'payrollService.typeInFile': [{
+    employerId: 7,
+    period: '2026-09',
+    statedTotal: '174.00',
+    rows: [{ staffNumber: 'SYN-1', idNumber: null, initials: 'S', surname: 'Synthetic', amount: '174.00' }],
+  }],
+  'payrollService.compareAgain': ['12', { version: 1, columnMapping: null }],
+  'payrollService.raiseQueries': ['12'],
+  'payrollService.addNote': ['77', 'Synthetic note'],
+  'payrollService.resolveDiscrepancy': ['77', { outcome: 'OTHER', note: 'Synthetic note', version: 2 }],
+  'payrollService.recordPayment': [{ employerId: 1, period: '2026-09', amount: '174.00', receivedOn: '2026-09-30' }],
+  'payrollService.downloadDiscrepancies': ['12', 'xlsx'],
+  'payrollService.downloadFullReport': ['12', 'pdf'],
+  'payrollService.downloadQuery': ['2', { format: 'xlsx', password: 'placeholder' }],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS
