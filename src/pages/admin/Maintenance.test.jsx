@@ -4,6 +4,8 @@ import { screen } from '@testing-library/react'
 
 import Maintenance from './Maintenance'
 import { navItems } from '../../config/navigation'
+import { PERMISSIONS } from '../../auth/permissions'
+import { TestAuthProvider } from '../../test/authTestUtils'
 import { renderWithProviders } from '../../test/renderWithProviders'
 
 /**
@@ -50,6 +52,28 @@ describe('the Maintenance menu', () => {
     // Written twice -- a card here, a leaf in the rail -- so both halves are asserted by name, not only by count.
     expect(screen.getByRole('link', { name: /^Workplaces/ })).toHaveAttribute('href', '/admin/maintenance/workplaces')
     expect(sidebarMaintenance().find((entry) => entry.title === 'Workplaces')?.href).toBe('/admin/maintenance/workplaces')
+  })
+
+  it('offers sign-in\'s users, positions, roles and record (5 Oct), each marked until the person may use it', () => {
+    const SIGN_IN = [
+      ['Users', '/admin/maintenance/users'],
+      ['Positions', '/admin/maintenance/positions'],
+      ['Roles', '/admin/maintenance/roles'],
+      ['Who did what', '/admin/maintenance/audit'],
+    ]
+    const { unmount } = renderWithProviders(<Maintenance />)
+    for (const [title, href] of SIGN_IN) {
+      const link = screen.getByRole('link', { name: new RegExp(`^${title}`) })
+      expect(link).toHaveAttribute('href', href)
+      // Shown, and marked -- never hidden (permissions.md, "Menus").
+      expect(link).toHaveTextContent('Sign in needed')
+      expect(sidebarMaintenance().find((entry) => entry.title === title)?.href).toBe(href)
+    }
+    unmount()
+
+    renderWithProviders(<TestAuthProvider permissions={[PERMISSIONS.USERS_ADMIN]}><Maintenance /></TestAuthProvider>)
+    expect(screen.getByRole('link', { name: /^Users/ })).not.toHaveTextContent(/needed|Needs/)
+    expect(screen.getByRole('link', { name: /^Who did what/ })).toHaveTextContent('Needs a permission')
   })
 
   it('says the same in the sidebar as on the page -- every entry a link, to the same place', () => {

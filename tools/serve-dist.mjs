@@ -616,6 +616,97 @@ const authAnswer = (req, path) => {
   return false;
 };
 
+/**
+ * MAINTENANCE'S USERS, POSITIONS, ROLES AND THE RECORD OF WHO DID WHAT (contracts/signin.md), for the signed-in
+ * surfaces. Six provisional positions and their roles as permissions.md lists them; twelve invented users across them,
+ * each scope a real code of the golden lists (regions NORTH and SOUTH, areas A, B and Y); a hundred and twenty entries
+ * of the record. Writes are answered and nothing is stored: a new user is always id 9201, and every temporary password
+ * is the same obviously-invented string, which is what a surface photographs.
+ */
+const ALL_PERMISSIONS = {
+  USERS_ADMIN: 'Create and edit users, positions and roles; reset a password; deactivate a user',
+  AUDIT_VIEW: 'Read the record of who did what',
+  MEMBERS_VIEW: 'See a listing that names members, within the user\'s region or area',
+  MEMBERS_CAPTURE: 'Capture a new member',
+  MEMBERS_EDIT: 'Edit a member\'s record and change a member\'s status',
+  REFERENCE_MAINTAIN: 'Maintain lists: banks and branches, workplaces, recruitment channels, reasons',
+  SUBSCRIPTIONS_MAINTAIN: 'Change subscription amounts',
+  MONTH_END_VIEW: 'Read month-end figures and statistics',
+  MONTH_END_TAKE: 'Take the month, and take it again with a reason',
+  MONTH_END_SEND: 'Produce, download and e-mail the month\'s packs, bank files and provider files',
+  DOD_PREPARE: 'Prepare a debit order run, record unpaids and suspensions, confirm endings',
+  DOD_FILE: 'Download the debit order file for the bank',
+  DOD_SETTINGS: 'Debit order rates, non-working days and moving a bank\'s members to a new debit day',
+  PAYROLL_PROCESS: 'Load employer payroll files, work discrepancies, raise and close queries',
+  PAYROLL_VIEW: 'Read payroll reconciliation results and reports',
+  VISITS_CAPTURE: 'Capture and submit a workplace visit',
+  REPORTS_PRINT: 'Print organisers\' reports and location listings',
+  MIGRATION_RUN: 'Run legacy data imports and their checks',
+};
+const PROVISIONAL = [
+  ['SYSTEM_ADMINISTRATOR', 'System Administrator', Object.keys(ALL_PERMISSIONS)],
+  ['HEAD_OFFICE_ADMINISTRATOR', 'Head Office Administrator', ['AUDIT_VIEW', 'MEMBERS_VIEW', 'MEMBERS_CAPTURE', 'MEMBERS_EDIT',
+    'REFERENCE_MAINTAIN', 'MONTH_END_VIEW', 'MONTH_END_TAKE', 'MONTH_END_SEND', 'DOD_PREPARE', 'PAYROLL_PROCESS', 'PAYROLL_VIEW',
+    'VISITS_CAPTURE', 'REPORTS_PRINT']],
+  ['CHIEF_FINANCIAL_OFFICER', 'Chief Financial Officer', ['MEMBERS_VIEW', 'MONTH_END_VIEW', 'DOD_FILE', 'DOD_SETTINGS',
+    'SUBSCRIPTIONS_MAINTAIN', 'PAYROLL_VIEW']],
+  ['SENIOR_SECRETARIAT', 'Senior Secretariat', ['MEMBERS_VIEW', 'MONTH_END_VIEW', 'REPORTS_PRINT']],
+  ['REGIONAL_SECRETARY', 'Regional Secretary', ['MEMBERS_VIEW', 'MONTH_END_VIEW', 'VISITS_CAPTURE', 'REPORTS_PRINT']],
+  ['ORGANISER', 'Organiser', ['MEMBERS_VIEW', 'MEMBERS_CAPTURE', 'VISITS_CAPTURE', 'REPORTS_PRINT']],
+];
+const adminPositions = PROVISIONAL.map(([code, name], i) => ({ code, name, defaultRoleCode: code, active: true, ordinal: i + 1 }));
+const adminRoles = PROVISIONAL.map(([code, name, permissions]) => ({ code, name, permissions }));
+const SCOPES = [{ type: 'ALL', codes: [] }, { type: 'REGION', codes: ['NORTH'] }, { type: 'AREA', codes: ['A', 'B'] }, { type: 'AREA', codes: ['Y'] }];
+const adminUsers = ['Ada', 'Ben', 'Cleo', 'Dumi', 'Eve', 'Femi', 'Gugu', 'Hal', 'Ivy', 'Jabu', 'Kea', 'Lulu'].map((first, i) => {
+  const [code, name, permissions] = PROVISIONAL[i % PROVISIONAL.length];
+  const scope = code === 'REGIONAL_SECRETARY' ? SCOPES[1] : code === 'ORGANISER' ? SCOPES[2 + (i % 2)] : SCOPES[0];
+  return {
+    id: 9101 + i, username: `${first.toLowerCase()}.synthetic`, displayName: `${first} Synthetic`,
+    email: `${first.toLowerCase()}.synthetic@example.invalid`, position: { code, name }, role: { code, name }, permissions, scope,
+    mustChangePassword: i === 11, lastSignInAt: i === 11 ? null : `2026-10-0${1 + (i % 6)}T0${6 + (i % 3)}:15:00Z`,
+    active: i !== 10, version: 1 + (i % 3),
+  };
+});
+const AUDIT_ACTIONS = [['SIGN_IN', 'USER', 'Signed in'], ['SIGN_IN_FAILED', 'USER', 'Sign-in refused: the password did not match'],
+  ['USER_UPDATED', 'USER', 'Changed: position, scope'], ['PASSWORD_RESET', 'USER', 'Temporary password issued; 2 sessions ended'],
+  ['ROLE_UPDATED', 'ROLE', 'Permissions: 1 added, 0 removed'], ['MONTH_TAKEN', 'MONTH', 'September 2026 taken: 6 statistics frozen']];
+const auditEntries = Array.from({ length: 120 }, (_, i) => {
+  const [action, entityType, summary] = AUDIT_ACTIONS[i % AUDIT_ACTIONS.length];
+  const who = adminUsers[i % 4];
+  return {
+    id: 50000 - i, at: `2026-10-${String(6 - Math.floor(i / 24)).padStart(2, '0')}T${String(16 - (i % 10)).padStart(2, '0')}:${String((i * 7) % 60).padStart(2, '0')}:00Z`,
+    username: who.username, displayName: who.displayName, action, entityType,
+    entityId: entityType === 'MONTH' ? '2026-09' : entityType === 'ROLE' ? 'ORGANISER' : String(adminUsers[(i + 3) % 12].id), summary,
+  };
+});
+const pageOf = (rows, query) => {
+  const size = Math.min(Math.max(Number(query.get('size') ?? 50) || 50, 1), 200);
+  const page = Math.max(Number(query.get('page') ?? 0) || 0, 0);
+  return { content: rows.slice(page * size, page * size + size), page, size, totalElements: rows.length, totalPages: Math.ceil(rows.length / size) };
+};
+const TEMPORARY = 'surface-temporary-password';
+const adminAnswer = (req, path, query) => {
+  if (req.method === 'GET' && path === '/api/admin/users') {
+    const q = (query.get('q') ?? '').toLowerCase();
+    return { status: 200, body: pageOf(adminUsers.filter((u) => !q || `${u.displayName} ${u.username}`.toLowerCase().includes(q)), query) };
+  }
+  if (req.method === 'POST' && path === '/api/admin/users') {
+    return { status: 201, body: { user: { ...adminUsers[5], id: 9201, version: 0, mustChangePassword: true, lastSignInAt: null }, temporaryPassword: TEMPORARY } };
+  }
+  const user = /^\/api\/admin\/users\/(\d+)(\/reset-password)?$/.exec(path);
+  if (user && req.method === 'POST' && user[2]) return { status: 200, body: { temporaryPassword: TEMPORARY } };
+  if (user && req.method === 'PUT') {
+    const found = adminUsers.find((u) => u.id === Number(user[1])) ?? adminUsers[0];
+    return { status: 200, body: { user: { ...found, version: found.version + 1 } } };
+  }
+  if (req.method === 'POST' && path === '/api/admin/positions') return { status: 201, body: adminPositions[0] };
+  if (req.method === 'PUT' && path.startsWith('/api/admin/positions/')) return { status: 200, body: adminPositions[0] };
+  if (req.method === 'POST' && path === '/api/admin/roles') return { status: 201, body: adminRoles[0] };
+  if (req.method === 'PUT' && path.startsWith('/api/admin/roles/')) return { status: 200, body: adminRoles[0] };
+  if (req.method === 'GET' && path === '/api/audit') return { status: 200, body: pageOf(auditEntries, query) };
+  return false;
+};
+
 /** Month end's shapes a prefix match cannot answer; `false` when the path is not one of them. */
 const monthEndAnswer = (req, path, query) => {
   if (path.startsWith('/api/month-end')) return monthEndOwnAnswer(req, path, query);
@@ -648,6 +739,12 @@ const API = {
   '/api/auth/login': {},
   '/api/auth/logout': {},
   '/api/auth/password': {},
+  // Maintenance's users, positions, roles and the record (`adminAnswer` pages and writes; these keys cover the reads).
+  '/api/admin/users': { content: adminUsers, page: 0, size: 50, totalElements: adminUsers.length, totalPages: 1 },
+  '/api/admin/positions': adminPositions,
+  '/api/admin/roles': adminRoles,
+  '/api/admin/permissions': Object.entries(ALL_PERMISSIONS).map(([name, description]) => ({ name, description })),
+  '/api/audit': { content: auditEntries.slice(0, 50), page: 0, size: 50, totalElements: auditEntries.length, totalPages: 3 },
   '/api/members': members,
   '/api/members/summary': memberSummary,
   // Month end's reads, from the server's golden answers (`golden`, above). The workplaces' key answers their first
@@ -869,7 +966,8 @@ const server = createServer((req, res) => {
       return;
     }
     // The shapes a prefix match cannot answer: sign-in, A.C.B.'s runs, and month end's pages and change of status.
-    const shaped = authAnswer(req, path) || acbRunAnswer(req, path) || monthEndAnswer(req, path, url.searchParams);
+    const shaped = authAnswer(req, path) || adminAnswer(req, path, url.searchParams) || acbRunAnswer(req, path)
+      || monthEndAnswer(req, path, url.searchParams);
     if (shaped) {
       // A JSON body, unless the shape carries bytes of its own type (the pack's workbook, an attachment).
       res.writeHead(shaped.status, { 'content-type': shaped.type ?? 'application/json; charset=utf-8', ...shaped.headers });

@@ -23,6 +23,8 @@ export const ROUTES = [
   '/login', '/change-password', '/home', '/admin', '/admin/acb', '/admin/acb/debits', '/admin/acb/runs', '/admin/daily-menu',
   '/admin/monthly-menu', '/admin/maintenance', '/admin/maintenance/recruitment-channel',
   '/admin/maintenance/subscriptions', '/admin/maintenance/workplaces', '/recruiters', '/banks', '/banks/listing',
+  // Sign-in's Maintenance screens: swept as nobody, they show what is needed (the signed-in states are surfaces).
+  '/admin/maintenance/users', '/admin/maintenance/positions', '/admin/maintenance/roles', '/admin/maintenance/audit',
   '/members', '/members/apply', '/members/capture', '/members/recruiters',
   '/reports', '/reports/organizer-report', '/reports/forms', '/reports/locations',
   '/archives', '/archives/affiliations-other-trade-unions', '/archives/finance-houses',

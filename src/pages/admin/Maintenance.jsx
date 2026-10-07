@@ -7,6 +7,7 @@ import { NavigationList } from '../../components/common/NavigationCard.jsx';
 import { Page } from '../../components/common/Sheet.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
 import {useOutletContext} from "react-router-dom";
+import { SIGN_IN_ENTRIES } from '../../config/navigation.js';
 
 const maintenance_cards = [
     /*{
@@ -69,6 +70,8 @@ const maintenance_cards = [
         href: '/admin/maintenance/workplaces',
         desc: 'Find a workplace by its name or R/A number'
     },
+    // Sign-in's users, positions, roles and record of who did what -- the same entries as the rail's, by construction.
+    ...SIGN_IN_ENTRIES,
     /*{
         title: 'Recruiters',
         icon: LucideUserKey,
