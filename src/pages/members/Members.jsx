@@ -40,7 +40,7 @@ import KeyHints from "../../components/common/KeyHints.jsx";
 import Sheet, { PAGE_GUTTER } from "../../components/common/Sheet.jsx";
 import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
-import { ERROR_KINDS, writeMayHaveLanded } from "@/services/parseApiError.js";
+import { ERROR_KINDS, messageOf, validationErrorsOf, writeMayHaveLanded } from "@/services/parseApiError.js";
 import useFocusOn from "../../hooks/useFocusOn.js";
 import { EMPTY, formatDate, formatZar, toWireDate } from "@/lib/format.js";
 import { finishField, sanitiseField, validateField } from "@/utils/inputRules.js";
@@ -52,7 +52,7 @@ import WorkplaceField from "../../components/members/WorkplaceField.jsx";
 import useWorkplaceSource from "../../hooks/useWorkplaceSource.js";
 import useWorkplaceChoice from "../../hooks/useWorkplaceChoice.js";
 import useMemberWorkplace from "../../hooks/useMemberWorkplace.js";
-import { WORKPLACE_UNKNOWN } from "@/config/monthEnd.js";
+import { MEMBER_CHANGED_SINCE, WORKPLACE_UNKNOWN } from "@/config/monthEnd.js";
 import ChangeStatus from "../../components/members/ChangeStatus.jsx";
 import { useDebounce } from "../../hooks/useDebounce.js";
 import useRegisterSearch from "./useRegisterSearch.js";
@@ -388,6 +388,7 @@ const SAVE_NOTICE_TITLES = {
     failed: "The changes were not saved",
     unconfirmed: "The save could not be confirmed",
     stale: "The changes were saved",
+    changed: "Someone else changed this record",
 };
 
 export default function Members() {
@@ -1142,6 +1143,7 @@ export default function Members() {
     const commitSave = async () => {
         if (savingRecord) return;
         setSavingRecord(true);
+        let saved = null;
         // ONE exit, whatever happens below: the write's own `catch` returns early, and the refresh that follows
         // has a `try` of its own, so a third path added later would otherwise leave the record busy for ever.
         try {
@@ -1157,7 +1159,12 @@ export default function Members() {
                  * telephone number can neither put back a status somebody changed since the record was read, nor be
                  * refused over one nobody touched once the `PUT` stops changing status (03.4).
                  */
-                await memberService.updateMember({
+                /*
+                 * 🔁 V68: AND IT NAMES THE VERSION OF THE RECORD IT READ (`editForm.version`, from the record's own read),
+                 * so the server refuses it -- MEMBER_CHANGED_SINCE -- where somebody has saved the record since. The later
+                 * of two edits used to undo the earlier one without a word.
+                 */
+                saved = await memberService.updateMember({
                     ...editForm,
                     status: undefined,
                     workplaceName: undefined,
@@ -1172,29 +1179,42 @@ export default function Members() {
                 // 🔴 R3-F2: "Nothing was written" only after a refusal. A timeout, a lost connection or a 5xx may have saved
                 // the change, and a clerk told otherwise redoes it.
                 setPendingSave(null);
-                // 01.3: a workplace that is not on record here is said AT the Workplace field, in the server's words, and
-                // the edit is kept exactly as typed so another can be chosen.
-                const refusal = error?.body?.code === WORKPLACE_UNKNOWN && error.message;
-                if (refusal) {
-                    setFieldErrors({ workplaceId: refusal });
-                    setActiveTab("employment");
-                }
-                setSaveNotice(writeMayHaveLanded(error)
-                    ? {
+                if (writeMayHaveLanded(error)) {
+                    setSaveNotice({
                         kind: "unconfirmed",
                         messages: ["We did not get an answer about these changes, so they may have been saved. Reload the register and check this member before trying again."],
-                    }
-                    : {
-                        kind: "failed",
-                        messages: [refusal || "We could not save these changes. Nothing was written — please try again."],
                     });
+                    return;
+                }
+                /*
+                 * 🔴 A REFUSED EDIT HID ITS REASON (the manual stream, 7 Oct): every refusal but one was "We could not save
+                 * these changes. Nothing was written — please try again." -- while the server had said why, and trying
+                 * again only met the same refusal. The server's sentence is what the clerk reads now (ME-13), the fields
+                 * it names are marked, and the edit is kept exactly as typed.
+                 */
+                const code = error?.body?.code;
+                const reason = messageOf(error);
+                if (code === MEMBER_CHANGED_SINCE) {
+                    // V68: somebody saved the record after it was read -- said, and the record offered again.
+                    setSaveNotice({ kind: "changed", messages: [reason] });
+                    return;
+                }
+                // 01.3: a workplace that is not on record here is said AT the Workplace field, in the server's words.
+                const named = code === WORKPLACE_UNKNOWN ? { workplaceId: reason } : validationErrorsOf(error);
+                const fields = Object.keys(named);
+                if (fields.length > 0) {
+                    setFieldErrors((prev) => ({ ...prev, ...named }));
+                    setActiveTab(FIELD_TO_TAB_MAP[fields[0]] || (code === WORKPLACE_UNKNOWN ? "employment" : activeTab));
+                }
+                setSaveNotice({ kind: "failed", messages: [`${reason} Nothing was written.`] });
                 return;
             }
 
             // The save landed. What follows is the register catching up, and its failure is not the save's (R3-F2): it
             // shared the write's `try`, so a good save followed by a failed refresh was reported as not written.
             setPendingSave(null);
-            setSelectedMember({ ...editForm });
+            // V68: the record holds the version this save wrote, so the next edit is not refused over this one.
+            setSelectedMember({ ...editForm, version: saved?.id === editForm.id ? saved.version : editForm.version });
             setEditBaseline(null);
             setIsEditing(false);
             const savedName = personName(editForm);
@@ -1238,6 +1258,16 @@ export default function Members() {
         setSaveNotice(null);
         setFieldErrors({});
     }, []);
+
+    /**
+     * 🔁 V68: THE RECORD SOMEBODY SAVED SINCE, READ AGAIN -- the refused edit set aside (nothing of it was written) and
+     * the record shown as it now stands, to be edited again; the page and the figures follow (`rereadMember`).
+     */
+    const reloadChangedRecord = useCallback(() => {
+        const id = guard.current.selectedId;
+        endEdit();
+        if (id != null) rereadMember(id);
+    }, [endEdit, rereadMember]);
 
     const requestOpenRecord = useCallback((row) => {
         const { isEditing: editing, selectedId } = guard.current;
@@ -1851,6 +1881,9 @@ export default function Members() {
                                 <ul className="mt-1 list-disc pl-6">
                                     {saveNotice.messages.map((message) => <li key={message}>{message}</li>)}
                                 </ul>
+                                {saveNotice.kind === "changed" && (
+                                    <Button size="sm" className="mt-2" onClick={reloadChangedRecord}>Reload the record</Button>
+                                )}
                             </div>
                         )}
 

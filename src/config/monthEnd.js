@@ -44,6 +44,13 @@ export const HISTORY_PAGE_INVALID = 'HISTORY_PAGE_INVALID';
 export const VISIT_INVALID = 'VISIT_INVALID';
 export const WORKPLACE_PAGE_INVALID = 'WORKPLACE_PAGE_INVALID';
 
+/**
+ * An edit of a member's record made after somebody else saved it (V68) -- the record says someone else changed it,
+ * keeps the form as typed, and offers to read the record again. Without it the later of two edits silently undid the
+ * earlier one.
+ */
+export const MEMBER_CHANGED_SINCE = 'MEMBER_CHANGED_SINCE';
+
 /** The refusal codes the screens branch on (ME-13) -- each one the server publishes. */
 export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   REQUEST_MALFORMED: 'REQUEST_MALFORMED',
@@ -55,6 +62,7 @@ export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   SUSPENSION_CODE_UNKNOWN,
   HISTORY_PAGE_INVALID,
   VISIT_INVALID,
+  MEMBER_CHANGED_SINCE,
 });
 
 /**
