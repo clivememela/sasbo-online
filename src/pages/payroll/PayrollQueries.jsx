@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { Download } from 'lucide-react';
+import { AlertTriangle, Copy, Download } from 'lucide-react';
 
 import DataState from '../../components/common/DataState.jsx';
 import DialogNotice from '../../components/common/DialogNotice.jsx';
@@ -8,26 +8,26 @@ import PageTitle from '../../components/common/PageTitle.jsx';
 import Sheet, { Page } from '../../components/common/Sheet.jsx';
 import Button from '../../components/form/Button.jsx';
 import SelectInput from '../../components/form/SelectInput.jsx';
-import TextInput from '../../components/form/TextInput.jsx';
 import Modal, { ModalClose } from '../../components/overlay/Modal.jsx';
 import Table from '../../components/table/Table.jsx';
 import { formatInt } from '../../lib/format.js';
 import reportError from '../../lib/reportError.js';
 import saveFile from '../../lib/saveFile.js';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
-import { downloadQuery, getFile, getQueries, payrollRefusalOf, raiseQueries } from '../../services/payrollService.js';
+import {
+  downloadQueryFile, getFile, getQueries, payrollRefusalOf, produceQueryFile, raiseQueries,
+} from '../../services/payrollService.js';
 import { instantLabel } from '../admin/monthEndRules.js';
 import { NavButton, ReadGate, SECTION_HEADING, usePayrollAccess } from './PayrollParts.jsx';
 import {
-  EMPTY, PASSWORD_MAX, PAYROLL_HOME, QUERY_ACTION, RECONCILED, discrepancyLabel, fileHref, fileTitle, idOf, monthLabel, passwordProblem,
-  rands, REFUSAL,
+  EMPTY, PAYROLL_HOME, QUERY_ACTION, RECONCILED, discrepancyLabel, fileHref, fileTitle, idOf, monthLabel, rands, REFUSAL,
 } from './payrollRules.js';
 
 /**
  * QUERIES TO THE EMPLOYER -- what SASBO asks an employer to change after a file is compared: add a member to its
  * deductions, delete a person from them, or correct an amount (Stephne, PAY-21: "We send them the discrepancy queries -
  * To add or delete."). A file's open discrepancies with a query action go on a list when it is raised; each list is
- * downloaded for the employer protected by a password the administrator chooses, because it leaves SASBO (POPIA).
+ * downloaded for the employer protected by a password the system makes and shows once, because it leaves SASBO (POPIA).
  */
 export default function PayrollQueries() {
   const { fileId } = useParams();
@@ -156,7 +156,7 @@ function QueriesScreen({ id }) {
           file={file}
           onClose={(saved) => {
             setDownloading(null);
-            if (saved) setNotice({ tone: 'ok', message: 'The query list is downloading. Send the password to the employer separately.' });
+            if (saved) setNotice({ tone: 'ok', message: 'The query list was downloaded. Give its password to the employer by phone.' });
           }}
         />
       )}
@@ -235,86 +235,130 @@ function QueryList({ query, canDownload, onDownload }) {
 }
 
 /**
- * The query list for the employer, in Excel or PDF, protected by a password typed here (8 to 64 characters). It is sent
- * once and kept nowhere -- not in the page, not in the browser -- so it is typed twice, and the dialog says it must reach
- * the employer separately from the file.
+ * THE QUERY LIST FOR THE EMPLOYER -- made as a protected file, as month end's bank files are (it leaves SASBO: POPIA).
+ * The SYSTEM makes the password, and this dialog shows it ONCE, with a way to copy it: it is never stored and never
+ * shown again, and lost, the list is made again -- a new file, with a new password. It lives in this dialog's state
+ * alone and goes when the dialog closes; nothing writes it anywhere.
  */
 function DownloadDialog({ query, file, onClose }) {
   const [format, setFormat] = useState('xlsx');
-  const [password, setPassword] = useState('');
-  const [again, setAgain] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [made, setMade] = useState(null);
+  const [making, setMaking] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [tried, setTried] = useState(false);
-  const passwordRef = useRef(null);
-  const why = passwordProblem(password) ?? (again !== password ? 'The two passwords differ. Type the same password twice.' : null);
+  const fallbackName = `Payroll queries - ${file?.employer?.name ?? 'employer'} - ${monthLabel(file?.period)}.${format}`;
 
-  const download = async () => {
-    setTried(true);
-    if (why || busy) return;
-    setBusy(true);
+  const make = async () => {
+    if (making) return;
+    setMaking(true);
     setNotice(null);
     try {
-      const fetched = await downloadQuery(query.id, { format, password });
-      saveFile(fetched, `Payroll queries - ${file?.employer?.name ?? 'employer'} - ${monthLabel(file?.period)}.${format}`);
-      setPassword('');
-      setAgain('');
-      onClose(true);
+      const answer = await produceQueryFile(query.id, format);
+      if (!answer?.password || answer?.file?.id == null) throw new Error('The answer carried no password.');
+      setMade(answer);
+    } catch (error) {
+      reportError('PayrollQueries.make', error);
+      setNotice({
+        message: writeMayHaveLanded(error)
+          ? 'Whether the protected file was made could not be confirmed. Make it again: a new file comes with a new '
+            + 'password, and a file nobody has the password for is of no use to anyone.'
+          : `The protected file was not made. ${messageOf(error)}`,
+      });
+    } finally {
+      setMaking(false);
+    }
+  };
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(made.password);
+      setCopied('yes');
+    } catch {
+      setCopied('no');
+    }
+  };
+
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    setNotice(null);
+    try {
+      saveFile(await downloadQueryFile(made.file.id), made.file.fileName || fallbackName);
+      setSaved(true);
     } catch (error) {
       reportError('PayrollQueries.download', error);
-      setNotice({ message: `The query list could not be downloaded. ${messageOf(error)}` });
+      setNotice({ message: `The file could not be downloaded. ${messageOf(error)} Try again: the password above still opens it.` });
     } finally {
-      setBusy(false);
+      setSaving(false);
     }
   };
 
   return (
     <Modal
       open
-      onOpenChange={(open) => { if (!open) onClose(false); }}
+      onOpenChange={(open) => { if (!open) onClose(saved); }}
       title="Download the query list for the employer"
-      description={`Raised on ${instantLabel(query.raisedAt)}. It leaves SASBO, so it is protected by a password.`}
+      description={made
+        ? 'The password below is shown once, and is not kept.'
+        : `Raised on ${instantLabel(query.raisedAt)}. It leaves SASBO, so it is protected by a password the system makes.`}
       size="md"
-      busy={busy}
-      initialFocusRef={passwordRef}
-      footer={(
+      busy={making || saving}
+      footer={made ? (
         <>
-          {tried && why && <p className="mr-auto text-sm text-ink-muted">{why}</p>}
+          <ModalClose>Close</ModalClose>
+          <Button variant="primary" onClick={save} loading={saving}>
+            <Download aria-hidden="true" className="size-4 shrink-0" />
+            Download the file
+          </Button>
+        </>
+      ) : (
+        <>
           <ModalClose>Cancel</ModalClose>
-          <Button variant="primary" onClick={download} loading={busy}>Download</Button>
+          <Button variant="primary" onClick={make} loading={making}>Make the protected file</Button>
         </>
       )}
     >
       <DialogNotice notice={notice} onDismiss={() => setNotice(null)} />
-      <div className="grid gap-4">
-        <SelectInput
-          label="Format"
-          value={format}
-          options={[{ value: 'xlsx', label: 'Excel (.xlsx)' }, { value: 'pdf', label: 'PDF' }]}
-          onChange={(value) => setFormat(value || 'xlsx')}
-          disabled={busy}
-        />
-        <TextInput
-          ref={passwordRef}
-          label="Password for the file"
-          kind="newPassword"
-          required
-          value={password}
-          onChange={(event) => setPassword(event.target.value.slice(0, PASSWORD_MAX))}
-          hint="At least 8 characters. Send it to the employer separately, never in the same e-mail as the file. It is not kept."
-          error={tried ? passwordProblem(password) ?? undefined : undefined}
-          disabled={busy}
-        />
-        <TextInput
-          label="The same password again"
-          kind="newPassword"
-          required
-          value={again}
-          onChange={(event) => setAgain(event.target.value.slice(0, PASSWORD_MAX))}
-          error={tried && !passwordProblem(password) && again !== password ? 'The two passwords differ.' : undefined}
-          disabled={busy}
-        />
-      </div>
+      {made ? (
+        <div className="grid gap-3">
+          <div className="rounded-lg border border-line-strong bg-surface-2 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">The password, shown once</p>
+            <p className="mt-1 select-all break-all font-mono text-xl tracking-[0.12em] text-ink" data-password="">{made.password}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button size="sm" onClick={copy}>
+                <Copy aria-hidden="true" className="size-4 shrink-0" />
+                Copy the password
+              </Button>
+              <span role="status" className="text-sm text-ink-muted">
+                {copied === 'yes' && 'Copied.'}
+                {copied === 'no' && 'This browser would not copy it: select it and copy it by hand.'}
+              </span>
+            </div>
+          </div>
+          <p role="alert" className="flex items-start gap-2 text-base font-semibold text-status-suspended">
+            <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            Give this to the employer by phone; it will not be shown again.
+          </p>
+          {made.passwordNote && <p className="text-sm text-ink-muted">{made.passwordNote}</p>}
+          <p className="text-sm text-ink-muted">
+            {saved ? `Downloaded: ${made.file.fileName || fallbackName}.` : `The file: ${made.file.fileName || fallbackName}.`}
+            {' '}Lost, make it again: a new file, with a new password.
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          <SelectInput
+            label="Format"
+            value={format}
+            options={[{ value: 'xlsx', label: 'Excel (.xlsx)' }, { value: 'pdf', label: 'PDF' }]}
+            onChange={(value) => setFormat(value || 'xlsx')}
+            disabled={making}
+          />
+          <p className="text-sm text-ink-muted">The system makes the password. It is shown once, here, and is not kept.</p>
+        </div>
+      )}
     </Modal>
   );
 }

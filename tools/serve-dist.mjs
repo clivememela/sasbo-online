@@ -736,9 +736,17 @@ const payrollAnswer = (req, path) => {
     if (post && m[2] === '/notes') return reply(201, { ...found, notes: [...notes, { id: 9, text: 'A synthetic note.', by: 'system', at: '2026-10-07T08:00:00Z' }] });
     if (post && m[2] === '/resolve') return reply(200, { ...found, notes, status: 'RESOLVED', resolution: { outcome: found.outcomes[0], by: 'system', at: '2026-10-07T08:00:00Z' } });
   }
-  m = /^\/api\/payroll\/queries\/(\d+)(\/download)?$/.exec(path);
+  m = /^\/api\/payroll\/queries\/(\d+)(\/files)?$/.exec(path);
   if (m && get && !m[2]) return reply(200, payrollQuery);
-  if (m && post && m[2]) return payrollAttachment('Payroll queries - Absa - September 2026.xlsx');
+  // The protected file made: its password in this answer only, written as month end's golden answers write theirs.
+  if (m && post && m[2]) {
+    return reply(201, {
+      file: { id: 31, queryId: Number(m[1]), fileName: 'Payroll queries - Absa - September 2026.xlsx', format: 'XLSX', protection: 'EXCEL_AES_256', bytes: 6120, producedAt: '2026-10-07T08:00:00Z', producedBy: 'system' },
+      password: '<shown once>',
+      passwordNote: 'This password is shown once and is not kept. Give it to the employer by phone -- never in the e-mail that carries the file.',
+    });
+  }
+  if (get && /^\/api\/payroll\/query-files\/\d+$/.test(path)) return payrollAttachment('Payroll queries - Absa - September 2026.xlsx');
   // Anything else under /api/payroll is a route the server does not have.
   return reply(404, { status: 404, error: 'Not Found', path });
 };
@@ -843,6 +851,7 @@ const API = {
   '/api/payroll/discrepancies': payrollPage(payrollDiscrepancies),
   '/api/payroll/payments': payrollPage(payrollSummary.payments),
   '/api/payroll/queries': payrollQuery,
+  '/api/payroll/query-files': { error: 'answered by payrollAnswer' },
   '/api/subscriptions': Array.from({ length: 15 }, (_, i) => ({
     id: i + 1, bankName: banks[i % banks.length], acbDebitDay: 25,
     subscriptionAmount: 182.77, isCoreBanking: i % 2 === 0,

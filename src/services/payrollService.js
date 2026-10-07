@@ -12,9 +12,9 @@ import { WRITE_CEILING_MS, requestJson, requestJsonWrite } from './parseApiError
  *              lines and its discrepancies (paged), a discrepancy with every note, a file's query lists
  *   writes     load a file (multipart) or type its lines in, compare it again (new columns), raise its query list,
  *              note and resolve a discrepancy, record a payment
- *   downloads  the discrepancies list and the full report (`xlsx` | `pdf`), and an employer's query list -- password
- *              protected, because it leaves SASBO (POPIA). Fetched, never linked: the token travels on a `fetch`. Each
- *              resolves `{ blob, filename }` for `lib/saveFile.js`.
+ *   downloads  the file as it arrived, the discrepancies list and the full report (`xlsx` | `pdf`), and an employer's
+ *              query list -- made protected by a password the system chooses and shows once, because it leaves SASBO
+ *              (POPIA). Fetched, never linked: the token travels on a `fetch`. Each resolves `{ blob, filename }`.
  *
  * Every id and filter travels encoded; what a person typed in an address is the server's to refuse, in its own words.
  */
@@ -154,13 +154,16 @@ export const downloadDiscrepancies = (fileId, format) =>
 export const downloadFullReport = (fileId, format) =>
   download(apiUrl(`/api/payroll/files/${id(fileId)}/reports/full`) + queryOf({ format }));
 
-/** Route 16: an employer's query list, protected by the password the administrator chose. Sent once, never kept. */
-export const downloadQuery = (queryId, { format, password } = {}) =>
-  download(apiUrl(`/api/payroll/queries/${id(queryId)}/download`), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ format, password }),
-  });
+/**
+ * An employer's query list, made as a protected file (it leaves SASBO: POPIA) -- as month end's bank files are. The
+ * SYSTEM chooses the password, and it is in this answer only: `{ file, password, passwordNote }`, never stored, never
+ * shown again. Lost, the list is made again: a new file, with a new password.
+ */
+export const produceQueryFile = (queryId, format) =>
+  post(apiUrl(`/api/payroll/queries/${id(queryId)}/files`), { format });
+
+/** The protected file just made, as bytes to save. */
+export const downloadQueryFile = (fileId) => download(apiUrl(`/api/payroll/query-files/${id(fileId)}`));
 
 /** The calls, gathered, for everything that iterates the service layer -- these very functions, never copies. */
 export const payrollService = {
@@ -182,7 +185,8 @@ export const payrollService = {
   downloadOriginal,
   downloadDiscrepancies,
   downloadFullReport,
-  downloadQuery,
+  produceQueryFile,
+  downloadQueryFile,
 };
 
 /** A refusal's stable code and its details, or `null` -- the sentence is the error's own `message`. */

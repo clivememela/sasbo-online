@@ -132,7 +132,8 @@ const ARGS = {
   'payrollService.downloadOriginal': ['12'],
   'payrollService.downloadDiscrepancies': ['12', 'xlsx'],
   'payrollService.downloadFullReport': ['12', 'pdf'],
-  'payrollService.downloadQuery': ['2', { format: 'xlsx', password: 'placeholder' }],
+  'payrollService.produceQueryFile': ['2', 'xlsx'],
+  'payrollService.downloadQueryFile': ['31'],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS

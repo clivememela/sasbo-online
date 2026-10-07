@@ -4,7 +4,8 @@ import { http, HttpResponse } from 'msw'
 import { server } from '../test/msw/server'
 import { deferred } from '../test/deferred'
 import {
-  addNote, compareAgain, downloadDiscrepancies, downloadFullReport, downloadOriginal, downloadQuery, getDiscrepancies, getFile, getFiles,
+  addNote, compareAgain, downloadDiscrepancies, downloadFullReport, downloadOriginal, downloadQueryFile, getDiscrepancies, getFile,
+  getFiles, produceQueryFile,
   getRows, payrollRefusalOf, raiseQueries, recordPayment, resolveDiscrepancy, typeInFile, uploadFile,
 } from './payrollService'
 
@@ -179,10 +180,18 @@ describe('the downloads, fetched with the name the server gave', () => {
     expect(fetched.filename).toBe('Absa payroll September 2026.xlsx')
   })
 
-  it('🔒 an employer\'s query list is asked for with the password in the body, never in the address', async () => {
-    const seen = capture('post', '*/api/payroll/queries/:id/download', attachment('Payroll queries - Absa - September 2026.xlsx'))
-    const fetched = await downloadQuery('2', { format: 'xlsx', password: 'placeholder' })
-    expect(seen[0]).toMatchObject({ path: '/api/payroll/queries/2/download', query: {}, body: { format: 'xlsx', password: 'placeholder' } })
+  it('🔒 an employer\'s query list: made with only its format sent -- the system makes the password -- then fetched', async () => {
+    const made = capture('post', '*/api/payroll/queries/:id/files', () => HttpResponse.json({
+      file: { id: 31, fileName: 'Payroll queries - Absa - September 2026.xlsx' }, password: 'shown-once-here', passwordNote: 'Shown once.',
+    }, { status: 201 }))
+    const bytes = capture('get', '*/api/payroll/query-files/:id', attachment('Payroll queries - Absa - September 2026.xlsx'))
+
+    const answer = await produceQueryFile('2', 'pdf')
+    const fetched = await downloadQueryFile(answer.file.id)
+
+    expect(made[0]).toMatchObject({ path: '/api/payroll/queries/2/files', query: {}, body: { format: 'pdf' } })
+    expect(answer.password).toBe('shown-once-here')
+    expect(bytes[0]).toMatchObject({ path: '/api/payroll/query-files/31', query: {} })
     expect(fetched.filename).toBe('Payroll queries - Absa - September 2026.xlsx')
   })
 })

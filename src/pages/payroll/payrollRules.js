@@ -330,16 +330,6 @@ export const QUERY_ACTION = /* @__PURE__ */ Object.freeze({
   CORRECT: { label: 'Correct', ask: 'Correct the amount' },
 });
 
-/** The download's password: it leaves SASBO for the employer, so it is protected (POPIA); 8 to 64 characters. */
-export const PASSWORD_MIN = 8;
-export const PASSWORD_MAX = 64;
-export const passwordProblem = (password) => {
-  const length = (password ?? '').length;
-  if (length < PASSWORD_MIN) return `Choose a password of at least ${PASSWORD_MIN} characters.`;
-  if (length > PASSWORD_MAX) return `Keep the password to ${PASSWORD_MAX} characters.`;
-  return null;
-};
-
 /* ── money ────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
 /** The payment check's verdict (PAY-28). Absa's 3% fee (PAY-27) is already out of what it is expected to pay. */

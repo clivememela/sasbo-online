@@ -178,72 +178,133 @@ describe('raising a list', () => {
   })
 })
 
-describe('downloading a list for the employer -- protected by a password (POPIA)', () => {
-  const downloads = () => {
+describe('downloading a list for the employer -- protected by a password the system makes, shown once (POPIA)', () => {
+  /** The produce answers, recorded; the bytes of the file it made, under the server's name. */
+  const produces = (answer = () => HttpResponse.json({
+    file: { id: 31, queryId: 2, fileName: 'Payroll queries - Absa - September 2026.pdf', format: 'PDF' },
+    password: 'K7MW-Q3ZR-T8XH-N4CP',
+    passwordNote: 'This password is shown once and is not kept.',
+  }, { status: 201 })) => {
     const seen = []
-    server.use(http.post('*/api/payroll/queries/:id/download', async ({ request }) => {
-      seen.push(await request.json())
-      return new HttpResponse('synthetic bytes', {
+    server.use(
+      http.post('*/api/payroll/queries/:id/files', async ({ request }) => {
+        seen.push(await request.json())
+        return answer(seen.length)
+      }),
+      http.get('*/api/payroll/query-files/:id', () => new HttpResponse('synthetic bytes', {
         headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="Payroll queries - Absa - September 2026.pdf"' },
-      })
-    }))
+      })),
+    )
     return seen
   }
 
-  it('🔑 needs a password of 8 to 64 characters, typed twice, then sends it once in the body and saves the file', async () => {
-    const seen = downloads()
+  // user-event's setup puts its own clipboard on `navigator`: what was copied is read back from it.
+
+  it('🔑 only the format is sent; the system\'s password is shown once with a copy button and the warning; the file saves', async () => {
+    const seen = produces()
     const user = setupUser()
     openQueries()
     await ready()
     await user.click(screen.getByRole('button', { name: 'Download for the employer' }))
     const dialog = screen.getByRole('dialog', { name: 'Download the query list for the employer' })
-    expect(dialog).toHaveAccessibleDescription('Raised on 29 September 2026 at 11:00. It leaves SASBO, so it is protected by a password.')
+    expect(dialog).toHaveAccessibleDescription('Raised on 29 September 2026 at 11:00. It leaves SASBO, so it is protected by a password the system makes.')
+    expect(within(dialog).queryByRole('textbox')).not.toBeInTheDocument()
 
-    await user.click(within(dialog).getByRole('button', { name: 'Download' }))
-    expect(within(dialog).getByLabelText(/^Password for the file/)).toHaveAccessibleDescription('Choose a password of at least 8 characters.')
-    expect(seen).toEqual([])
-
-    await user.type(within(dialog).getByLabelText(/^Password for the file/), 'placeholder')
-    await user.type(within(dialog).getByLabelText(/^The same password again/), 'xxxxxxxxxx')
-    await user.click(within(dialog).getByRole('button', { name: 'Download' }))
-    expect(within(dialog).getByLabelText(/^The same password again/)).toHaveAccessibleDescription('The two passwords differ.')
-    expect(seen).toEqual([])
-
-    await user.clear(within(dialog).getByLabelText(/^The same password again/))
-    await user.type(within(dialog).getByLabelText(/^The same password again/), 'placeholder')
     await user.selectOptions(within(dialog).getByLabelText('Format'), 'PDF')
-    await user.click(within(dialog).getByRole('button', { name: 'Download' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Make the protected file' }))
 
-    expect(await screen.findByText('The query list is downloading. Send the password to the employer separately.')).toBeInTheDocument()
-    expect(seen).toEqual([{ format: 'pdf', password: 'placeholder' }])
-    expect(saved).toEqual(['Payroll queries - Absa - September 2026.pdf'])
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(await within(dialog).findByText('K7MW-Q3ZR-T8XH-N4CP')).toBeInTheDocument()
+    expect(seen).toEqual([{ format: 'pdf' }])
+    expect(dialog).toHaveAccessibleDescription('The password below is shown once, and is not kept.')
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Give this to the employer by phone; it will not be shown again.')
+    expect(within(dialog).getByText('This password is shown once and is not kept.')).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Copy the password' }))
+    expect(await navigator.clipboard.readText()).toBe('K7MW-Q3ZR-T8XH-N4CP')
+    expect(within(dialog).getByText('Copied.')).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Download the file' }))
+    await waitFor(() => expect(saved).toEqual(['Payroll queries - Absa - September 2026.pdf']))
+    expect(within(dialog).getByText(/^Downloaded: Payroll queries - Absa - September 2026\.pdf\./)).toBeInTheDocument()
+
+    await user.click(within(dialog).getAllByRole('button', { name: 'Close' }).at(-1))
+    expect(await screen.findByText('The query list was downloaded. Give its password to the employer by phone.')).toBeInTheDocument()
   })
 
-  it('a list that did not arrive says so inside the dialog', async () => {
-    server.use(http.post('*/api/payroll/queries/:id/download', () =>
-      refusal(400, 'PASSWORD_INVALID', 'The password must be 8 to 64 characters.')))
+  it('🔒 the password is not kept: closing and opening again shows none, and asks the system for a new file', async () => {
+    let n = 0
+    const seen = produces(() => {
+      n += 1
+      return HttpResponse.json({ file: { id: 30 + n, fileName: 'q.pdf' }, password: n === 1 ? 'FIRST-PASSWORD' : 'SECOND-PASSWORD' }, { status: 201 })
+    })
+    const user = setupUser()
+    openQueries()
+    await ready()
+    await user.click(screen.getByRole('button', { name: 'Download for the employer' }))
+    await user.click(screen.getByRole('button', { name: 'Make the protected file' }))
+    expect(await screen.findByText('FIRST-PASSWORD')).toBeInTheDocument()
+    await user.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: 'Close' }).at(-1))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.queryByText('FIRST-PASSWORD')).not.toBeInTheDocument()
+    expect(JSON.stringify({ ...localStorage, ...sessionStorage })).not.toContain('FIRST-PASSWORD')
+
+    await user.click(screen.getByRole('button', { name: 'Download for the employer' }))
+    expect(screen.queryByText('FIRST-PASSWORD')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Make the protected file' }))
+    expect(await screen.findByText('SECOND-PASSWORD')).toBeInTheDocument()
+    expect(seen).toHaveLength(2)
+  })
+
+  it('a browser that will not copy says so, and the password stays there to copy by hand', async () => {
+    produces()
+    const user = setupUser()
+    // After the setup, which would otherwise put its own working clipboard in place.
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied') } } })
+    openQueries()
+    await ready()
+    await user.click(screen.getByRole('button', { name: 'Download for the employer' }))
+    await user.click(screen.getByRole('button', { name: 'Make the protected file' }))
+    await user.click(await screen.findByRole('button', { name: 'Copy the password' }))
+    expect(screen.getByText('This browser would not copy it: select it and copy it by hand.')).toBeInTheDocument()
+    expect(screen.getByText('K7MW-Q3ZR-T8XH-N4CP')).toBeInTheDocument()
+  })
+
+  it('a file not made says so inside the dialog, in the server\'s words; one whose answer never arrived is unconfirmed', async () => {
+    produces((n) => (n === 1
+      ? refusal(400, 'REPORT_FORMAT_UNKNOWN', 'That format is not offered.')
+      : HttpResponse.json({ message: 'boom' }, { status: 503 })))
     const user = setupUser()
     openQueries()
     await ready()
     await user.click(screen.getByRole('button', { name: 'Download for the employer' }))
     const dialog = screen.getByRole('dialog', { name: 'Download the query list for the employer' })
-    await user.type(within(dialog).getByLabelText(/^Password for the file/), 'placeholder')
-    await user.type(within(dialog).getByLabelText(/^The same password again/), 'placeholder')
-    await user.click(within(dialog).getByRole('button', { name: 'Download' }))
-    expect(await within(dialog).findByText('The query list could not be downloaded. The password must be 8 to 64 characters.')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Make the protected file' }))
+    expect(await within(dialog).findByText('The protected file was not made. That format is not offered.')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Make the protected file' }))
+    expect(await within(dialog).findByText(/Whether the protected file was made could not be confirmed\. Make it again/)).toBeInTheDocument()
     expect(saved).toEqual([])
   })
 })
 
+// One scan a test: whole-page scans are the slowest work here, and a contended box cannot finish two in one.
 describe('accessibility', () => {
-  it('the lists, and the download dialog, have no violations', async () => {
-    const user = setupUser()
+  it('the lists have no violations', async () => {
     const { container } = openQueries()
     await ready()
     await expectNoA11yViolations(container)
+  })
+
+  it('the download dialog, with the password shown once, has no violations', async () => {
+    server.use(http.post('*/api/payroll/queries/:id/files', () => HttpResponse.json({
+      file: { id: 31, fileName: 'Payroll queries - Absa - September 2026.xlsx' }, password: 'K7MW-Q3ZR-T8XH-N4CP',
+    }, { status: 201 })))
+    const user = setupUser()
+    openQueries()
+    await ready()
     await user.click(screen.getByRole('button', { name: 'Download for the employer' }))
+    await user.click(screen.getByRole('button', { name: 'Make the protected file' }))
     const dialog = screen.getByRole('dialog', { name: 'Download the query list for the employer' })
+    await within(dialog).findByText('K7MW-Q3ZR-T8XH-N4CP')
     await expectNoA11yViolations(dialog, { rules: { region: { enabled: false } } })
   })
 })

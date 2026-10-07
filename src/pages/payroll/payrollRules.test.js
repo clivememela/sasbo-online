@@ -7,7 +7,7 @@ import {
   AMOUNT_STATUS, DEFAULT_LIMITS, DISCREPANCY_LABEL, DISCREPANCY_STATUS, ENTRY, FILE_STATUS, MATCH_RULE, PAYMENT_STATUS,
   PURGED, QUERY_ACTION, RECONCILED, REFUSAL, RESOLVED, ROW_FILTER, SUPERSEDED, amountOf, amountStatusLabel,
   differenceLabel, discrepancyLabel, fileProblem, fileState, idOf, limitsOf, mappingOf, mappingProblems, noteProblem,
-  outcomeLabel, passwordProblem, percentLabel, rands, recentMonths, sizeLabel, sniffKind, typedAmountOf,
+  outcomeLabel, percentLabel, rands, recentMonths, sizeLabel, sniffKind, typedAmountOf,
 } from './payrollRules'
 
 /**
@@ -205,20 +205,13 @@ describe('the columns of a file', () => {
   })
 })
 
-describe('notes, passwords and words', () => {
+describe('notes and words', () => {
   it('a note says what was done, within the server\'s limit', () => {
     expect(noteProblem('')).toBe('Write what was done first.')
     expect(noteProblem('   ')).toBe('Write what was done first.')
     expect(noteProblem('x'.repeat(1001))).toBe(`Keep the note to ${formatInt(1000)} characters.`)
     expect(noteProblem('x'.repeat(41), 40)).toBe('Keep the note to 40 characters.')
     expect(noteProblem('Asked the employer by e-mail.')).toBeNull()
-  })
-
-  it('a query list\'s password is 8 to 64 characters', () => {
-    expect(passwordProblem('x'.repeat(7))).toMatch(/at least 8/)
-    expect(passwordProblem('x'.repeat(65))).toMatch(/64 characters/)
-    expect(passwordProblem('x'.repeat(8))).toBeNull()
-    expect(passwordProblem('x'.repeat(64))).toBeNull()
   })
 
   it('a type\'s name: the vocabulary\'s when it answered, else the same words held here, else its code', () => {
