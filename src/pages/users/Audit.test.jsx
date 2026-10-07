@@ -114,6 +114,6 @@ describe('the record of who did what', () => {
     await expectNoA11yViolations(container)
     await user.click(screen.getByLabelText(/^From/))
     await screen.findByRole('gridcell', { name: /^07 Oct 2026/ })
-    await expectNoA11yViolations(document.body)
+    await expectNoA11yViolations(screen.getByRole('dialog'), { rules: { region: { enabled: false } } })
   })
 })

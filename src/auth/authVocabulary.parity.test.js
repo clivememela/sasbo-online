@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { committedVocabulary } from '../test/apiContractScan'
-import { AUTH_REFUSAL, SCOPE_TYPES, SIGN_IN_MODES, refusalOf } from './authVocabulary'
+import { AUTH_REFUSAL, SCOPE_TYPES, SESSION_ENDING, SIGN_IN_MODES, refusalOf } from './authVocabulary'
 import { PERMISSIONS, PERMISSION_LABELS } from './permissions'
 
 /**
@@ -28,6 +28,15 @@ describe('the sign-in vocabulary is the server\'s', () => {
     expect(published.get(AUTH_REFUSAL.ACCOUNT_LOCKED)).toBe(423)
     expect(published.get(AUTH_REFUSAL.SESSION_EXPIRED)).toBe(401)
     expect(published.get(AUTH_REFUSAL.SIGN_IN_REQUIRED)).toBe(401)
+  })
+
+  it('the refusals that end a session are the server\'s 401s, and among the codes the screens know', () => {
+    const published = new Map(auth.refusalCodes.map(({ code, status }) => [code, status]))
+    for (const code of SESSION_ENDING) {
+      expect(published.get(code), `${code} ends a session in api.js but the server does not give it as a 401`).toBe(401)
+      expect(Object.values(AUTH_REFUSAL)).toContain(code)
+    }
+    expect(SESSION_ENDING).not.toContain(AUTH_REFUSAL.SIGN_IN_FAILED)
   })
 
   it('the two modes and the three kinds of scope are exactly the server\'s', () => {

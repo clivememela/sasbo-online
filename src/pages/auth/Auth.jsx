@@ -9,7 +9,8 @@ import TextInput from '../../components/form/TextInput';
 import useFocusOn from '../../hooks/useFocusOn.js';
 import reportError from '../../lib/reportError.js';
 import { useAuth } from '../../auth/useAuth';
-import { safeNext } from '../../auth/next';
+import { safeNext } from '../../auth/safeNext';
+import { signInWith } from '../../auth/authActions';
 import { signInFailure } from './signInRules';
 
 /**
@@ -42,7 +43,7 @@ const validate = ({ username, password }) => {
 export default function Auth() {
   // `user` is set exactly when someone is signed in; a page tests that rather than `status`, whose name the vocabulary
   // parity scan keeps for the member's status (vocabulary.parity.test.js).
-  const { mode, user, signIn, sessionEnded } = useAuth();
+  const { mode, user, sessionEnded } = useAuth();
   const [params] = useSearchParams();
   const next = safeNext(params.get('next'));
   const navigate = useNavigate();
@@ -72,7 +73,7 @@ export default function Auth() {
     setProblem(null);
     setBusy(true);
     try {
-      await signIn({ username, password });
+      await signInWith({ username, password });
       // The navigation itself happens through the `user` check above, on the render this sign-in causes.
     } catch (error) {
       reportError('Auth.signIn', error);

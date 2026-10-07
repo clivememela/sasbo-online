@@ -1,5 +1,4 @@
-import { AUTH_REFUSAL } from '../auth/authVocabulary';
-import { endSession, readSession } from '../auth/session';
+import { SESSION_ENDING, endSession, readSession } from '../auth/session';
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
@@ -39,7 +38,7 @@ export function isApiRequest(input) {
 }
 
 /** The two refusals that mean "this session is over" (signin.md). `SIGN_IN_FAILED` is a wrong password, not an ending. */
-const SESSION_OVER = new Set([AUTH_REFUSAL.SESSION_EXPIRED, AUTH_REFUSAL.SIGN_IN_REQUIRED]);
+const SESSION_OVER = new Set(SESSION_ENDING);
 
 /** A 401's refusal code -- read from a copy, so the caller still gets the body to read. Not JSON is no code. */
 const refusalCode = async (response) => {

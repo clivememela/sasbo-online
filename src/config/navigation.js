@@ -13,46 +13,46 @@ import {
   LucideDatabase, LucideMails, LucideMenu,
   LucideUserRoundPlus, LucideFile, LucideTags,
   LucidePiggyBank, LucidePresentation, LucideCalendarRange,
-  LucideConstruction, LucideCopyCheck, UserRoundPen,
-  Briefcase, ScrollText, ShieldCheck, UserCog
+  LucideConstruction, LucideCopyCheck, UserRoundPen
 } from "lucide-react";
-import { PERMISSIONS } from "../auth/permissions";
 
 /**
  * Sign-in's four Maintenance entries (the 5 Oct Show & Tell: "an administrator creating users with a position and an
- * area", roles kept as data, "a record of who did what"). Written twice -- here and as `Maintenance.jsx`'s cards -- and
- * `Maintenance.test.jsx` holds the two together. Each names the permission it needs: the entry stays for everyone and
- * says so when it needs a sign-in or a permission the person does not hold (permissions.md, "Menus").
+ * area", roles kept as data, "a record of who did what"). Written once, for the rail here and for `Maintenance.jsx`'s
+ * cards, and `Maintenance.test.jsx` holds the two together. Each names the `permission` its screen needs -- the key the
+ * menu rule (`navAccess.js`, OB18) reads to mark an entry for a person who may not use it; the screen itself says what
+ * is needed either way.
+ *
+ * 🔑 NO ICONS AND NO IMPORT OF `permissions.js`, BECAUSE THIS FILE IS IN THE FIRST LOAD (OB17a). The rail draws an icon
+ * only on its top level, so these third-level entries never show one; `Maintenance.jsx` gives its cards theirs. The
+ * names are `PERMISSIONS`' own, held to it by `Maintenance.test.jsx` -- importing the catalogue here put all of it,
+ * labels and all, into every first paint.
  */
 export const SIGN_IN_ENTRIES = [
   {
     title: 'Users',
-    icon: UserCog,
     href: '/admin/maintenance/users',
     desc: 'Who signs in, their position and the part of SASBO they see',
-    permission: PERMISSIONS.USERS_ADMIN,
+    permission: 'USERS_ADMIN',
   },
   {
     title: 'Positions',
-    icon: Briefcase,
     href: '/admin/maintenance/positions',
     desc: 'SASBO’s positions, and the role each one gives',
-    permission: PERMISSIONS.USERS_ADMIN,
+    permission: 'USERS_ADMIN',
   },
   {
     title: 'Roles',
-    icon: ShieldCheck,
     href: '/admin/maintenance/roles',
     desc: 'What each role may see and do',
-    permission: PERMISSIONS.USERS_ADMIN,
+    permission: 'USERS_ADMIN',
   },
   {
     // Short enough for the rail's third level, which truncates; SASBO's own words ("a record of who did what", 5 Oct).
     title: 'Who did what',
-    icon: ScrollText,
     href: '/admin/maintenance/audit',
     desc: 'The record of every sign-in and every change to users, positions and roles',
-    permission: PERMISSIONS.AUDIT_VIEW,
+    permission: 'AUDIT_VIEW',
   },
 ];
 

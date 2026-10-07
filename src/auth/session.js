@@ -17,9 +17,20 @@
 export const SESSION_KEY = 'sasbo.session';
 export const MODE_KEY = 'sasbo.mode';
 
+/**
+ * The two facts of the contract the SHELL needs, kept here because this module is in the first load and the rest of
+ * the vocabulary (`authVocabulary.js`, which re-exports them) is not: the refusals that end a session (signin.md, "The
+ * client"), and `sasbo.signin.mode`'s two values. `authVocabulary.parity.test.js` holds both to the server's.
+ */
+export const SESSION_ENDING = Object.freeze(['SESSION_EXPIRED', 'SIGN_IN_REQUIRED']);
+export const SIGN_IN_MODES = Object.freeze(['open', 'required']);
+
 let memory = null;
 let cachedText;
 let cachedSession = null;
+// The token a sign-in has just answered with: its user is the server's own word of a moment ago, so the shell does not
+// ask `GET /api/auth/me` for it again (`AuthProvider`).
+let freshToken = null;
 const changeListeners = new Set();
 const endListeners = new Set();
 
@@ -53,7 +64,9 @@ export const readSession = () => {
 
 const changed = () => changeListeners.forEach((listener) => listener());
 
-export const saveSession = (session) => {
+/** `fresh`: this session is a sign-in's answer, just given -- see `isFresh`. */
+export const saveSession = (session, { fresh = false } = {}) => {
+  if (fresh) freshToken = session.token;
   const text = JSON.stringify(session);
   try {
     sessionStorage.setItem(SESSION_KEY, text);
@@ -73,6 +86,8 @@ export const clearSession = () => {
   }
   changed();
 };
+
+export const isFresh = (token) => Boolean(token) && token === freshToken;
 
 /** For `useSyncExternalStore`: called after every save or clear. */
 export const subscribeSession = (listener) => {

@@ -5,6 +5,8 @@ import { Route, Routes, useLocation } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 
 import AppLayout from '../layouts/AppLayout'
+// The ended-session notice is a lazy chunk; in the registry before any test, so a wait times the page, not the box.
+import '../components/common/SessionNotice'
 import { AuthProvider } from './AuthContext'
 import { SESSION_KEY } from './session'
 import { expectNoA11yViolations } from '../test/assertions'
@@ -26,7 +28,8 @@ function Where({ label }) {
 }
 
 const renderShell = ({ path = '/home', mode = 'open', user = userWith(), me } = {}) => {
-  server.use(...authHandlers({ mode, user }), ...(me ? [http.get('*/api/auth/me', me)] : []))
+  // ⚠️ FIRST: within one `server.use(a, b)` MSW tries `a` before `b`, so an override listed after the defaults never runs.
+  server.use(...(me ? [http.get('*/api/auth/me', me)] : []), ...authHandlers({ mode, user }))
   return renderWithProviders(
     <AuthProvider>
       <Routes>

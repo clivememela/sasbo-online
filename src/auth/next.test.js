@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { loginPath, safeNext } from './next'
+import { loginPath } from './next'
+import { safeNext } from './safeNext'
 
 /**
  * `next` -- where a person goes after signing in -- arrives in an address anybody can write, so only a path on THIS

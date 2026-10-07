@@ -47,12 +47,12 @@ function Account() {
         <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-ink">
           {initialsOf(user.displayName || user.username)}
         </span>
-        {/* The name across the whole desk, from `xl` as the placeholder's was; below that it is the button's name. */}
-        <span className="hidden min-w-0 leading-tight xl:grid">
+        {/* The name and position across the whole desk, from `xl` as the placeholder's name was; below that, read but
+            not shown -- ONE copy of the words, so a screen reader never hears them twice. */}
+        <span className="sr-only min-w-0 leading-tight xl:not-sr-only xl:grid">
           <span className="truncate text-[13.5px] font-medium text-ink">{user.displayName || user.username}</span>
-          {position && <span className="truncate text-xs text-ink-muted">{position}</span>}
+          {position && <span className="truncate text-xs text-ink-muted"><span className="sr-only">, </span>{position}</span>}
         </span>
-        <span className="sr-only xl:hidden">{`${user.displayName || user.username}${position ? `, ${position}` : ""}`}</span>
       </p>
       <Link to="/change-password" className={TOOL_LINK} aria-label="Change your password" title="Change your password">
         <KeyRound size={18} strokeWidth={1.75} aria-hidden="true" />

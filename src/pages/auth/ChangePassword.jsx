@@ -7,7 +7,8 @@ import PasswordInput from '../../components/form/PasswordInput';
 import useFocusOn from '../../hooks/useFocusOn.js';
 import reportError from '../../lib/reportError.js';
 import { useAuth } from '../../auth/useAuth';
-import { safeNext } from '../../auth/next';
+import { safeNext } from '../../auth/safeNext';
+import { changePasswordWith } from '../../auth/authActions';
 import { AUTH_REFUSAL, refusalOf } from '../../auth/authVocabulary';
 import { PASSWORD_MIN, PASSWORD_RULES, passwordFailure, passwordProblem } from './signInRules';
 
@@ -35,7 +36,7 @@ const validate = ({ current, chosen, again }, username) => {
 };
 
 export default function ChangePassword() {
-  const { user, changePassword } = useAuth();
+  const { user } = useAuth();
   const [params] = useSearchParams();
   const next = safeNext(params.get('next'));
   const navigate = useNavigate();
@@ -60,7 +61,7 @@ export default function ChangePassword() {
     }
     setBusy(true);
     try {
-      const signedIn = await changePassword({ currentPassword: values.current, newPassword: values.chosen });
+      const signedIn = await changePasswordWith({ currentPassword: values.current, newPassword: values.chosen });
       setValues({ current: '', chosen: '', again: '' });
       setOutcome({ changed: true, signedIn });
     } catch (error) {

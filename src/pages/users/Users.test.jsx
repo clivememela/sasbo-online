@@ -61,11 +61,20 @@ const renderUsers = ({ permissions = [PERMISSIONS.USERS_ADMIN] } = {}) => {
 
 const dialog = () => screen.getByRole('dialog')
 
-/** Open Create a user, and wait for its lists: a select is shut while they load. */
+/**
+ * Wait for the dialog's lists: a select is shut while they load. Asked of the Position select alone, because the Role
+ * select offers an "Organiser" too.
+ */
+const listsLoaded = () => within(within(dialog()).getByLabelText(/^Position/)).findByRole('option', { name: 'Organiser' })
+
+/** Open Create a user, and wait for its lists. */
 const openCreate = async (user) => {
   await user.click(await screen.findByRole('button', { name: /Create a user/ }))
-  await within(dialog()).findByRole('option', { name: 'Organiser' })
+  await listsLoaded()
 }
+
+/** A dialog is scanned on its own, as Modal's and DateField's are: it is portalled, and it is not a page (`region`). */
+const scanDialog = () => expectNoA11yViolations(dialog(), { rules: { region: { enabled: false } } })
 
 /** Everything the tab has stored, as one string -- key by key, the way Storage is meant to be read. */
 const storedText = () => [sessionStorage, localStorage]
@@ -242,7 +251,7 @@ describe('creating a user with a position and an area', () => {
 describe('changing a user', () => {
   const openAda = async (user) => {
     await user.click(await screen.findByRole('button', { name: 'Change Ada Synthetic (ada.synthetic)' }))
-    await within(dialog()).findByRole('option', { name: 'Organiser' })
+    await listsLoaded()
   }
 
   it('sends the change with the version it was read at, and says it is saved', async () => {
@@ -336,14 +345,14 @@ describe('Maintenance > Users -- accessibility', () => {
     await expectNoA11yViolations(container)
 
     await user.click(screen.getByRole('button', { name: /Create a user/ }))
-    await within(dialog()).findByRole('option', { name: 'Organiser' })
-    await expectNoA11yViolations(document.body)
+    await listsLoaded()
+    await scanDialog()
 
     await user.type(within(dialog()).getByLabelText(/^Name/), 'Mo Synthetic')
     await user.type(within(dialog()).getByLabelText(/^Username/), 'mo.synthetic')
     await user.selectOptions(within(dialog()).getByLabelText(/^Position/), 'ORGANISER')
     await user.click(within(dialog()).getByRole('button', { name: 'Create user' }))
     await within(dialog()).findByText(TEMPORARY)
-    await expectNoA11yViolations(document.body)
+    await scanDialog()
   })
 })

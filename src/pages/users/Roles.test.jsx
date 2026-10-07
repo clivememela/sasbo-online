@@ -72,6 +72,6 @@ describe('Maintenance > Roles', () => {
     await screen.findByRole('button', { name: 'Change Organiser' })
     await expectNoA11yViolations(container)
     await user.click(screen.getByRole('button', { name: 'Change Organiser' }))
-    await expectNoA11yViolations(document.body)
+    await expectNoA11yViolations(screen.getByRole('dialog'), { rules: { region: { enabled: false } } })
   })
 })

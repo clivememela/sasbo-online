@@ -2,12 +2,20 @@
 // nowhere but inside the commented-out card blocks below -- so a grep for each name found two
 // hits and concluded it was live, while eslint (which reads code, not comments) called all ten
 // dead. eslint was right. Anyone restoring one of those cards restores its icon import with it.
-import { Building2, Landmark, LucideCopyCheck, LucideMails, UserRoundPen } from "lucide-react";
+import { Briefcase, Building2, Landmark, LucideCopyCheck, LucideMails, ScrollText, ShieldCheck, UserCog, UserRoundPen } from "lucide-react";
 import { NavigationList } from '../../components/common/NavigationCard.jsx';
 import { Page } from '../../components/common/Sheet.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
 import {useOutletContext} from "react-router-dom";
 import { SIGN_IN_ENTRIES } from '../../config/navigation.js';
+
+/** Sign-in's cards' icons, by the screen each opens. */
+const SIGN_IN_ICONS = {
+    '/admin/maintenance/users': UserCog,
+    '/admin/maintenance/positions': Briefcase,
+    '/admin/maintenance/roles': ShieldCheck,
+    '/admin/maintenance/audit': ScrollText,
+};
 
 const maintenance_cards = [
     /*{
@@ -70,8 +78,9 @@ const maintenance_cards = [
         href: '/admin/maintenance/workplaces',
         desc: 'Find a workplace by its name or R/A number'
     },
-    // Sign-in's users, positions, roles and record of who did what -- the same entries as the rail's, by construction.
-    ...SIGN_IN_ENTRIES,
+    // Sign-in's users, positions, roles and record of who did what -- the same entries as the rail's, by construction,
+    // with their icons here: the rail never draws them, and this page is lazy where navigation.js is not.
+    ...SIGN_IN_ENTRIES.map((entry) => ({ ...entry, icon: SIGN_IN_ICONS[entry.href] })),
     /*{
         title: 'Recruiters',
         icon: LucideUserKey,

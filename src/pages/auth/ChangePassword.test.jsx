@@ -26,8 +26,9 @@ const CHOSEN = 'your_new_password'
 
 const renderScreen = ({ user = userWith({ mustChangePassword: true }), path = '/change-password?next=%2Fmembers', signedIn = true, me } = {}) => {
   if (signedIn) storeSession(user)
-  // `me` replaces the default `GET /api/auth/me` before anything mounts, so the mount's own read meets it too.
-  server.use(...authHandlers({ user }), ...(me ? [http.get('*/api/auth/me', me)] : []))
+  // `me` replaces the default `GET /api/auth/me` before anything mounts, so the mount's own read meets it too -- and it
+  // is listed FIRST: within one `server.use(a, b)` MSW tries `a` before `b`.
+  server.use(...(me ? [http.get('*/api/auth/me', me)] : []), ...authHandlers({ user }))
   return renderWithProviders(
     <AuthProvider>
       <Routes>

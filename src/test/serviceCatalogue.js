@@ -13,6 +13,7 @@ import { monthEndService } from '../services/monthEndService'
 import { recruiterService } from '../services/recruiterService'
 import { recruitmentChannelService } from '../services/recruitmentChannelService'
 import { referenceService } from '../services/referenceService'
+import { signInService } from '../services/signInService'
 import { subscriptionsService } from '../services/subscriptionsService'
 import { summaryService } from '../services/summaryService'
 import { workplaceService } from '../services/workplaceService'
@@ -47,6 +48,7 @@ export const SERVICE_MODULES = [
   { name: 'recruiterService', module: recruiterService },
   { name: 'recruitmentChannelService', module: recruitmentChannelService },
   { name: 'referenceService', module: referenceService },
+  { name: 'signInService', module: signInService },
   { name: 'subscriptionsService', module: subscriptionsService },
   { name: 'summaryService', module: summaryService },
   { name: 'workplaceService', module: workplaceService },
@@ -115,8 +117,8 @@ const ARGS = {
   'workplaceVisitService.getVisits': ['7', 0, 20],
   'workplaceVisitService.recordVisit': ['7', { visitedOn: '2026-09-10', complementFound: 40 }],
   // Placeholders the secret scan clears by shape (`committedSecrets.js`) -- never a credential-looking literal.
-  'authService.signIn': [{ username: 'synthetic.user', password: 'your_password_here' }],
-  'authService.changePassword': [{ currentPassword: 'your_password_here', newPassword: 'your_new_password' }],
+  'signInService.signIn': [{ username: 'synthetic.user', password: 'your_password_here' }],
+  'signInService.changePassword': [{ currentPassword: 'your_password_here', newPassword: 'your_new_password' }],
   'adminService.getUsers': [{ page: 0, size: 50, q: 'Synthetic' }],
   'adminService.createUser': [{ username: 'synthetic.user', displayName: 'Synthetic User', positionCode: 'ORGANISER', scope: { type: 'AREA', codes: ['A'] } }],
   'adminService.updateUser': ['7', { displayName: 'Synthetic User', positionCode: 'ORGANISER', active: true, version: 3 }],
