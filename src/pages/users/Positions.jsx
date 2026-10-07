@@ -82,7 +82,7 @@ function PositionDialog({ position, roles, onClose, onSaved }) {
         <SelectInput label="Default role" required placeholder="Choose a role" {...roles} optionValue="code" optionLabel="name"
           value={form.defaultRoleCode} onChange={set('defaultRoleCode')} error={fields.defaultRoleCode}
           hint="What a new user in this position may do, unless their own role says otherwise." />
-        <TextInput label="Order" kind="number" value={form.ordinal} onChange={text('ordinal')} error={fields.ordinal} maxLength={3}
+        <TextInput label="Order" kind="number" value={form.ordinal} onChange={text('ordinal')} error={fields.ordinal} maxLength={4}
           hint="Where it stands in the list of positions: lower comes first." />
         <label className="touch-target flex cursor-pointer items-start gap-3 rounded p-1.5 text-sm text-ink">
           <input type="checkbox" checked={form.active} onChange={(event) => set('active')(event.target.checked)} className="mt-0.5 size-4 shrink-0 accent-brand" />
