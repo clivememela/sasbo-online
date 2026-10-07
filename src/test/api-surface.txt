@@ -33,6 +33,11 @@ GET /api/acb/runs/{id}/unpaids
 GET /api/acb/termination-report
 POST /api/acb/termination-report/{memberId}/terminate
 GET /api/areas
+POST /api/auth/login
+POST /api/auth/logout
+GET /api/auth/me
+GET /api/auth/mode
+POST /api/auth/password
 GET /api/banks
 GET /api/banks/branches
 POST /api/banks/branches

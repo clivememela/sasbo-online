@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Lock } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { useAccessNote } from "../../auth/useAuth";
 
 /**
  * One row of the rail -- card.html's `.nav__item`: 36px, 14px medium, an 18px icon, a
@@ -32,6 +33,8 @@ export default function SidebarItem({ item, isActive, expandedItems, onToggle, o
   const isExpanded = expandedItems?.[item.href];
   const isCardSelected = selectedCardHref === item.href;
   const highlighted = isActive || isCardSelected;
+  // An entry whose screen needs a permission this person lacks stays, and says so (permissions.md, "Menus").
+  const accessNote = useAccessNote(item.permission);
 
   // A menu entry with no route yet (Maintenance > Bank/Branch) is a label, not a link.
   // Every sub-item renders through this component now, so the id and the link both have
@@ -82,6 +85,7 @@ export default function SidebarItem({ item, isActive, expandedItems, onToggle, o
             className={linkClass}
             onClick={onClick}
             aria-current={isActive ? "page" : undefined}
+            title={accessNote ?? undefined}
           >
             {depth === 0 && Icon && (
               <Icon
@@ -92,6 +96,12 @@ export default function SidebarItem({ item, isActive, expandedItems, onToggle, o
               />
             )}
             <span className="truncate">{item.title}</span>
+            {accessNote && (
+              <>
+                <Lock size={13} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-nav-icon" />
+                <span className="sr-only">({accessNote})</span>
+              </>
+            )}
           </Link>
         ) : (
           <span className={cn(linkClass, "text-ink-muted")} title="Not available yet">

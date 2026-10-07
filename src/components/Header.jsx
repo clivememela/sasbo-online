@@ -1,11 +1,75 @@
 import { useEffect, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Bell, Menu, Search } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Bell, KeyRound, LogIn, LogOut, Menu, Search } from "lucide-react";
 import Breadcrumbs from "./common/Breadcrumbs";
 import Button from "./form/Button";
 import { MENU_BUTTON_ID, SIDEBAR_ID } from "./shellIds";
 import { cn } from "../lib/utils";
 import useMediaQuery from "../hooks/useMediaQuery";
+import { useAuth } from "../auth/useAuth";
+import { loginPath } from "../auth/next";
+
+/** Up to two letters from the name a person is shown by -- "Thandi Synthetic" is TS. */
+export const initialsOf = (name) =>
+  String(name ?? "").trim().split(/\s+/).slice(0, 2).map((word) => word[0] ?? "").join("").toUpperCase();
+
+/** A link that looks like the topbar's ghost buttons: the same 38px row, ring and hover. */
+const TOOL_LINK = cn(
+  "touch-target inline-flex min-h-(--size-control) items-center gap-2 rounded-lg border border-transparent px-3 text-sm font-medium text-ink-muted",
+  "hover-hover:hover:bg-surface hover-hover:hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
+);
+
+/**
+ * WHO IS SIGNED IN -- the mock's account chip, made real by sign-in (signin.md, "The client"): the person's name and
+ * position, a way to change the password, and Sign out. Nobody signed in sees Sign in, which brings them back here.
+ *
+ * Sign out revokes the session on the server and then opens the sign-in page, in either mode: staying on a screen as
+ * somebody who has just left it is how a shared office computer hands the next person a session.
+ */
+function Account() {
+  const { status, user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  if (status !== "signed-in") {
+    return (
+      <Link to={loginPath(location)} className={TOOL_LINK}>
+        <LogIn size={18} strokeWidth={1.75} aria-hidden="true" />
+        Sign in
+      </Link>
+    );
+  }
+
+  const position = user.position?.name;
+  return (
+    <>
+      <p className="flex h-9 min-w-0 items-center gap-2.5 rounded-full py-0 pl-1 pr-2.5">
+        <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-ink">
+          {initialsOf(user.displayName || user.username)}
+        </span>
+        {/* The name across the whole desk, from `xl` as the placeholder's was; below that it is the button's name. */}
+        <span className="hidden min-w-0 leading-tight xl:grid">
+          <span className="truncate text-[13.5px] font-medium text-ink">{user.displayName || user.username}</span>
+          {position && <span className="truncate text-xs text-ink-muted">{position}</span>}
+        </span>
+        <span className="sr-only xl:hidden">{`${user.displayName || user.username}${position ? `, ${position}` : ""}`}</span>
+      </p>
+      <Link to="/change-password" className={TOOL_LINK} aria-label="Change your password" title="Change your password">
+        <KeyRound size={18} strokeWidth={1.75} aria-hidden="true" />
+      </Link>
+      <Button
+        variant="ghost"
+        onClick={async () => {
+          await signOut();
+          navigate("/login", { replace: true });
+        }}
+      >
+        <LogOut size={18} strokeWidth={1.75} aria-hidden="true" />
+        <span className="max-sm:sr-only">Sign out</span>
+      </Button>
+    </>
+  );
+}
 
 /**
  * THE TOPBAR. card.html's `.topbar`, and it is 60px.
@@ -216,25 +280,9 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
           <Bell size={18} strokeWidth={1.75} aria-hidden="true" />
         </Button>
 
-        {/* ⚠️ A PLACEHOLDER, AND AN HONEST ONE. There is no signed-in person for the pill to
-            belong to: authentication is DEFERRED (R-SEC-C). It stays as the shell's anchor,
-            as a non-interactive chip assistive technology is not told to believe in. When
-            authentication lands it becomes the mock's account menu, whose name comes from
-            the session. */}
-        <p
-          aria-hidden="true"
-          className="flex h-9 select-none items-center gap-2.5 rounded-full py-0 pl-1 pr-2.5"
-        >
-          <span className="grid size-7 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-ink">
-            SA
-          </span>
-          {/* 🔑 THE NAME IS PRESENT ACROSS THE WHOLE DESK, which is what the mock's topbar
-              shows and what the contract calls desktop -- from `xl` (1280), the same edge
-              the record panel docks at. It was briefly hidden below 1440 because it had been
-              pushing the breadcrumb off; the trail carries `min-w-0` now, so the row's
-              give comes out of the crumbs and the name stays where the mock puts it. */}
-          <span className="hidden whitespace-nowrap text-[13.5px] font-medium text-ink xl:inline">Administrator</span>
-        </p>
+        {/* The placeholder chip ("SA", "Administrator") that stood here while authentication was deferred (R-SEC-C)
+            is the real account now: the session's name and position, and the way out. */}
+        <Account />
       </div>
     </header>
   );

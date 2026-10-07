@@ -5,6 +5,7 @@ import ErrorBoundary from "./common/ErrorBoundary";
 import RoutePending from "./common/RoutePending";
 import { MAIN_CONTENT_ID } from "./shellIds";
 import OfflineBanner from "./common/OfflineBanner";
+import SessionNotice from "./common/SessionNotice";
 import { PAGE_GUTTER } from "./common/Sheet.jsx";
 import { cn } from "../lib/utils";
 import { getLastNetworkFailureAt, onNetworkFailure } from "../lib/reportError";
@@ -60,6 +61,8 @@ export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref,
             // which is a large amount of machinery for a button pressed once a month.
             onRetry={() => window.location.reload()}
           />
+          {/* Beside the offline banner and for its reason: a fact about the application, not about one screen. */}
+          <SessionNotice />
         </div>
         {/* 🔴 THE BOUNDARY IS HERE, INSIDE THE SHELL, and the position is the whole point.
             A11's standard-facing test says it in one line: "the shell must survive, and

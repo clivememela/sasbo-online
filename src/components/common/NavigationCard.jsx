@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 
 import { cn } from "../../lib/utils";
+import { useAccessNote } from "../../auth/useAuth";
 import Sheet from "./Sheet.jsx";
 
 /**
@@ -43,7 +44,10 @@ const ROW = "flex items-center gap-4 px-5 py-3.5";
  * refuse until sign-in -- so their rows say *Waits for sign-in*. Keep it short: it never wraps, and sits beside the
  * title on a phone.
  */
-export default function NavigationCard({ title, icon: Icon, href, desc, onSelect, note = 'Not yet available' }) {
+export default function NavigationCard({ title, icon: Icon, href, desc, onSelect, note = 'Not yet available', permission }) {
+  // A card whose screen needs a permission this person lacks still opens it (the screen says what is needed), and says
+  // so here first -- the same words as the rail (permissions.md, "Menus").
+  const accessNote = useAccessNote(permission);
   const body = (
     <span className="min-w-0 flex-1">
       <span className="block text-base font-semibold leading-tight">{title}</span>
@@ -77,6 +81,7 @@ export default function NavigationCard({ title, icon: Icon, href, desc, onSelect
     >
       {Icon && <Icon size={18} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-brand" />}
       {body}
+      {accessNote && <span className="shrink-0 whitespace-nowrap text-sm text-ink-muted">{accessNote}</span>}
       <ChevronRight
         size={16}
         strokeWidth={1.75}

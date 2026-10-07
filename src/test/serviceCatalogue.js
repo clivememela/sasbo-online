@@ -1,4 +1,5 @@
 import { acbRunService } from '../services/acbRunService'
+import { authService } from '../services/authService'
 import { bankService } from '../services/bankService'
 import { debounceService } from '../services/debounceService'
 import { jobGradeService } from '../services/jobGradeService'
@@ -30,6 +31,7 @@ import * as api from '../services/api'
  */
 export const SERVICE_MODULES = [
   { name: 'acbRunService', module: acbRunService },
+  { name: 'authService', module: authService },
   { name: 'bankService', module: bankService },
   { name: 'debounceService', module: debounceService },
   { name: 'jobGradeService', module: jobGradeService },
@@ -47,7 +49,10 @@ export const SERVICE_MODULES = [
   { name: 'workplaceVisitService', module: workplaceVisitService },
 ]
 
-/** The one module that exports no method that performs a request. */
+/**
+ * The one module that exports no method that performs a request. Since sign-in it also installs the `fetch` wrapper
+ * that carries the session's token (`installSessionFetch`) -- which changes requests, and makes none of its own.
+ */
 export const PURE_MODULES = [{ name: 'api', module: api }]
 
 /**
@@ -105,6 +110,9 @@ const ARGS = {
   'memberHistoryService.getMemberHistory': ['7', 0, 50],
   'workplaceVisitService.getVisits': ['7', 0, 20],
   'workplaceVisitService.recordVisit': ['7', { visitedOn: '2026-09-10', complementFound: 40 }],
+  // Placeholders the secret scan clears by shape (`committedSecrets.js`) -- never a credential-looking literal.
+  'authService.signIn': [{ username: 'synthetic.user', password: 'your_password_here' }],
+  'authService.changePassword': [{ currentPassword: 'your_password_here', newPassword: 'your_new_password' }],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS

@@ -58,6 +58,8 @@ const RecruitmentChannel = lazy(() => import('./pages/maintainance/RecruitmentCh
 const Subscriptions = lazy(() => import('./pages/maintainance/Subscriptions.jsx'));
 // Month end `01.5`: SASBO's workplaces -- a leaf of Maintenance, beside the other tables it maintains.
 const Workplaces = lazy(() => import('./pages/maintainance/Workplaces.jsx'));
+// Sign-in (contracts/signin.md): a person's own password. Lazy like every page.
+const ChangePassword = lazy(() => import('./pages/auth/ChangePassword.jsx'));
 
 // NAMED exports, so the dynamic import has to be adapted to lazy()'s default-export
 // contract. Written out rather than hidden in a helper: the shape of the mistake --
@@ -77,6 +79,7 @@ function App() {
     <Routes>
       <Route element={<AuthLayout />}>
         <Route path="login" element={<AuthPage />} />
+        <Route path="change-password" element={<ChangePassword />} />
         <Route path="signup" element={<Navigate to="/login" replace />} />
       </Route>
       <Route path="/" element={<AppLayout />}>

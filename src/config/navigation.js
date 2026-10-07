@@ -7,7 +7,6 @@ import {
   Users,
   ChartNoAxesCombined,
   Archive,
-  LogOutIcon,
   NotebookPen,
   Form,
   MapPinnedIcon,
@@ -335,8 +334,4 @@ export const navItems = [
       { title: "Location Listing", icon: MapPinnedIcon, href: "/reports/locations" }
     ]
   }
-];
-
-export const authItems = [
-  { title: "Log out", icon: LogOutIcon, href: "/login" },
 ];
