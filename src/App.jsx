@@ -51,6 +51,11 @@ const DailyMenu = lazy(() => import('./pages/admin/DailyMenu.jsx'));
 // statistics; a name the server has no statistic for is the page's not-found state, never a blank.
 const MonthlyMenu = lazy(() => import('./pages/admin/MonthlyMenu.jsx'));
 const MonthEndStatistic = lazy(() => import('./pages/admin/MonthEndStatistic.jsx'));
+// The October build's month end (`contracts/monthend-api.md`): sending the month -- the regions' packs, the banks' and
+// providers' files, what was sent -- and the suspended members. Each a static segment, which ranks above `:statistic`.
+const MonthEndRegionPacks = lazy(() => import('./pages/admin/MonthEndRegionPacks.jsx'));
+const MonthEndFiles = lazy(() => import('./pages/admin/MonthEndFiles.jsx'));
+const MonthEndSent = lazy(() => import('./pages/admin/MonthEndSent.jsx'));
 const CaptureMember = lazy(() => import('./pages/members/CaptureMember.jsx'));
 const Maintenance = lazy(() => import('./pages/admin/Maintenance.jsx'));
 const BankListing = lazy(() => import('./pages/bank_branch/BankListing.jsx'));
@@ -88,6 +93,9 @@ function App() {
         <Route path="admin/acb/runs" element={<AcbRuns />} />
         <Route path="admin/daily-menu" element={<DailyMenu />} />
         <Route path="admin/monthly-menu" element={<MonthlyMenu />} />
+        <Route path="admin/monthly-menu/region-packs" element={<MonthEndRegionPacks />} />
+        <Route path="admin/monthly-menu/files" element={<MonthEndFiles />} />
+        <Route path="admin/monthly-menu/sent" element={<MonthEndSent />} />
         <Route path="admin/monthly-menu/:statistic" element={<MonthEndStatistic />} />
         <Route path="recruiters" element={<Recruiters />} />
         <Route path="banks" element={<MapsScope><BanksPage /></MapsScope>} />
