@@ -146,7 +146,7 @@ describe('SASBO\'s codes as a person chooses one (RC7: the number, never the row
 })
 
 describe('the figures (02.2, 02.3)', () => {
-  it('the six groupings a person may choose are the server\'s, in its order (MD31)', () => {
+  it('the seven groupings a person may choose are the server\'s, in its order (MD31; the tier, MEN-31)', () => {
     expect(Object.keys(SUMMARY_GROUPING)).toEqual(monthEnd.summaryGroupings)
   })
 
@@ -217,7 +217,8 @@ describe('the figures (02.2, 02.3)', () => {
   })
 
   it('the must-pass: nothing unplaced says nothing', () => {
-    expect(unplacedSentence(monthEndBody('GET /api/members/summary').unplaced)).toBe('1 member has no workplace on record')
+    // The server's golden summary: the invented member and the invented suspended member, each at no workplace.
+    expect(unplacedSentence(monthEndBody('GET /api/members/summary').unplaced)).toBe('2 members have no workplace on record')
     expect(unplacedSentence({ statuses: [], noWorkplace: 0, noTableCode: 0 })).toBe('')
     expect(unplacedSentence(undefined)).toBe('')
   })

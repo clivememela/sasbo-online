@@ -105,6 +105,35 @@ describe('the states of the list', () => {
   })
 })
 
+describe('the server\'s golden answers (MD48)', () => {
+  it('🔑 the month\'s files as the server answers them: a bank\'s full list made, one changes-only, a provider off, one by SFTP', async () => {
+    server.use(monthEndAnswer('GET /api/month-end/{month}/files'))
+    openPage()
+
+    const bank = await rowFound('Invented Bank')
+    expect(within(bank).getByText(/^The full list, as Absa’s fixed-width text file\. Now: 0 members\.$/)).toBeInTheDocument()
+    expect(bank).toHaveTextContent('INVENTEDBANKFULL_260831.zip: 0 rows, produced on 29 September 2026 at 10:00 by system. '
+      + 'Downloaded 0 times. Password-protected, in a ZIP with a password: open it with 7-Zip, WinZip or WinRAR.')
+    expect(within(row('Invented Insurer')).getByText(/^New and deleted members only, as an Excel workbook\./)).toBeInTheDocument()
+    expect(row('Invented suspended benefit')).toHaveTextContent('Suspended for now: nothing is made for it, and it can be used again.')
+    expect(within(row('Invented legal cover')).getByText(SFTP_OFF)).toBeInTheDocument()
+  })
+
+  it('a produced file, as the server answers it: the password panel shows what the answer carries -- once', async () => {
+    server.use(monthEndAnswer('GET /api/month-end/{month}/files'),
+      monthEndAnswer('POST /api/month-end/{month}/files/banks/INVENTED_BANK'))
+    const user = setupUser()
+    openPage()
+
+    await user.click(within(await rowFound('Invented Bank')).getByRole('button', { name: 'Produce the file again' }))
+    const made = monthEndExamples.answers['POST /api/month-end/{month}/files/banks/INVENTED_BANK'].body
+    const panel = await screen.findByRole('group', { name: `The password for ${made.file.fileName}` })
+    // The golden answer writes the password as a placeholder; the panel shows whatever the answer carries.
+    expect(within(panel).getByText(made.password)).toHaveAttribute('data-one-time-password')
+    expect(panel).toHaveTextContent(made.passwordNote)
+  })
+})
+
 describe('what each bank and provider receives (MEN-32 to MEN-35)', () => {
   it('🔑 a bank\'s full list or its new and deleted only -- its setting -- in its own layout, password-protected', async () => {
     server.use(filesAnswer())

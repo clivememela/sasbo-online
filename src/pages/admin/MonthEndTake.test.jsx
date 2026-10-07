@@ -212,6 +212,9 @@ describe('the month, as the take left it (R4)', () => {
   })
 
   it('the must-pass: a take the server kept no reason or window for says neither', async () => {
+    // A take made before the window was kept (V79): the server's own August carries one, so it is taken away here.
+    const before = { ...MONTHS.taken[0], reason: null, countsFrom: null, countsUntil: null }
+    server.use(monthsAnswer({ ...MONTHS, taken: [before] }))
     openPage({ permissions: [] })
     await monthsRead()
 

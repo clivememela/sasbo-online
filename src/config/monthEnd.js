@@ -208,8 +208,9 @@ export const committeeLine = (workplace) =>
 /* ── The figures (02.2, 02.3) ────────────────────────────────────────────────────────────────────── */
 
 /**
- * What the figures are grouped by: the server's six, in its order (`summaryGroupings`), each as a person reads it --
- * which is also how the sheet's first column is headed. Held to the server's list by `monthEnd.test.js`.
+ * What the figures are grouped by: the server's seven, in its order (`summaryGroupings`), each as a person reads it --
+ * which is also how the sheet's first column is headed. Held to the server's list by `monthEnd.test.js`. The seventh is
+ * Stephne's Core A, B and C (MEN-31): the codes in no tier read as "All other institutions", the server's own row.
  */
 export const SUMMARY_GROUPING = /* @__PURE__ */ Object.freeze({
   group: 'Employer group',
@@ -218,6 +219,7 @@ export const SUMMARY_GROUPING = /* @__PURE__ */ Object.freeze({
   area: 'Area',
   region: 'Region',
   committee: 'Committee',
+  tier: 'Core tier',
 });
 
 /**

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { committedSurface, committedVocabulary } from '../../test/apiContractScan'
+import { monthEndBody } from '../../test/msw/monthEndExamples'
 import { STATISTICS } from './monthEndRules'
 import {
   DELIVERY, DELIVERY_REASON, FORMATS, MAIL_OFF, PACKS_UNAVAILABLE, SEND_REFUSAL, SENDING_READS, SFTP_OFF, areasSaid,
@@ -163,7 +164,10 @@ describe('the banks\' and providers\' files -- MEN-05 (POPIA), MEN-32 to MEN-35'
 })
 
 describe('MV-36: an answer of another shape is not available, never an empty list', () => {
-  it('the contract\'s answers are each its shape', () => {
+  it('the server\'s golden answers, and the contract\'s, are each their shape (MD48)', () => {
+    expect(regionPacksOf(monthEndBody('GET /api/month-end/{month}/region-packs'))).not.toBeNull()
+    expect(filesOf(monthEndBody('GET /api/month-end/{month}/files'))).not.toBeNull()
+    expect(deliveriesOf(monthEndBody('GET /api/month-end/{month}/deliveries'))).not.toBeNull()
     expect(regionPacksOf(regionPacks())).not.toBeNull()
     expect(filesOf(monthFiles())).not.toBeNull()
     expect(deliveriesOf({ month: '2026-08', page: 0, size: 50, total: 0, items: [] })).not.toBeNull()

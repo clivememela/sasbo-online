@@ -27,7 +27,6 @@ export const DELIVERY_REASON = /* @__PURE__ */ Object.freeze({
   MAIL_NOT_CONFIGURED: 'no mail is set up on this server',
   RECIPIENT_HAS_NO_ADDRESS: 'no e-mail address is on record for the recipient',
   PACK_NOT_PRODUCED: 'its pack is not produced yet',
-  MAIL_ATTACHMENT_TOO_LARGE: 'the files were too large to e-mail together',
   MAIL_FAILED: 'the mail server refused it or could not be reached',
   SFTP_NOT_CONFIGURED: 'SFTP is not set up on this server',
   SFTP_FAILED: 'the SFTP server refused it or could not be reached',

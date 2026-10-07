@@ -69,6 +69,16 @@ describe('what was sent', () => {
     ])
   })
 
+  it('the server\'s golden answer (MD48): a pack downloaded, read as the server writes it', async () => {
+    server.use(monthEndAnswer('GET /api/month-end/{month}/deliveries'))
+    openPage()
+
+    await screen.findByText('Region’s pack: Invented North')
+    const cells = within(bodyRows()[0]).getAllByRole('cell').filter((cell) => !cell.hasAttribute('data-expander'))
+    expect(cells.slice(0, 4).map((cell) => cell.textContent))
+      .toEqual(['29 September 2026 at 10:00', 'Region’s pack: Invented North', 'Downloaded as PDF', 'Done'])
+  })
+
   it('nothing sent yet: said as nothing, never as a failure', async () => {
     server.use(deliveriesAnswer(deliveriesPage([])))
     openPage()

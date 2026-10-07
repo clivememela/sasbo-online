@@ -227,8 +227,12 @@ describe('the October build -- Stephne\'s Month end answers (contracts/monthend-
     expect(countsSaid(months, monthStateOf(months, '2026-09')))
       .toBe('Everything captured or changed since 29 September 2026 at 10:00, when August 2026 was taken, counts in '
         + 'September 2026.')
+    // The server's own August, taken by the seed after the month: the calendar month, as it counted.
+    expect(countsSaid(MONTHS, monthStateOf(MONTHS, '2026-08')))
+      .toBe('It counts everything captured or changed from 1 August 2026 at 00:00 to 1 September 2026 at 00:00.')
     // A take made before the window was kept says nothing it was not told; so does a month whose month before was not taken.
-    expect(countsSaid(MONTHS, monthStateOf(MONTHS, '2026-08'))).toBe('')
+    const unwindowed = { ...MONTHS, taken: [{ ...MONTHS.taken[0], countsFrom: null, countsUntil: null }] }
+    expect(countsSaid(unwindowed, monthStateOf(unwindowed, '2026-08'))).toBe('')
     expect(countsSaid({ openMonth: '2026-09', taken: [] }, monthStateOf({ openMonth: '2026-09', taken: [] }, '2026-09'))).toBe('')
     expect(countsSaid(MONTHS, monthStateOf(MONTHS, '2026-07'))).toBe('')
   })
@@ -237,7 +241,8 @@ describe('the October build -- Stephne\'s Month end answers (contracts/monthend-
     expect(lapsedSaid(5)).toBe('5 suspensions have lapsed. The members can be deleted.')
     expect(lapsedSaid(1)).toBe('1 suspension has lapsed. The member can be deleted.')
     expect(lapsedSaid(0)).toBe('No suspension has lapsed.')
-    expect(lapsedSaid(1234)).toBe('1 234 suspensions have lapsed. The members can be deleted.')
+    // The count's grouping space is the formatter's no-break one.
+    expect(lapsedSaid(1234)).toMatch(/^1\s234 suspensions have lapsed\. The members can be deleted\.$/)
   })
 
   it('the take\'s refusals are ones the server publishes, and the reason\'s limit is the contract\'s 500', () => {

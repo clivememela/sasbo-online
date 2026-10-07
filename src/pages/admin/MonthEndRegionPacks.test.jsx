@@ -170,6 +170,41 @@ describe('the states of the list', () => {
   })
 })
 
+describe('the server\'s golden answers (MD48) -- what the running server answered, not what somebody typed', () => {
+  it('🔑 a pack made and downloaded, and a recipient with no address and no pack yet -- read as the server writes them', async () => {
+    server.use(monthEndAnswer('GET /api/month-end/{month}/region-packs'))
+    openPage()
+
+    const north = await cardFound('Invented North')
+    expect(north).toHaveTextContent('Produced on 29 September 2026 at 10:00 by system: 0 joined, 0 left, 0 suspended.')
+    expect(within(north).getByRole('list', { name: 'What was sent to Invented North' }))
+      .toHaveTextContent('29 September 2026 at 10:00: Downloaded as PDF, by system. Done.')
+    const south = card('Invented South')
+    expect(south).toHaveTextContent('The whole region · Regional Secretary · No e-mail address on record')
+    expect(south).toHaveTextContent('Not produced yet.')
+    expect(screen.getByText(MAIL_OFF)).toBeInTheDocument()
+    expect(screen.getByText('1 member has no workplace on record, so is in no region’s pack.')).toBeInTheDocument()
+  })
+
+  it('produced, then the bulk send answered as the server answers it: refused for mail, and for a pack not made', async () => {
+    const packs = monthEndExamples.answers['GET /api/month-end/{month}/region-packs'].body
+    server.use(
+      packsAnswer({ ...packs, mail: { configured: true } }),
+      monthEndAnswer('POST /api/month-end/{month}/region-packs/send'),
+    )
+    const user = setupUser()
+    openPage()
+
+    await cardFound('Invented North')
+    await user.click(screen.getByRole('button', { name: 'E-mail 1 pack' }))
+    const send = monthEndExamples.answers['POST /api/month-end/{month}/region-packs/send'].body.results
+    expect(await within(card('Invented North')).findByRole('alert')).toHaveTextContent(send[0].message)
+    expect(within(card('Invented South')).getByRole('alert')).toHaveTextContent(send[1].message)
+    // The server said it has no mail: e-mail shut for the visit, said once.
+    expect(screen.getByText(MAIL_OFF)).toBeInTheDocument()
+  })
+})
+
 describe('the month\'s packs (MEN-02, MEN-08)', () => {
   it('🔑 seven recipients for six regions -- Johannesburg twice -- each with its areas, position and address', async () => {
     server.use(packsAnswer())
