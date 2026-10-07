@@ -324,7 +324,13 @@ const CEILINGS = {
   //   level) · MemberHistory +30 (the reasons' new name) · AcbDebits +20 (two longer labels) · eight chunks within 10 B
   //   each (a column's new name, renamed import stubs).
   //   Nothing from src/test/ is imported. The css is unmoved at 80.63; the entry is 330.40 against main's 330.47.
-  js: 791.39 * KB,
+  //
+  // 791.39 -> 791.44 on 2026-10-07, MEASURED (OB17), for the senior review's fixes to the same stream (review-home):
+  // run 37557813096 at 7db86d9, javascript 791.43 KiB, 0.05 over 791.38 at 3824ec2. +60 B by vite's sizes, in one chunk
+  // there already: MonthlyMenu 12.53 -> 12.59 kB -- a month never taken now names what refuses it (its statistics and its
+  // pack) and says its figures are worked out now, where the page had said "a past month is read only from what was
+  // taken" above figures that work the month out. Nothing from src/test/ is imported; entry and css unmoved.
+  js: 791.44 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
@@ -355,7 +361,10 @@ const CEILINGS = {
   // 934.87 -> 935.58 on 2026-10-07, MEASURED (OB17): 935.57 KiB on run 37549523705 -- the javascript's +1.50 above and
   // index.html's +80 B (its pre-paint script sets the color-scheme meta: light unless the browser chose dark), the
   // stylesheet unmoved at 80.63.
-  total: 935.58 * KB,
+  //
+  // 935.58 -> 935.64 on 2026-10-07, MEASURED (OB17): 935.63 KiB on run 37557813096 -- the javascript's +60 B above
+  // (review-home's never-taken sentence), the stylesheet unmoved at 80.63.
+  total: 935.64 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to
