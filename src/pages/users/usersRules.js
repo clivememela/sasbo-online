@@ -28,11 +28,14 @@ export const standingLabel = (user) => {
  * name in `usersRules.test.js`. The screens hold state; what they say and what they send is decided here.
  */
 
-/** Longest a typed value may be: what the server's columns hold, and enough for any real name. */
-export const LIMITS = Object.freeze({ username: 100, displayName: 120, email: 200, code: 40, name: 100, search: 100 });
+/** Longest a typed value may be -- the server's own limits (CreateUserRequest, PositionRequest, RoleRequest). */
+export const LIMITS = Object.freeze({ username: 60, displayName: 80, email: 254, code: 40, name: 80, search: 100 });
 
-/** A position or role code as the server stores it: capitals, digits and underscores, starting with a letter. */
-export const CODE_PATTERN = /^[A-Z][A-Z0-9_]*$/;
+/** A position or role code as the server takes it: 2 to 40 capitals, digits and underscores, starting with a letter. */
+export const CODE_PATTERN = /^[A-Z][A-Z0-9_]{1,39}$/;
+
+/** A username as the server takes it: 3 to 60 letters, digits, dots, dashes, underscores or @, starting alphanumeric. */
+export const USERNAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._@-]{2,59}$/;
 
 /** The words for a scope (permissions.md, "Scope") -- "All of SASBO", "Regions: NORTH, SOUTH", "Area: A". */
 export const scopeLabel = (scope) => {
@@ -81,7 +84,9 @@ export const userProblems = (form, { creating }) => {
   const problems = {};
   if (!form.displayName.trim()) problems.displayName = 'Enter the name this user is shown by.';
   if (creating && !form.username.trim()) problems.username = 'Enter a username.';
-  else if (creating && /\s/.test(form.username.trim())) problems.username = 'A username has no spaces.';
+  else if (creating && !USERNAME_PATTERN.test(form.username.trim())) {
+    problems.username = 'A username is 3 to 60 letters, digits, dots, dashes, underscores or @, with no spaces, starting with a letter or a digit.';
+  }
   if (form.email.trim() && !looksLikeEmail(form.email.trim())) problems.email = 'Enter an e-mail address like name@sasbo.co.za, or leave it empty.';
   if (!form.positionCode) problems.positionCode = 'Choose the position this user holds.';
   if (form.scopeType === 'REGION' && form.codes.length === 0) problems.scope = 'Choose at least one region this user sees.';
@@ -101,8 +106,8 @@ export const userBody = (form, { creating, version }) => {
   return creating ? { username: form.username.trim(), ...body } : { ...body, active: form.active, version };
 };
 
-/** The server's field names, mapped to the form's: its `scope.codes` is the form's scope. */
-const FIELD_OF = { 'scope.codes': 'scope', 'scope.type': 'scope', scope: 'scope' };
+/** The server's field names, mapped to the form's: `scope`, `scope.type`, `scope.codes[2]` all belong to the scope. */
+const fieldOf = (field) => (field.startsWith('scope') ? 'scope' : field);
 
 /**
  * A refused create or change, as the dialog shows it: `fields` for what belongs on a field, `notice` for the rest, and
@@ -121,7 +126,7 @@ export const userRefusal = (error) => {
   if (code === AUTH_REFUSAL.LAST_ADMINISTRATOR) {
     return { notice: 'This would leave SASBO with no active user who can manage users. Give another user that permission first, then make this change.' };
   }
-  const fields = Object.fromEntries(Object.entries(validationErrorsOf(error)).map(([field, text]) => [FIELD_OF[field] ?? field, text]));
+  const fields = Object.fromEntries(Object.entries(validationErrorsOf(error)).map(([field, text]) => [fieldOf(field), text]));
   return Object.keys(fields).length ? { fields, notice: said } : { notice: said };
 };
 
@@ -133,13 +138,17 @@ export const editorFailure = (error, what, where) => (writeMayHaveLanded(error)
   ? { fields: {}, notice: writeFailure(error, what, where) }
   : { fields: validationErrorsOf(error), notice: messageOf(error) });
 
-/** A position as its dialog holds it, and what a save sends (contracts/signin.md). */
+/**
+ * A position as its dialog holds it, and what a save sends (contracts/signin.md). A change carries the `version` it was
+ * read at, so the server refuses one made over somebody else's (`STALE_VERSION`, said in its own words).
+ */
 export const positionForm = (position) => ({
   code: position?.code ?? '',
   name: position?.name ?? '',
   defaultRoleCode: position?.defaultRoleCode ?? '',
   ordinal: position?.ordinal == null ? '' : String(position.ordinal),
   active: position ? position.active !== false : true,
+  version: position?.version ?? null,
 });
 
 export const positionProblems = (form, { creating }) => {
@@ -149,7 +158,7 @@ export const positionProblems = (form, { creating }) => {
     problems.code = 'A code is capital letters, digits and underscores, starting with a letter, for example REGIONAL_SECRETARY.';
   }
   if (!form.defaultRoleCode) problems.defaultRoleCode = 'Choose the role a user in this position gets.';
-  if (form.ordinal.trim() && !/^\d{1,3}$/.test(form.ordinal.trim())) problems.ordinal = 'The order is a whole number, 0 to 999.';
+  if (form.ordinal.trim() && !/^\d{1,4}$/.test(form.ordinal.trim())) problems.ordinal = 'The order is a whole number, 0 to 9999.';
   return problems;
 };
 
@@ -159,10 +168,19 @@ export const positionBody = (form) => ({
   defaultRoleCode: form.defaultRoleCode,
   active: form.active,
   ordinal: form.ordinal.trim() ? Number(form.ordinal.trim()) : 0,
+  ...(form.version != null && { version: form.version }),
 });
 
-/** A role as its dialog holds it, and what a save sends. */
-export const roleForm = (role) => ({ code: role?.code ?? '', name: role?.name ?? '', permissions: [...(role?.permissions ?? [])] });
+/**
+ * A role as its dialog holds it, and what a save sends -- with its `version`, as a position's. A `fixed` role (the
+ * System Administrator's) holds every permission and keeps them: only its name changes (the server's `ROLE_FIXED`).
+ */
+export const roleForm = (role) => ({
+  code: role?.code ?? '',
+  name: role?.name ?? '',
+  permissions: [...(role?.permissions ?? [])],
+  version: role?.version ?? null,
+});
 
 export const roleProblems = (form, { creating }) => {
   const problems = {};
@@ -173,7 +191,12 @@ export const roleProblems = (form, { creating }) => {
   return problems;
 };
 
-export const roleBody = (form) => ({ code: form.code.trim(), name: form.name.trim(), permissions: form.permissions });
+export const roleBody = (form) => ({
+  code: form.code.trim(),
+  name: form.name.trim(),
+  permissions: form.permissions,
+  ...(form.version != null && { version: form.version }),
+});
 
 /** Positions in the order SASBO lists them (`ordinal`), then by name. */
 export const byOrdinal = (positions) =>

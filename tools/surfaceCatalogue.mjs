@@ -566,8 +566,8 @@ export const SURFACES = [
     present: { NOT_FOUND: TEXT('No such statistic') } },
 
   // ── sign-in's Maintenance screens (contracts/signin.md), signed in through `session` ──────────
-  // `serve-dist.mjs` answers twelve invented users over six provisional positions, their roles, the permission
-  // catalogue and a hundred and twenty entries of the record. A new user's temporary password is one invented string.
+  // `serve-dist.mjs` answers invented users over the server's seeded positions, their roles, the permission catalogue
+  // and several pages of the record (`adminAnswer`). A new user's temporary password is one invented string.
   { name: 'users', route: '/admin/maintenance/users', session: ['USERS_ADMIN'], ready: ROWS,
     present: { ROWS, CREATE: TEXT('Create a user'), SCOPE: TEXT('Areas: A, B') } },
   { name: 'users-refused', route: '/admin/maintenance/users', session: [], ready: HEADING,
@@ -587,9 +587,10 @@ export const SURFACES = [
   { name: 'positions-change', route: '/admin/maintenance/positions', session: ['USERS_ADMIN'], ready: ROWS,
     steps: [step('open a position', clickNth('main [data-row-action]', 0), ANY_DIALOG)],
     present: { DIALOG: dialogNamed('/^Change System Administrator$/') }, covers: ['pages/users/Positions.jsx#Modal@position'] },
+  // The SECOND role: the first is the System Administrator's, `fixed`, whose dialog says so instead of a checklist.
   { name: 'roles-change', route: '/admin/maintenance/roles', session: ['USERS_ADMIN'], ready: ROWS,
-    steps: [step('open a role', clickNth('main [data-row-action]', 0), ANY_DIALOG)],
-    present: { DIALOG: dialogNamed('/^Change System Administrator$/'), CATALOGUE: TEXT('Read the record of who did what') },
+    steps: [step('open a role', clickNth('main [data-row-action]', 1), ANY_DIALOG)],
+    present: { DIALOG: dialogNamed('/^Change Head Office Administrator$/'), CATALOGUE: TEXT('Read the record of who did what') },
     covers: ['pages/users/Roles.jsx#Modal@role'] },
   { name: 'audit-from', route: '/admin/maintenance/audit', session: ['AUDIT_VIEW'], ready: ROWS,
     steps: [step('open From', mouseDownOn('main input[aria-haspopup="dialog"]', '/^From/'), DATE_PICKER_OPEN)],

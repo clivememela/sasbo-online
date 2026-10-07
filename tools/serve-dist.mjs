@@ -618,10 +618,11 @@ const authAnswer = (req, path) => {
 
 /**
  * MAINTENANCE'S USERS, POSITIONS, ROLES AND THE RECORD OF WHO DID WHAT (contracts/signin.md), for the signed-in
- * surfaces. Six provisional positions and their roles as permissions.md lists them; twelve invented users across them,
- * each scope a real code of the golden lists (regions NORTH and SOUTH, areas A, B and Y); a hundred and twenty entries
- * of the record. Writes are answered and nothing is stored: a new user is always id 9201, and every temporary password
- * is the same obviously-invented string, which is what a surface photographs.
+ * surfaces. The provisional positions and their roles as the server seeds them (`SignInSeeder`: permissions.md's, and
+ * the two named in the room on 5 Oct); invented users across them, each scope a real code of the golden lists (regions
+ * NORTH and SOUTH, areas A, B and Y); several pages of the record. Writes are answered and nothing is stored: a new user
+ * is always id 9201, and every temporary password is the same obviously-invented string, which is what a surface
+ * photographs.
  */
 const ALL_PERMISSIONS = {
   USERS_ADMIN: 'Create and edit users, positions and roles; reset a password; deactivate a user',
@@ -652,14 +653,17 @@ const PROVISIONAL = [
     'SUBSCRIPTIONS_MAINTAIN', 'PAYROLL_VIEW']],
   ['SENIOR_SECRETARIAT', 'Senior Secretariat', ['MEMBERS_VIEW', 'MONTH_END_VIEW', 'REPORTS_PRINT']],
   ['REGIONAL_SECRETARY', 'Regional Secretary', ['MEMBERS_VIEW', 'MONTH_END_VIEW', 'VISITS_CAPTURE', 'REPORTS_PRINT']],
+  ['REGIONAL_ORGANISER', 'Regional Organiser', ['MEMBERS_VIEW', 'VISITS_CAPTURE', 'REPORTS_PRINT']],
   ['ORGANISER', 'Organiser', ['MEMBERS_VIEW', 'MEMBERS_CAPTURE', 'VISITS_CAPTURE', 'REPORTS_PRINT']],
+  ['MSO', 'MSO (to be confirmed)', ['MEMBERS_VIEW', 'MEMBERS_CAPTURE', 'VISITS_CAPTURE', 'REPORTS_PRINT']],
 ];
-const adminPositions = PROVISIONAL.map(([code, name], i) => ({ code, name, defaultRoleCode: code, active: true, ordinal: i + 1 }));
-const adminRoles = PROVISIONAL.map(([code, name, permissions]) => ({ code, name, permissions }));
+// As the server seeds them (SignInSeeder): ordinals 10 to 80, the System Administrator's role `fixed`, each with a version.
+const adminPositions = PROVISIONAL.map(([code, name], i) => ({ code, name, defaultRoleCode: code, active: true, ordinal: (i + 1) * 10, version: 1 }));
+const adminRoles = PROVISIONAL.map(([code, name, permissions]) => ({ code, name, permissions, fixed: code === 'SYSTEM_ADMINISTRATOR', version: 1 }));
 const SCOPES = [{ type: 'ALL', codes: [] }, { type: 'REGION', codes: ['NORTH'] }, { type: 'AREA', codes: ['A', 'B'] }, { type: 'AREA', codes: ['Y'] }];
 const adminUsers = ['Ada', 'Ben', 'Cleo', 'Dumi', 'Eve', 'Femi', 'Gugu', 'Hal', 'Ivy', 'Jabu', 'Kea', 'Lulu'].map((first, i) => {
   const [code, name, permissions] = PROVISIONAL[i % PROVISIONAL.length];
-  const scope = code === 'REGIONAL_SECRETARY' ? SCOPES[1] : code === 'ORGANISER' ? SCOPES[2 + (i % 2)] : SCOPES[0];
+  const scope = code.startsWith('REGIONAL_') ? SCOPES[1] : code === 'ORGANISER' || code === 'MSO' ? SCOPES[2 + (i % 2)] : SCOPES[0];
   return {
     id: 9101 + i, username: `${first.toLowerCase()}.synthetic`, displayName: `${first} Synthetic`,
     email: `${first.toLowerCase()}.synthetic@example.invalid`, position: { code, name }, role: { code, name }, permissions, scope,

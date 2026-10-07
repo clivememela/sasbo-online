@@ -84,6 +84,13 @@ function RoleDialog({ role, catalogue, onClose, onSaved }) {
             error={fields.code} required maxLength={LIMITS.code} autoComplete="off" spellCheck={false}
             hint="Capital letters, digits and underscores. It cannot be changed later." />
         )}
+        {/* The System Administrator's role (`fixed`) holds every permission and keeps them -- the server refuses any
+            other set (ROLE_FIXED) -- so it is said, not offered as a checklist that could only be refused. */}
+        {role?.fixed ? (
+          <p className="rounded-lg border border-line bg-surface-2 p-3 text-sm text-ink">
+            This role holds every permission, and they are not changed here. Its name can be.
+          </p>
+        ) : (
         <LoadFailureFrame failed={Boolean(catalogue.loadError)} label="The permissions" loadError={catalogue.loadError} onRetryLoad={catalogue.onRetryLoad}>
           {catalogue.loading ? (
             <p role="status" className="text-sm text-ink-muted">Loading the permissions…</p>
@@ -103,6 +110,7 @@ function RoleDialog({ role, catalogue, onClose, onSaved }) {
             />
           )}
         </LoadFailureFrame>
+        )}
       </form>
     </Modal>
   );

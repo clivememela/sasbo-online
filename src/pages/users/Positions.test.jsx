@@ -17,7 +17,7 @@ import { setupUser } from '../../test/user'
  * arrives, and replaced as data (permissions.md).
  */
 const POSITIONS = [
-  { code: 'ORGANISER', name: 'Organiser', defaultRoleCode: 'ORGANISER', active: true, ordinal: 6 },
+  { code: 'ORGANISER', name: 'Organiser', defaultRoleCode: 'ORGANISER', active: true, ordinal: 6, version: 2 },
   { code: 'SYSTEM_ADMINISTRATOR', name: 'System Administrator', defaultRoleCode: 'SYSTEM_ADMINISTRATOR', active: true, ordinal: 1 },
 ]
 const ROLES = [
@@ -69,7 +69,7 @@ describe('Maintenance > Positions', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
     expect(await screen.findByText('Organiser is saved.')).toBeInTheDocument()
-    expect(sent).toEqual([{ code: 'ORGANISER', name: 'Organiser', defaultRoleCode: 'ORGANISER', active: false, ordinal: 6 }])
+    expect(sent).toEqual([{ code: 'ORGANISER', name: 'Organiser', defaultRoleCode: 'ORGANISER', active: false, ordinal: 6, version: 2 }])
   })
 
   it('a new position needs a code in capitals, and a refusal is said in the server\'s words inside the dialog', async () => {

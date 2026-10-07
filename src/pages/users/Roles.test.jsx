@@ -19,7 +19,10 @@ const CATALOGUE = [
   { name: 'MEMBERS_VIEW', description: 'See a listing that names members, within the user\'s region or area' },
   { name: 'AUDIT_VIEW', description: 'Read the record of who did what' },
 ]
-const ROLES = [{ code: 'ORGANISER', name: 'Organiser', permissions: ['MEMBERS_VIEW'] }]
+const ROLES = [
+  { code: 'ORGANISER', name: 'Organiser', permissions: ['MEMBERS_VIEW'], fixed: false, version: 4 },
+  { code: 'SYSTEM_ADMINISTRATOR', name: 'System Administrator', permissions: ['MEMBERS_VIEW', 'AUDIT_VIEW'], fixed: true, version: 1 },
+]
 
 const renderRoles = ({ catalogue = () => HttpResponse.json(CATALOGUE), roles = () => HttpResponse.json(ROLES) } = {}) => {
   server.use(http.get('*/api/admin/roles', roles), http.get('*/api/admin/permissions', catalogue))
@@ -56,7 +59,29 @@ describe('Maintenance > Roles', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
     expect(await screen.findByText('Organiser is saved.')).toBeInTheDocument()
-    expect(sent).toEqual([{ code: 'ORGANISER', name: 'Organiser', permissions: ['MEMBERS_VIEW', 'AUDIT_VIEW'] }])
+    // With the version it was read at, so a change made over somebody else's is refused (STALE_VERSION).
+    expect(sent).toEqual([{ code: 'ORGANISER', name: 'Organiser', permissions: ['MEMBERS_VIEW', 'AUDIT_VIEW'], version: 4 }])
+  })
+
+  it('the System Administrator\'s role keeps every permission: said, not offered -- only its name changes', async () => {
+    const user = setupUser()
+    const sent = []
+    server.use(http.put('*/api/admin/roles/SYSTEM_ADMINISTRATOR', async ({ request }) => {
+      sent.push(await request.json())
+      return HttpResponse.json({})
+    }))
+    renderRoles()
+    await user.click(await screen.findByRole('button', { name: 'Change System Administrator' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/holds every permission, and they are not changed here/)).toBeInTheDocument()
+    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
+
+    const name = within(dialog).getByLabelText(/^Name/)
+    await user.clear(name)
+    await user.type(name, 'Systems Administrator')
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Systems Administrator is saved.')).toBeInTheDocument()
+    expect(sent).toEqual([{ code: 'SYSTEM_ADMINISTRATOR', name: 'Systems Administrator', permissions: ['MEMBERS_VIEW', 'AUDIT_VIEW'], version: 1 }])
   })
 
   it('a catalogue that did not load says so inside the dialog, with a retry', async () => {

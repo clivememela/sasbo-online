@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  NEW_USER, actionLabel, byOrdinal, editorFailure, formOf, positionBody, positionProblems, roleProblems, scopeLabel,
+  NEW_USER, actionLabel, byOrdinal, editorFailure, formOf, positionBody, positionForm, positionProblems, roleProblems, scopeLabel,
   standingLabel, userBody, userProblems, userRefusal, whenLabel, whoLabel,
 } from './usersRules'
 
@@ -74,10 +74,18 @@ describe('each refusal says what to do next', () => {
     expect(userRefusal(refused(409, 'LAST_ADMINISTRATOR')).notice).toMatch(/no active user who can manage users/)
   })
 
-  it('field errors the server names land on their fields; its scope.codes on the scope', () => {
-    const refusal = userRefusal(refused(400, 'REQUEST_MALFORMED', 'Check the fields.', { displayName: 'Too long.', 'scope.codes': 'Unknown code.' }))
+  it('field errors the server names land on their fields; every scope path on the scope', () => {
+    const refusal = userRefusal(refused(400, 'VALIDATION_FAILED', 'Check the fields.', { displayName: 'Too long.', 'scope.codes': 'Unknown code.' }))
     expect(refusal.fields).toEqual({ displayName: 'Too long.', scope: 'Unknown code.' })
     expect(refusal.notice).toBe('Check the fields.')
+    // Bean Validation names a list's element by its index.
+    expect(userRefusal(refused(400, 'VALIDATION_FAILED', 'Check.', { 'scope.codes[1]': 'A code is at most 8 characters.' })).fields)
+      .toEqual({ scope: 'A code is at most 8 characters.' })
+  })
+
+  it('a refusal the screen does not branch on is said in the server\'s words (ROLE_ABOVE_YOUR_OWN, signin-server-notes §3)', () => {
+    expect(userRefusal(refused(403, 'ROLE_ABOVE_YOUR_OWN', 'That role holds a permission you do not hold.')).notice)
+      .toBe('That role holds a permission you do not hold.')
   })
 
   it('a position or role save that may have landed says "could not be confirmed", never "not saved"', () => {
@@ -95,6 +103,10 @@ describe('positions and roles', () => {
     expect(positionProblems(form, { creating: false })).toEqual({})
     expect(positionProblems({ ...form, ordinal: 'x' }, { creating: false }).ordinal).toBeDefined()
     expect(positionBody({ ...form, code: ' ORGANISER ', ordinal: ' 6 ' })).toEqual({ code: 'ORGANISER', name: 'Organiser', defaultRoleCode: 'ORGANISER', active: true, ordinal: 6 })
+    // A position read from the server carries its version, and a change sends it back (signin-server-notes §1.5).
+    expect(positionBody(positionForm({ code: 'ORGANISER', name: 'Organiser', defaultRoleCode: 'ORGANISER', active: true, ordinal: 6, version: 3 })))
+      .toMatchObject({ version: 3 })
+    expect(positionProblems({ ...form, code: 'O' }, { creating: true }).code).toBeDefined()
     expect(roleProblems({ code: '', name: '', permissions: [] }, { creating: true })).toEqual({ name: expect.any(String), code: expect.any(String) })
   })
 
