@@ -140,6 +140,12 @@ export const recordPayment = ({ employerId, period, amount, receivedOn, referenc
 
 /* ── downloads ── */
 
+/**
+ * The file as it arrived (`GET /files/{id}/content`, on the server beside route 7; not yet in the contract's table):
+ * the one place administrators reach every employer's file (PAY-32). Gone with the lines once the file is a year old.
+ */
+export const downloadOriginal = (fileId) => download(apiUrl(`/api/payroll/files/${id(fileId)}/content`));
+
 /** Route 11: the file's discrepancies list, `xlsx` or `pdf`. */
 export const downloadDiscrepancies = (fileId, format) =>
   download(apiUrl(`/api/payroll/files/${id(fileId)}/reports/discrepancies`) + queryOf({ format }));
@@ -173,6 +179,7 @@ export const payrollService = {
   addNote,
   resolveDiscrepancy,
   recordPayment,
+  downloadOriginal,
   downloadDiscrepancies,
   downloadFullReport,
   downloadQuery,

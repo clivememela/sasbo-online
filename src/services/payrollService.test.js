@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { server } from '../test/msw/server'
 import { deferred } from '../test/deferred'
 import {
-  addNote, compareAgain, downloadDiscrepancies, downloadFullReport, downloadQuery, getDiscrepancies, getFile, getFiles,
+  addNote, compareAgain, downloadDiscrepancies, downloadFullReport, downloadOriginal, downloadQuery, getDiscrepancies, getFile, getFiles,
   getRows, payrollRefusalOf, raiseQueries, recordPayment, resolveDiscrepancy, typeInFile, uploadFile,
 } from './payrollService'
 
@@ -170,6 +170,13 @@ describe('the downloads, fetched with the name the server gave', () => {
     expect(one.filename).toBe('Payroll discrepancies - Absa - September 2026.xlsx')
     expect(two.filename).toBe('Payroll reconciliation - Absa - September 2026.pdf')
     expect(await one.blob.text()).toBe('synthetic bytes')
+  })
+
+  it('the employer\'s file, as it arrived, with its own name', async () => {
+    const seen = capture('get', '*/api/payroll/files/:id/content', attachment('Absa payroll September 2026.xlsx'))
+    const fetched = await downloadOriginal('12')
+    expect(seen[0]).toMatchObject({ path: '/api/payroll/files/12/content', query: {} })
+    expect(fetched.filename).toBe('Absa payroll September 2026.xlsx')
   })
 
   it('🔒 an employer\'s query list is asked for with the password in the body, never in the address', async () => {

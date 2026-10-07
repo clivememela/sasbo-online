@@ -129,6 +129,7 @@ const ARGS = {
   'payrollService.addNote': ['77', 'Synthetic note'],
   'payrollService.resolveDiscrepancy': ['77', { outcome: 'OTHER', note: 'Synthetic note', version: 2 }],
   'payrollService.recordPayment': [{ employerId: 1, period: '2026-09', amount: '174.00', receivedOn: '2026-09-30' }],
+  'payrollService.downloadOriginal': ['12'],
   'payrollService.downloadDiscrepancies': ['12', 'xlsx'],
   'payrollService.downloadFullReport': ['12', 'pdf'],
   'payrollService.downloadQuery': ['2', { format: 'xlsx', password: 'placeholder' }],

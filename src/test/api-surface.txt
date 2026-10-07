@@ -82,6 +82,7 @@ GET /api/payroll/files
 POST /api/payroll/files
 POST /api/payroll/files/typed
 GET /api/payroll/files/{id}
+GET /api/payroll/files/{id}/content
 GET /api/payroll/files/{id}/discrepancies
 GET /api/payroll/files/{id}/queries
 POST /api/payroll/files/{id}/queries

@@ -334,6 +334,27 @@ describe('the reports -- the discrepancies list and the full report, Excel and P
     expect(within(reports).getByRole('button', { name: 'Full report (Excel)' })).toBeEnabled()
   })
 
+  it('🔑 the employer\'s file, as it arrived, is saved under its own name (PAY-32) -- and a typed or year-old file offers none', async () => {
+    const reads = asked('get', '*/api/payroll/files/:id/content', () => new HttpResponse('synthetic workbook', {
+      headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="Absa payroll September 2026.xlsx"' },
+    }))
+    const user = setupUser()
+    const view = openFile(VIEW)
+    await ready()
+    await user.click(screen.getByRole('button', { name: 'The employer’s file, as it arrived' }))
+    await waitFor(() => expect(saved).toEqual(['Absa payroll September 2026.xlsx']))
+    expect(reads).toHaveLength(1)
+    view.unmount()
+
+    for (const changed of [{ entry: 'TYPED' }, { status: 'PURGED' }]) {
+      server.use(http.get('*/api/payroll/files/:id', () => HttpResponse.json({ ...ABSA_SEPTEMBER, ...changed })))
+      const again = openFile(VIEW)
+      await ready()
+      expect(screen.queryByRole('button', { name: 'The employer’s file, as it arrived' }), JSON.stringify(changed)).not.toBeInTheDocument()
+      again.unmount()
+    }
+  })
+
   it('a report that did not arrive says so, and nothing is saved', async () => {
     server.use(http.get('*/api/payroll/files/:id/reports/discrepancies', () => HttpResponse.json({ message: 'The report could not be made.' }, { status: 500 })))
     const user = setupUser()

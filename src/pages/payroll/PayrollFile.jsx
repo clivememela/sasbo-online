@@ -13,7 +13,8 @@ import reportError from '../../lib/reportError.js';
 import { cn } from '../../lib/utils.js';
 import { messageOf, writeMayHaveLanded } from '../../services/parseApiError.js';
 import {
-  compareAgain, downloadDiscrepancies, downloadFullReport, getFile, getVocabulary, payrollRefusalOf, raiseQueries,
+  compareAgain, downloadDiscrepancies, downloadFullReport, downloadOriginal, getFile, getVocabulary, payrollRefusalOf,
+  raiseQueries,
 } from '../../services/payrollService.js';
 import { instantLabel } from '../admin/monthEndRules.js';
 import { ColumnsDialog, DiscrepancyDialog, PaymentDialog } from './PayrollDialogs.jsx';
@@ -271,6 +272,18 @@ function FileReady({ file, setFile, vocabulary, readAgain }) {
               </Button>
             ))}
           </div>
+          {/* The file as it arrived -- the one place every administrator reaches it (PAY-32); kept a year (PAY-39). */}
+          {file.entry === 'UPLOAD' && file.status !== PURGED && (
+            <Button
+              onClick={() => downloads.run('original', () => downloadOriginal(file.id), file.originalName
+                ?? reportName('Payroll file', (file.format ?? 'xlsx').toLowerCase()))}
+              loading={downloads.busy === 'original'}
+              disabled={downloads.busy != null}
+            >
+              <Download aria-hidden="true" className="size-4 shrink-0" />
+              The employer’s file, as it arrived
+            </Button>
+          )}
         </Sheet>
       </div>
 

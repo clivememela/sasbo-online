@@ -724,6 +724,7 @@ const payrollAnswer = (req, path) => {
     if (get && rest === '/queries') return reply(200, [payrollQuery]);
     if (post && rest === '/queries') return reply(201, payrollQuery);
     if (post && rest === '/reconcile') return reply(200, payrollSummary);
+    if (get && rest === '/content') return payrollAttachment('Invented Absa payroll September 2026.xlsx');
     if (get && rest === '/reports/discrepancies') return payrollAttachment('Payroll discrepancies - Absa - September 2026.xlsx');
     if (get && rest === '/reports/full') return payrollAttachment('Payroll reconciliation - Absa - September 2026.xlsx');
   }
