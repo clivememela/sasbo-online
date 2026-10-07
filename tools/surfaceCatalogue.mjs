@@ -128,6 +128,12 @@ const emptyHistory = () => {
 const VISITS = (state) => `!!document.querySelector('main [data-visits="${state}"]')`;
 /** Open INVENTED HARBOUR's visits by its R/A number, the row's control -- named by what it opens -- until `state`. */
 const OPEN_VISITS = (state) => step("open a workplace's visits", clickByText('main td button', '/^900003 — the visits to /'), VISITS(state));
+/** The batch print's numbers, pasted as a list -- two of the golden batch's banks and one number not on record. */
+const TYPE_RA_NUMBERS = step('paste the R/A numbers', typeIntoLabelled('main', '/^R\\/A numbers/', '900001, 900003\n900099'));
+/** Show listings, until the state the surface is after. */
+const SHOW_LISTINGS = (until) => step('show the listings', clickByText('main button', '/^Show listings$/'), until);
+/** A batch of which not one number is on record, as the server answers it. */
+const noneOnRecord = () => ({ asked: [900099], listings: [], unknown: [900099], workplacesServed: 'ALL', reason: null });
 /** A workplace with no visit on record, as the server answers one: the golden page with none on it. */
 const noVisits = () => {
   const golden = JSON.parse(readFileSync(join(REPO_ROOT, 'src', 'test', 'month-end-examples.json'), 'utf8'))
@@ -515,6 +521,27 @@ export const SURFACES = [
     intercept: { url: '*/api/workplaces/*/visits*', mode: 'fulfill', body: noVisits }, steps: [OPEN_VISITS('empty')],
     present: { EMPTY: TEXT('No visits on record') } },
 
+  // ── the organisers' batch print (October build, 5 Oct Show & Tell) ──────────────────────────────
+  // The R/A numbers pasted into the box as an organiser pastes a list, and Show listings; `serve-dist.mjs` answers the
+  // server's golden batch -- two invented banks and a number not on record. Signed out, so each branch says why its
+  // members are not listed. The other states: the batch hung, failed, or not one number on record.
+  { name: 'batch-print-results', route: '/reports/locations/print', ready: HEADING,
+    steps: [TYPE_RA_NUMBERS, SHOW_LISTINGS(`!!document.querySelector('main .print-bank article')`)],
+    present: { BANKS: `!!document.querySelector('main .print-bank h2')`, UNKNOWN: TEXT('Not on record here: 900099'),
+      SIGN_IN: TEXT('Sign in to see the members at this branch') } },
+  { name: 'batch-print-loading', route: '/reports/locations/print', ready: HEADING,
+    intercept: { url: '*/api/workplaces/listings*', mode: 'hang' },
+    steps: [TYPE_RA_NUMBERS, SHOW_LISTINGS(TEXT('Finding the branches…'))], present: { LOADING: STATE('loading') },
+    covers: ['pages/reports/BatchPrint.jsx#DataState@loading'] },
+  { name: 'batch-print-error', route: '/reports/locations/print', ready: HEADING,
+    intercept: { url: '*/api/workplaces/listings*', mode: 'fail' },
+    steps: [TYPE_RA_NUMBERS, SHOW_LISTINGS(TEXT('We could not find those branches.'))], present: { ERROR: STATE('error') },
+    covers: ['pages/reports/BatchPrint.jsx#DataState@error'] },
+  { name: 'batch-print-none-on-record', route: '/reports/locations/print', ready: HEADING,
+    intercept: { url: '*/api/workplaces/listings*', mode: 'fulfill', body: noneOnRecord },
+    steps: [TYPE_RA_NUMBERS, SHOW_LISTINGS(TEXT('None of these R/A numbers is on record here'))],
+    present: { EMPTY: STATE('empty') }, covers: ['pages/reports/BatchPrint.jsx#DataState@empty'] },
+
   // ── month end (`04.1`-`04.10`) ────────────────────────────────────────────────────────────────
   // The Month end page and a statistic's screen, from `serve-dist.mjs`'s golden months and sheets: August 2026 taken,
   // September 2026 open. Each state is reached the way a person meets it -- a month chosen by its address, a sheet
@@ -583,6 +610,14 @@ export const UNREACHABLE = [
     why: 'rendered `disabled` -- a date nobody can open' },
   { site: 'components/form/AddressAutocomplete.jsx#aria-expanded@suggestions',
     why: 'its suggestions come from Google Places; the stub cannot answer Google and a measurement sends nothing to it (R-SEC-H)' },
+  // October build: the two screens below need a signed-in user, and oct/base's AuthProvider is the anonymous caller
+  // until the sign-in stream's client lands -- then the stub mode of contracts/signin.md drives them, and these go.
+  { site: 'pages/reports/WorkplaceListing.jsx#DataState@loading',
+    why: 'the members at a branch are read only for a signed-in user holding MEMBERS_VIEW, and no session can be stubbed until sign-in lands' },
+  { site: 'pages/reports/WorkplaceListing.jsx#DataState@error',
+    why: 'the members at a branch are read only for a signed-in user holding MEMBERS_VIEW, and no session can be stubbed until sign-in lands' },
+  { site: 'pages/reports/MyVisitDrafts.jsx#DataState@state',
+    why: 'My visits is shown only to a signed-in user holding VISITS_CAPTURE, and no session can be stubbed until sign-in lands' },
 ];
 
 /* ── the guard: the catalogue against the source ─────────────────────────────────────────────────── */

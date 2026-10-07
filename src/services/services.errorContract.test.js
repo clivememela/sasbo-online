@@ -82,6 +82,8 @@ const BODYLESS = new Set([
   'recruiterService.remove',
   'recruitmentChannelService.remove',
   'subscriptionsService.remove',
+  // October build review: Discard draft -- DELETE /api/workplaces/visit-drafts/{id}?version= answers 204.
+  'workplaceVisitService.discardDraft',
 ])
 
 /**
@@ -190,7 +192,7 @@ describe('the service error contract', () => {
 
       // A body-less DELETE resolves with `undefined`, and that is CORRECT --
       // it read no body to resolve with. Asserting a value here would be
-      // asserting the wrong contract for those three methods.
+      // asserting the wrong contract for those methods.
       if (!BODYLESS.has(qualified)) {
         expect(
           resolved,
