@@ -38,6 +38,13 @@ export const STATISTICS = /* @__PURE__ */ Object.freeze([
   },
   // 04.9 (A.1's visits, MO22): the branches longest unvisited first; the manager's details wait for sign-in.
   { key: 'visits', name: 'The branches due a visit', legacy: 'Print Branches requiring visits' },
+  // Stephne, MEN-18: "Suspension totals should appear within their Banks" -- by bank and code, by code, and the reasons
+  // for no payroll deduction (contracts/monthend-api.md R5). The members themselves are a listing: `SUSPENDED_HREF`.
+  {
+    key: 'suspensions',
+    name: 'Suspended members, by bank',
+    legacy: 'Bank / Branch Member Count — the suspended, by code',
+  },
 ]);
 
 /** A statistic by its route name -- `null` for a name the server has no statistic for, which is a not-found state. */
@@ -62,23 +69,67 @@ export const LISTINGS = /* @__PURE__ */ Object.freeze([
 export const LISTING_WAITS = 'This waits until administrators sign in to the system. Nothing was produced.';
 
 /**
- * Why *Take the month* is there and cannot be pressed -- the server's own reason for refusing it (`IDENTITY_REQUIRED`),
- * said before anyone asks, as A.C.B.'s *Approve* says its own.
+ * Why *Take the month* cannot be pressed by someone who has not signed in: the take is held by `MONTH_END_TAKE`
+ * (contracts/permissions.md), said before anyone asks, as Debit Order Runs' *Approve* says its own.
  */
-export const TAKE_WAITS = 'Taking a month freezes its figures for good, so it waits until administrators sign in to this system.';
+export const TAKE_WAITS = 'Taking a month freezes its figures for good, so only an administrator who has signed in with '
+  + 'permission to take the month can do it.';
 
 /**
- * Why *Take the month again* is there and cannot be pressed (04.11, MM51): SASBO's answer is that a correction overwrites
- * the wrong figures, and the take that replaces them refuses every caller until sign-in, as the first take does.
+ * Why *Take the month again* cannot be pressed by someone who has not signed in (04.11, MM51): a correction replaces
+ * the figures, the first take kept for the record -- by the position that took it, with a reason (Stephne, MEN-10,
+ * MEN-11).
  */
 export const TAKE_AGAIN_WAITS = 'Taking a month again replaces its figures with the month as it stands now, and keeps the '
-  + 'first take for the record. It waits until administrators sign in to this system.';
+  + 'first take for the record. It needs an administrator who has signed in with permission to take the month, and a '
+  + 'reason.';
 
-/** The statistics pack, as the page names it; the second line is what it replaces. */
+/** The same, to someone signed in without the permission -- who to ask, as `RequirePermission` says it. */
+export const TAKE_NEEDS_PERMISSION = 'You need permission to take the month. Ask your administrator if you should have it.';
+
+/**
+ * The refusals the take's dialog branches on (R4) -- each one the server publishes; the sentence is always the server's.
+ * A reason refused is said at the reason; a month taken since is said, and the months read again.
+ */
+export const TAKE_REFUSAL = /* @__PURE__ */ Object.freeze({
+  TAKE_REASON_REQUIRED: 'TAKE_REASON_REQUIRED',
+  TAKE_REASON_INVALID: 'TAKE_REASON_INVALID',
+  MONTH_ALREADY_TAKEN: 'MONTH_ALREADY_TAKEN',
+  MONTH_TAKEN_SINCE: 'MONTH_TAKEN_SINCE',
+});
+
+/** The most a take's reason may hold, in characters (R4: `details.limit`); the field stops there. */
+export const TAKE_REASON_LIMIT = 500;
+
+/**
+ * The statistics pack, as the page names it; the second line is what it replaces. Stephne, MEN-03: "The Management
+ * Committee dont receive any report. Powerpoint presentations are prepared on request" -- so the line no longer names
+ * it as a recipient.
+ */
 export const PACK = /* @__PURE__ */ Object.freeze({
   name: 'The statistics pack',
-  legacy: 'The Secretariat’s and the Management Committee’s workbooks, typed by hand until now',
+  legacy: 'The statistics and monthly workbooks, typed by hand until now',
 });
+
+/**
+ * The words a row of rule C reads in place of its figures (MD27, MD37): a membership of one to four at a named group,
+ * employer, table code or tier, and the one row beside it, so that neither can be worked out by subtraction. Never
+ * "withheld", which SASBO read as "has to be approved" (5 Oct, transcript ¶92; contracts/monthend-api.md, "Small
+ * counts"). A caller signed in with `MONTH_END_VIEW` is answered every figure, and meets neither.
+ */
+export const HIDDEN_ROW_WORDS = /* @__PURE__ */ Object.freeze({
+  fewerThanFive: 'fewer than five',
+  withheld: 'Not shown until you sign in',
+});
+export const hiddenRowWords = (row) => (row?.withheld ? HIDDEN_ROW_WORDS.withheld : HIDDEN_ROW_WORDS.fewerThanFive);
+
+/**
+ * Stephne, MEN-26: "This usually happens when the compliment is not updated or correct. This should be flagged so we can
+ * fix it." A penetration over 100 % is shown as it is, and flagged -- by the server's `complementOutOfDate` on the row
+ * (R6), and by the figure itself where it is over 1, so a row the server did not mark is flagged all the same.
+ */
+export const COMPLEMENT_OUT_OF_DATE = 'staff complement out of date';
+export const penetrationOutOfDate = (value, flag) => flag === true || (typeof value === 'number' && value > 1);
 
 /** A pack's states, as the server writes them (`MonthEndPackDto.status`). */
 export const PACK_STATUS = /* @__PURE__ */ Object.freeze({
@@ -121,7 +172,7 @@ export const monthsOf = (answer) =>
   answer && typeof answer === 'object' && isYearMonth(answer.openMonth) && Array.isArray(answer.taken) ? answer : null;
 
 /** The months taken, newest first -- sorted here, so the screen does not lean on the answer's order. */
-const takenNewestFirst = (months) =>
+export const takenNewestFirst = (months) =>
   months.taken.filter((taken) => isYearMonth(taken?.month)).sort((a, b) => b.month.localeCompare(a.month));
 
 /**
@@ -189,6 +240,48 @@ export const takenSentence = ({ takenAt, takenBy, firstTakenAt, firstTakenBy }) 
     : `Taken on ${instantLabel(takenAt)}${by(takenBy)}.`;
 };
 
+/**
+ * Why a month was taken again, in the taker's own words -- Stephne, MEN-11: "This will help to understand why the file
+ * was replaced!" -- or what was noted at a first take, where anything was. `''` where nothing was kept.
+ */
+export const takeReasonSaid = ({ reason, takeNumber, firstTakenAt } = {}) => {
+  const words = typeof reason === 'string' ? reason.trim() : '';
+  if (!words) return '';
+  return takeNumber > 1 || firstTakenAt ? `Why it was taken again: “${words}”` : `Noted when it was taken: “${words}”`;
+};
+
+/**
+ * What a month counts (contracts/monthend-api.md R4; Stephne, MEN-14: "After month end is done - all capturing and
+ * changes move to the next month"): a taken month, every capture and change from the cut-off before it to its own take;
+ * the open month, everything since the month before it was taken. `''` where the server kept no window -- a take made
+ * before it did, which counted the calendar month -- or the month before the open one was never taken.
+ */
+export const countsSaid = (months, state) => {
+  if (state?.state === 'TAKEN') {
+    return state.countsFrom && state.countsUntil
+      ? `It counts everything captured or changed from ${instantLabel(state.countsFrom)} to ${instantLabel(state.countsUntil)}.`
+      : '';
+  }
+  if (state?.state !== 'OPEN') return '';
+  const [year, month] = state.month.split('-').map(Number);
+  const before = `${month === 1 ? year - 1 : year}-${String(month === 1 ? 12 : month - 1).padStart(2, '0')}`;
+  const cut = takenNewestFirst(months).find((record) => record.month === before);
+  const at = cut?.countsUntil ?? cut?.takenAt;
+  return at ? `Everything captured or changed since ${instantLabel(at)}, when ${monthLabel(before)} was taken, counts in `
+    + `${monthLabel(state.month)}.` : '';
+};
+
+/** The suspended members' listing (R5): everyone suspended now -- or, with `?lapsed=1`, those whose three months are up. */
+export const SUSPENDED_HREF = '/admin/monthly-menu/suspended-members';
+
+/** Stephne, MEN-18: "The system should also remind us when the suspension period for a member have lapsed, so we can delete." */
+export const lapsedSaid = (total) => {
+  if (!total) return 'No suspension has lapsed.';
+  return total === 1
+    ? '1 suspension has lapsed. The member can be deleted.'
+    : `${formatInt(total)} suspensions have lapsed. The members can be deleted.`;
+};
+
 /* ── a statistic ─────────────────────────────────────────────────────────────────────────────────── */
 
 /**
@@ -225,6 +318,9 @@ const ROW_IS = /* @__PURE__ */ Object.freeze({
   'memnet-members': 'Table code',
   'suspended-by-code': 'Suspension code',
   'due-a-visit': 'Branch',
+  // The suspensions statistic (R5): a row a suspension code, and a row a reason for no payroll deduction.
+  'by-code': 'Suspension code',
+  'no-deduction': 'Reason',
 });
 const ROWS_BY = /* @__PURE__ */ Object.freeze({
   area: 'Area',
@@ -233,6 +329,8 @@ const ROWS_BY = /* @__PURE__ */ Object.freeze({
   employer: 'Employer',
   recruiter: 'Recruiter',
   channel: 'Channel',
+  // Stephne, MEN-31: Core A, B and C (R7's `by-tier`).
+  tier: 'Core tier',
 });
 
 /**
@@ -264,7 +362,10 @@ export const cellText = (kind, value) => {
 };
 
 /**
- * Which of the notes says why a row shows no number -- the one naming the row *withheld* beside a row of fewer than
- * five (rule C). Its index, or `-1` where no note says so; the screen then says nothing it was not told.
+ * Which of the notes says why a row shows no number -- the one naming the row beside a row of fewer than five (rule C):
+ * "not shown until you sign in" since 7 Oct, "withheld" before it. Its index, or `-1` where no note says so; the screen
+ * then says nothing it was not told.
  */
-export const ruleCNote = (notes) => (Array.isArray(notes) ? notes.findIndex((note) => /\bwithheld\b/i.test(note)) : -1);
+export const ruleCNote = (notes) => (Array.isArray(notes)
+  ? notes.findIndex((note) => /\bwithheld\b|\bnot shown until you sign in\b/i.test(note))
+  : -1);

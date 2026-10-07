@@ -7,6 +7,7 @@ import { memberService } from '../services/memberService'
 import { memberHistoryService } from '../services/memberHistoryService'
 import { memberStatusService } from '../services/memberStatusService'
 import { monthEndService } from '../services/monthEndService'
+import { monthEndSendService } from '../services/monthEndSendService'
 import { recruiterService } from '../services/recruiterService'
 import { recruitmentChannelService } from '../services/recruitmentChannelService'
 import { referenceService } from '../services/referenceService'
@@ -38,6 +39,7 @@ export const SERVICE_MODULES = [
   { name: 'memberHistoryService', module: memberHistoryService },
   { name: 'memberStatusService', module: memberStatusService },
   { name: 'monthEndService', module: monthEndService },
+  { name: 'monthEndSendService', module: monthEndSendService },
   { name: 'recruiterService', module: recruiterService },
   { name: 'recruitmentChannelService', module: recruitmentChannelService },
   { name: 'referenceService', module: referenceService },
@@ -102,6 +104,21 @@ const ARGS = {
   'monthEndService.getVisits': ['2026-08', { area: 'B' }],
   'monthEndService.askPack': ['2026-08'],
   'monthEndService.getPack': [7],
+  'monthEndService.getSuspensions': ['2026-08', { area: 'A' }],
+  'monthEndService.getSuspendedMembers': [{ page: 0, size: 50, employer: 1, code: 11 }],
+  'monthEndService.getLapsedSuspensions': [{ page: 0, size: 5 }],
+  'monthEndService.takeMonth': ['2026-08', { replaces: 1, reason: 'Synthetic reason' }],
+  'monthEndSendService.getRegionPacks': ['2026-09'],
+  'monthEndSendService.produceRegionPack': ['2026-09', 'JHB', { again: true }],
+  'monthEndSendService.downloadRegionPack': [41, 'PDF'],
+  'monthEndSendService.emailRegionPack': [41, ['PDF', 'XLSX']],
+  'monthEndSendService.emailRegionPacks': ['2026-09', ['JHB', 'DBN'], ['PDF']],
+  'monthEndSendService.getFiles': ['2026-09'],
+  'monthEndSendService.produceBankFile': ['2026-09', 'ABSA'],
+  'monthEndSendService.produceProviderFile': ['2026-09', 'LAW_CALL'],
+  'monthEndSendService.downloadFile': [7],
+  'monthEndSendService.sendFileBySftp': [8],
+  'monthEndSendService.getDeliveries': ['2026-09', 0, 50],
   'memberHistoryService.getMemberHistory': ['7', 0, 50],
   'workplaceVisitService.getVisits': ['7', 0, 20],
   'workplaceVisitService.recordVisit': ['7', { visitedOn: '2026-09-10', complementFound: 40 }],

@@ -7,8 +7,8 @@ import {
   LIST_EMPTY_REASON, MEMBER_STATUS_KIND, MONTH_END_REFUSAL, STATUS_KIND, STATUS_REASON, SUMMARY_GROUPING,
   UNGROUPED_BECAUSE, WORKPLACES_SERVED, committeeLine, dayLabel, deletionCodeOptions, emptyReasonSentence, listProvenance,
   listRows,
-  listsProvenance, monthLabel, monthsTo, placeOptions, placeQuery, reasonFor, statusKind, summaryOf, suspensionCodeOptions,
-  unplacedSentence,
+  listsProvenance, monthLabel, monthsTo, noDeductionReasonsUnder, placeOptions, placeQuery, reasonFor, statusKind, summaryOf,
+  suspensionCodeOptions, unplacedSentence,
 } from './monthEnd'
 
 /**
@@ -143,10 +143,30 @@ describe('SASBO\'s codes as a person chooses one (RC7: the number, never the row
     expect(suspensionCodeOptions(monthEnd.suspensionCodes).map((o) => o.code))
       .toEqual(monthEnd.suspensionCodes.map((row) => row.code))
   })
+
+  it('MEN-17: the reasons a suspension under a code may name -- the active ones under it, in the list\'s order, by id', () => {
+    const reasons = monthEndBody('GET /api/reference/no-deduction-reasons')
+    expect(noDeductionReasonsUnder(reasons, 11).map((option) => option.label))
+      .toEqual(['Unpaid leave', 'Paternity leave', 'Insufficient funds'])
+    expect(noDeductionReasonsUnder(reasons, '12')).toEqual([{ value: '2', label: 'Maternity leave' }])
+    expect(noDeductionReasonsUnder(reasons, 13)).toEqual([])
+    const unpaidSetInactive = { ...reasons, rows: reasons.rows.map((row) => (row.id === 1 ? { ...row, active: false } : row)) }
+    expect(noDeductionReasonsUnder(unpaidSetInactive, 11).map((option) => option.label))
+      .toEqual(['Paternity leave', 'Insufficient funds'])
+    // MV-36: an answer of another shape offers none -- never a crash.
+    expect(noDeductionReasonsUnder([], 11)).toEqual([])
+    expect(noDeductionReasonsUnder(undefined, 11)).toEqual([])
+  })
+
+  it('MEN-17\'s refusals are codes the server publishes', () => {
+    const published = monthEnd.refusalCodes.map((c) => c.code)
+    expect(published).toEqual(expect.arrayContaining([MONTH_END_REFUSAL.NO_DEDUCTION_REASON_REQUIRED,
+      MONTH_END_REFUSAL.NO_DEDUCTION_REASON_UNKNOWN, MONTH_END_REFUSAL.STATUS_REASON_MISMATCH]))
+  })
 })
 
 describe('the figures (02.2, 02.3)', () => {
-  it('the six groupings a person may choose are the server\'s, in its order (MD31)', () => {
+  it('the seven groupings a person may choose are the server\'s, in its order (MD31; the tier, MEN-31)', () => {
     expect(Object.keys(SUMMARY_GROUPING)).toEqual(monthEnd.summaryGroupings)
   })
 
@@ -217,7 +237,8 @@ describe('the figures (02.2, 02.3)', () => {
   })
 
   it('the must-pass: nothing unplaced says nothing', () => {
-    expect(unplacedSentence(monthEndBody('GET /api/members/summary').unplaced)).toBe('1 member has no workplace on record')
+    // The server's golden summary: the invented member and the invented suspended member, each at no workplace.
+    expect(unplacedSentence(monthEndBody('GET /api/members/summary').unplaced)).toBe('2 members have no workplace on record')
     expect(unplacedSentence({ statuses: [], noWorkplace: 0, noTableCode: 0 })).toBe('')
     expect(unplacedSentence(undefined)).toBe('')
   })

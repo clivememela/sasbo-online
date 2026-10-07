@@ -310,7 +310,40 @@ const CEILINGS = {
   // runner: clivememela/sasbo-online run 36988020502 at b0f9a4d, javascript 790.75 KiB, 0.10 over 790.65 at 0eb0d56
   // (run 36903903677). +100 B by vite's sizes, in one chunk there already: HomeFigures 5.90 -> 6.00 kB (the sentence,
   // and the choice between it and "today"). Nothing from src/test/ is imported.
-  js: 790.76 * KB,
+  //
+  // 790.76 -> 791.39 on 2026-10-07, MEASURED, under OB17 (the October build's rule for every client stream: `entry js`
+  // must not rise; javascript, css and all assets rise to the figures measured on the stream's staging run, and no
+  // further): Home keeps only the modules, as cards, a list or a table, and the month's figures move to Month end (the
+  // 5 Oct Show & Tell). Measured on a team runner: clivememela/sasbo-online run 37549523705 at 3824ec2, javascript
+  // 791.38 KiB, 1.50 over 789.88 at cbd11dc (run 37017335321) -- after reclaiming first: run 37543710742 had it at
+  // 793.11, the css at 81.37 and the entry up 0.02. +1,536 B by this script's count; by vite's sizes, chunk by chunk:
+  //   Home +1,250 (the view switch, the table view, the modules' whole names and menu paths, the remembered choice --
+  //   less the figures' lazy loader) · NavigationCard +360 (the card, drawn from the row's own parts) · MonthlyMenu
+  //   +6,080 and HomeFigures -6,000 (the figures moved, their own month control gone) · Admin +80 · monthEnd -210 (the
+  //   months the figures no longer offer) · index -70 (the entry: the rail's short name, Subscriptions off its top
+  //   level) · MemberHistory +30 (the reasons' new name) · AcbDebits +20 (two longer labels) · eight chunks within 10 B
+  //   each (a column's new name, renamed import stubs).
+  //   Nothing from src/test/ is imported. The css is unmoved at 80.63; the entry is 330.40 against main's 330.47.
+  //
+  // 791.39 -> 791.44 on 2026-10-07, MEASURED (OB17), for the senior review's fixes to the same stream (review-home):
+  // run 37557813096 at 7db86d9, javascript 791.43 KiB, 0.05 over 791.38 at 3824ec2. +60 B by vite's sizes, in one chunk
+  // there already: MonthlyMenu 12.53 -> 12.59 kB -- a month never taken now names what refuses it (its statistics and its
+  // pack) and says its figures are worked out now, where the page had said "a past month is read only from what was
+  // taken" above figures that work the month out. Nothing from src/test/ is imported; entry and css unmoved.
+  //
+  // 791.44 -> 842.55 on 2026-10-07, MEASURED (OB17), for month end's October screens (oct/monthend): run 37678761943 at
+  // 647b300, javascript 842.54 KiB, +51.10 over the 791.43 of home's run 37609192309 at f87f573 (this branch's last
+  // ceiling). By vite's sizes, chunk by chunk: MonthEndRegionPacks +10.37 kB (new) · MonthEndFiles +9.10 (new) ·
+  // monthEndService +8.28 (its own chunk now, the sending calls with it) · useTakenMonth +7.12 (new; useMonths -5.81 moved
+  // into it) · MonthlyMenu 12.59 -> 19.65 (the take with its reason, Sending the month, the lapsed suspensions) ·
+  // MonthEndSuspended +5.70 (new) · MonthEndSent +2.54 (new) · RequirePermission +2.13 (oct/base's, first used by a lazy
+  // screen) · MonthEndSendParts +1.47 · Members 54.96 -> 56.10 (Change status's reason for no payroll deduction, MEN-17)
+  // · useAsyncOptions +0.86 (split out) · MonthEndStatistic +0.46 · monthEnd +0.30 · the Send icon +0.29 · saveFile +0.25
+  // (oct/base's, OB31) · referenceService +0.10 · useWorkplaceChoice -0.77 · CaptureMember -0.15. The entry rises
+  // 330.40 -> 332.24 KiB (index 338.33 -> 340.22 kB): oct/base's shell, which home's run predates -- the auth context,
+  // the permission catalogue and requestJson's file mode (OB17a, OB31); every month-end screen is a lazy route. Nothing
+  // from src/test/ is imported. The hundredth over the printed figure covers its rounding.
+  js: 842.55 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
@@ -320,7 +353,11 @@ const CEILINGS = {
   // 80 -> 80.64 on 2026-10-01, MEASURED (MO25): 80.63 KiB on the same run, +720 B over 79.92 -- MO24's card rows' `end`
   // rule, the first screen's phone block and five utilities the build had not shipped (+590 B), and A.1's opened row's
   // rule (+130 B). The hundredth over the printed figure covers its rounding, as the javascript's does.
-  css: 80.64 * KB,
+  //
+  // 80.64 -> 80.88 on 2026-10-07, MEASURED (OB17): 80.87 KiB on run 37678761943 -- index 82.56 -> 82.81 kB, the
+  // utilities month end's October screens use that the build had not shipped (the packs' cards, the password panel,
+  // the suspended members' table). The hundredth over the printed figure covers its rounding.
+  css: 80.88 * KB,
   // 900 -> 925.12 on 2026-09-30, MEASURED, on the owner's word (MO14), the first time `all assets` was over: the same
   // pair as the javascript's, 866.48 KiB (run 36773278932) -> 925.11 KiB (run 36773289808). The javascript's +59,631 B
   // and the stylesheet's +409 B (296 of them the History tab's: its column widths, gutter bleed, alignment and one line
@@ -337,7 +374,17 @@ const CEILINGS = {
   //
   // 934.77 -> 934.87 on 2026-10-02, MEASURED (MO33): 934.86 KiB on run 36988020502 -- the javascript's +0.10 above,
   // the stylesheet unmoved at 80.63.
-  total: 934.87 * KB,
+  //
+  // 934.87 -> 935.58 on 2026-10-07, MEASURED (OB17): 935.57 KiB on run 37549523705 -- the javascript's +1.50 above and
+  // index.html's +80 B (its pre-paint script sets the color-scheme meta: light unless the browser chose dark), the
+  // stylesheet unmoved at 80.63.
+  //
+  // 935.58 -> 935.64 on 2026-10-07, MEASURED (OB17): 935.63 KiB on run 37557813096 -- the javascript's +60 B above
+  // (review-home's never-taken sentence), the stylesheet unmoved at 80.63.
+  //
+  // 935.64 -> 986.98 on 2026-10-07, MEASURED (OB17): 986.97 KiB on run 37678761943 -- month end's October screens'
+  // javascript (+51.10 above) and stylesheet (+0.24 above), and nothing else. The hundredth over covers its rounding.
+  total: 986.98 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to

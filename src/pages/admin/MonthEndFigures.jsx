@@ -6,24 +6,35 @@ import SelectInput from '../../components/form/SelectInput.jsx';
 import FigureStrip from '../../components/members/FigureStrip.jsx';
 import Table from '../../components/table/Table.jsx';
 import {
-  SUMMARY_GROUPING, UNGROUPED_BECAUSE, WORKPLACES_SERVED, listRows, listsProvenance, monthLabel, monthsTo, placeOptions,
+  SUMMARY_GROUPING, UNGROUPED_BECAUSE, WORKPLACES_SERVED, listRows, listsProvenance, monthLabel, placeOptions,
   placeQuery, summaryOf, unplacedSentence,
 } from '../../config/monthEnd.js';
 import { formatInt, formatPercent } from '../../lib/format.js';
 import reportError from '../../lib/reportError.js';
 import { getAreas, getRegions, getStatus } from '../../services/referenceService.js';
 import { summaryService } from '../../services/summaryService.js';
+import { COMPLEMENT_OUT_OF_DATE, hiddenRowWords, penetrationOutOfDate } from './monthEndRules.js';
 
 /**
- * THE FIGURES ON THE FIRST SCREEN -- month end `02.3`, *"the eye of SASBO"* (SASBO's 22 Sep agenda). The strip and the
- * sheet of `planning/branches/monthly-menu/screens.md` §0.1, from ONE answer of `GET /api/members/summary`.
+ * THE MONTH'S FIGURES -- month end `02.3`, *"the eye of SASBO"* (SASBO's 22 Sep agenda), the strip and the sheet of
+ * `planning/branches/monthly-menu/screens.md` §0.1, from ONE answer of `GET /api/members/summary`.
  *
- * 🔑 A CHUNK OF ITS OWN, ASKED FOR AFTER THE MENU HAS PAINTED (MD69). `Home.jsx` renders the menu rows at once and
- * this after them, so the rows never wait on the figures' code, on their request, or on their failure. The first paint
- * is ONE request -- the summary. The areas and regions are asked for when their control is opened, and kept.
+ * 🗣️ ON THE MONTH END PAGE SINCE THE 5 OCT SHOW & TELL, where SASBO looked for them (handover §A: "move the month's
+ * figures (paying, suspended, on record, joined, left, penetration) into Month end"; Home keeps only the modules). They
+ * were `pages/home/HomeFigures.jsx`, a lazy chunk under Home's title; here they are the page's first section.
  *
- * 🔴 THE FIRST REQUEST NAMES NO MONTH (MD55). The server answers for its own month, in Johannesburg, and the screen
- * shows that month; the months offered are counted back from it. The browser's clock decides nothing.
+ * 🔑 THE MONTH IS THE PAGE'S. Month end chooses its month once, at the top (screens.md §0.3), and the figures follow it
+ * as the statistics and the pack do: a second month control here would let one page answer for two months at once. So
+ * `month` comes from the page --
+ *   a month    the one the address names, or the page's own (the newest month taken), each the server's word (MD55:
+ *              the browser's clock decides nothing);
+ *   ''         the page could not read its months: the figures ask for none, and show the month the server answers;
+ *   undefined  the months are still on their way: nothing is asked yet. A first read for a month the page is about to
+ *              replace would be a wasted read of the heaviest query here.
+ * `openMonth` is the server's open month: a month before it is a past one, and says how it is grouped (rule F).
+ *
+ * The first read is ONE request -- the summary. The areas and regions are asked for when their control is opened, and
+ * kept for the visit (MD69).
  *
  * The five states, and what each shows:
  *   loading   the strip's shimmer, the sheet's skeleton -- no figure until one was read (K1);
@@ -66,24 +77,27 @@ const stripOf = (answer) => {
     {
       label: 'Penetration',
       value: totals.penetration == null ? null : formatPercent(totals.penetration),
-      definition: `paying members over staff complement${totals.complementOutOfDate ? ': complement out of date' : ''}`,
+      definition: `paying members over staff complement${penetrationOutOfDate(totals.penetration, totals.complementOutOfDate)
+        ? `: ${COMPLEMENT_OUT_OF_DATE}` : ''}`,
     },
   ];
 };
 
 const count = (key) => (row) => row.figures && formatInt(row.figures[key]);
 const NUMBER = { align: 'right', className: 'tabular-nums' };
-// The words a figure's cell may hold -- "fewer than five", "complement out of date" -- wrap on a phone rather than
+// The words a figure's cell may hold -- "fewer than five", "staff complement out of date" -- wrap on a phone rather than
 // widen the sheet past it; a figure itself never breaks, its spaces being no-break ones (`format.js`).
 const WORDS = { ...NUMBER, nowrap: false };
 
 /**
  * The sheet's columns. 🔴 RULE C: a row of one to four members at a named employer, table code or workplace comes
- * with NO figures (MD27, MD37), and so does the row withheld beside it (MV-19) -- it reads *fewer than five* or
- * *withheld*, and not one number, not even its staff.
+ * with NO figures (MD27, MD37), and so does the row beside it that would give it away (MV-19) -- it reads *fewer than
+ * five* or *Not shown until you sign in* (`HIDDEN_ROW_WORDS`: never "withheld", which SASBO read as "has to be
+ * approved"), and not one number, not even its staff.
  *
  * The marks are the mock's (MO24): a core group's `.core` pill -- small capitals, teal ink on the teal wash -- a word
- * read in place of a figure in the mock's quiet italic, and *complement out of date* in the pending ink, as a flag.
+ * read in place of a figure in the mock's quiet italic, and *staff complement out of date* in the pending ink, as a flag
+ * -- wherever a penetration is over 100 % (Stephne, MEN-26), whether or not the server marked the row.
  */
 const columnsFor = (by) => [
   {
@@ -111,7 +125,7 @@ const columnsFor = (by) => [
     header: 'Members',
     ...WORDS,
     cell: (row) => (row.figures ? formatInt(row.figures.paying)
-      : <span className="italic text-ink-muted">{row.withheld ? 'withheld' : 'fewer than five'}</span>),
+      : <span className="italic text-ink-muted">{hiddenRowWords(row)}</span>),
   },
   { key: 'joined', header: 'Joined', priority: 'secondary', ...NUMBER, cell: count('joined') },
   { key: 'left', header: 'Left', priority: 'secondary', ...NUMBER, cell: count('left') },
@@ -123,8 +137,8 @@ const columnsFor = (by) => [
     cell: (row) => row.figures && (
       <>
         {formatPercent(row.figures.penetration)}
-        {row.figures.complementOutOfDate && (
-          <span className="block text-xs font-medium text-status-pending">complement out of date</span>
+        {penetrationOutOfDate(row.figures.penetration, row.figures.complementOutOfDate) && (
+          <span className="block text-xs font-medium text-status-pending">{COMPLEMENT_OUT_OF_DATE}</span>
         )}
       </>
     ),
@@ -142,35 +156,40 @@ const groupedSentence = (answer) => (answer.takenAt
   ? `As taken: each member is grouped where they stood when ${monthLabel(answer.month)} was taken.`
   : 'Grouped by where each member works today.');
 
-export default function HomeFigures() {
-  // What a person asked for. The month starts EMPTY -- the first request names none -- and the grouping as the server's.
-  const [ask, setAsk] = useState({ by: 'group', month: '', place: '' });
-  // What was read: the newest answer, when, the server's own month, and the newest request's failure.
-  const [read, setRead] = useState({ pending: true });
+export default function MonthEndFigures({ month, openMonth = null }) {
+  // What a person asked for besides the month, which is the page's: the grouping as the server's, every area, and
+  // `attempt` -- *Try again*, the same question asked once more.
+  const [ask, setAsk] = useState({ by: 'group', place: '', attempt: 0 });
+  // The question in force, as one key -- and none until the page knows its month.
+  const question = month === undefined ? null : [month, ask.by, ask.place, ask.attempt].join('|');
+  // What was read: the newest answer, when, the server's own month, the newest request's failure, and the question
+  // the newest of them answered. A question nothing has answered yet is a read in flight.
+  const [read, setRead] = useState({});
   const [places, setPlaces] = useState(null);
   const placesAsked = useRef(false);
   const [lists, setLists] = useState(null);
   const listsAsked = useRef(false);
 
   useEffect(() => {
+    if (question === null) return undefined;
     let current = true;
-    summaryService.getSummary({ by: ask.by, month: ask.month, ...placeQuery(ask.place) })
+    summaryService.getSummary({ by: ask.by, month, ...placeQuery(ask.place) })
       .then((body) => {
         const answer = summaryOf(body);
         const readAt = new Date();
         if (!current) return;
         setRead((was) => (answer
-          ? { answer, readAt, serverMonth: answer.monthFromTheServer ? answer.month : was.serverMonth }
-          : { ...was, pending: false, failure: failureOf(null) }));
+          ? { answer, readAt, serverMonth: answer.monthFromTheServer ? answer.month : was.serverMonth, question }
+          : { ...was, failure: failureOf(null), question }));
       })
       .catch((error) => {
-        reportError('HomeFigures.summary', error);
-        if (current) setRead((was) => ({ ...was, pending: false, failure: failureOf(error) }));
+        reportError('MonthEndFigures.summary', error);
+        if (current) setRead((was) => ({ ...was, failure: failureOf(error), question }));
       });
     return () => {
       current = false;
     };
-  }, [ask]);
+  }, [question, month, ask.by, ask.place]);
 
   /*
    * WHICH OF SASBO'S LISTS GROUPED THE SHEET, AND WHETHER SHE HAS CONFIRMED THEM (MD28) -- the line beneath it, from the
@@ -182,15 +201,14 @@ export default function HomeFigures() {
   useEffect(() => {
     if (!grouped || listsAsked.current) return;
     listsAsked.current = true;
-    getStatus().then(setLists, (error) => reportError('HomeFigures.lists', error));
+    getStatus().then(setLists, (error) => reportError('MonthEndFigures.lists', error));
   }, [grouped]);
   const groupedBy = listsProvenance(lists);
 
-  /** A person's question: the grouping, the month or the place changed, or *Try again* -- read once, now. */
-  const change = (part) => {
-    setRead((was) => ({ ...was, pending: true }));
-    setAsk((was) => ({ ...was, ...part }));
-  };
+  /** A person's question: the grouping or the place changed -- read once, now. The month changes on the page. */
+  const change = (part) => setAsk((was) => ({ ...was, ...part }));
+  /** *Try again*: the same question, asked once more. */
+  const retry = () => setAsk((was) => ({ ...was, attempt: was.attempt + 1 }));
 
   /** SASBO's areas and regions, asked for when the control is first opened and kept for the visit (MD69). */
   const askPlaces = () => {
@@ -199,13 +217,17 @@ export default function HomeFigures() {
     Promise.all([getRegions(), getAreas()])
       .then(([regions, areas]) => setPlaces({ options: placeOptions(listRows(regions) ?? [], listRows(areas) ?? []) }))
       .catch((error) => {
-        reportError('HomeFigures.places', error);
+        reportError('MonthEndFigures.places', error);
         placesAsked.current = false;
         setPlaces({ error });
       });
   };
 
-  const { answer, failure, pending, readAt, serverMonth } = read;
+  const { answer, failure, readAt } = read;
+  const pending = question === null || read.question !== question;
+  // The server's open month, from the page's months -- or, when those could not be read, from an answer the server
+  // gave for its own month.
+  const serverMonth = openMonth ?? read.serverMonth;
   const view = pending ? 'loading' : !answer ? 'error' : failure ? 'partial' : 'ready';
   const totals = answer?.totals;
   const empty = view === 'ready' && !totals.onRecord && !totals.joined && !totals.left;
@@ -213,9 +235,13 @@ export default function HomeFigures() {
   const rows = view === 'ready' && !empty ? answer.rows : [];
 
   return (
-    <section aria-label="SASBO's figures" data-figures={empty ? 'empty' : view} className="mt-6">
+    <section aria-labelledby="month-end-figures-heading" data-figures={empty ? 'empty' : view} className="mt-8">
+      <h2 id="month-end-figures-heading" className="text-lg font-semibold text-ink">The month’s figures</h2>
+      {/* A name of its own: under the section's, the strip is the month's six totals, and the sheet beneath breaks
+          them down. One name for the region, the heading and the list was read three times over (review-home). */}
       <FigureStrip
-        label="The month's figures"
+        className="mt-3"
+        label="The month’s totals"
         figures={stripOf(answer)}
         state={view === 'loading' ? 'loading' : view === 'error' ? 'error' : 'ready'}
       />
@@ -228,15 +254,6 @@ export default function HomeFigures() {
         + "is SASBO's own, which is why penetration reads low.")}
 
       <Criteria className="mt-4" label="Which figures">
-        <SelectInput
-          className={CRITERION_WIDE}
-          label="Month"
-          value={ask.month || serverMonth}
-          options={serverMonth ? monthsTo(serverMonth) : []}
-          loading={!serverMonth && pending}
-          emptyLabel="Not known yet"
-          onChange={(month) => change({ month })}
-        />
         <SelectInput
           className={CRITERION}
           label="Area"
@@ -265,7 +282,7 @@ export default function HomeFigures() {
           rowKey="key"
           loading={view === 'loading'}
           error={view === 'error' || view === 'partial' ? failure : null}
-          onRetry={() => change({})}
+          onRetry={retry}
           emptyTitle="No members are on record yet."
           dense
           // The total is the sheet's foot: a row of the same columns that nothing opens (MO24).
@@ -278,6 +295,8 @@ export default function HomeFigures() {
           + 'that would give one away.',
         !empty && 'Members are paying members: on record and not suspended.',
         unplacedSentence(answer.unplaced),
+        // The server's own lines -- since R6, the sentence that says a staff complement is out of date.
+        ...(Array.isArray(answer.notes) ? answer.notes : []),
         UNGROUPED_BECAUSE[answer.workplacesServed],
         answer.month !== serverMonth && groupedSentence(answer),
         grouped && groupedBy && `Grouped by SASBO's lists ${groupedBy.replace('As', 'as')}`,

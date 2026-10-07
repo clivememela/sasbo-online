@@ -44,8 +44,11 @@ const FIGURES = (state) => `!!document.querySelector('[data-figures="${state}"]'
 /** The first screen's menu rows -- a row of the page, not the rail's entry for the same area. */
 const MENU_ROWS = `!!document.querySelector('main a[href="/members"]')`;
 const EXPANDED = (scope) => `!!document.querySelector(${JSON.stringify(`${scope} [aria-expanded="true"]`)})`;
-/** The Month end page's six statistics, each a link to its screen (`04.1`). */
-const MONTH_END_LINKS = `document.querySelectorAll('main a[href^="/admin/monthly-menu/"]').length === 6`;
+/**
+ * The Month end page's links to its own screens (`04.1`): the eight statistics and, since the October build, the three
+ * sending screens -- the regions' packs, the files and what was sent.
+ */
+const MONTH_END_LINKS = `document.querySelectorAll('main a[href^="/admin/monthly-menu/"]').length === 11`;
 /**
  * The record's History tab in one of its four states (`MemberHistory.jsx`'s `data-history`) -- not `DataState`'s own
  * `data-state`, which turns `slow` after five seconds of a held request while the tab is still loading.
@@ -583,6 +586,11 @@ export const UNREACHABLE = [
     why: 'rendered `disabled` -- a date nobody can open' },
   { site: 'components/form/AddressAutocomplete.jsx#aria-expanded@suggestions',
     why: 'its suggestions come from Google Places; the stub cannot answer Google and a measurement sends nothing to it (R-SEC-H)' },
+  // The October build's month end. Each converts to a surface once sign-in's `session: [...]` field reaches this run.
+  { site: 'pages/admin/MonthEndSendParts.jsx#DataState@state',
+    why: 'behind MONTH_END_SEND: the browser run signs nobody in until sign-in\'s stub session is wired into surfaces.mjs' },
+  { site: 'pages/admin/MonthEndTake.jsx#Modal@take',
+    why: 'behind MONTH_END_TAKE: the browser run signs nobody in until sign-in\'s stub session is wired into surfaces.mjs' },
 ];
 
 /* ── the guard: the catalogue against the source ─────────────────────────────────────────────────── */

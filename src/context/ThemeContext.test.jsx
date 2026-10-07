@@ -1,7 +1,8 @@
 // @vitest-environment jsdom -- renders a provider and asserts on documentElement's class list
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render, renderHook, screen } from '@testing-library/react'
 
+import indexHtml from '../../index.html?raw'
 import { ThemeProvider } from './ThemeContext'
 import { useTheme } from './useTheme'
 
@@ -24,6 +25,23 @@ const renderTheme = () => renderHook(() => useTheme(), { wrapper })
 
 describe('ThemeProvider', () => {
   it('starts light when nothing has been stored', () => {
+    const { result } = renderTheme()
+    expect(result.current.darkMode).toBe(false)
+    expect(document.documentElement).not.toHaveClass('dark')
+  })
+
+  it('🗣️ starts light even where the operating system prefers dark -- light by default (the 5 Oct Show & Tell)', () => {
+    // A provider that followed the OS would read this and start dark for every administrator on a dark Windows theme.
+    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+      matches: /prefers-color-scheme:\s*dark/.test(query),
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }))
     const { result } = renderTheme()
     expect(result.current.darkMode).toBe(false)
     expect(document.documentElement).not.toHaveClass('dark')
@@ -127,6 +145,65 @@ describe('ThemeProvider', () => {
         'theme switches in state and nothing re-renders to show it.',
     ).not.toBe(first)
     expect(result.current.darkMode).toBe(true)
+  })
+})
+
+/**
+ * 🔑 INDEX.HTML'S PRE-PAINT SCRIPT GIVES THE SAME ANSWER, BEFORE REACT RUNS -- run here as the browser runs it, against
+ * the document's own `color-scheme` meta, so the class and the scheme the browser paints its canvas in are asserted
+ * together for every stored value. A script that drifted from the provider would flash one theme and then the other.
+ */
+describe('the pre-paint script in index.html agrees: light unless this browser chose dark', () => {
+  const META = /<meta name="color-scheme" content="([^"]*)" \/>/.exec(indexHtml)
+  const SCRIPT = /<script>([\s\S]*?)<\/script>/.exec(indexHtml)
+
+  const prePaint = () => {
+    document.head.innerHTML = `<meta name="color-scheme" content="${META[1]}">`
+    // The page's own inline script, verbatim -- not a copy of what it is believed to say.
+    new Function(SCRIPT[1])()
+    return document.querySelector('meta[name="color-scheme"]').content
+  }
+
+  beforeEach(() => {
+    document.documentElement.classList.remove('dark')
+  })
+  afterEach(() => {
+    document.head.innerHTML = ''
+  })
+
+  it('found the meta and the script it runs against', () => {
+    expect(META, 'index.html has no <meta name="color-scheme">').not.toBeNull()
+    expect(SCRIPT, 'index.html has no inline pre-paint script').not.toBeNull()
+    expect(SCRIPT[1]).toContain("localStorage.getItem('darkMode')")
+  })
+
+  it('nothing stored: light -- the class absent, and the canvas light before any CSS arrives', () => {
+    expect(META[1], 'a "light dark" meta lets a dark operating system paint a dark canvas under a light page').toBe('light')
+    expect(prePaint()).toBe('light')
+    expect(document.documentElement).not.toHaveClass('dark')
+  })
+
+  it('"true" stored: dark -- the class set, and the canvas dark from the first frame', () => {
+    localStorage.setItem('darkMode', 'true')
+    expect(prePaint()).toBe('dark')
+    expect(document.documentElement).toHaveClass('dark')
+  })
+
+  it('any other stored value is light, as the provider reads it', () => {
+    for (const stored of ['false', '', 'TRUE']) {
+      localStorage.setItem('darkMode', stored)
+      expect(prePaint(), `stored value ${JSON.stringify(stored)}`).toBe('light')
+      expect(document.documentElement).not.toHaveClass('dark')
+    }
+  })
+
+  it('storage that throws is light, and the script does not throw -- it runs above every boundary', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('The operation is insecure.', 'SecurityError')
+    })
+    expect(() => prePaint()).not.toThrow()
+    expect(document.querySelector('meta[name="color-scheme"]').content).toBe('light')
+    expect(document.documentElement).not.toHaveClass('dark')
   })
 })
 

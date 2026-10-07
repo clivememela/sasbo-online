@@ -104,8 +104,16 @@ export const navItems = [
         icon: LucideCalendarRange,
         href: "/admin/monthly-menu",
       },
+      // 🗣️ THE MODULE ONCE CALLED "A.C.B." -- "Debit Order Deductions" is SASBO's name for it (the 5 Oct Show & Tell,
+      // handover §A; the status report SASBO saw uses it), and Stephne's DOD answer settles the rest: "ACB" becomes
+      // "Debit Order" everywhere, and the screens keep their names for now (Runs, Debits). 📐 The rail and the crumbs
+      // print "Debit Orders": a 256px rail row cuts the whole name off mid-word, and this file ships on every page's
+      // first load. The whole name is Home's (`homeModules.js`) and Admin Membership's. The address stays `/admin/acb`
+      // -- deep links and the decks use it. Written twice, here and on the rail's top level below.
+      // ⏳ "Debit Orders" IS PROVISIONAL: the wording of the shorter labels is asked of SASBO at Friday's meeting (DOD
+      // item 16, `answers/DOD.md`), so both entries change on her answer.
       {
-        title: "A.C.B",
+        title: "Debit Orders",
         href:'/admin/acb',
         icon: LucideFile,
         subItems: [
@@ -181,7 +189,7 @@ export const navItems = [
     ]
   },
   {
-    title: "A.C.B",
+    title: "Debit Orders",
     href:'/admin/acb',
     icon: LucideFile,
     subItems: [
@@ -317,13 +325,10 @@ export const navItems = [
     href: '/recruiters',
     desc: 'Capture/Print Recruiters'
   },
+  // 🗣️ SUBSCRIPTIONS IS NOT ON THIS LEVEL ANY MORE -- the 5 Oct Show & Tell (handover §A): only staff change the
+  // amounts, so it lives under Admin Menu > Maintenance alone, and it came off Home's quick view with this entry (Home
+  // is this list read across). Its address is unchanged; `Maintenance.test.jsx` holds where it is reached from.
   {
-    title: 'Subscriptions',
-    icon: LucideMails,
-    href: '/admin/maintenance/subscriptions',
-    desc: 'Maintain Subscription Table'
-  },
-  { 
     title: "Reports", 
     icon: ChartNoAxesCombined, 
     href: "/reports",

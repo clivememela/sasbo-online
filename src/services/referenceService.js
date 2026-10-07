@@ -14,7 +14,7 @@ import { requestJson } from './parseApiError';
  *
  * 🔑 EACH READ IS ALSO ITS OWN NAMED EXPORT, so a screen that needs two lists ships two reads and not ten: an object
  * literal's unused methods are never shaken out of a bundle, and the bundle's ceiling is not raised to fit a change.
- * The first screen (`02.3`) reads only the areas, the regions and the lists' status; the member's Workplace control
+ * The month's figures (`02.3`, on Month end since 5 Oct) read only the areas, the regions and the lists' status; the member's Workplace control
  * (`01.3`) only the employers and the status; 03.3's Change status dialog only the deletion and the suspension codes;
  * the record's Structures tab only the committees -- by name since 2 Oct, where it had imported the whole object.
  * `referenceService` is the same reads, gathered, for everything that iterates the service layer -- the object holds
@@ -53,6 +53,14 @@ export const getDeletionCodes = () =>
 export const getSuspensionCodes = () =>
   requestJson((signal) => fetch(apiUrl('/api/reference/suspension-codes'), { credentials: 'include', signal }));
 
+/**
+ * The reasons for no payroll deduction (contracts/monthend-api.md R1; Stephne, MEN-17): `{ rows, ceiling, nameLimit,
+ * noteLimit }`, each row under one of SASBO's suspension codes by its number. Every reason, active or not; a drop-down
+ * offers the active ones.
+ */
+export const getNoDeductionReasons = () =>
+  requestJson((signal) => fetch(apiUrl('/api/reference/no-deduction-reasons'), { credentials: 'include', signal }));
+
 /** How many rows each list holds here, and why none where none is (ME-18, ME-19) -- the workplaces' among them. */
 export const getStatus = () =>
   requestJson((signal) => fetch(apiUrl('/api/reference/status'), { credentials: 'include', signal }));
@@ -67,5 +75,6 @@ export const referenceService = {
   getCommittees,
   getDeletionCodes,
   getSuspensionCodes,
+  getNoDeductionReasons,
   getStatus,
 };

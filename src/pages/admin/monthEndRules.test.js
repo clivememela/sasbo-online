@@ -4,10 +4,12 @@ import { STATISTIC_READS } from '../../services/monthEndService'
 import { committedSurface, committedVocabulary } from '../../test/apiContractScan'
 import { monthEndBody } from '../../test/msw/monthEndExamples'
 import {
-  LISTINGS, MONTH_END_P4_REFUSAL, STATISTICS, cellText, defaultMonth, failureOf, instantLabel, isYearMonth,
-  monthChoices, monthStateOf, monthsOf, rowHeader, ruleCNote, statisticHref, statisticNamed, statisticOf,
-  takenSentence, workbookLabel,
+  COMPLEMENT_OUT_OF_DATE, HIDDEN_ROW_WORDS, LISTINGS, MONTH_END_P4_REFUSAL, PACK, STATISTICS, TAKE_REASON_LIMIT,
+  TAKE_REFUSAL, cellText, countsSaid, defaultMonth, failureOf, hiddenRowWords, instantLabel, isYearMonth, lapsedSaid,
+  monthChoices, monthStateOf, monthsOf, penetrationOutOfDate, rowHeader, ruleCNote, statisticHref, statisticNamed,
+  statisticOf, takeReasonSaid, takenSentence, workbookLabel,
 } from './monthEndRules'
+import { SENDING_READS } from './monthEndSendRules'
 
 /**
  * Month end P4's rules, held to the SERVER'S (MD48): the statistics are the routes the server publishes, the codes the
@@ -16,10 +18,14 @@ import {
  */
 const MONTHS = monthEndBody('GET /api/month-end/months')
 
-/** The statistics the server routes: `GET /api/month-end/{month}/<name>` -- a listing's is two segments, not one. */
+/**
+ * The statistics the server routes: `GET /api/month-end/{month}/<name>` -- a listing's is two segments, not one -- less
+ * the sending screens' own reads (`SENDING_READS`: the regions' packs, the files, what was sent), which are not
+ * statistics. `monthEndSendRules.test.js` holds that list to the routes, so it cannot hide one.
+ */
 const ROUTED = committedSurface()
   .map((line) => /^GET \/api\/month-end\/\{month\}\/([a-z-]+)$/.exec(line)?.[1])
-  .filter(Boolean)
+  .filter((name) => name && !SENDING_READS.includes(name))
   .sort()
 
 describe('the statistics are the server\'s', () => {
@@ -180,5 +186,72 @@ describe('a statistic, as a person reads it', () => {
     expect(workbookLabel('statistics')).toBe('the statistics workbook')
     expect(workbookLabel('monthly')).toBe('the monthly workbook')
     expect(workbookLabel('quarterly')).toBe('quarterly')
+  })
+})
+
+describe('the October build -- Stephne\'s Month end answers (contracts/monthend-api.md R4-R6)', () => {
+  it('rule C\'s words: "fewer than five", and the row beside it "Not shown until you sign in" -- never "withheld"', () => {
+    expect(HIDDEN_ROW_WORDS).toEqual({ fewerThanFive: 'fewer than five', withheld: 'Not shown until you sign in' })
+    expect(hiddenRowWords({ fewerThanFive: true, withheld: false })).toBe('fewer than five')
+    expect(hiddenRowWords({ fewerThanFive: false, withheld: true })).toBe('Not shown until you sign in')
+    expect(Object.values(HIDDEN_ROW_WORDS).join(' ')).not.toMatch(/withheld/i)
+  })
+
+  it('MEN-26: a penetration is out of date where the server says so, or where it is over a hundred -- and not otherwise', () => {
+    expect(COMPLEMENT_OUT_OF_DATE).toBe('staff complement out of date')
+    expect(penetrationOutOfDate(0.63, true)).toBe(true)
+    expect(penetrationOutOfDate(1.042, false)).toBe(true)
+    expect(penetrationOutOfDate(1.042, undefined)).toBe(true)
+    // The must-pass: a hundred exactly, under it, and no figure at all are not.
+    expect(penetrationOutOfDate(1, false)).toBe(false)
+    expect(penetrationOutOfDate(0.63, false)).toBe(false)
+    expect(penetrationOutOfDate(null, false)).toBe(false)
+  })
+
+  it('MEN-11: a month taken again says why, in the taker\'s words -- and a first take only what was noted', () => {
+    expect(takeReasonSaid({ takeNumber: 2, reason: '  Corrected the workplaces of 12 members ' }))
+      .toBe('Why it was taken again: “Corrected the workplaces of 12 members”')
+    expect(takeReasonSaid({ firstTakenAt: '2026-09-29T08:00:00Z', reason: 'A late capture' }))
+      .toBe('Why it was taken again: “A late capture”')
+    expect(takeReasonSaid({ takeNumber: 1, reason: 'Run early' })).toBe('Noted when it was taken: “Run early”')
+    expect(takeReasonSaid({ takeNumber: 2, reason: null })).toBe('')
+    expect(takeReasonSaid({ takeNumber: 2, reason: '   ' })).toBe('')
+    expect(takeReasonSaid(undefined)).toBe('')
+  })
+
+  it('MEN-14: what a month counts -- a taken month its window, the open month everything since the month before it was taken', () => {
+    const august = { ...MONTHS.taken[0], countsFrom: '2026-07-31T05:10:00Z', countsUntil: '2026-09-29T08:00:00Z' }
+    const months = { ...MONTHS, taken: [august] }
+    expect(countsSaid(months, monthStateOf(months, '2026-08')))
+      .toBe('It counts everything captured or changed from 31 July 2026 at 07:10 to 29 September 2026 at 10:00.')
+    expect(countsSaid(months, monthStateOf(months, '2026-09')))
+      .toBe('Everything captured or changed since 29 September 2026 at 10:00, when August 2026 was taken, counts in '
+        + 'September 2026.')
+    // The server's own August, taken by the seed after the month: the calendar month, as it counted.
+    expect(countsSaid(MONTHS, monthStateOf(MONTHS, '2026-08')))
+      .toBe('It counts everything captured or changed from 1 August 2026 at 00:00 to 1 September 2026 at 00:00.')
+    // A take made before the window was kept says nothing it was not told; so does a month whose month before was not taken.
+    const unwindowed = { ...MONTHS, taken: [{ ...MONTHS.taken[0], countsFrom: null, countsUntil: null }] }
+    expect(countsSaid(unwindowed, monthStateOf(unwindowed, '2026-08'))).toBe('')
+    expect(countsSaid({ openMonth: '2026-09', taken: [] }, monthStateOf({ openMonth: '2026-09', taken: [] }, '2026-09'))).toBe('')
+    expect(countsSaid(MONTHS, monthStateOf(MONTHS, '2026-07'))).toBe('')
+  })
+
+  it('MEN-18: the lapsed suspensions\' reminder, in the contract\'s words', () => {
+    expect(lapsedSaid(5)).toBe('5 suspensions have lapsed. The members can be deleted.')
+    expect(lapsedSaid(1)).toBe('1 suspension has lapsed. The member can be deleted.')
+    expect(lapsedSaid(0)).toBe('No suspension has lapsed.')
+    // The count's grouping space is the formatter's no-break one.
+    expect(lapsedSaid(1234)).toMatch(/^1\s234 suspensions have lapsed\. The members can be deleted\.$/)
+  })
+
+  it('the take\'s refusals are ones the server publishes, and the reason\'s limit is the contract\'s 500', () => {
+    const published = committedVocabulary().monthEnd.refusalCodes.map((refusal) => refusal.code)
+    expect(published).toEqual(expect.arrayContaining(Object.values(TAKE_REFUSAL)))
+    expect(TAKE_REASON_LIMIT).toBe(500)
+  })
+
+  it('MEN-03: the statistics pack no longer names the Management Committee as a recipient', () => {
+    expect(PACK.legacy).not.toMatch(/Management Committee/)
   })
 })
