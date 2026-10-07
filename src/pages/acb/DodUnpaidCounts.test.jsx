@@ -139,10 +139,11 @@ describe('rowsFromPaste', () => {
 
 describe('the opening arrears position (D24)', () => {
   it('refuses a file that is not an .xlsx before sending it', async () => {
-    const user = setupUser()
+    // A browser's file picker honours `accept`; one that is dragged in or chosen from "all files" does not.
+    const user = setupUser({ applyAccept: false })
     renderCounts()
     await screen.findByText('No opening position has been stored.')
-    await user.upload(screen.getByLabelText(/^The sheet/), new File(['x'], 'position.csv', { type: 'text/csv' }), { applyAccept: false })
+    await user.upload(screen.getByLabelText(/^The sheet/), new File(['x'], 'position.csv', { type: 'text/csv' }))
     expect(screen.getByText('Choose the position as an .xlsx sheet.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Upload the position' })).toBeDisabled()
   })

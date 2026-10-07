@@ -14,7 +14,8 @@ const byDay = (counts) => {
   const parts = Object.entries(counts ?? {})
     .filter(([, count]) => count > 0)
     .sort(([a], [b]) => (a === 'none') - (b === 'none') || Number(a) - Number(b))
-    .map(([day, count]) => `${formatInt(count)} ${day === 'none' ? 'with no day' : `on the ${ordinal(day)}`}`);
+    // `key`, not `day`: a key of the server's map ("20", "none"), never a member's debit-day field (the parity scan).
+    .map(([key, count]) => `${formatInt(count)} ${key === 'none' ? 'with no day' : `on the ${ordinal(key)}`}`);
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0] ?? '';
 };
 

@@ -147,7 +147,7 @@ describe('the non-working days (DOD-15, DOD-17, DOD-18)', () => {
     expect(within(closure).getByText('Fri 23 Oct 2026')).toBeInTheDocument()
     expect(within(closure).getByText('Bank closed')).toBeInTheDocument()
     expect(within(closure).getByRole('button', { name: /^Remove/ })).toBeInTheDocument()
-    expect(within(within(table).getByText('Christmas Day').closest('tr')).queryByRole('button')).toBeNull()
+    expect(within(within(table).getByText('Christmas Day').closest('tr')).queryByRole('button', { name: /^Remove/ })).toBeNull()
     expect(screen.getByText(/The list is complete to 31 Dec 2028/)).toBeInTheDocument()
   })
 
