@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { bankService } from "../../services/bankService.js";
-import { validationErrorsOf, writeFailure, writeMayHaveLanded } from "../../services/parseApiError.js";
+import { writeFailure, writeMayHaveLanded } from "../../services/parseApiError.js";
 import reportError from "../../lib/reportError.js";
 import { TextInput, Button } from "../../components/form";
 import AddressAutocomplete from "../../components/form/AddressAutocomplete";
@@ -11,11 +11,19 @@ import { toBranchForm, toBranchPayload, toBranchRecord } from "./branchForm.js";
 const normalizeText = (value) => (value === null || value === undefined ? "" : String(value)).trim();
 
 /**
+ * The fields a refusal named, always an object. Kept here rather than imported as `parseApiError`'s
+ * `validationErrorsOf`: nothing else uses that export, so importing it would ship it in the entry chunk, which the
+ * bundle budget holds flat (OB17).
+ */
+const fieldErrorsOf = (err) =>
+  err?.validationErrors && typeof err.validationErrors === "object" ? err.validationErrors : {};
+
+/**
  * What a failed save says. A refusal names its reasons -- the server's sentence, or each field it refused -- and says
  * nothing was written; a timeout, a lost connection or a 5xx may have saved, so it says to check (R3-F2).
  */
 const saveFailure = (err, what) => {
-  const fields = Object.values(validationErrorsOf(err));
+  const fields = Object.values(fieldErrorsOf(err));
   return !writeMayHaveLanded(err) && fields.length > 0
     ? `${what} was not saved. ${fields.join(" ")}`
     : writeFailure(err, what, "the branch list");
@@ -106,7 +114,7 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
       }
     } catch (err) {
       reportError(isEditMode ? "BankBranchModal.update" : "BankBranchModal.create", err);
-      setFieldErrors((prev) => ({ ...prev, ...validationErrorsOf(err) }));
+      setFieldErrors((prev) => ({ ...prev, ...fieldErrorsOf(err) }));
       setError(saveFailure(err, isEditMode ? "The change to this branch" : "This branch"));
     } finally {
       setLoading(false);
