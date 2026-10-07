@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * 🔴 THE RECORD'S RESEED, WITNESSED BEFORE IT MOVED. `10.4`, batch 8.
@@ -51,7 +52,7 @@ describe('the record, when another member is opened', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     server.use(...pageFixtures)
     server.use(
-      http.get('*/api/members', () => HttpResponse.json(MEMBERS)),
+      ...registerHandlers(MEMBERS),
       http.get('*/api/job-grades', () => HttpResponse.json([])),
     )
   })

@@ -1,13 +1,13 @@
 // @vitest-environment jsdom -- the record's save confirmation: the form's own words, and no change that is not one
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen, within } from '@testing-library/react'
-import { http, HttpResponse } from 'msw'
 
 import MembersPage from './Members'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * THE SAVE CONFIRMATION SAYS WHAT CHANGED, IN THE FORM'S OWN WORDS. `06.5`, the `06.3` critique, F-P55.
@@ -64,7 +64,7 @@ describe('the save confirmation', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     // Two `use` calls: the catch-all first, then the specific handlers, which prepend.
     server.use(...pageFixtures)
-    server.use(http.get('*/api/members', () => HttpResponse.json([MEMBER])))
+    server.use(...registerHandlers([MEMBER]))
   })
 
   it('① names each change as the form does, and reads a yes/no and a list as a person would', async () => {

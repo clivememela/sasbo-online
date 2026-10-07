@@ -79,6 +79,8 @@ const ARGS = {
   'memberService.updateMember': [{ id: '7', surname: 'Synthetic' }],
   'memberService.updateBanking': ['7', { bankAccountNumber: '0000000000' }],
   'memberService.createMember': [{ surname: 'Synthetic', identityNumber: '0000000000000' }],
+  'memberService.searchRegister': [{ q: 'Synthetic', page: 0, size: 50, sort: 'surname,asc' }],
+  'memberService.getRegisterOverview': [],
   'debounceService.useDebounce': ['search', 200],
   'jobGradeService.getByBank': ['ABSA'],
   'locationService.search': [{ bankName: 'Synthetic Bank' }],
@@ -162,4 +164,4 @@ export function allServiceMethods() {
  * declared so -- otherwise this list becomes a place to hide a method that is
  * failing the contract.
  */
-export const NON_FETCHING = new Set(['bankService.getPageSize', 'memberService.getPageSize'])
+export const NON_FETCHING = new Set(['bankService.getPageSize'])

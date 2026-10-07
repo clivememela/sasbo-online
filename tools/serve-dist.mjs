@@ -974,6 +974,33 @@ const API_BODY = new Map(API_KEYS.map((k) => [k, Buffer.from(JSON.stringify(API[
  */
 const unmatched = new Map();
 
+/*
+ * THE REGISTER A PAGE AT A TIME (A10): `POST /api/members/register/search` answers one page of the synthetic members
+ * -- the page and size asked, in the register's own order (surname) -- and `GET /api/members/register/overview` their
+ * figures and branches. A prefix match would answer both with the whole list, which the register reads as "not a page"
+ * and shows as a failure on every /members surface.
+ */
+const registerRow = ({ id, membershipNumber, employeeNumber, title, initials, surname, firstNames, bankName, branch, status }) =>
+  ({ id, membershipNumber, employeeNumber, title, initials, surname, firstNames, bankName, branch, status });
+const registerPage = (query) => {
+  const size = Number.isInteger(query?.size) && query.size > 0 ? Math.min(query.size, 100) : 50;
+  const ordered = [...members].sort((a, b) => a.surname.localeCompare(b.surname) || a.id - b.id);
+  const totalPages = Math.max(1, Math.ceil(ordered.length / size));
+  const page = Math.min(Math.max(0, Number.isInteger(query?.page) ? query.page : 0), totalPages - 1);
+  return {
+    content: ordered.slice(page * size, (page + 1) * size).map(registerRow),
+    page, size, totalElements: ordered.length, totalPages, sort: 'surname,asc',
+  };
+};
+const registerOverview = () => {
+  const by = (status) => members.filter((m) => m.status === status).length;
+  return {
+    total: members.length, active: by('Active'), pending: by('Pending'), suspended: by('Suspended'),
+    newThisMonth: 3, newDebitOrders: 2, updatedToday: 1,
+    branches: [...new Set(members.map((m) => m.branch))].sort(), asOf: '2026-10-07',
+  };
+};
+
 const server = createServer((req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1');
   const path = decodeURIComponent(url.pathname);
@@ -990,6 +1017,22 @@ const server = createServer((req, res) => {
     if (req.method === 'POST' && /^\/api\/members\/\d+\/send-welcome$/.test(path)) {
       res.writeHead(200);
       res.end();
+      return;
+    }
+    if (req.method === 'POST' && path === '/api/members/register/search') {
+      let raw = '';
+      req.on('data', (chunk) => { raw += chunk; });
+      req.on('end', () => {
+        let query = {};
+        try { query = JSON.parse(raw || '{}'); } catch { /* an unreadable body asks for the register's first page */ }
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(registerPage(query)));
+      });
+      return;
+    }
+    if (req.method === 'GET' && path === '/api/members/register/overview') {
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(registerOverview()));
       return;
     }
     // The shapes a prefix match cannot answer: sign-in, A.C.B.'s runs, and month end's pages and change of status.

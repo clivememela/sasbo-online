@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { registerFails, registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * WHAT THE REGISTER AND THE RECORD SAID WITHOUT CHECKING. `06.4`.
@@ -34,7 +35,7 @@ const boom = () => HttpResponse.json({ status: 500, error: 'boom' }, { status: 5
 
 async function openMembership(member) {
   const user = setupUser()
-  server.use(http.get('*/api/members', () => HttpResponse.json([member])))
+  server.use(...registerHandlers([member]))
   renderWithProviders(<MembersPage />)
   await user.click(await screen.findByRole('button', { name: /open the record for/i }))
   await user.click(await screen.findByRole('button', { name: /Membership & Subscriptions/i }))
@@ -69,7 +70,7 @@ describe('Members', () => {
 
   describe('② the notice about the edit panel’s lists', () => {
     it('does not call the register complete when the register failed too', async () => {
-      server.use(http.get('*/api/banks', boom), http.get('*/api/members', boom))
+      server.use(http.get('*/api/banks', boom), registerFails(500))
       renderWithProviders(<MembersPage />)
 
       expect(await screen.findByText('Banks did not load, so the edit panel cannot offer them.')).toBeInTheDocument()
@@ -77,7 +78,7 @@ describe('Members', () => {
     })
 
     it('the must-pass: with the register loaded, it says the register is complete', async () => {
-      server.use(http.get('*/api/banks', boom), http.get('*/api/members', () => HttpResponse.json([MEMBER])))
+      server.use(http.get('*/api/banks', boom), ...registerHandlers([MEMBER]))
       renderWithProviders(<MembersPage />)
 
       expect(
@@ -88,7 +89,7 @@ describe('Members', () => {
 
   describe('③ the empty register', () => {
     it('with nothing set, offers to capture a member -- not a Clear with nothing to clear', async () => {
-      server.use(http.get('*/api/members', () => HttpResponse.json([])))
+      server.use(...registerHandlers([]))
       renderWithProviders(<MembersPage />)
 
       const empty = await emptyState()
@@ -97,7 +98,7 @@ describe('Members', () => {
     })
 
     it('the must-pass: with a criterion set, it offers Clear', async () => {
-      server.use(http.get('*/api/members', () => HttpResponse.json([MEMBER])))
+      server.use(...registerHandlers([MEMBER]))
       const user = setupUser()
       renderWithProviders(<MembersPage />)
       await screen.findByRole('button', { name: /open the record for/i })

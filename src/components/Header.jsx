@@ -34,17 +34,22 @@ import { HeaderAccount } from "./account/lazyAccount";
  * and `headingContract.test.jsx` mounts every route and counts.
  */
 
-/** What the search recognised: the register's own identifiers, named as the user types them. */
+/**
+ * What the search recognised: the register's own identifiers, named as the user types them.
+ *
+ * 🔁 THE REGISTER SEARCHES ON THE SERVER SINCE A10, and the chip names only what that search finds -- the start of a
+ * name or a number, an identity number whole or by its last four (`memberRegister.js`). It named a cellphone number, a
+ * telephone number and an e-mail address too, which the register's box matched when it filtered every member in the
+ * browser; those are "More criteria" now, and a chip promising them would promise a match that never comes.
+ */
 function searchKind(query) {
   const q = String(query ?? "").trim();
   if (!q) return "";
   if (/^m-?\d{3,}$/i.test(q)) return "Membership number";
   if (/^\d{13}$/.test(q)) return "I.D. number";
-  if (/^(\+27|0)\s?\d{2}[\s-]?\d{3}[\s-]?\d{4}$/.test(q)) return "Cellphone number";
-  if (/^\+27|^0\d{1,2}\s?\d{0,3}$/.test(q)) return "Phone number";
-  if (/^[a-z]{2,4}-?\d{3,}$/i.test(q)) return "Employee number";
-  if (/@/.test(q)) return "Email address";
-  if (/^\d{6,12}$/.test(q)) return "I.D. or account number";
+  if (/^\d{4}$/.test(q)) return "Last four of an I.D.";
+  if (/^\d{5,12}$/.test(q)) return "Number";
+  if (/^[a-z]{1,4}-?\d{3,}$/i.test(q)) return "Employee number";
   if (/^[a-z][a-z' -]{1,}$/i.test(q)) return "Name or surname";
   return "";
 }
@@ -182,7 +187,7 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
           autoComplete="off"
           value={search}
           onChange={onChange}
-          placeholder={narrow ? "Search members" : "Search members: surname, number, I.D., bank, branch"}
+          placeholder={narrow ? "Search members" : "Search members: surname, first name, number, I.D."}
           className="search-text min-w-0 flex-1 border-0 bg-transparent text-ink placeholder:text-ink-muted focus:outline-none [&::-webkit-search-cancel-button]:appearance-none"
         />
         {kind && (

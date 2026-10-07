@@ -8,6 +8,7 @@ import MembersPage from './Members'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
+import { registerHandlers } from '../../test/msw/memberRegister'
 import { setupUser } from '../../test/user'
 
 /**
@@ -327,7 +328,7 @@ describe('Edit Member · 03.9, the same three, read-only', () => {
 
   it('🗣️ shows all three and offers no control to change them', async () => {
     // The stakeholder: recruitment "should only show ... should not be editable from there".
-    server.use(http.get('*/api/members', () => HttpResponse.json([MEMBER])))
+    server.use(...registerHandlers([MEMBER]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     const panel = await openRecruitment(user, { editing: true })
@@ -344,7 +345,7 @@ describe('Edit Member · 03.9, the same three, read-only', () => {
   })
 
   it('🔑 a STORED area is shown as held -- a historical fact -- and the recruiter list is not even asked for', async () => {
-    server.use(http.get('*/api/members', () => HttpResponse.json([MEMBER])))
+    server.use(...registerHandlers([MEMBER]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     const panel = await openRecruitment(user)
@@ -354,8 +355,7 @@ describe('Edit Member · 03.9, the same three, read-only', () => {
   })
 
   it('🗣️ with no stored area, it is read off the recruiter, and the record says whose it is', async () => {
-    server.use(http.get('*/api/members', () =>
-      HttpResponse.json([{ ...MEMBER, recruitedHow: 'RO', areaRecruited: null, recruitmentRepresentativeName: 'Achmat Adams' }])))
+    server.use(...registerHandlers([{ ...MEMBER, recruitedHow: 'RO', areaRecruited: null, recruitmentRepresentativeName: 'Achmat Adams' }]))
     const user = setupUser()
     renderWithProviders(<MembersPage />)
     const panel = await openRecruitment(user)
@@ -366,8 +366,7 @@ describe('Edit Member · 03.9, the same three, read-only', () => {
 
   it('🔴 and when the recruiter list fails, the record says the area cannot be shown -- not that there is none', async () => {
     server.use(
-      http.get('*/api/members', () =>
-        HttpResponse.json([{ ...MEMBER, recruitedHow: 'RO', areaRecruited: null, recruitmentRepresentativeName: 'Achmat Adams' }])),
+      ...registerHandlers([{ ...MEMBER, recruitedHow: 'RO', areaRecruited: null, recruitmentRepresentativeName: 'Achmat Adams' }]),
       http.get('*/api/recruiters', () => HttpResponse.json({ status: 500, error: 'boom' }, { status: 500 })),
     )
     const user = setupUser()

@@ -18,6 +18,7 @@ import { monthEndAnswer, monthEndBody } from './msw/monthEndExamples'
 import { smokeHandlers } from './msw/smokeLayer'
 import { pageFixtures } from './msw/pageFixtures'
 import { setupUser } from './user'
+import { registerHandlers } from './msw/memberRegister'
 
 /**
  * THE ACCESSIBILITY GATE, on the surfaces named below -- the three this phase named, the first screen since month
@@ -44,6 +45,7 @@ beforeEach(() => {
 
 describe('accessibility', () => {
   it('the Members list has no violations', async () => {
+    server.use(...registerHandlers([]))
     const { container } = renderWithProviders(<MembersPage />)
     await screen.findByText(/No members match these criteria/i)
     await expectNoA11yViolations(container)
@@ -53,13 +55,12 @@ describe('accessibility', () => {
     'the Members list has no violations with rows rendered',
     async () => {
       // The empty table and the populated table are different DOM. Scanning
-      // only the empty one would miss every violation that lives in a row.
+      // only the empty one would miss every violation that lives in a row --
+      // and, since A10, the headings that sort and the pager's page size.
       server.use(
-        http.get('*/api/members', () =>
-          HttpResponse.json([
-            { id: 1, firstNames: 'Synthetic', surname: 'Testperson', status: 'Active' },
-          ]),
-        ),
+        ...registerHandlers([
+          { id: 1, firstNames: 'Synthetic', surname: 'Testperson', status: 'Active' },
+        ]),
       )
       const { container } = renderWithProviders(<MembersPage />)
       await screen.findByText(/Testperson/)
@@ -85,9 +86,7 @@ describe('accessibility', () => {
     // A state-gated surface, opened first: the record, its Membership tab, the dialog, and a leaving status, so that the
     // code list is there to be scanned rather than an empty dialog.
     server.use(
-      http.get('*/api/members', () =>
-        HttpResponse.json([{ id: 1, membershipNumber: 'M0001', firstNames: 'Synthetic', surname: 'Testperson', status: 'Active' }]),
-      ),
+      ...registerHandlers([{ id: 1, membershipNumber: 'M0001', firstNames: 'Synthetic', surname: 'Testperson', status: 'Active' }]),
       monthEndAnswer('GET /api/reference/deletion-codes'),
     )
     const user = setupUser()
@@ -132,7 +131,7 @@ describe('accessibility', () => {
 
     it('its sheet has no violations -- every kind of row the mock draws, and the pager', async () => {
       server.use(
-        http.get('*/api/members', () => HttpResponse.json([member])),
+        ...registerHandlers([member]),
         http.get('*/api/members/:id/history', () => HttpResponse.json({ ...golden, content: sheet, totalElements: sheet.length })),
       )
       const { container, tab } = await openHistory()
@@ -143,7 +142,7 @@ describe('accessibility', () => {
 
     it('its failed state has no violations -- the alert, Try again and the Details', async () => {
       server.use(
-        http.get('*/api/members', () => HttpResponse.json([member])),
+        ...registerHandlers([member]),
         http.get('*/api/members/:id/history', () => HttpResponse.error()),
       )
       const { container, tab } = await openHistory()

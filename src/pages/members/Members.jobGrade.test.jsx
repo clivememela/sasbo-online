@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * THE JOB GRADE ON A MEMBER'S RECORD -- shown, kept, and cleared only when the bank changes.
@@ -59,7 +60,7 @@ describe('the job grade on a member record', () => {
     // Two `use` calls: the catch-all first, then the specific handlers, which prepend.
     server.use(...pageFixtures)
     server.use(
-      http.get('*/api/members', () => HttpResponse.json([MEMBER])),
+      ...registerHandlers([MEMBER]),
       http.get('*/api/job-grades', () => HttpResponse.json(GRADES)),
       http.get('*/api/banks', () => HttpResponse.json([{ name: 'ABSA' }, { name: 'Capitec' }])),
     )
