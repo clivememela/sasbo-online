@@ -1,5 +1,5 @@
 import {
-    LucideMenu, LucideFile, LucideConstruction, LucideCalendarRange, ReceiptText
+    HandCoins, LucideMenu, LucideFile, LucideConstruction, LucideCalendarRange
 } from 'lucide-react';
 import { NavigationList } from '../../components/common/NavigationCard';
 import { Page } from '../../components/common/Sheet.jsx';
@@ -14,7 +14,7 @@ const cards = [
     {
         title: 'Payroll Deductions and Reconciliation',
         desc: 'Employers’ payroll files compared with SASBO’s members: discrepancies, queries and the payment check',
-        icon: ReceiptText,
+        icon: HandCoins,
         href: '/admin/payroll',
         permission: 'PAYROLL_VIEW',
         hideWithout: true,

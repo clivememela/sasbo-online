@@ -14,7 +14,7 @@ import {
   LucideDatabase, LucideMails, LucideMenu,
   LucideUserRoundPlus, LucideFile, LucideTags,
   LucidePiggyBank, LucidePresentation, LucideCalendarRange,
-  LucideConstruction, LucideCopyCheck, UserRoundPen, ReceiptText
+  LucideConstruction, LucideCopyCheck, UserRoundPen
 } from "lucide-react";
 
 export const navItems = [
@@ -129,7 +129,7 @@ export const navItems = [
       // here and as Admin Membership's card; `PayrollFiles.test.jsx` holds the two and the route together.
       {
         title: "Payroll Deductions",
-        icon: ReceiptText,
+        icon: HandCoins,
         href: "/admin/payroll",
         permission: "PAYROLL_VIEW",
         hideWithout: true,
