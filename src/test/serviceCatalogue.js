@@ -1,6 +1,7 @@
 import { acbRunService } from '../services/acbRunService'
 import { bankService } from '../services/bankService'
 import { debounceService } from '../services/debounceService'
+import { dodService } from '../services/dodService'
 import { jobGradeService } from '../services/jobGradeService'
 import { locationService } from '../services/locationService'
 import { memberService } from '../services/memberService'
@@ -32,6 +33,7 @@ export const SERVICE_MODULES = [
   { name: 'acbRunService', module: acbRunService },
   { name: 'bankService', module: bankService },
   { name: 'debounceService', module: debounceService },
+  { name: 'dodService', module: dodService },
   { name: 'jobGradeService', module: jobGradeService },
   { name: 'locationService', module: locationService },
   { name: 'memberService', module: memberService },
@@ -88,6 +90,33 @@ const ARGS = {
   'acbRunService.markHandled': ['7', '21', 'Synthetic handled note'],
   'acbRunService.sendLetter': ['7', '21'],
   'acbRunService.searchMembers': [{ surname: 'Synthetic' }, 0, 25],
+  'dodService.approve': ['7', 3],
+  'dodService.submitted': ['7', 3],
+  'dodService.declined': ['7', 3, 'WRONG_DEBIT_DATE', 'Synthetic words of the bank'],
+  'dodService.returned': ['7', 3],
+  'dodService.close': ['7', 3],
+  'dodService.recordReturns': ['7', { actionDate: '2026-10-27', entries: [{ fileSequence: 4, code: '2' }] }],
+  'dodService.returnsBatches': ['7', 0, 20],
+  'dodService.suspendMember': ['7', '3', { suspensionCode: 16 }],
+  'dodService.terminate': ['7', 'Synthetic note'],
+  'dodService.reactivate': ['7', 'Synthetic note'],
+  'dodService.rejoin': ['7', '2026-10-07', 'Synthetic note'],
+  'dodService.unpaidCounts': [0, 50],
+  'dodService.captureUnpaidCounts': ['Synthetic list', [{ membershipNumber: 'SYN-0007', unpaidCount: 2 }]],
+  'dodService.openingPosition': [],
+  'dodService.uploadOpeningPosition': [new Blob(['synthetic sheet'])],
+  'dodService.letterSpecimen': ['RE_DEBIT'],
+  'dodService.codes': [],
+  'dodService.updateCode': ['2', { version: 1, reDebit: 'YES', suspensionCode: 18, wording: 'Synthetic', provisional: false, note: 'Synthetic why' }],
+  'dodService.addCode': [{ bankCode: '99', wording: 'Synthetic', reDebit: 'UNKNOWN', suspensionCode: null, note: 'Synthetic why' }],
+  'dodService.addDay': ['2026-12-28', 'Synthetic closure', 'BANK_CLOSED'],
+  'dodService.removeDay': ['2026-12-28'],
+  'dodService.knownUntil': ['2028-12-31'],
+  'dodService.calendarSettings': [true],
+  'dodService.addRate': ['2027-01-01', 185, 'Synthetic source'],
+  'dodService.banks': [],
+  'dodService.previewMove': ['7', 27],
+  'dodService.move': ['7', 27, 42],
   'memberStatusService.changeStatus': ['7', {
     toStatus: 'Resigned', expectedStatus: 'Active', reason: 'DELETION_CODE', deletionCode: 2,
   }],
