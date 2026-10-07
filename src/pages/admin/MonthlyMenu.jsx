@@ -6,15 +6,15 @@ import ErrorBoundary from '../../components/common/ErrorBoundary.jsx';
 import { NavigationList } from '../../components/common/NavigationCard.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
 import { Page } from '../../components/common/Sheet.jsx';
-import Button from '../../components/form/Button.jsx';
 import SelectInput from '../../components/form/SelectInput.jsx';
 import { monthLabel } from '../../config/monthEnd.js';
 import MonthEndFigures from './MonthEndFigures.jsx';
 import MonthEndPack from './MonthEndPack.jsx';
+import MonthEndSending from './MonthEndSending.jsx';
+import MonthEndTake, { MonthEndTakeRecord, MonthEndTakeWhy } from './MonthEndTake.jsx';
 import {
-  LISTINGS, LISTING_WAITS, MONTH_CRITERION, STATISTICS, TAKE_AGAIN_WAITS, TAKE_WAITS, defaultMonth, monthChoices,
-  monthStateOf,
-  statisticHref, takenSentence,
+  LISTINGS, LISTING_WAITS, MONTH_CRITERION, STATISTICS, defaultMonth, monthChoices, monthStateOf, statisticHref,
+  takenSentence,
 } from './monthEndRules.js';
 import useMonths from './useMonths.js';
 
@@ -34,13 +34,17 @@ const figuresFailed = () => (
  *                    when, the open month that its figures are read live. The browser's clock decides nothing;
  *   the figures      FIRST, for the month chosen: paying, suspended, on record, joined, left and penetration, and their
  *                    sheet (`MonthEndFigures`) -- moved here from Home at the 5 Oct Show & Tell (handover §A);
- *   the statistics   seven links, each opening its screen for the chosen month (`?month=`), with its plain name and the
+ *   the statistics   eight links, each opening its screen for the chosen month (`?month=`), with its plain name and the
  *                    legacy title as its second line;
  *   the pack         the two workbooks, prepared as a job and saved from here (`MonthEndPack`);
- *   the listings     four rows, disabled with their reason -- each names members and refuses until sign-in, so the
+ *   sending          the regions' packs, the banks' and providers' files and what was sent, each its own screen, and
+ *                    the suspensions whose three months are up (`MonthEndSending`; the October build, Stephne's MEN
+ *                    answers) -- below the pack, so the month is read before it is sent;
+ *   the listings     four rows, disabled with their reason -- each names members and refuses every caller, so the
  *                    page says so WITHOUT ASKING: the listing route is never called;
- *   *Take the month* for the open month, disabled with its reason, as Debit Order Runs' *Approve* is -- the take
- *                    refuses every caller (`IDENTITY_REQUIRED`), so it is never called either.
+ *   *Take the month* for the open month -- or *Take it again* for a taken one, with a reason -- held by
+ *                    `MONTH_END_TAKE` (`MonthEndTake`): shut, with its reason, for anyone else. Beneath the month, why
+ *                    it was taken again and what it counts (MEN-11, MEN-14).
  *
  * `MonthlyMenu.test.jsx` holds the page, the rail, the Admin page and the route together, and forbids a row that links
  * to the page it is on.
@@ -67,7 +71,7 @@ export default function MonthlyMenu({ pollDelaysMs }) {
     <Page>
       <PageTitle
         title="Month end"
-        subtitle="The month’s figures and statistics, the pack of workbooks made from them, and the listings that wait for sign-in."
+        subtitle="The month’s figures and statistics, the pack of workbooks made from them, what the month is sent as, and the suspensions that have lapsed."
       />
 
       <Criteria className="mt-6" label="The month">
@@ -81,13 +85,8 @@ export default function MonthlyMenu({ pollDelaysMs }) {
           onRetryLoad={retry}
           onChange={(value) => setParams({ month: value }, { replace: true })}
         />
-        {open && (
-          <Button variant="primary" disabled aria-describedby="month-end-take-why">Take {monthLabel(month)}</Button>
-        )}
-        {/* 04.11, MM51: a taken month can be taken again, to correct it -- disabled with its reason, as the take is. */}
-        {taken && (
-          <Button disabled aria-describedby="month-end-take-why">Take {monthLabel(month)} again</Button>
-        )}
+        {/* The open month is taken; a taken month taken again, with a reason (04.11, MM51; Stephne, MEN-10, MEN-11). */}
+        <MonthEndTake month={month} state={state} onTaken={retry} />
       </Criteria>
       {state && (
         <p className="mt-2 max-w-prose text-sm text-ink-muted" data-month-state={state.state}>
@@ -99,11 +98,8 @@ export default function MonthlyMenu({ pollDelaysMs }) {
           }[state.state]}
         </p>
       )}
-      {(open || taken) && (
-        <p id="month-end-take-why" className="mt-1 max-w-prose text-sm text-ink-muted">
-          {open ? TAKE_WAITS : TAKE_AGAIN_WAITS}
-        </p>
-      )}
+      <MonthEndTakeRecord months={months} state={state} />
+      <MonthEndTakeWhy state={state} />
 
       <ErrorBoundary fallback={figuresFailed}>
         <MonthEndFigures month={figuresMonth} openMonth={months?.openMonth ?? null} />
@@ -123,6 +119,8 @@ export default function MonthlyMenu({ pollDelaysMs }) {
       />
 
       <MonthEndPack month={month} open={open} pollDelaysMs={pollDelaysMs} />
+
+      <MonthEndSending month={month} taken={taken} />
 
       <h2 className="mt-8 text-lg font-semibold text-ink">Listings of members</h2>
       <p className="mt-0.5 max-w-prose text-sm text-ink-muted" data-listings-wait="">{LISTING_WAITS}</p>

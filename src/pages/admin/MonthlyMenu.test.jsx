@@ -65,6 +65,13 @@ const monthsRead = () => waitFor(() => expect(screen.getByLabelText(/^Month/)).t
 const pageLinks = (scope = document.body) =>
   within(scope).queryAllByRole('link').map((link) => link.getAttribute('href'))
 
+/** The screens the October build's *Sending the month* opens -- each a link of its own, beside the statistics. */
+const SENDING = ['region-packs', 'files', 'sent']
+const screenOf = (href) => /^\/admin\/monthly-menu\/([a-z-]+)/.exec(href)?.[1]
+
+/** The page's links to its statistics, in the page's order. */
+const statisticLinks = () => pageLinks().filter((href) => STATISTICS.some((statistic) => statistic.key === screenOf(href)))
+
 describe('where the page is -- the Admin page, the rail and the route agree (04.1, MD38)', () => {
   it('Admin Membership offers Month end between Daily and Debit Order Deductions, at the Monthly Menu\'s address', () => {
     renderWithProviders(<Admin />)
@@ -112,16 +119,39 @@ describe('what the page lists -- what is built, and nothing else', () => {
     expect(pageLinks().length).toBeGreaterThan(0)
   })
 
-  it('🔴 the statistics are its links, each opening its screen for the month chosen -- and nothing else links', async () => {
+  it('🔴 the statistics are its links, each opening its screen for the month chosen -- beside the sending screens, and nothing else', async () => {
     openPage()
     await monthsRead()
 
-    expect(pageLinks()).toEqual(STATISTICS.map((statistic) => `/admin/monthly-menu/${statistic.key}?month=2026-08`))
+    expect(statisticLinks()).toEqual(STATISTICS.map((statistic) => `/admin/monthly-menu/${statistic.key}?month=2026-08`))
     for (const statistic of STATISTICS) {
       const link = screen.getByRole('link', { name: new RegExp(`^${statistic.name}`) })
       // Its plain name, and the legacy title as its second line.
       expect(link).toHaveTextContent(statistic.legacy)
     }
+    // The only other links: the three sending screens, for the taken month, and the lapsed suspensions' "Sign in".
+    const others = pageLinks().filter((href) => !statisticLinks().includes(href))
+    expect(others).toEqual([
+      ...SENDING.map((screenName) => `/admin/monthly-menu/${screenName}?month=2026-08`),
+      '/login?next=%2Fadmin%2Fmonthly-menu',
+    ])
+  })
+
+  it('the October build: Sending the month -- the regions\' packs, the files and what was sent -- opens each for a taken month only', async () => {
+    const user = setupUser()
+    openPage()
+    await monthsRead()
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Sending the month' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^The regions’ packs/ })).toHaveAttribute('href', '/admin/monthly-menu/region-packs?month=2026-08')
+    expect(screen.getByRole('link', { name: /^Files for the banks and providers/ })).toHaveAttribute('href', '/admin/monthly-menu/files?month=2026-08')
+    expect(screen.getByRole('link', { name: /^What was sent/ })).toHaveAttribute('href', '/admin/monthly-menu/sent?month=2026-08')
+    // A pack is made from a take, never from the open month: for the open month each opens on the newest month taken.
+    await user.selectOptions(screen.getByLabelText(/^Month/), '2026-09')
+    expect(screen.getByRole('link', { name: /^The regions’ packs/ })).toHaveAttribute('href', '/admin/monthly-menu/region-packs')
+    // The lapsed suspensions name members: nobody signed in is asked to, and nothing is asked of the server.
+    expect(screen.getByRole('heading', { level: 2, name: 'Suspensions that have lapsed' })).toBeInTheDocument()
+    expect(requests.some((request) => request.includes('/suspensions/'))).toBe(false)
   })
 
   it('🔴 the nine dead rows are gone, and no row says "Not yet available"', async () => {
@@ -227,7 +257,7 @@ describe('the month -- chosen once, at the top, from the server\'s months (MD55)
 
     expect(screen.getByText(/^September 2026 is the open month: its figures are read live/))
       .toHaveAttribute('data-month-state', 'OPEN')
-    expect(pageLinks()).toEqual(STATISTICS.map((statistic) => `/admin/monthly-menu/${statistic.key}?month=2026-09`))
+    expect(statisticLinks()).toEqual(STATISTICS.map((statistic) => `/admin/monthly-menu/${statistic.key}?month=2026-09`))
     expect(screen.getByRole('button', { name: 'Prepare the pack for September 2026' })).toBeEnabled()
   })
 
@@ -259,7 +289,7 @@ describe('the month -- chosen once, at the top, from the server\'s months (MD55)
     openPage()
 
     expect(await screen.findByText('Month could not be loaded.')).toBeInTheDocument()
-    expect(pageLinks()).toEqual(STATISTICS.map((statistic) => `/admin/monthly-menu/${statistic.key}`))
+    expect(statisticLinks()).toEqual(STATISTICS.map((statistic) => `/admin/monthly-menu/${statistic.key}`))
     expect(screen.getByRole('button', { name: 'Prepare the pack' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Try again' }))
 
