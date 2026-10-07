@@ -2,12 +2,14 @@ import { ChartNoAxesCombined, Users } from 'lucide-react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 
 import Criteria from '../../components/common/Criteria.jsx';
+import ErrorBoundary from '../../components/common/ErrorBoundary.jsx';
 import { NavigationList } from '../../components/common/NavigationCard.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
 import { Page } from '../../components/common/Sheet.jsx';
 import Button from '../../components/form/Button.jsx';
 import SelectInput from '../../components/form/SelectInput.jsx';
 import { monthLabel } from '../../config/monthEnd.js';
+import MonthEndFigures from './MonthEndFigures.jsx';
 import MonthEndPack from './MonthEndPack.jsx';
 import {
   LISTINGS, LISTING_WAITS, MONTH_CRITERION, STATISTICS, TAKE_AGAIN_WAITS, TAKE_WAITS, defaultMonth, monthChoices,
@@ -16,22 +18,29 @@ import {
 } from './monthEndRules.js';
 import useMonths from './useMonths.js';
 
+/** A figures section that throws takes only itself down: the statistics, the pack and the listings stand. */
+const figuresFailed = () => (
+  <p className="mt-8 text-sm text-ink-muted">The figures could not be shown. Reload the page to try again.</p>
+);
+
 /**
  * THE MONTH END PAGE -- month end `04.1`, at the Monthly Menu's address (MD38): *Admin → Month end*, a card on Admin
- * Membership between Daily and A.C.B., and a leaf of the rail's Admin Menu with nothing under it (BR8).
+ * Membership between Daily and Debit Order Deductions, and a leaf of the rail's Admin Menu with nothing under it (BR8).
  *
  * 🔴 IT LISTS WHAT IS BUILT, AND NOTHING ELSE. The nine legacy rows this page carried were nine dead ends -- *Key File
  * Setup* to *Print Membership Summary*, not one with a route. They are gone. What is here (screens.md §0.3):
  *
  *   the month        chosen ONCE, at the top, from the server's months (MD55): a taken month says who took it and
  *                    when, the open month that its figures are read live. The browser's clock decides nothing;
+ *   the figures      FIRST, for the month chosen: paying, suspended, on record, joined, left and penetration, and their
+ *                    sheet (`MonthEndFigures`) -- moved here from Home at the 5 Oct Show & Tell (handover §A);
  *   the statistics   seven links, each opening its screen for the chosen month (`?month=`), with its plain name and the
  *                    legacy title as its second line;
  *   the pack         the two workbooks, prepared as a job and saved from here (`MonthEndPack`);
  *   the listings     four rows, disabled with their reason -- each names members and refuses until sign-in, so the
  *                    page says so WITHOUT ASKING: the listing route is never called;
- *   *Take the month* for the open month, disabled with its reason, as A.C.B.'s *Approve* is -- the take refuses every
- *                    caller (`IDENTITY_REQUIRED`), so it is never called either.
+ *   *Take the month* for the open month, disabled with its reason, as Debit Order Runs' *Approve* is -- the take
+ *                    refuses every caller (`IDENTITY_REQUIRED`), so it is never called either.
  *
  * `MonthlyMenu.test.jsx` holds the page, the rail, the Admin page and the route together, and forbids a row that links
  * to the page it is on.
@@ -50,12 +59,15 @@ export default function MonthlyMenu({ pollDelaysMs }) {
   const state = months && month ? monthStateOf(months, month) : null;
   const open = state?.state === 'OPEN';
   const taken = state?.state === 'TAKEN';
+  // The figures' month is this one, once it is known; none at all -- the server's own -- when the months could not be
+  // read; and not yet, while they are on their way (`MonthEndFigures`).
+  const figuresMonth = month || (failure ? '' : undefined);
 
   return (
     <Page>
       <PageTitle
         title="Month end"
-        subtitle="The month’s statistics, the pack of workbooks made from them, and the listings that wait for sign-in."
+        subtitle="The month’s figures and statistics, the pack of workbooks made from them, and the listings that wait for sign-in."
       />
 
       <Criteria className="mt-6" label="The month">
@@ -92,6 +104,10 @@ export default function MonthlyMenu({ pollDelaysMs }) {
           {open ? TAKE_WAITS : TAKE_AGAIN_WAITS}
         </p>
       )}
+
+      <ErrorBoundary fallback={figuresFailed}>
+        <MonthEndFigures month={figuresMonth} openMonth={months?.openMonth ?? null} />
+      </ErrorBoundary>
 
       <h2 className="mt-8 text-lg font-semibold text-ink">Statistics</h2>
       <NavigationList

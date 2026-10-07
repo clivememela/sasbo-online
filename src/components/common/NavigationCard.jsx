@@ -42,48 +42,50 @@ const ROW = "flex items-center gap-4 px-5 py-3.5";
  * `note` is that caption, where "not yet available" is not the truth: month end's listings (`04.1`) ARE built, and
  * refuse until sign-in -- so their rows say *Waits for sign-in*. Keep it short: it never wraps, and sits beside the
  * title on a phone.
+ *
+ * 🗣️ `tile` IS HOME'S CARD VIEW, AND IT IS SASBO'S ASK OVER THE DIRECTION CONTRACT'S REFUSAL ABOVE. At the 5 Oct Show &
+ * Tell Natalie said she liked the cards Home had before the rows, so Home offers both (handover §A) and opens on the
+ * cards. A card is this row's own parts on the sheet's surface -- the icon and the way in on a line above the words --
+ * with the row's hover wash, focus ring and honest dead state, so the two views cannot drift apart, and the stylesheet
+ * gains nothing for it (the bundle had no room: bundle-budget.mjs). Every other menu page keeps the rows.
  */
-export default function NavigationCard({ title, icon: Icon, href, desc, onSelect, note = 'Not yet available' }) {
+const TILE = "flex h-full flex-col gap-3 rounded-lg bg-surface p-5 shadow-(--shadow-1)";
+const LIVE =
+  "group text-ink transition-colors duration-(--duration-instant) hover-hover:hover:bg-surface-2 " +
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-ring";
+
+export default function NavigationCard({ title, icon: Icon, href, desc, onSelect, note = 'Not yet available', layout = 'row' }) {
+  const tile = layout === 'tile';
+  const icon = Icon && (
+    <Icon size={tile ? 24 : 18} strokeWidth={1.75} aria-hidden="true" className={cn("shrink-0", href ? "text-brand" : "text-ink-faint")} />
+  );
   const body = (
     <span className="min-w-0 flex-1">
-      <span className="block text-base font-semibold leading-tight">{title}</span>
+      <span className={cn("block font-semibold leading-tight", tile ? "text-lg" : "text-base")}>{title}</span>
       {desc && <span className="mt-0.5 block text-sm text-ink-muted">{desc}</span>}
     </span>
   );
+  const end = href ? (
+    <ChevronRight
+      size={16}
+      strokeWidth={1.75}
+      aria-hidden="true"
+      className="ml-auto shrink-0 text-ink-faint transition-transform duration-(--duration-fast) hover-hover:group-hover:translate-x-0.5"
+    />
+  ) : (
+    /* A NOTE, NOT A STATUS CHIP. Set as small capitals it read as a label of the same
+       weight as a table head, and nine of them down the Monthly Menu formed a second
+       column that competed with the nine titles it was annotating. Sentence case in the
+       quiet ink says the same thing and lets the names be read first. */
+    <span className="ml-auto shrink-0 whitespace-nowrap text-sm text-ink-muted">{note}</span>
+  );
+  // A row reads across; a card puts the icon and the way in on one line, above its words.
+  const parts = tile ? <><span className="flex items-start gap-3">{icon}{end}</span>{body}</> : <>{icon}{body}{end}</>;
 
-  if (!href) {
-    return (
-      <div className={cn(ROW, "text-ink-muted")}>
-        {Icon && <Icon size={18} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-ink-faint" />}
-        {body}
-        {/* A NOTE, NOT A STATUS CHIP. Set as small capitals it read as a label of the same
-            weight as a table head, and nine of them down the Monthly Menu formed a second
-            column that competed with the nine titles it was annotating. Sentence case in the
-            quiet ink says the same thing and lets the names be read first. */}
-        <span className="shrink-0 whitespace-nowrap text-sm text-ink-muted">{note}</span>
-      </div>
-    );
-  }
-
-  return (
-    <Link
-      to={href}
-      onClick={onSelect}
-      className={cn(
-        ROW,
-        "group text-ink transition-colors duration-(--duration-instant)",
-        "hover-hover:hover:bg-surface-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-ring",
-      )}
-    >
-      {Icon && <Icon size={18} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-brand" />}
-      {body}
-      <ChevronRight
-        size={16}
-        strokeWidth={1.75}
-        aria-hidden="true"
-        className="shrink-0 text-ink-faint transition-transform duration-(--duration-fast) hover-hover:group-hover:translate-x-0.5"
-      />
-    </Link>
+  return href ? (
+    <Link to={href} onClick={onSelect} className={cn(tile ? TILE : ROW, LIVE)}>{parts}</Link>
+  ) : (
+    <div className={cn(tile ? TILE : ROW, "text-ink-muted")}>{parts}</div>
   );
 }
 
@@ -94,13 +96,20 @@ export default function NavigationCard({ title, icon: Icon, href, desc, onSelect
  *
  * `onSelect(card)` is the page's word to the shell; `wide` is Home's, the one menu that spans the page. `className`
  * places the sheet -- month end's page (`04.1`) sets its lists under section headings, a step closer than a page head.
+ * `tiles` lays the same cards out as cards (Home's card view): one a row on a phone, two from `md`, three from `lg`.
  */
-export function NavigationList({ cards, onSelect, wide = false, className }) {
-  return (
-    <Sheet className={cn("mt-6 divide-y divide-line", !wide && "max-w-4xl", className)}>
-      {cards.map((card) => (
-        <NavigationCard key={`${card.href}-${card.title}`} {...card} onSelect={onSelect && (() => onSelect(card))} />
-      ))}
-    </Sheet>
+export function NavigationList({ cards, onSelect, wide = false, tiles = false, className }) {
+  const items = cards.map((card) => (
+    <NavigationCard
+      key={`${card.href}-${card.title}`}
+      {...card}
+      layout={tiles ? 'tile' : 'row'}
+      onSelect={onSelect && (() => onSelect(card))}
+    />
+  ));
+  return tiles ? (
+    <div className={cn("mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3", className)}>{items}</div>
+  ) : (
+    <Sheet className={cn("mt-6 divide-y divide-line", !wide && "max-w-4xl", className)}>{items}</Sheet>
   );
 }

@@ -320,7 +320,7 @@ function DebitsScreen() {
                                 ["Debit Day", selectedMember.debitDay ? ordinal(selectedMember.debitDay) : null],
                                 ["Monthly Subscription", selectedMember.monthlySubscription == null ? null : formatZar(selectedMember.monthlySubscription)],
                                 ["Subscription Frequency", selectedMember.subscriptionFrequency],
-                                ["Deduct via ACB", selectedMember.deductACB],
+                                ["Deduct by Debit Order", selectedMember.deductACB],
                             ].map(([label, val]) => (
                                 <div key={label}>
                                     <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{label}</p>
@@ -420,7 +420,7 @@ function DebitsScreen() {
                             </div>
                         )}
                         <Table
-                            caption="Members matching the ACB search"
+                            caption="Members matching the debit order search"
                             columns={memberColumns}
                             rows={results.content}
                             rowKey="id"

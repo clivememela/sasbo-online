@@ -24,7 +24,7 @@ export const HEADING = `!!document.querySelector('main h1')`;
 const TEXT = (s) => `document.body.innerText.toLowerCase().includes(${JSON.stringify(s.toLowerCase())})`;
 const STATE = (s) => `!!document.querySelector('[data-state="${s}"]')`;
 /** The Debits screen's search results, by the table's own caption: the unpaid table above has rows before any search. */
-const SEARCH_ROWS = `[...document.querySelectorAll('main table')].some((t) => t.querySelector('caption')?.textContent === 'Members matching the ACB search' && t.querySelectorAll('tr[data-row]').length > 1)`;
+const SEARCH_ROWS = `[...document.querySelectorAll('main table')].some((t) => t.querySelector('caption')?.textContent === 'Members matching the debit order search' && t.querySelectorAll('tr[data-row]').length > 1)`;
 const PANEL = '[data-testid="member-panel"]';
 const PANEL_OPEN = `!!document.querySelector('${PANEL}[data-open="true"] .mcard')`;
 export const ANY_DIALOG = `!!document.querySelector('[role="dialog"]')`;
