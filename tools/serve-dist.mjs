@@ -617,6 +617,131 @@ const monthEndAnswer = (req, path, query) => {
   return false;
 };
 
+/*
+ * Payroll Deductions and Reconciliation (October build, `payroll-api.md` draft 2): one employer's month told whole --
+ * Absa, September 2026, one discrepancy of every type the committed vocabulary publishes, lines matched each way, a
+ * query list and a payment short of the lines' total by Absa's 3% fee alone. Invented people throughout; ID numbers
+ * arrive masked to their last four, as the server sends them, and every amount is a decimal string.
+ */
+const PAYROLL_TYPES = JSON.parse(readFileSync('src/test/api-vocabulary.json', 'utf8')).payroll.discrepancyTypes;
+const PAYROLL_ABSA = { id: 1, code: 'ABSA', name: 'Absa' };
+const payrollPage = (content, size = 20) => ({ content, page: 0, size, totalElements: content.length, totalPages: 1 });
+const payrollFile = {
+  id: 12, employer: PAYROLL_ABSA, period: '2026-09', originalName: 'Invented Absa payroll September 2026.xlsx',
+  entry: 'UPLOAD', format: 'XLSX', sizeBytes: 18234, sha256: 'a'.repeat(64), status: 'RECONCILED', uploadedBy: 'system',
+  uploadedAt: '2026-09-28T08:15:00Z', retainUntil: '2027-09-28', rows: 34, matched: 32, discrepancies: PAYROLL_TYPES.length,
+  openDiscrepancies: PAYROLL_TYPES.length - 4, fileTotal: '5916.00', paymentStatus: 'EXACT', lastRunAt: '2026-09-28T08:15:02Z',
+  version: 1,
+};
+const payrollDiscrepancies = PAYROLL_TYPES.map(({ type, rule, queryAction, outcomes }, i) => ({
+  id: 70 + i, fileId: 12, employer: PAYROLL_ABSA, period: '2026-09', type, rule,
+  whatToDo: `What SASBO does about this kind of difference, as the server words it (${rule ?? 'a line the file could not give'}).`,
+  status: i < 4 ? 'RESOLVED' : i < 6 ? 'QUERIED' : 'OPEN',
+  detail: `Synthetic Testerson${i}, staff number EMP-${40000 + i}: R150.00 deducted; R174.00 expected: R24.00 short.`,
+  member: { id: 300 + i, membershipNumber: `M-0951${String(i).padStart(2, '0')}`, name: `S. Testerson${i}`, status: i === 1 ? 'Resigned' : 'Active', paymentType: 'Payroll Deduction' },
+  row: { rowNumber: 5 + i, staffNumber: `EMP-${40000 + i}`, idNumber: `****${String(1000 + i * 37).slice(-4)}`, initials: 'S', surname: `Testerson${i}`, amount: '150.00' },
+  amountOnFile: '150.00', expectedAmount: '174.00', difference: '-24.00', months: null, queryAction,
+  query: i >= 4 && i < 6 ? { id: 2, raisedAt: '2026-09-29T09:00:00Z' } : null, outcomes,
+  resolution: i < 4 ? { outcome: outcomes[0], by: 'system', at: '2026-09-30T08:00:00Z' } : null,
+  noteCount: i === 6 ? 1 : 0,
+  lastNote: i === 6 ? { id: 5, text: 'Asked the employer by e-mail about this deduction and its month.', by: 'system', at: '2026-09-29T10:00:00Z' } : null,
+  createdAt: '2026-09-28T08:15:02Z', version: 0,
+}));
+const payrollSummary = {
+  ...payrollFile, alreadyLoaded: false,
+  layout: {
+    key: 'absa', sheet: 'Sheet1', headingRow: 4,
+    headings: { staffNumber: 'EMP NO', idNumber: 'ID NUMBER', initials: 'INITIALS', surname: 'SURNAME', fullName: null, amount: 'AMOUNT' },
+    columns: ['EMP NO', 'ID NUMBER', 'INITIALS', 'SURNAME', 'AMOUNT', 'BRANCH'],
+  },
+  counts: { rowsRead: 34, rowsUnreadable: 1, matched: 32, matchedByStaffNumber: 28, matchedByIdNumber: 3, matchedByName: 1, notMembers: 1, missingMembers: 1, catchUps: 1, listedTwice: 2 },
+  discrepanciesByType: payrollDiscrepancies.map((d) => ({
+    type: d.type, open: d.status === 'OPEN' ? 1 : 0, queried: d.status === 'QUERIED' ? 1 : 0, resolved: d.status === 'RESOLVED' ? 1 : 0,
+  })),
+  totals: {
+    fileTotal: '5916.00', statedTotal: '5916.00', statedTotalAgrees: true, subscription: { amount: '174.00', effectiveFrom: '2026-01-01' },
+    expectedTotal: '5568.00', adminFeePercent: '3.00', adminFee: '177.48', expectedPayment: '5738.52',
+    received: '5738.52', paymentDifference: '0.00', paymentStatus: 'EXACT',
+  },
+  payments: [{ id: 3, employer: PAYROLL_ABSA, period: '2026-09', amount: '5738.52', receivedOn: '2026-09-30', reference: 'EFT 0923', recordedBy: 'system', recordedAt: '2026-10-01T07:30:00Z' }],
+  queries: [{ id: 2, raisedAt: '2026-09-29T09:00:00Z', raisedBy: 'system', add: 1, delete: 1, correct: 1 }],
+  runs: 1, lastRunBy: 'system',
+};
+const payrollLines = Array.from({ length: 8 }, (_, i) => ({
+  id: 500 + i, rowNumber: 5 + i, staffNumber: `EMP-${40000 + i}`, idNumber: i === 2 ? null : `****${String(2000 + i * 41).slice(-4)}`,
+  initials: 'S', surname: `Testerson${i}`, amount: i === 3 ? '348.00' : '174.00', valid: i !== 7, problem: i === 7 ? 'The amount is not a number.' : null,
+  match: i >= 6 ? null : {
+    memberId: 300 + i, membershipNumber: `M-0952${String(i).padStart(2, '0')}`, memberName: `S. Testerson${i}`,
+    rule: ['STAFF_NUMBER', 'ID_NUMBER', 'NAME'][i % 3], confidence: 'HIGH', reason: 'Staff number and ID number agree',
+    expectedAmount: '174.00', amountStatus: i === 3 ? 'CATCH_UP' : 'MATCHES', months: i === 3 ? 2 : 1, rateUnknownFor: null,
+  },
+}));
+const payrollQuery = {
+  id: 2, fileId: 12, employer: PAYROLL_ABSA, period: '2026-09', raisedBy: 'system', raisedAt: '2026-09-29T09:00:00Z',
+  counts: { add: 1, delete: 1, correct: 1 },
+  lines: ['ADD', 'DELETE', 'CORRECT'].map((action, i) => ({
+    action, discrepancyId: 74 + i, type: PAYROLL_TYPES[i].type, staffNumber: `EMP-${40100 + i}`, idNumber: `****${4400 + i}`,
+    name: `Q. Invented${i}`, membershipNumber: action === 'DELETE' ? null : `M-0953${i}0`, amountOnFile: action === 'ADD' ? null : '174.00',
+    expectedAmount: action === 'DELETE' ? null : '174.00', reason: 'Please start, stop or correct this deduction, as the line says.',
+  })),
+};
+const payrollEmployers = [
+  { ...PAYROLL_ABSA, delivery: 'EMAIL', readable: true, layoutKey: 'absa', adminFeePercent: '3.00', columnMapping: null, sasboEmployers: ['ABSA BANK'], latestFile: { id: 12, period: '2026-09', status: 'RECONCILED', openDiscrepancies: payrollFile.openDiscrepancies }, version: 0 },
+  { id: 7, code: 'GBS', name: 'GBS', delivery: 'EMAIL', readable: false, layoutKey: null, adminFeePercent: '0.00', columnMapping: null, sasboEmployers: ['GBS MUTUAL BANK'], latestFile: null, version: 0 },
+];
+const payrollVocabulary = {
+  discrepancyTypes: payrollDiscrepancies.map(({ type, rule, whatToDo, queryAction, outcomes }) => ({ type, rule, whatToDo, queryAction, outcomes, label: PAYROLL_TYPES.find((t) => t.type === type).label })),
+  outcomes: [...new Set(PAYROLL_TYPES.flatMap((t) => t.outcomes))].map((outcome) => ({ outcome, label: outcome.toLowerCase().replaceAll('_', ' ') })),
+  statuses: ['OPEN', 'QUERIED', 'RESOLVED'], matchRules: ['STAFF_NUMBER', 'ID_NUMBER', 'NAME'], confidences: ['HIGH', 'MEDIUM', 'LOW'],
+  amountStatuses: ['MATCHES', 'CATCH_UP', 'DIFFERS', 'LISTED_TWICE', 'RATE_UNKNOWN'],
+  limits: { maxBytes: 10485760, maxRows: 20000, maxTypedRows: 5000, noteMaxLength: 1000, pageMaxSize: 100 }, accepted: ['xlsx', 'xls', 'csv'],
+};
+/** A report or a query list as the server sends one: bytes, with the name to save them under. */
+const payrollAttachment = (name) => ({
+  status: 200, type: 'application/octet-stream', raw: 'SYNTHETIC PAYROLL REPORT',
+  headers: { 'content-disposition': `attachment; filename="${name}"`, 'access-control-expose-headers': 'Content-Disposition' },
+});
+
+/** Payroll's shapes, every route under `/api/payroll` by its shape; `false` when the path is not payroll's. */
+const payrollAnswer = (req, path) => {
+  if (!path.startsWith('/api/payroll')) return false;
+  const reply = (status, body) => ({ status, body });
+  const get = req.method === 'GET';
+  const post = req.method === 'POST';
+  if (get && path === '/api/payroll/vocabulary') return reply(200, payrollVocabulary);
+  if (get && path === '/api/payroll/employers') return reply(200, payrollEmployers);
+  if (get && path === '/api/payroll/files') return reply(200, payrollPage([payrollFile]));
+  if (post && (path === '/api/payroll/files' || path === '/api/payroll/files/typed')) return reply(201, payrollSummary);
+  if (get && path === '/api/payroll/payments') return reply(200, payrollPage(payrollSummary.payments));
+  if (post && path === '/api/payroll/payments') return reply(201, payrollSummary.payments[0]);
+  if (get && path === '/api/payroll/discrepancies') return reply(200, payrollPage(payrollDiscrepancies));
+  let m = /^\/api\/payroll\/files\/(\d+)(\/[a-z/]+)?$/.exec(path);
+  if (m) {
+    const rest = m[2] ?? '';
+    if (get && rest === '') return reply(200, payrollSummary);
+    if (get && rest === '/rows') return reply(200, payrollPage(payrollLines));
+    if (get && rest === '/discrepancies') return reply(200, payrollPage(payrollDiscrepancies));
+    if (get && rest === '/queries') return reply(200, [payrollQuery]);
+    if (post && rest === '/queries') return reply(201, payrollQuery);
+    if (post && rest === '/reconcile') return reply(200, payrollSummary);
+    if (get && rest === '/reports/discrepancies') return payrollAttachment('Payroll discrepancies - Absa - September 2026.xlsx');
+    if (get && rest === '/reports/full') return payrollAttachment('Payroll reconciliation - Absa - September 2026.xlsx');
+  }
+  m = /^\/api\/payroll\/discrepancies\/(\d+)(\/notes|\/resolve)?$/.exec(path);
+  if (m) {
+    const found = payrollDiscrepancies.find((d) => d.id === Number(m[1])) ?? payrollDiscrepancies[6];
+    const notes = found.lastNote ? [found.lastNote] : [];
+    if (get && !m[2]) return reply(200, { ...found, notes });
+    if (post && m[2] === '/notes') return reply(201, { ...found, notes: [...notes, { id: 9, text: 'A synthetic note.', by: 'system', at: '2026-10-07T08:00:00Z' }] });
+    if (post && m[2] === '/resolve') return reply(200, { ...found, notes, status: 'RESOLVED', resolution: { outcome: found.outcomes[0], by: 'system', at: '2026-10-07T08:00:00Z' } });
+  }
+  m = /^\/api\/payroll\/queries\/(\d+)(\/download)?$/.exec(path);
+  if (m && get && !m[2]) return reply(200, payrollQuery);
+  if (m && post && m[2]) return payrollAttachment('Payroll queries - Absa - September 2026.xlsx');
+  // Anything else under /api/payroll is a route the server does not have.
+  return reply(404, { status: 404, error: 'Not Found', path });
+};
+
 const API = {
   '/api/members': members,
   '/api/members/summary': memberSummary,
@@ -708,6 +833,15 @@ const API = {
   '/api/areas': ['Gauteng South', 'Western Cape'].map((name, i) => ({ id: i + 1, name })),
   '/api/districts': [{ id: 1, name: 'Synthetic District' }],
   '/api/job-grades': [{ code: 'A1', description: 'Clerk' }, { code: 'B2', description: 'Officer' }],
+  // Payroll (October build): every path under these is answered by `payrollAnswer` first, each by its shape; the keys
+  // are what `stubDrift` reads, so the services' paths are covered by name. `files/typed` stops `files` claiming it.
+  '/api/payroll/vocabulary': payrollVocabulary,
+  '/api/payroll/employers': payrollEmployers,
+  '/api/payroll/files/typed': payrollSummary,
+  '/api/payroll/files': payrollPage([payrollFile]),
+  '/api/payroll/discrepancies': payrollPage(payrollDiscrepancies),
+  '/api/payroll/payments': payrollPage(payrollSummary.payments),
+  '/api/payroll/queries': payrollQuery,
   '/api/subscriptions': Array.from({ length: 15 }, (_, i) => ({
     id: i + 1, bankName: banks[i % banks.length], acbDebitDay: 25,
     subscriptionAmount: 182.77, isCoreBanking: i % 2 === 0,
@@ -839,7 +973,7 @@ const server = createServer((req, res) => {
       return;
     }
     // The shapes a prefix match cannot answer: A.C.B.'s runs, and month end's pages and change of status.
-    const shaped = acbRunAnswer(req, path) || monthEndAnswer(req, path, url.searchParams);
+    const shaped = acbRunAnswer(req, path) || monthEndAnswer(req, path, url.searchParams) || payrollAnswer(req, path);
     if (shaped) {
       // A JSON body, unless the shape carries bytes of its own type (the pack's workbook, an attachment).
       res.writeHead(shaped.status, { 'content-type': shaped.type ?? 'application/json; charset=utf-8', ...shaped.headers });

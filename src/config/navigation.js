@@ -14,7 +14,7 @@ import {
   LucideDatabase, LucideMails, LucideMenu,
   LucideUserRoundPlus, LucideFile, LucideTags,
   LucidePiggyBank, LucidePresentation, LucideCalendarRange,
-  LucideConstruction, LucideCopyCheck, UserRoundPen
+  LucideConstruction, LucideCopyCheck, UserRoundPen, ReceiptText
 } from "lucide-react";
 
 export const navItems = [
@@ -122,6 +122,17 @@ export const navItems = [
             icon: LucideCalendarRange,
           },
         ]
+      },
+      // Payroll Deductions and Reconciliation (October build): every employer's payroll file in one place (Stephne,
+      // PAY-32). `permission` and `hideWithout` are data the rail reads: marked for sign-in when nobody is signed in,
+      // hidden from a signed-in user without it -- organisers never see payroll discrepancies (PAY-33). Written twice,
+      // here and as Admin Membership's card; `PayrollFiles.test.jsx` holds the two and the route together.
+      {
+        title: "Payroll Deductions",
+        icon: ReceiptText,
+        href: "/admin/payroll",
+        permission: "PAYROLL_VIEW",
+        hideWithout: true,
       },
       {
         title: "Maintenance",
