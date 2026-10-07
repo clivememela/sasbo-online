@@ -1,5 +1,5 @@
 import {
-    LucideMenu, LucideFile, LucideConstruction, LucideCalendarRange
+    HandCoins, LucideMenu, LucideFile, LucideConstruction, LucideCalendarRange
 } from 'lucide-react';
 import { NavigationList } from '../../components/common/NavigationCard';
 import { Page } from '../../components/common/Sheet.jsx';
@@ -10,6 +10,15 @@ const cards = [
     // Month end `04.1`: the Monthly Menu renamed, at its own address (MD38), between Daily and A.C.B.
     { title: 'Month end', desc: 'The month taken, its statistics and its pack of workbooks', icon: LucideCalendarRange, href: '/admin/monthly-menu' },
     { title: 'A.C.B', desc: 'A.C.B Menu',icon: LucideFile, href:'/admin/acb'},
+    // Payroll Deductions and Reconciliation (October build), with the rail entry's data-only keys (navigation.js).
+    {
+        title: 'Payroll Deductions and Reconciliation',
+        desc: 'Employers’ payroll files compared with SASBO’s members: discrepancies, queries and the payment check',
+        icon: HandCoins,
+        href: '/admin/payroll',
+        permission: 'PAYROLL_VIEW',
+        hideWithout: true,
+    },
     // { title: 'BankBranch', icon: Landmark, href:'/banks' },
     //{ title: 'Utilities', icon: LucideToolbox, color: 'text-red-600 dark:text-red-400' },
     //{ title: 'Regional Branches', icon: LucideGitBranch, color: 'text-red-600 dark:text-red-400' },

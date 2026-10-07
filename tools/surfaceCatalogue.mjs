@@ -583,6 +583,29 @@ export const UNREACHABLE = [
     why: 'rendered `disabled` -- a date nobody can open' },
   { site: 'components/form/AddressAutocomplete.jsx#aria-expanded@suggestions',
     why: 'its suggestions come from Google Places; the stub cannot answer Google and a measurement sends nothing to it (R-SEC-H)' },
+  // Payroll Deductions and Reconciliation (October build). Every screen is behind a payroll permission, so each site
+  // becomes a driven surface once sign-in's stub session reaches this run (oct/signin's `session` field) -- the stubs it
+  // needs are in `serve-dist.mjs` already (`payrollAnswer`).
+  ...[
+    ['pages/payroll/PayrollFile.jsx#DataState@loading', 'PAYROLL_VIEW'],
+    ['pages/payroll/PayrollFile.jsx#DataState@failed', 'PAYROLL_VIEW'],
+    ['pages/payroll/PayrollFile.jsx#DataState@not found', 'PAYROLL_VIEW'],
+    ['pages/payroll/PayrollDialogs.jsx#Modal@notes and outcome', 'PAYROLL_VIEW'],
+    ['pages/payroll/PayrollDialogs.jsx#DataState@discrepancy loading', 'PAYROLL_VIEW'],
+    ['pages/payroll/PayrollDialogs.jsx#DataState@discrepancy failed', 'PAYROLL_VIEW'],
+    ['pages/payroll/PayrollDialogs.jsx#Modal@record a payment', 'PAYROLL_PROCESS'],
+    ['pages/payroll/PayrollDialogs.jsx#DateField@received on', 'PAYROLL_PROCESS'],
+    ['pages/payroll/PayrollDialogs.jsx#Modal@change the columns', 'PAYROLL_PROCESS'],
+    ['pages/payroll/PayrollLoad.jsx#ConfirmDialog@replace the file', 'PAYROLL_PROCESS'],
+    ['pages/payroll/PayrollQueries.jsx#DataState@loading', 'PAYROLL_VIEW'],
+    ['pages/payroll/PayrollQueries.jsx#DataState@failed', 'PAYROLL_VIEW'],
+    ['pages/payroll/PayrollQueries.jsx#DataState@not found', 'PAYROLL_VIEW'],
+    ['pages/payroll/PayrollQueries.jsx#DataState@no query list', 'PAYROLL_VIEW'],
+    ['pages/payroll/PayrollQueries.jsx#Modal@download for the employer', 'PAYROLL_PROCESS'],
+  ].map(([site, permission]) => ({
+    site,
+    why: `behind ${permission}: the browser run signs nobody in until sign-in's stub session is wired into surfaces.mjs`,
+  })),
 ];
 
 /* ── the guard: the catalogue against the source ─────────────────────────────────────────────────── */

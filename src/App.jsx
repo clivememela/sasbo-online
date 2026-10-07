@@ -58,6 +58,13 @@ const RecruitmentChannel = lazy(() => import('./pages/maintainance/RecruitmentCh
 const Subscriptions = lazy(() => import('./pages/maintainance/Subscriptions.jsx'));
 // Month end `01.5`: SASBO's workplaces -- a leaf of Maintenance, beside the other tables it maintains.
 const Workplaces = lazy(() => import('./pages/maintainance/Workplaces.jsx'));
+// Payroll Deductions and Reconciliation (October build): the Files list, Load a file, a file's own page -- its summary,
+// discrepancies and lines, read with GETs only -- and its queries to the employer. `files` alone is the list again, so
+// the crumb above a file leads somewhere.
+const PayrollFiles = lazy(() => import('./pages/payroll/PayrollFiles.jsx'));
+const PayrollLoad = lazy(() => import('./pages/payroll/PayrollLoad.jsx'));
+const PayrollFile = lazy(() => import('./pages/payroll/PayrollFile.jsx'));
+const PayrollQueries = lazy(() => import('./pages/payroll/PayrollQueries.jsx'));
 
 // NAMED exports, so the dynamic import has to be adapted to lazy()'s default-export
 // contract. Written out rather than hidden in a helper: the shape of the mistake --
@@ -89,6 +96,11 @@ function App() {
         <Route path="admin/daily-menu" element={<DailyMenu />} />
         <Route path="admin/monthly-menu" element={<MonthlyMenu />} />
         <Route path="admin/monthly-menu/:statistic" element={<MonthEndStatistic />} />
+        <Route path="admin/payroll" element={<PayrollFiles />} />
+        <Route path="admin/payroll/load" element={<PayrollLoad />} />
+        <Route path="admin/payroll/files" element={<Navigate to="/admin/payroll" replace />} />
+        <Route path="admin/payroll/files/:fileId" element={<PayrollFile />} />
+        <Route path="admin/payroll/files/:fileId/queries" element={<PayrollQueries />} />
         <Route path="recruiters" element={<Recruiters />} />
         <Route path="banks" element={<MapsScope><BanksPage /></MapsScope>} />
         <Route path="banks/listing" element={<BankListing />} />

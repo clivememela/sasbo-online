@@ -79,12 +79,12 @@ describe('the bundle budget can fail', () => {
    * The direction the ceiling exists for: something got bigger and nobody looked.
    */
   it('FAILS when the javascript is over its ceiling', () => {
-    // 850 KiB of js against the javascript ceiling (bundle-budget.mjs's `js`, under 790 KiB since MO25) -- and deliberately
-    // arranged as a 300 KiB entry plus 550 KiB of lazy chunks, so the ENTRY row stays green and
+    // 900 KiB of js against the javascript ceiling (bundle-budget.mjs's `js`, 860.70 KiB since payroll, OB17) -- and
+    // deliberately arranged as a 300 KiB entry plus 600 KiB of lazy chunks, so the ENTRY row stays green and
     // this case can only be caught by the total. Each row is proved on its own. The fixture
-    // was 700, then 750, until the ceiling passed it: a fixture under the ceiling proves nothing.
+    // was 700, then 750, then 850, until the ceiling passed it: a fixture under the ceiling proves nothing.
     const { status, out } = budgetAgainst((dir) =>
-      realisticBuild(dir, { entryKiB: 300, lazyKiB: 550 }))
+      realisticBuild(dir, { entryKiB: 300, lazyKiB: 600 }))
 
     expect(out).toMatch(/OVER +javascript/)
     expect(out, 'it should say what to look for, not just that a number moved')

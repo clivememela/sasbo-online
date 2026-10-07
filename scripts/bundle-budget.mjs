@@ -310,7 +310,20 @@ const CEILINGS = {
   // runner: clivememela/sasbo-online run 36988020502 at b0f9a4d, javascript 790.75 KiB, 0.10 over 790.65 at 0eb0d56
   // (run 36903903677). +100 B by vite's sizes, in one chunk there already: HomeFigures 5.90 -> 6.00 kB (the sentence,
   // and the choice between it and "today"). Nothing from src/test/ is imported.
-  js: 790.76 * KB,
+  //
+  // 790.76 -> 860.70 on 2026-10-07, MEASURED, under the October build's OB17 ("rise to the figure measured on the
+  // stream's staging run, attributed per chunk; final values set at integration"): Payroll Deductions and
+  // Reconciliation, five lazy routes. The staging run clivememela/sasbo-online 37676872035 measured 860.69 KiB at
+  // 12c2cd7, 70.81 over main's 789.88 at 255b89e (run 37017335321). By vite's sizes, against main, +72,520 B:
+  //   PayrollFile 0 -> 29.16 kB (a file's page: the summary, the payment check, the columns, queries, reports, the
+  //   discrepancies and the lines, and the three dialogs) · PayrollParts 0 -> 14.16 (shared by the four pages: the
+  //   rules, the service, the access gate) · PayrollLoad 0 -> 12.30 · PayrollQueries 0 -> 9.92 · PayrollFiles 0 -> 4.62
+  //   · monthEndRules 0 -> 4.67 with useMonths 6.37 -> 1.74 (+0.04 net: month end's `instantLabel` shared, so Rollup
+  //   lifted its rules into a chunk of their own) · index +1.88 (the entry, OB17a's shell code: the five routes and
+  //   their preload lists, the rail leaf, and the shared download path in parseApiError, 3ba7bac -- its icon reclaimed,
+  //   98327b6) · Admin +0.25 (the card) · plus 0 -> 0.15 (Add a line) · Rollup's import stubs +0.04 net. Nothing from
+  //   src/test/ is imported by the product. The entry is 332.31 KiB against main's 330.47 (index +1.88 above).
+  js: 860.70 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
@@ -320,7 +333,11 @@ const CEILINGS = {
   // 80 -> 80.64 on 2026-10-01, MEASURED (MO25): 80.63 KiB on the same run, +720 B over 79.92 -- MO24's card rows' `end`
   // rule, the first screen's phone block and five utilities the build had not shipped (+590 B), and A.1's opened row's
   // rule (+130 B). The hundredth over the printed figure covers its rounding, as the javascript's does.
-  css: 80.64 * KB,
+  //
+  // 80.64 -> 82.27 on 2026-10-07, MEASURED (OB17): 82.26 KiB on run 37676872035 at 12c2cd7, +1.63 over main's 80.63
+  // (index.css 82.56 -> 84.23 kB by vite) -- the payroll screens' utilities the build had not shipped (the file
+  // chooser's `file:` button, the ledgers' and dialogs' grids, the shown-once password's box). Nothing else moved.
+  css: 82.27 * KB,
   // 900 -> 925.12 on 2026-09-30, MEASURED, on the owner's word (MO14), the first time `all assets` was over: the same
   // pair as the javascript's, 866.48 KiB (run 36773278932) -> 925.11 KiB (run 36773289808). The javascript's +59,631 B
   // and the stylesheet's +409 B (296 of them the History tab's: its column widths, gutter bleed, alignment and one line
@@ -337,7 +354,11 @@ const CEILINGS = {
   //
   // 934.77 -> 934.87 on 2026-10-02, MEASURED (MO33): 934.86 KiB on run 36988020502 -- the javascript's +0.10 above,
   // the stylesheet unmoved at 80.63.
-  total: 934.87 * KB,
+  //
+  // 934.87 -> 1006.44 on 2026-10-07, MEASURED (OB17): 1006.43 KiB on run 37676872035 at 12c2cd7 -- the javascript's
+  // +70.81 and the stylesheet's +1.63 above over main's 933.99 (run 37017335321), to the hundredth; index.html unmoved
+  // at 3.19 kB.
+  total: 1006.44 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to

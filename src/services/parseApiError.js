@@ -31,7 +31,7 @@
 /**
  * Every user-facing string this module can produce, in one place.
  *
- * All six, not the three that happened to be reused -- hoisting half of them is
+ * All of them, not the three that happened to be reused -- hoisting half of them is
  * worse than hoisting none, because a reader cannot tell which strings are "the
  * vocabulary" and which are incidental.
  */
@@ -41,6 +41,7 @@ const TOO_SLOW = 'The request took too long and was stopped.'
 const SERVER_FAILED = 'The server could not complete that request.'
 const REJECTED = 'That request was rejected.'
 const UNKNOWN = 'Something went wrong. Please try again.'
+const NOT_A_FILE = 'The server answered with a web page instead of the file. Please try again.'
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * 🔴 EVERYTHING FROM HERE TO THE END OF `requestJson` IS THE DESIGN ARC'S ADDITION,
@@ -213,10 +214,11 @@ export function networkError(cause, { timedOut = false } = {}) {
  * hide eight of nine services' endpoints behind one call and blind that guard.
  *
  * @param {() => Promise<Response>} send
- * @param {{ parseBody?: boolean }} [options] `parseBody: false` for a 204/DELETE.
+ * @param {{ parseBody?: boolean, file?: boolean }} [options] `parseBody: false` for a 204/DELETE; `file: true` for a
+ *   download, which resolves `{ blob, filename }` (see `readFile`).
  * @returns {Promise<unknown>}
  */
-export async function requestJson(send, { parseBody = true, allowEmpty = false, optionalBody = false, timeoutMs = READ_CEILING_MS } = {}) {
+export async function requestJson(send, { parseBody = true, allowEmpty = false, optionalBody = false, file = false, timeoutMs = READ_CEILING_MS } = {}) {
   /*
    * 🔴 THE CEILING. A14, and the failure mode with the LONGEST time to detection in this
    * application: a hung backend renders the loading state forever, which an administrator reads
@@ -259,6 +261,7 @@ export async function requestJson(send, { parseBody = true, allowEmpty = false, 
   try {
     if (!response.ok) throw await apiErrorFrom(response)
     if (!parseBody) return undefined
+    if (file) return await readFile(response)
     return await readBody(response, { allowEmpty, optionalBody })
   } catch (cause) {
     /*
@@ -298,6 +301,41 @@ async function readBody(response, { allowEmpty, optionalBody }) {
     if (optionalBody) return undefined
     throw apiError(NOT_JSON, { kind: ERROR_KINDS.NON_JSON, status: response.status, cause })
   }
+}
+
+/**
+ * A download's body (`file: true`): `{ blob, filename }`, the name read from `Content-Disposition` when the server gave
+ * one. A fourth shape, for a report fetched rather than linked -- a sign-in token travels on a `fetch`, never on an
+ * `<a href>` -- and it stays inside `requestJson` so the deadline still covers the body (R2-F4).
+ *
+ * 🔴 AN HTML PAGE ANSWERED WITH A 200 IS NOT THE FILE: it is a proxy's or a gateway's page, and saving it would hand an
+ * administrator a web page named `.xlsx`. It rejects as case ④ does; anything else is the file.
+ */
+async function readFile(response) {
+  if (/^\s*text\/html\b/i.test(response.headers.get('Content-Type') ?? '')) {
+    throw apiError(NOT_A_FILE, { kind: ERROR_KINDS.NON_JSON, status: response.status })
+  }
+  return { blob: await response.blob(), filename: filenameOf(response.headers.get('Content-Disposition')) }
+}
+
+/**
+ * The file name in a `Content-Disposition` header -- RFC 6266's `filename*=UTF-8''…` first, then `filename="…"` -- or
+ * `null`. Only the last path segment is kept, so a name can never point the save anywhere but the downloads folder.
+ * @param {string | null} header
+ * @returns {string | null}
+ */
+export function filenameOf(header) {
+  if (!header) return null
+  const extended = /filename\*\s*=\s*utf-8''([^;]+)/i.exec(header)
+  const plain = /filename\s*=\s*"?([^";]+)"?/i.exec(header)
+  let name = null
+  try {
+    name = extended ? decodeURIComponent(extended[1].trim()) : plain?.[1].trim() ?? null
+  } catch {
+    name = plain?.[1].trim() ?? null
+  }
+  const leaf = name?.split(/[\\/]/).pop()?.trim()
+  return leaf && leaf !== '.' && leaf !== '..' ? leaf : null
 }
 
 /**
