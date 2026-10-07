@@ -39,5 +39,60 @@ export const recordVisit = (workplaceId, visit) =>
     signal,
   }));
 
-/** The same two, gathered, for everything that iterates the service layer -- these very functions, never copies. */
-export const workplaceVisitService = { getVisits, recordVisit };
+/**
+ * A person's own visit drafts -- the visit forms saving and submitting (October build, 5 Oct Show & Tell). Every route
+ * needs `VISITS_CAPTURE`, and a draft is only ever its owner's: another person's is `VISIT_DRAFT_NOT_FOUND`.
+ *
+ * A draft is `{ id, status, workplaceId, raNumber, workplaceName, visitedOn, timeIn, timeOut, organiser,
+ * complementFound, complementBefore, membershipFound, nonMembers, recruited, nonMembersInterviewed, createdBy,
+ * createdAt, updatedAt, submittedBy, submittedAt, visitId, version }`; `status` is `DRAFT` until it is submitted, then
+ * `SUBMITTED` and read-only. A save names the R/A number (`raNumber`) and the fields a visit keeps; saving over a draft
+ * and submitting it name the `version` it was made from.
+ *
+ * Refused: `VISIT_INVALID` (`details.field`), `WORKPLACE_UNKNOWN` (`details.field` = `raNumber`),
+ * `WORKPLACE_OUT_OF_SCOPE`, `VISIT_DRAFT_STALE` (saved since -- `details.version`), `VISIT_ALREADY_SUBMITTED`,
+ * `VISIT_DRAFT_NOT_FOUND`. A submission sent twice answers the first.
+ */
+export const DRAFT_PAGE_SIZE = 20;
+
+export const getMyDrafts = (status = 'DRAFT', page = 0, size = DRAFT_PAGE_SIZE) => {
+  const query = new URLSearchParams({ status, page: String(page), size: String(size) });
+  return requestJson((signal) => fetch(apiUrl('/api/workplaces/visit-drafts') + `?${query}`,
+    { credentials: 'include', signal }));
+};
+
+export const getDraft = (id) =>
+  requestJson((signal) => fetch(apiUrl(`/api/workplaces/visit-drafts/${encodeURIComponent(id)}`),
+    { credentials: 'include', signal }));
+
+export const createDraft = (draft) =>
+  requestJsonWrite((signal) => fetch(apiUrl('/api/workplaces/visit-drafts'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(draft),
+    signal,
+  }));
+
+export const updateDraft = (id, draft) =>
+  requestJsonWrite((signal) => fetch(apiUrl(`/api/workplaces/visit-drafts/${encodeURIComponent(id)}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(draft),
+    signal,
+  }));
+
+export const submitDraft = (id, version) =>
+  requestJsonWrite((signal) => fetch(apiUrl(`/api/workplaces/visit-drafts/${encodeURIComponent(id)}/submit`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ version }),
+    signal,
+  }));
+
+/** Every function above, gathered, for everything that iterates the service layer -- these very functions, never copies. */
+export const workplaceVisitService = {
+  getVisits, recordVisit, getMyDrafts, getDraft, createDraft, updateDraft, submitDraft,
+};

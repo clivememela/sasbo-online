@@ -60,4 +60,34 @@ export const locationService = {
       credentials: 'include',
       signal,
     })),
+
+  /**
+   * The organisers' batch print (October build, 5 Oct Show & Tell: "put all the R/A numbers, print them one time"):
+   * the workplaces of up to fifty R/A numbers in ONE request -- `GET /api/workplaces/listings?raNumbers=` -- answered
+   * `{ asked, listings: [{ workplace, lastVisited }], unknown, workplacesServed, reason }`, in the order asked, the
+   * numbers that are no workplace here in `unknown`. Open, as every read of the workplaces is. `RA_NUMBERS_INVALID`
+   * for none, more than fifty, or one that is not a number -- the screen reads the numbers first, so it says so before
+   * asking. The numbers go comma-separated, as the route reads them.
+   */
+  getListings: (raNumbers) => {
+    const query = new URLSearchParams({ raNumbers: raNumbers.join(',') });
+    return requestJson((signal) => fetch(apiUrl(`/api/workplaces/listings?${query}`), {
+      credentials: 'include',
+      signal,
+    }));
+  },
+
+  /**
+   * The members at one branch, a page at a time -- `GET /api/workplaces/{id}/members?page=&size=`, answered
+   * `{ workplaceId, members, page, size, totalElements, totalPages }`. Needs `MEMBERS_VIEW`, and lists only a branch in
+   * the caller's region or area (`WORKPLACE_OUT_OF_SCOPE`). The numbers come masked: the employee number as its last
+   * four digits, the ID, e-mail and cell as whether there is one.
+   */
+  getBranchMembers: (workplaceId, page = 0, size = 200) => {
+    const query = new URLSearchParams({ page: String(page), size: String(size) });
+    return requestJson((signal) => fetch(apiUrl(`/api/workplaces/${encodeURIComponent(workplaceId)}/members?${query}`), {
+      credentials: 'include',
+      signal,
+    }));
+  },
 };

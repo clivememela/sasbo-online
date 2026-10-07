@@ -1,17 +1,24 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import TextInput from '../../components/form/TextInput';
 import DateField from '../../components/form/DateField';
 import Button from '../../components/form/Button';
 import PageTitle from '../../components/common/PageTitle';
 import { PageNotice } from '../../components/common/DialogNotice.jsx';
 import { Page } from '../../components/common/Sheet.jsx';
-import { VISIT_INVALID, WORKPLACE_UNKNOWN } from '../../config/monthEnd.js';
+import { useAuth } from '../../auth/useAuth';
+import { PERMISSIONS } from '../../auth/permissions';
+import {
+    VISIT_ALREADY_SUBMITTED, VISIT_DRAFT_NOT_FOUND, VISIT_DRAFT_STALE, VISIT_INVALID, WORKPLACE_UNKNOWN,
+} from '../../config/monthEnd.js';
 import useFocusOn from '../../hooks/useFocusOn.js';
-import { formatInt } from '../../lib/format.js';
+import { formatDateLong, formatInt } from '../../lib/format.js';
 import reportError from '../../lib/reportError.js';
 import { messageOf, writeFailure } from '../../services/parseApiError.js';
 import { workplaceService } from '../../services/workplaceService.js';
-import { recordVisit } from '../../services/workplaceVisitService.js';
+import { createDraft, getDraft, recordVisit, submitDraft, updateDraft } from '../../services/workplaceVisitService.js';
+import MyVisitDrafts from './MyVisitDrafts.jsx';
+import { DRAFT_FIELDS, draftOf, formFieldsOf } from './visitDraft.js';
 
 /**
  * 🔴 THESE THREE LIVE AT MODULE SCOPE, AND UNTIL NOW THEY DID NOT -- WHICH BROKE TYPING.
@@ -28,8 +35,11 @@ import { recordVisit } from '../../services/workplaceVisitService.js';
  * The values reach them through a context rather than through 31 new pairs of props, because
  * the IDENTITY is what had to stop changing; the data was never the problem.
  * `eslint`'s `react-hooks/static-components` had been reporting this the whole time.
+ *
+ * October build: `readOnly` reaches them the same way -- a SUBMITTED visit is SASBO's record, and opens read-only, to
+ * be printed and not changed.
  */
-const FormScope = createContext({ values: {}, errors: {}, onChange: () => {} });
+const FormScope = createContext({ values: {}, errors: {}, onChange: () => {}, readOnly: false });
 
 /**
  * 🔴 BR-4's FOURTH WRAPPER, AND THE LAST ONE. `blastRadius.md` counted four answers
@@ -44,7 +54,7 @@ const FormScope = createContext({ values: {}, errors: {}, onChange: () => {} });
  * shared chrome: one label element, one error path, one focus ring, one 16px rule.
  */
 const TextArea = ({ label, name, rows = 3 }) => {
-    const { values, errors, onChange } = useContext(FormScope);
+    const { values, errors, onChange, readOnly } = useContext(FormScope);
     return (
     <TextInput
         label={label}
@@ -54,6 +64,7 @@ const TextArea = ({ label, name, rows = 3 }) => {
         value={values[name]}
         onChange={onChange}
         error={errors[name]}
+        readOnly={readOnly}
         className="sm:col-span-2"
     />
     );
@@ -63,17 +74,21 @@ const TextArea = ({ label, name, rows = 3 }) => {
 // ONE edit reaches all FOUR of this form's date fields, which is the point of the
 // wrapper existing at all -- and it is why the conversion is done here rather than at
 // each site. (This wrapper is one of BR-4's four; replacing it wholesale is `04.3`.)
+// October build: read-only, a date is a read-only text -- `DateField` has no read-only mode, and a disabled one prints
+// faded.
 const Field = ({ label, name, type = 'text', fullWidth = false, textarea = false }) => {
-    const { values, errors, onChange } = useContext(FormScope);
+    const { values, errors, onChange, readOnly } = useContext(FormScope);
     return textarea
         ? <TextArea label={label} name={name} />
         : (
             // `sm:col-span-2`, not `col-span-2`: in a one-column grid a span of two
             // is a span past the end, which some engines honour by widening the track.
             <div className={fullWidth ? 'sm:col-span-2' : ''}>
-                {type === 'date'
+                {type === 'date' && !readOnly
                     ? <DateField label={label} name={name} value={values[name]} onChange={onChange} hint="ago" error={errors[name]} />
-                    : <TextInput label={label} name={name} type={type} value={values[name]} onChange={onChange} error={errors[name]} />}
+                    : <TextInput label={label} name={name} type={type === 'date' ? 'text' : type}
+                        value={type === 'date' && values[name] ? formatDateLong(values[name]) : values[name]}
+                        onChange={onChange} error={errors[name]} readOnly={readOnly} />}
             </div>
         );
 };
@@ -89,7 +104,7 @@ const VISIT_FIELDS = {
     timeIn: 'timeIn',
     timeOut: 'timeOut',
     organiser: 'organiserName',
-    complementFound: 'compliment',
+    complementFound: 'complement',
     membershipFound: 'membership',
     nonMembers: 'noOfNonMembers',
     recruited: 'noOfNewMembersRecruited',
@@ -126,7 +141,7 @@ const BLANK = {
     organiserName: '', dateOfVisit: '', timeIn: '', timeOut: '', bank: '', branchDepartment: '', raNumber: '', area: '',
     postalAddress: '', physicalAddress: '', branchDepTelNo: '', branchDepFaxNo: '',
     branchDepManager: '', branchRepName: '', cellPhoneEmail1: '', memnetMemName: '',
-    cellPhoneEmail2: '', becMemberName: '', cellPhoneEmail3: '', compliment: '',
+    cellPhoneEmail2: '', becMemberName: '', cellPhoneEmail3: '', complement: '',
     noOfNonMembers: '', membership: '', noOfNewMembersRecruited: '',
     percentagePenetration: '', noOfNonMembersInterviewed: '', organiserSignature: '',
     organiserSignatureDate: '', snrOrganiserSignature: '', snrOrganiserSignatureDate: '',
@@ -139,6 +154,10 @@ const openedWith = (filters) => ({
     raNumber: filters?.randomAccessNumber || '',
     area: filters?.area || '',
 });
+
+/** What a submitted visit says it changed, where it found another staff complement. */
+const complementChange = (answer) => (answer?.complementBefore == null ? ''
+    : ` Staff complement changed from ${formatInt(answer.complementBefore)} to ${formatInt(answer.complementFound)}.`);
 
 /*
  * 🔴 THE SOLID TEAL BAND IS GONE. Each section used to be announced by a filled
@@ -171,6 +190,12 @@ const Section = ({ title, children }) => (
  *
  * Embedded, the report is only its sheet, captioned by the `<h2>` letterhead it already
  * had -- which is the shape `GeneralForm` uses in the same picker.
+ *
+ * 💾 OCTOBER BUILD -- SAVED AS A DRAFT, AND SUBMITTED (5 Oct Show & Tell). An organiser who may capture visits
+ * (`VISITS_CAPTURE`) saves the form as a draft, comes back to it from My visits, and submits it: the visit then goes on
+ * SASBO's record and the form is read-only, to be printed. Nobody signed in keeps the one-step Save visit the form had,
+ * while sign-in is open -- everything that works today still works (contracts/signin.md) -- with a line saying that
+ * signing in brings drafts and submitting; a signed-in user without the permission is told what they need.
  */
 export const OrganizerReport = ({ filters, embedded = false }) => {
     /*
@@ -184,7 +209,21 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
     const [saving, setSaving] = useState(false);
     // The form as it stood when it was saved: Save visit rests until something on it changes, so one visit is one save.
     const [savedAs, setSavedAs] = useState(null);
+    // October build: the draft the form holds -- `{ id, version, status, workplaceName, raNumber }` -- or none yet; the
+    // form as last saved or opened, against which "changed since" is judged; which action is under way; a draft asked
+    // to be opened over unsaved changes; and a nudge for My visits to read itself again.
+    const [draft, setDraft] = useState(null);
+    const [baseline, setBaseline] = useState(() => formData);
+    const [busy, setBusy] = useState(null);
+    const [opening, setOpening] = useState(null);
+    const [listed, setListed] = useState(0);
     const noticeRef = useFocusOn(notice, notice?.tone === 'error');
+    const { status: authStatus, can } = useAuth();
+    const location = useLocation();
+    const capture = can(PERMISSIONS.VISITS_CAPTURE);
+    const signedIn = authStatus === 'signed-in';
+    const readOnly = draft?.status === 'SUBMITTED';
+    const changed = formData !== baseline;
 
     // `useCallback` with no dependencies: `setFormData`'s updater form reads the previous
     // state, so this handler never needs to close over `formData` and never has to change.
@@ -225,8 +264,7 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
             setSavedAs(formData);
             setNotice({
                 tone: 'ok',
-                text: `Visit saved for ${workplace.name} (R/A ${workplace.raNumber}).${saved?.complementBefore == null ? ''
-                    : ` Staff complement changed from ${formatInt(saved.complementBefore)} to ${formatInt(saved.complementFound)}.`}`,
+                text: `Visit saved for ${workplace.name} (R/A ${workplace.raNumber}).${complementChange(saved)}`,
             });
         } catch (error) {
             reportError('LocationVisit.save', error);
@@ -246,10 +284,148 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
         }
     };
 
+    /** A saved draft, into the form: every field it keeps, the rest of the form as it opened. */
+    const show = (saved, text) => {
+        const form = { ...openedWith(filters), ...formFieldsOf(saved) };
+        setFormData(form);
+        setBaseline(form);
+        setDraft(saved);
+        setErrors({});
+        setOpening(null);
+        setNotice(text ? { tone: 'ok', text } : null);
+    };
+
+    /**
+     * A refusal of a draft's save or submission, said where it belongs: at the field it names; at the R/A number for a
+     * workplace that is none; as a notice offering the draft as it now stands where it was saved since or submitted
+     * already; as a notice for anything else -- "could not be confirmed" where it may have landed, never "not saved".
+     */
+    const refused = (error, what) => {
+        reportError('LocationVisit.draft', error);
+        const { code, details } = error?.body ?? {};
+        const field = code === VISIT_INVALID ? DRAFT_FIELDS[details?.field] : code === WORKPLACE_UNKNOWN && 'raNumber';
+        if (field) {
+            setErrors({ [field]: messageOf(error) });
+            return;
+        }
+        if (code === VISIT_DRAFT_STALE || code === VISIT_ALREADY_SUBMITTED) {
+            setNotice({ tone: 'error', text: messageOf(error), reopen: true });
+            return;
+        }
+        if (code === VISIT_DRAFT_NOT_FOUND) {
+            setDraft(null);
+            setNotice({ tone: 'error', text: `${messageOf(error)} Save draft keeps this form as a new draft.` });
+            return;
+        }
+        setNotice({ tone: 'error', text: writeFailure(error, what, 'My visits') });
+    };
+
+    /** Saves the form as a draft -- the first time, or over the version it holds. The draft as saved, or `null`. */
+    const saveDraft = async ({ submitting }) => {
+        const { draft: body, errors: invalid } = draftOf(formData, { submitting });
+        setErrors(invalid);
+        setNotice(null);
+        if (Object.keys(invalid).length) return null;
+        try {
+            const saved = draft?.id
+                ? await updateDraft(draft.id, { ...body, version: draft.version })
+                : await createDraft(body);
+            setDraft(saved);
+            setBaseline(formData);
+            setListed((n) => n + 1);
+            return saved;
+        } catch (error) {
+            refused(error, 'The draft');
+            return null;
+        }
+    };
+
+    const handleSaveDraft = async (e) => {
+        e?.preventDefault?.();
+        if (busy || readOnly) return;
+        setBusy('save');
+        try {
+            const saved = await saveDraft({ submitting: false });
+            if (saved) setNotice({ tone: 'ok', text: `Draft saved for ${saved.workplaceName} (R/A ${saved.raNumber}).` });
+        } finally {
+            setBusy(null);
+        }
+    };
+
+    /**
+     * SUBMIT VISIT: the form is saved first where it changed since its last save (or was never saved), then submitted
+     * at that version -- the visit goes on record and the form becomes read-only. A submission refused leaves the draft
+     * saved, and says why at the field.
+     */
+    const handleSubmitVisit = async () => {
+        if (busy || readOnly) return;
+        setBusy('submit');
+        try {
+            let current = draft;
+            if (!current?.id || changed) {
+                current = await saveDraft({ submitting: true });
+                if (!current) return;
+            } else {
+                const { errors: invalid } = draftOf(formData, { submitting: true });
+                setErrors(invalid);
+                if (Object.keys(invalid).length) return;
+            }
+            const submitted = await submitDraft(current.id, current.version);
+            setDraft(submitted);
+            setBaseline(formData);
+            setListed((n) => n + 1);
+            setNotice({
+                tone: 'ok',
+                text: `Visit submitted for ${submitted.workplaceName} (R/A ${submitted.raNumber}). It is on record now, `
+                    + `and this form can be printed but not changed.${complementChange(submitted)}`,
+            });
+        } catch (error) {
+            refused(error, 'The visit');
+        } finally {
+            setBusy(null);
+        }
+    };
+
+    /** The draft as it now stands on the server -- after a save from elsewhere, or a submission. */
+    const reopen = async () => {
+        if (!draft?.id) return;
+        try {
+            const fresh = await getDraft(draft.id);
+            show(fresh, fresh.status === 'SUBMITTED'
+                ? 'This visit has been submitted: it is shown as it was submitted, read-only.'
+                : 'The draft is shown as it was last saved.');
+        } catch (error) {
+            refused(error, 'The draft');
+        }
+    };
+
+    /** A draft from My visits, into the form -- asked first where the form has changes not yet saved. */
+    const open = (chosen) => {
+        if (changed && !readOnly) {
+            setOpening(chosen);
+            return;
+        }
+        show(chosen, chosen.status === 'SUBMITTED'
+            ? `Showing the visit submitted for ${chosen.workplaceName}: read-only, to print.`
+            : `Opened the draft for ${chosen.workplaceName} (R/A ${chosen.raNumber}).`);
+    };
+
+    const startAgain = () => {
+        const form = openedWith(filters);
+        setFormData(form);
+        setBaseline(form);
+        setDraft(null);
+        setErrors({});
+        setNotice(null);
+        setOpening(null);
+    };
+
     // One object per render, so a keystroke reaches all 31 fields -- which is what a
     // controlled form does anyway. What must NOT change per render is the component
     // identity, and that is now fixed at module scope above.
-    const scope = useMemo(() => ({ values: formData, errors, onChange: handleChange }), [formData, errors, handleChange]);
+    const scope = useMemo(() => ({ values: formData, errors, onChange: handleChange, readOnly }),
+        [formData, errors, handleChange, readOnly]);
+    const next = encodeURIComponent(`${location.pathname}${location.search}`);
 
     const sheet = (
         <FormScope.Provider value={scope}>
@@ -265,20 +441,25 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
                         most important thing on the page was the form's letterhead. It is
                         the form's name, so it is a heading, but a SECOND-level one under
                         the page title PageTitle now supplies. */}
-                    {/* 🗣️ SASBO, 18 Sep 2026: this letterhead is the line that confused the people filling
-                        the form in -- "it says on top ... organizers, branch or department report form". The
+                    {/* 🗣️ SASBO, 18 Sep 2026: this letterhead is the line that confused the people filling the
+                        form in -- "it says on top ... organizers, branch or department report form". The
                         report is of a VISIT to a location, so that is what it is called now. */}
                     <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-muted">
                         SASBO Finance Union — Location Visit: Branch / Department
                     </h2>
+                    {draft && (
+                        <p className="no-print mt-2 text-sm text-ink-muted">
+                            {readOnly ? 'Submitted visit — read-only' : 'Draft'} · {draft.workplaceName} · R/A {draft.raNumber}
+                        </p>
+                    )}
                 </div>
                 {/* 🔴 CLEAR FORM RESET THE BOXES AND NOT THE FORM. A native reset puts each control back to its
                     default and tells React nothing, so the state kept every value the boxes no longer showed --
                     harmless while the form saved nothing, and a visit saved from stale values once it did. */}
                 <form
-                    onSubmit={handleSubmit}
+                    onSubmit={capture ? handleSaveDraft : handleSubmit}
                     onReset={() => {
-                        setFormData(openedWith(filters));
+                        setFormData(draft ? baseline : openedWith(filters));
                         setErrors({});
                         setNotice(null);
                     }}
@@ -312,7 +493,9 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
                     </Section>
 
                     <Section title="Membership (After Visit)">
-                        <Field label="Compliment" name="compliment" />
+                        {/* 🗣️ "Complement", the staff of the branch -- spelt "Compliment" here until the owner promised
+                            the fix at the 5 Oct Show & Tell. */}
+                        <Field label="Complement" name="complement" />
                         <Field label="No of Non-Members" name="noOfNonMembers" type="number" />
                         <Field label="Membership" name="membership" />
                         <Field label="No of New Members Recruited" name="noOfNewMembersRecruited" type="number" />
@@ -329,8 +512,9 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
                         <Field label="Date Captured" name="dateCaptured" type="date" />
                     </Section>
 
-                    {/* Save visit's outcome, beside the button that asked: a confirmation announced, a failure that
-                        takes focus. On screen only. */}
+                    {/* The outcome, beside the buttons that asked: a confirmation announced, a failure that takes
+                        focus -- with the draft as it now stands, where it was saved since or submitted already. On
+                        screen only. */}
                     {notice && (
                         <PageNotice
                             ref={noticeRef}
@@ -340,22 +524,80 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
                             onDismiss={() => setNotice(null)}
                         >
                             {notice.text}
+                            {notice.reopen && (
+                                <>
+                                    {' '}
+                                    <Button size="sm" onClick={reopen}>Open it as it is now</Button>
+                                </>
+                            )}
                         </PageNotice>
+                    )}
+
+                    {opening && (
+                        <div role="alert" className="no-print mt-4 rounded-md border border-line-strong bg-surface-2 p-3 text-sm text-ink">
+                            <p>
+                                The form has changes that are not saved. Open {opening.workplaceName} anyway, and lose them?
+                            </p>
+                            <div className="mt-2 flex gap-2">
+                                <Button size="sm" onClick={() => show(opening, `Opened the ${opening.status === 'SUBMITTED' ? 'visit' : 'draft'} for ${opening.workplaceName}.`)}>
+                                    Open anyway
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => setOpening(null)}>Keep editing</Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {!capture && (
+                        <p className="no-print mt-4 text-sm text-ink-muted">
+                            {signedIn ? (
+                                'You need permission to capture visits. Ask your administrator if you should have it. The form can still be printed.'
+                            ) : (
+                                <>
+                                    Sign in to save visits as drafts and submit them.{' '}
+                                    <Link className="font-medium text-brand-ink underline" to={`/login?next=${next}`}>Sign in</Link>
+                                </>
+                            )}
+                        </p>
                     )}
 
                     {/* The actions sit where every other surface in this world puts them:
                         at the end of the sheet, to the right, primary last. */}
-                    <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-line pt-4">
-                        <Button type="reset" variant="default">Clear form</Button>
-                        {/* The form's one primary, where "Submit report" sent nothing anywhere (A60). */}
-                        <Button type="submit" variant="primary" loading={saving} disabled={savedAs === formData}>
-                            Save visit
-                        </Button>
+                    <div className="no-print mt-6 flex flex-wrap justify-end gap-2 border-t border-line pt-4">
+                        {readOnly ? (
+                            <Button type="button" variant="default" onClick={startAgain}>Start a new visit</Button>
+                        ) : (
+                            <Button type="reset" variant="default">Clear form</Button>
+                        )}
+                        <Button type="button" variant="default" onClick={() => window.print()}>Print form</Button>
+                        {capture && !readOnly && (
+                            <>
+                                <Button type="submit" variant="default" loading={busy === 'save'}
+                                    disabled={busy === 'submit' || (draft && !changed)}>
+                                    Save draft
+                                </Button>
+                                <Button type="button" variant="primary" loading={busy === 'submit'}
+                                    disabled={busy === 'save'} onClick={handleSubmitVisit}>
+                                    Submit visit
+                                </Button>
+                            </>
+                        )}
+                        {/* The form's one primary while nobody is signed in, where "Submit report" sent nothing
+                            anywhere (A60): one visit, one save. */}
+                        {!capture && !signedIn && (
+                            <Button type="submit" variant="primary" loading={saving} disabled={savedAs === formData}>
+                                Save visit
+                            </Button>
+                        )}
                     </div>
                 </form>
             </div>
         </FormScope.Provider>
     );
+
+    // My visits: the signed-in organiser's own drafts and submissions, to finish or to print.
+    const mine = capture && !embedded ? (
+        <MyVisitDrafts refreshKey={listed} openId={draft?.id} onOpen={open} />
+    ) : null;
 
     if (embedded) return sheet;
 
@@ -365,6 +607,7 @@ export const OrganizerReport = ({ filters, embedded = false }) => {
                 title="Location Visit"
                 subtitle="Record an organiser's visit to a branch or department: the engagement, the membership, and the recruitment."
             />
+            {mine}
             {sheet}
         </Page>
     );

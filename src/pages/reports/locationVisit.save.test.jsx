@@ -60,7 +60,7 @@ async function fillAVisit(user) {
   await fill(user, {
     'Organiser Name': 'INVENTED ORGANISER',
     'R / A Number': '900002',
-    Compliment: '40',
+    Complement: '40',
     Membership: '12',
     'No of Non-Members': '3',
     'No of New Members Recruited': '2',
@@ -153,11 +153,11 @@ describe('Save visit -- what it says when it cannot', () => {
     server.use(workplacesSearched(), visitRecorded())
     const user = setupUser()
     renderWithProviders(<OrganizerReport />)
-    await fill(user, { Compliment: 'forty', 'No of Non-Members': '1.5', Membership: '12' })
+    await fill(user, { Complement: 'forty', 'No of Non-Members': '1.5', Membership: '12' })
 
     await user.click(screen.getByRole('button', { name: 'Save visit' }))
 
-    expect(saidAt('Compliment')).toBe('A whole number, or leave it empty.')
+    expect(saidAt('Complement')).toBe('A whole number, or leave it empty.')
     expect(saidAt('No of Non-Members')).toBe('A whole number, or leave it empty.')
     expect(saidAt('Date of Visit')).toBe('Choose the day of the visit.')
     expect(saidAt('R / A Number')).toBe('The R/A number says which workplace was visited.')
@@ -196,7 +196,7 @@ describe('Save visit -- what it says when it cannot', () => {
     expect(refusal.details.field).toBe('visitedOn')
     await waitFor(() => expect(saidAt('Date of Visit')).toBe(refusal.message))
     expect(field('Organiser Name')).toHaveValue('INVENTED ORGANISER')
-    expect(field('Compliment')).toHaveValue('40')
+    expect(field('Complement')).toHaveValue('40')
     expect(screen.queryByText(/^Visit saved/)).not.toBeInTheDocument()
   })
 
