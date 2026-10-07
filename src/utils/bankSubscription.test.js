@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { findSubscriptionForBank } from './bankSubscription'
+import { bankDebitDay, findSubscriptionForBank } from './bankSubscription'
 
 /**
  * THE SUBSCRIPTION LOOKUP MUST AGREE WITH THE SERVER'S, EXACTLY.
@@ -43,3 +43,27 @@ describe('findSubscriptionForBank matches the way the server matches', () => {
   })
 })
 
+
+describe('bankDebitDay: the bank\'s day as a member\'s default (A67)', () => {
+  const DAYS = [
+    { bankName: 'Absa Bank Limited', acbDebitDay: 5 },
+    { bankName: 'Nedbank Limited', acbDebitDay: 20 },
+    { bankName: 'TymeBank Limited', acbDebitDay: 28 },
+  ]
+
+  it('answers a usable day as the option string the form holds', () => {
+    expect(bankDebitDay(DAYS, 'Nedbank Limited')).toBe('20')
+    expect(bankDebitDay(DAYS, ' tymebank limited ')).toBe('28')
+  })
+
+  it('answers null for a day outside the range, as the server declines one', () => {
+    // Absa's seeded 5th is placeholder data (the owner, 2026-09-09); the server gives no member a day it would refuse.
+    expect(bankDebitDay(DAYS, 'Absa Bank Limited')).toBeNull()
+  })
+
+  it('answers null for no bank, no row, or no rows at all', () => {
+    expect(bankDebitDay(DAYS, '')).toBeNull()
+    expect(bankDebitDay(DAYS, 'Bank Of Nowhere')).toBeNull()
+    expect(bankDebitDay(undefined, 'Nedbank Limited')).toBeNull()
+  })
+})

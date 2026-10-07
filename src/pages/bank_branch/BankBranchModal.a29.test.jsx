@@ -1,93 +1,177 @@
-// @vitest-environment jsdom -- renders the branch modal inside the route's error boundary
+// @vitest-environment jsdom -- renders the branch dialog inside the route's error boundary
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
+import { http, HttpResponse } from 'msw'
 
 import BankBranchModal from './BankBranchModal'
 import ErrorBoundary from '../../components/common/ErrorBoundary'
 import { renderWithProviders } from '../../test/renderWithProviders'
+import { server } from '../../test/msw/server'
 import { setupUser } from '../../test/user'
-import { DEFECTS, disabled, pin } from '../../test/knownDefects'
 
 /**
- * A29 AT THE CLIENT: editing a bank branch crashes the screen.
+ * A29, FIXED: editing a bank branch crashed the screen.
  *
- * Until now this row was asserted in ONE place, the browser suite's
- * `banks-and-branches.feature`, which needs the whole compose stack. A fix to
- * `AddressAutocomplete` would redden that scenario only on the next full gate --
- * and on 2026-09-16 the full gate could not run at all against main (C13). This
- * pair makes the same row visible in thirty seconds of `npm test`.
+ * The dialog used the API's record AS its form. `GET /api/banks/branches` answers the ENTITY -- the branch's name as
+ * `branchName`, the physical address as an OBJECT -- so *Edit* handed the object to `AddressAutocomplete`, whose
+ * `.trim()` threw, and the screen fell to its error page (the boundary beside the outlet kept the shell standing).
+ * The Branch field read `branch`, which the record does not have, so even a form that had opened would have been
+ * refused for a missing branch. Now `branchForm.js` converts the record once on the way in and the form once on the
+ * way out.
  *
- * 🔑 THE FIXTURE IS THE API'S SHAPE, NOT A GUESS. `physicalAddress` arrives as an
- * OBJECT for every one of the 68 seeded branches (measured by P5 against the live
- * stack). The read-only view survives it because `DetailItem` formats objects; the
- * edit form hands the object straight to `AddressAutocomplete`, whose debounce
- * effect calls `query.trim()` on mount.
- *
- * ⚠️ THE BLAST RADIUS SHRANK AND THE DEFECT DID NOT. Before the design merge there was
- * no boundary and the whole application unmounted; now `Main.jsx` puts one beside the
- * outlet, so the SCREEN falls and the shell stands. The boundary is rendered here
- * explicitly, the way `Main.jsx` renders it, so the pin asserts what a user sees.
+ * 🔑 THE FIXTURE IS THE API'S SHAPE, NOT A GUESS: `branchName`, and the address as the entity embeds it, its suburb
+ * and city as `{id, name}` rows. The boundary is rendered here the way `Main.jsx` renders it, so a crash would show
+ * as the page a user sees -- and no test below may meet it.
  */
 const BRANCH = {
   id: 1,
   bankName: 'Absa Bank Limited',
-  branch: 'Sandton',
+  branchName: 'Sandton',
   branchCode: '632005',
   physicalAddress: {
+    complexOrBuilding: null,
     streetNumber: '15',
     streetName: 'Alice Lane',
-    suburb: { name: 'Sandown' },
-    city: { name: 'Sandton' },
+    suburb: { id: 3, name: 'Sandown' },
+    city: { id: 2, name: 'Sandton' },
+    province: null,
     postalCode: '2196',
   },
   postalAddress: 'PO Box 1, Sandton, 2146',
+  tableCode: 12,
+  branchStaffComplement: 40,
 }
 
-function renderBranch(onError) {
+function renderBranch({ onUpdated = () => {} } = {}) {
+  const errors = []
   renderWithProviders(
-    <ErrorBoundary onError={onError}>
-      <BankBranchModal selectedBank={BRANCH} onClose={() => {}} />
+    <ErrorBoundary onError={(error) => errors.push(error)}>
+      <BankBranchModal selectedBank={BRANCH} onClose={() => {}} onUpdated={onUpdated} />
     </ErrorBoundary>,
   )
+  return errors
 }
 
-describe('editing a branch whose address arrives as an object', () => {
+async function openEdit(user) {
+  await user.click(await screen.findByRole('button', { name: 'Edit' }))
+  return screen.findByRole('dialog', { name: 'Edit Bank/Branch Details' })
+}
+
+describe('editing a branch whose record arrives in the API\'s shape (A29)', () => {
   beforeEach(() => {
-    // Silencing only: React logs a render error before the boundary catches it. The
-    // log is not asserted -- the boundary's error is.
     vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
-  it.skip(
-    disabled(DEFECTS.A29, 'the edit form opens with the address as editable text'),
-    async () => {
-      // Written to the correct behaviour: the form the Edit button opens is a form. The
-      // read-only view already knows how to turn this object into a line of text.
-      const user = setupUser()
-      renderBranch()
+  it('the read-only view names the branch and prints the address as one line', async () => {
+    renderBranch()
+    const dialog = await screen.findByRole('dialog', { name: 'Bank Details' })
 
-      await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    // `branch` was read, which the record does not carry: the view said "N/A" for every branch.
+    expect(within(dialog).getByText('Sandton')).toBeInTheDocument()
+    expect(within(dialog).getByText('15, Alice Lane, Sandown, Sandton, 2196')).toBeInTheDocument()
+  })
 
-      expect(await screen.findByRole('combobox', { name: 'Physical Address' })).toHaveValue(
-        expect.stringContaining('Alice Lane'),
-      )
-    },
-  )
-
-  it(pin(DEFECTS.A29, 'Edit throws on the address and the screen falls to its error page'), async () => {
-    const errors = []
+  it('🔴 Edit opens a form: the address as editable text, the branch by its name', async () => {
     const user = setupUser()
-    renderBranch((error) => errors.push(error))
+    const errors = renderBranch()
 
-    // Must-pass first: the read-only view renders the same record, so a failure below
-    // is about EDITING and not about a fixture the modal cannot open at all.
-    expect(await screen.findByText(BRANCH.branchCode)).toBeInTheDocument()
+    const dialog = await openEdit(user)
+
+    expect(within(dialog).getByRole('combobox', { name: 'Physical Address' })).toHaveValue('15, Alice Lane, Sandown, Sandton, 2196')
+    expect(within(dialog).getByLabelText(/^Branch \*/)).toHaveValue('Sandton')
+    expect(within(dialog).getByLabelText(/^Table Code/)).toHaveValue(12)
+    expect(screen.queryByText('This page could not be displayed.')).toBeNull()
     expect(errors).toEqual([])
+  })
 
-    await user.click(screen.getByRole('button', { name: 'Edit' }))
+  it('Save Changes sends the shape the server reads: the branch by name, numbers as numbers, the address left out when unchanged', async () => {
+    let sent
+    server.use(http.put('*/api/banks/branches/1', async ({ request }) => {
+      sent = await request.json()
+      return HttpResponse.json({ ...BRANCH, managerName: 'Synthetic Manager' })
+    }))
+    const onUpdated = vi.fn()
+    const user = setupUser()
+    renderBranch({ onUpdated })
+    const dialog = await openEdit(user)
 
-    expect(await screen.findByText('This page could not be displayed.')).toBeInTheDocument()
-    // WHICH call on WHAT is the useful half of the finding: `.trim` on a non-string.
-    expect(errors.map((e) => e.message)).toEqual([expect.stringMatching(/\.trim is not a function/)])
+    await user.type(within(dialog).getByLabelText(/^Manager Name/), 'Synthetic Manager')
+    await user.click(within(dialog).getByRole('button', { name: 'Save Changes' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Bank Details' })).toBeInTheDocument()
+    expect(sent).toMatchObject({
+      bankName: 'Absa Bank Limited', branch: 'Sandton', branchCode: '632005', managerName: 'Synthetic Manager',
+      tableCode: 12, branchStaffComplement: 40, subsValueBranch: null, postalAddress: 'PO Box 1, Sandton, 2146',
+    })
+    // The server keeps the stored address -- its suburb and city rows -- for a save that names none.
+    expect(sent).not.toHaveProperty('physicalAddress')
+    expect(sent).not.toHaveProperty('branchName')
+    expect(onUpdated).toHaveBeenCalledWith(expect.objectContaining({ id: 1, branchName: 'Sandton', managerName: 'Synthetic Manager' }))
+  })
+
+  it('a changed address is sent as the line typed', async () => {
+    let sent
+    server.use(http.put('*/api/banks/branches/1', async ({ request }) => {
+      sent = await request.json()
+      return HttpResponse.json({ ...BRANCH, physicalAddress: { streetName: '1 Synthetic Street' } })
+    }))
+    const user = setupUser()
+    renderBranch()
+    const dialog = await openEdit(user)
+
+    const address = within(dialog).getByRole('combobox', { name: 'Physical Address' })
+    await user.clear(address)
+    await user.type(address, '1 Synthetic Street')
+    await user.click(within(dialog).getByRole('button', { name: 'Save Changes' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Bank Details' })).toBeInTheDocument()
+    expect(sent.physicalAddress).toBe('1 Synthetic Street')
+  })
+
+  it('a refused save says why in a sentence, keeps the form, and marks the field', async () => {
+    server.use(http.put('*/api/banks/branches/1', () => HttpResponse.json({
+      status: 409,
+      code: 'BRANCH_CODE_TAKEN',
+      message: 'Another Absa Bank Limited branch already has branch code 632005. Each branch of a bank has its own code.',
+    }, { status: 409 })))
+    const user = setupUser()
+    renderBranch()
+    const dialog = await openEdit(user)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Save Changes' }))
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'The change to this branch was not saved. Another Absa Bank Limited branch already has branch code 632005. '
+      + 'Each branch of a bank has its own code.')
+    expect(within(dialog).getByLabelText(/^Branch \*/), 'still the form, as it was typed').toHaveValue('Sandton')
+  })
+
+  it('a field the server refuses is named under that field and in the sentence', async () => {
+    server.use(http.put('*/api/banks/branches/1', () => HttpResponse.json({
+      status: 400,
+      message: 'Validation failed for the incoming request payload.',
+      validationErrors: { branchCode: 'Branch Code is at most 6 characters.' },
+    }, { status: 400 })))
+    const user = setupUser()
+    renderBranch()
+    const dialog = await openEdit(user)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Save Changes' }))
+
+    expect(await within(dialog).findByText('The change to this branch was not saved. Branch Code is at most 6 characters.'))
+      .toBeInTheDocument()
+    expect(within(dialog).getByLabelText(/^Branch Code/)).toHaveAccessibleDescription('Branch Code is at most 6 characters.')
+  })
+
+  it('a save that cannot be confirmed says so, and to check before trying again', async () => {
+    server.use(http.put('*/api/banks/branches/1', () => HttpResponse.json({ status: 500 }, { status: 500 })))
+    const user = setupUser()
+    renderBranch()
+    const dialog = await openEdit(user)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Save Changes' }))
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'The change to this branch could not be confirmed. Reload the branch list and check before trying again.')
   })
 })

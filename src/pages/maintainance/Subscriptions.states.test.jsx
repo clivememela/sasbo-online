@@ -10,6 +10,11 @@ import { ThemeProvider } from '../../context/ThemeContext'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { setupUser } from '../../test/user'
+import { TestAuthProvider } from '../../test/authTestUtils'
+import { PERMISSIONS } from '../../auth/permissions'
+
+/** Staff who may change amounts: every case below edits a row, or waits for the Edit control as the list's arrival. */
+const asStaff = (ui) => <TestAuthProvider permissions={[PERMISSIONS.SUBSCRIPTIONS_MAINTAIN]}>{ui}</TestAuthProvider>
 
 /**
  * THREE STATES THIS SCREEN STATED WITHOUT CHECKING. `06.4`.
@@ -38,7 +43,7 @@ const boom = () => HttpResponse.json({ status: 500, error: 'boom' }, { status: 5
 
 async function saveTheRow() {
   const user = setupUser()
-  renderWithProviders(<Subscriptions />)
+  renderWithProviders(asStaff(<Subscriptions />))
   await user.click(await screen.findByRole('button', { name: 'Edit the subscription for Synthetic Bank' }))
   await user.click(screen.getByRole('button', { name: 'Save changes to Synthetic Bank' }))
 }
@@ -69,7 +74,7 @@ describe('Subscriptions', () => {
 
     it('the must-pass: a list that genuinely is empty still says so', async () => {
       server.use(http.get('*/api/subscriptions', () => HttpResponse.json([])))
-      renderWithProviders(<Subscriptions />)
+      renderWithProviders(asStaff(<Subscriptions />))
 
       expect(await screen.findByText(EMPTY)).toBeInTheDocument()
     })
@@ -100,7 +105,7 @@ describe('Subscriptions', () => {
   describe('③ the bank list', () => {
     it('that did not load says so AT the Bank field, with a retry', async () => {
       server.use(http.get('*/api/subscriptions', () => HttpResponse.json([SUB])), http.get('*/api/banks', boom))
-      renderWithProviders(<Subscriptions />)
+      renderWithProviders(asStaff(<Subscriptions />))
 
       expect(await screen.findByText('Bank could not be loaded.')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
@@ -108,7 +113,7 @@ describe('Subscriptions', () => {
 
     it('the must-pass: a bank list that loaded says nothing of the kind', async () => {
       server.use(http.get('*/api/subscriptions', () => HttpResponse.json([SUB])))
-      renderWithProviders(<Subscriptions />)
+      renderWithProviders(asStaff(<Subscriptions />))
 
       await screen.findByRole('button', { name: 'Edit the subscription for Synthetic Bank' })
       expect(screen.queryByText(/could not be loaded/i)).not.toBeInTheDocument()
@@ -132,7 +137,7 @@ describe('Subscriptions', () => {
     it('Try again reloads the list, and the failure it replaced is GONE, not left above the rows', async () => {
       const user = setupUser()
       server.use(http.get('*/api/subscriptions', boom))
-      renderWithProviders(<Subscriptions />)
+      renderWithProviders(asStaff(<Subscriptions />))
 
       const retry = await screen.findByRole('button', { name: /try again/i })
       // Swapped BEFORE the press, never after: a handler changed after the click races the
@@ -146,7 +151,7 @@ describe('Subscriptions', () => {
 
     it('the must-pass: a list that fails says so, and does not claim to be empty', async () => {
       server.use(http.get('*/api/subscriptions', boom))
-      renderWithProviders(<Subscriptions />)
+      renderWithProviders(asStaff(<Subscriptions />))
 
       expect(await screen.findByText(/could not load the subscriptions/i)).toBeInTheDocument()
       expect(screen.queryByText(EMPTY)).not.toBeInTheDocument()

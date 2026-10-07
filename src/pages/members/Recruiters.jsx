@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useRef, useState, useEffect, useCallback } from 'react';
+import { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { ChevronRight, UserPlus, Trash2, UserMinus, Eye } from 'lucide-react';
 import PageTitle from '../../components/common/PageTitle';
 import Criteria, { CRITERION, CRITERION_WIDE } from '../../components/common/Criteria.jsx';
@@ -23,6 +23,18 @@ import { formalName } from '../../lib/names.js';
 import { formatDate, formatZar } from '../../lib/format.js';
 import { writeFailure } from '../../services/parseApiError.js';
 import useFocusOn from '../../hooks/useFocusOn.js';
+import useServerAnswer from '../../hooks/useServerAnswer.js';
+import { useDebounce } from '../../hooks/useDebounce.js';
+import { useAuth } from '../../auth/useAuth';
+import RequirePermission from '../../auth/RequirePermission';
+import { PERMISSIONS } from '../../auth/permissions';
+import { bankPlacesOf, channelRowsFromSummary } from './channelFigures.js';
+
+/** How many of a channel's members its dialog lists at once; past that it says how many there are, and to narrow. */
+const CHANNEL_MEMBERS_SHOWN = 100;
+
+/** How long a typed search waits for the next keystroke before it asks the server. */
+const SEARCH_PAUSE_MS = 300;
 
 const PAGE_SIZE = 20;
 
@@ -76,8 +88,8 @@ const recordDate = (value) => (value ? formatDate(value) : '');
 const EMPTY_REP_DETAILS = { roleId: null, recruiterTypeId: null, isElectedRep: false, electionDate: '', structureIds: [] };
 
 export function Recruiters() {
-    const [members, setMembers] = useState([]);
-    const [reps, setReps] = useState([]);
+    // RC15: the channels with their figures, from the server -- the screen no longer loads a single member to draw them.
+    const [summary, setSummary] = useState([]);
     const [filters, setFilters] = useState({ repName: '', bankName: '', branch: '', province: '', area: '' });
     const [page, setPage] = useState(1);
     const [selectedRep, setSelectedRep] = useState(null);
@@ -165,38 +177,27 @@ export function Recruiters() {
     const noticeRef = useFocusOn(notice, notice?.tone === 'error' && !dialogOpen);
 
     /*
-     * 🔴 THE LOADING RESET MOVED TO THE RETRY PATH (`10.4`), AND THIS ONE HAD SEVEN CALLERS.
+     * 🔴 THE LOADING RESET MOVED TO THE RETRY PATH (`10.4`), AND THIS ONE HAS SEVERAL CALLERS.
      *
-     * `refreshAll` is called on mount, by Try again, and by five write handlers that reload the
-     * lists after a save. The line that `react-hooks/set-state-in-effect` flagged was already
-     * written defensively -- `current === 'ready' ? 'ready' : 'loading'` -- and that guard is
-     * the proof this change is behaviour-preserving rather than a judgement:
+     * `refreshAll` is called on mount, by Try again, and by the write handlers that reload the figures after a save.
+     * Only Try again moves 'error' to 'loading' -- in `retryAll` -- because every write starts from a loaded table.
      *
-     *   on mount          `listState` is already 'loading'        -> no-op
-     *   after a write     the table is 'ready', so the guard holds -> no-op. That is structural, not luck:
-     *                     every write needs a ROW or a MEMBER from this same load, so no write can start
-     *                     from a failed one. A write reachable from the error screen would break this.
-     *   on Try again      'error' -> 'loading'                     -> THE ONLY REAL CASE
-     *
-     * So the five write handlers keep calling `refreshAll` unchanged, and the one case that
-     * mattered is now stated plainly at the place it happens, in `retryAll`.
+     * 🔴 RC15: it loaded EVERY MEMBER (`GET /api/members`) beside the channels, to count them here -- the whole register
+     * to draw a handful of rows, matched on the wrong id. The server counts them now (`summary`), and a channel's
+     * members are asked for a page at a time when its dialog opens.
      */
-    const refreshAll = useCallback(() => {
-        return Promise.all([
-            memberService.getMembers(),
-            recruitmentChannelService.getAll(),
-        ]).then(([m, r]) => {
-            setMembers(m);
-            setReps(r);
+    const refreshAll = useCallback(() => recruitmentChannelService.summary()
+        .then((rows) => {
+            setSummary(Array.isArray(rows) ? rows : []);
             setListState('ready');
-        }).catch(err => {
+        })
+        .catch(err => {
             reportError('Recruiters.refreshAll', err);
             setListState('error');
-        });
-    }, []);
+        }), []);
 
-    // The reference lists are `useReferenceData`'s now; this effect owns only the two lists
-    // the TABLE renders, whose failure is already a first-class `listState`.
+    // The reference lists are `useReferenceData`'s; this effect owns only the figures the TABLE renders, whose
+    // failure is already a first-class `listState`.
     useEffect(() => {
         refreshAll();
     }, [refreshAll]);
@@ -208,15 +209,7 @@ export function Recruiters() {
     const AREAS = useMemo(() => [...new Set(banksData.map(b => b?.area).filter(Boolean))].sort(), [banksData]);
     const BRANCHES = useMemo(() => [...new Set(banksData.map(b => b?.branchName).filter(Boolean))].sort(), [banksData]);
 
-    const BANK_META = useMemo(() => {
-        const meta = {};
-        banksData.forEach(b => {
-            if (b?.bankName) {
-                meta[b.bankName] = { province: b.provinceCommitteeName, area: b.area };
-            }
-        });
-        return meta;
-    }, [banksData]);
+    const BANK_META = useMemo(() => bankPlacesOf(banksData), [banksData]);
 
     const ROLES = useMemo(() => roles.map(r => ({ ...r })), [roles]);
     const STRUCTURES_TREE = structures;
@@ -233,58 +226,9 @@ export function Recruiters() {
     }, [structures]);
     const RECRUITMENT_CHANNELS = useMemo(() => recruitmentChannels.filter(r => r.enabled).sort((a, b) => a.name.localeCompare(b.name)), [recruitmentChannels]);
 
-    const repList = useMemo(() => {
-        const memberMap = {};
-        members.forEach(m => {
-            const repId = m.recruitmentRepresentativeId;
-            if (repId == null) return;
-            if (!memberMap[repId]) memberMap[repId] = {
-                bankSet: new Set(),
-                branchSet: new Set(),
-                provinceSet: new Set(),
-                areaSet: new Set(),
-                count: 0
-            };
-            memberMap[repId].bankSet.add(m.bankName ?? '');
-            memberMap[repId].branchSet.add(m.branch ?? '');
-            const meta = BANK_META[m.bankName] || {};
-            if (meta.province) memberMap[repId].provinceSet.add(meta.province);
-            if (meta.area) memberMap[repId].areaSet.add(meta.area);
-            memberMap[repId].count++;
-        });
-
-        return reps.map(r => {
-            const d = memberMap[r.id] || {
-                bankSet: new Set(),
-                branchSet: new Set(),
-                provinceSet: new Set(),
-                areaSet: new Set(),
-                count: 0
-            };
-            return {
-                id: r.id,
-                name: r.name,
-                email: r.email || '',
-                phone: r.phone || '',
-                memberId: r.memberId || null,
-                roleId: r.roleId || null,
-                isElectedRep: r.isElectedRep || false,
-                electionDate: r.electionDate || null,
-                recruiterTypeId: r.recruiterTypeId || null,
-                structureIds: r.structureIds || [],
-                banks: [...d.bankSet].filter(Boolean).join(', '),
-                branches: [...d.branchSet].filter(Boolean).join(', '),
-                provinces: [...d.provinceSet].join(', '),
-                areas: [...d.areaSet].join(', '),
-                count: d.count,
-            };
-        }).sort((a, b) => {
-            const nameA = a.name || "";
-            const nameB = b.name || "";
-            // Numeric collation, so "Synthetic Channel 2" comes before "Synthetic Channel 10" (`06.3` critique).
-            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' })
-        });
-    }, [members, reps, BANK_META]);
+    // 🔴 RC15: each channel's members are those recruited THROUGH it, counted by the server (`channelFigures.js`) -- the
+    // screen used to count them itself, matching the member's recruiter's id against the channel's id.
+    const repList = useMemo(() => channelRowsFromSummary(summary, BANK_META), [summary, BANK_META]);
 
     const filtered = useMemo(() => {
         const q = v => (v || '').trim().toLowerCase();
@@ -324,59 +268,48 @@ export function Recruiters() {
         setPage(1);
     }, []);
 
-    const repMembers = useMemo(() =>
-            selectedRep ? members.filter(m => m.recruitmentRepresentativeId === selectedRep.id) : [],
-        [selectedRep, members]);
-
-    const filteredRepMembers = useMemo(() => {
-        const { membershipNumber, name, bank, branch, status } = repSearch;
-        return repMembers.filter(m =>
-            (!membershipNumber || (m.membershipNumber ?? '').toLowerCase().includes(membershipNumber.toLowerCase())) &&
-            (!name || `${m.initials || ''} ${m.surname || ''}`.toLowerCase().includes(name.toLowerCase())) &&
-            (!bank || (m.bankName ?? '').toLowerCase().includes(bank.toLowerCase())) &&
-            (!branch || (m.branch ?? '').toLowerCase().includes(branch.toLowerCase())) &&
-            (!status || (m.status ?? '').toLowerCase().includes(status.toLowerCase()))
-        );
-    }, [repMembers, repSearch]);
-
-    /**
-     * R-PERF-J. Both member pickers filter the WHOLE member list on every keystroke.
-     * `useDeferredValue` lets React paint the keystroke first and the filtered list a beat
-     * later, so typing stays responsive however long the list is.
+    /*
+     * 🔒 THE LISTS THAT NAME MEMBERS ARE THE SERVER'S, AND ASKED ONLY OF A USER WHO MAY SEE THEM (RC15).
      *
-     * ⚠️ NOT `useDebounce`, and R-PERF-E's premise is corrected rather than followed. That
-     * hook delays a VALUE by a fixed time -- the right instrument when a keystroke costs a
-     * REQUEST, and neither of these does: both filter an array already in memory. Adding a
-     * debounce here would add latency for nothing. The one place in this application where
-     * a keystroke does reach the network is `AddressAutocomplete`, and it already debounces
-     * correctly, in the component that makes the call. findings.md, corrected premise ⑭.
+     * A channel's members, and the two pickers, used to be filtered here out of the whole register. Each is now one
+     * request -- paged or capped by the server, within the user's region or area -- asked when its dialog is open, its
+     * search a pause after the last keystroke (R-PERF-E: a keystroke costs a request now, which is what a debounce is
+     * for). Without MEMBERS_VIEW nothing is asked: the dialog says what is needed instead.
      */
-    const deferredAddSearch = useDeferredValue(addSearch);
-    const deferredNewRepSearch = useDeferredValue(newRepSearch);
+    const { can } = useAuth();
+    const canViewMembers = can(PERMISSIONS.MEMBERS_VIEW);
+    const canEditMembers = can(PERMISSIONS.MEMBERS_EDIT);
 
-    /** How many rows a picker shows before it says "refine your search". */
-    const PICKER_CAP = 50;
+    const repCriteria = useDebounce(repSearch, SEARCH_PAUSE_MS);
+    const channelMembers = useServerAnswer(
+        () => recruitmentChannelService.members(selectedRep.id, { ...repCriteria, page: 0, size: CHANNEL_MEMBERS_SHOWN }),
+        [selectedRep?.id, repCriteria],
+        { enabled: Boolean(selectedRep) && canViewMembers },
+    );
+    const repMembers = channelMembers.data?.content ?? [];
+    const repMembersTotal = channelMembers.data?.totalElements ?? 0;
 
-    const matchesQuery = (m, q) => !q || (
-        (m.membershipNumber ?? '').toLowerCase().includes(q) ||
-        `${m.initials || ''} ${m.surname || ''}`.toLowerCase().includes(q) ||
-        (m.firstNames ?? '').toLowerCase().includes(q) ||
-        (m.bankName ?? '').toLowerCase().includes(q)
+    const addQuery = useDebounce(addSearch, SEARCH_PAUSE_MS);
+    const candidates = useServerAnswer(
+        () => recruitmentChannelService.candidates({ q: addQuery, excludeChannel: selectedRep?.id }),
+        [addQuery, selectedRep?.id],
+        { enabled: showAddMember && Boolean(selectedRep) && canViewMembers },
     );
 
-    const candidateMembers = useMemo(() => {
-        const q = deferredAddSearch.trim().toLowerCase();
-        return members.filter(m => m.recruitmentRepresentativeId !== selectedRep?.id && matchesQuery(m, q));
-    }, [members, selectedRep, deferredAddSearch]);
+    // A member's details: the list's row carries who they are; the record is asked for when their details open.
+    const memberDetail = useServerAnswer(
+        () => memberService.getMemberById(selectedMember.id),
+        [selectedMember?.id],
+        { enabled: Boolean(selectedMember) },
+    );
+    const shownMember = memberDetail.data ?? selectedMember ?? {};
 
-    const visibleCandidates = useMemo(() => candidateMembers.slice(0, PICKER_CAP), [candidateMembers]);
-
-    const newRepCandidates = useMemo(() => {
-        const q = deferredNewRepSearch.trim().toLowerCase();
-        return members.filter(m => !repList.some(r => r.memberId === m.id) && matchesQuery(m, q));
-    }, [members, repList, deferredNewRepSearch]);
-
-    const visibleNewRepCandidates = useMemo(() => newRepCandidates.slice(0, PICKER_CAP), [newRepCandidates]);
+    const newRepQuery = useDebounce(newRepSearch, SEARCH_PAUSE_MS);
+    const newRepCandidates = useServerAnswer(
+        () => recruitmentChannelService.candidates({ q: newRepQuery }),
+        [newRepQuery],
+        { enabled: showAddRep && canViewMembers },
+    );
 
     const handleRepSearchChange = useCallback((field) => (e) => {
         const targetValue = e.target.value;
@@ -411,119 +344,37 @@ export function Recruiters() {
 
 
 
-    const sanitizeMemberPayload = (member, updateFields) => {
-        return {
-            id: member.id,
-            membershipNumber: member.membershipNumber || '',
-            title: member.title || '',
-            initials: member.initials || '',
-            surname: member.surname || '',
-            firstNames: member.firstNames || '',
-            identityNumber: member.identityNumber || '',
-            race: member.race || '',
-            preferredEmail: member.preferredEmail || 'work',
-            workEmail: member.workEmail || '',
-            personalEmail: member.personalEmail || '',
-            phone: member.phone || '',
-            cellTel: member.cellTel || '',
-            workTel: member.workTel || '',
-            homeTel: member.homeTel || '',
-            address: member.address || '',
-            employeeNumber: member.employeeNumber || '',
-            jobGrade: member.jobGrade || '',
-            bankName: member.bankName || '',
-            branch: member.branch || '',
-            bankAccountNumber: member.bankAccountNumber || '',
-            ibtNo: member.ibtNo || '',
-            paymentType: member.paymentType || '',
-            workBankAddress: member.workBankAddress || '',
-            joinDate: member.joinDate || '',
-            // 🔁 03.4: NO `status`. A status is changed with *Change status*, with SASBO's code, and the PUT refuses one
-            // that differs from the member's (STATUS_VIA_CHANGE_STATUS) -- so `member.status || 'Active'` would have had
-            // every assign and remove on this screen refused for a member with no status on record. An omitted key
-            // keeps the stored value (decision ⑨, server 0cf00e1).
-            /*
-             * 🔴 ONE LINE IS DELIBERATELY ABSENT HERE, AND TWO ARE DELIBERATELY STILL PRESENT.
-             *
-             * GONE: `recruitmentRep: member.recruitmentRep || ''`.
-             *
-             * ⚠️ `recruitmentRep` IS NOT A FIELD ON THE MEMBER DTO -- its wire name is
-             * `recruitmentRepresentativeName`. So `member.recruitmentRep` was ALWAYS
-             * undefined, the `|| ''` always fired, and the PUT always carried an empty
-             * recruiter name. Where the server reads that key, a blank name means CLEAR:
-             * every assign, every remove and every bulk deactivation on this screen wiped
-             * the member's captured recruiter -- the exact field this screen exists to
-             * manage. Reported by the Capture Member arc (findings.md R7-F1, hardening.md
-             * H8), who own the DTO and could see the name mismatch from the other side.
-             *
-             * It survived this arc's own P4 rewrite because nothing here is wrong to READ:
-             * every line looks like careful defensive defaulting, and a field that does not
-             * exist looks exactly like the fields that do.
-             *
-             * 🔴 STILL PRESENT, AND ON PURPOSE: `currentBalance` and `arrearsBalance`.
-             *
-             * The same report flagged their `|| 0` -- correctly: it cannot tell "no balance
-             * recorded" from "a balance of zero", so a member who had never been billed is
-             * written back with a real zero. The obvious fix is to drop them the way
-             * `recruitmentRep` was dropped, AND THAT WOULD BE WORSE. `MemberMapper` has no
-             * `nullValuePropertyMappingStrategy`, so `updateFromMember` copies nulls: a PUT
-             * that OMITS a field ERASES it. Dropping two real DTO fields would trade a
-             * wrong zero for a null.
-             *
-             * 🔑 WHICH IS WHY `recruitmentRep` COULD GO AND THESE CANNOT. It is not a
-             * property on the DTO at all, so its absence cannot null anything; these two
-             * are, so their absence would. The standing rule: THIS BUILDER SENDS THE WHOLE
-             * DTO. A key that is not on the DTO is removed; a key that is on it stays, even
-             * when its default is imperfect.
-             *
-             * ✅ AND THE HOLD NOW HAS AN EXPIRY. The owner took decision ⑤ on 2026-09-10 as
-             * ABSENT-KEEPS / BLANK-CLEARS: `updateFromMember` gets
-             * `NullValuePropertyMappingStrategy.IGNORE`, so an omitted key keeps the stored
-             * value and an explicit `''` clears it. Once that is COMMITTED on
-             * `phase/capture-member`, these two lines should be deleted rather than fixed --
-             * omitting them will then preserve whatever the member actually has, which is
-             * the honest answer that neither `|| 0` nor a null can give.
-             *
-             * ⚠️ NOT YET. The decision is taken and the mapper change has not landed; until
-             * it does, the current behaviour still erases an omitted field. The Capture
-             * Member arc will say when it is committed.
-             */
-            // 📨 2026-09-10, from the server arc: decision ⑨ (absent keeps, blank clears) is on
-            // the server at 0cf00e1 -- but the stack THIS branch runs against is the
-            // phase-07-orchestration jar, whose mapper still copies nulls. These two lines
-            // become removable when the server this client is pointed at carries 0cf00e1,
-            // not because the decision exists. Delete them on the strength of the decision
-            // alone and every recruiter action erases both balances again.
-            // ✅ 2026-09-21 (ACB 00.2): `monthlySubscription`, `currentBalance` and `arrearsBalance` are GONE from
-            // this builder, as the note above said they would be. Server `0cf00e1` -- `updateFromMember` with
-            // `NullValuePropertyMappingStrategy.IGNORE` -- is on `origin/main`, measured with `git merge-base`: an
-            // omitted key now KEEPS the stored value, where `|| 0` wrote a member with nothing on file back as R 0,00.
-            electedRep: member.electedRep || '',
-            repElectionDay: member.repElectionDay || '',
-            repElectionMonth: member.repElectionMonth || '',
-            repElectionYear: member.repElectionYear || '',
-            remarks: member.remarks || '',
-            ...updateFields
-        };
-    };
+    /*
+     * 🔴 RC15: ADD MEMBER ADDED NOTHING. It PUT the member's whole record with the channel's NAME in `areasRep` -- the
+     * area's representative, a field of its own, resolved against a table no channel is in -- so the member's channel,
+     * the thing this screen lists, never changed. It sets that channel now, through the channel's own route, which
+     * records the change in the member's history; Remove takes it off the same way. No whole record is sent from here
+     * any more, so nothing this screen does not show can be written back.
+     */
+    const afterMemberChange = useCallback(async () => {
+        await refreshAll();
+        channelMembers.refetch();
+        candidates.refetch();
+    }, [refreshAll, channelMembers, candidates]);
 
     const handleAssign = useCallback(async (member) => {
+        const name = formalName(member) || 'That member';
+        const channel = selectedRep?.name ?? 'this recruitment channel';
         try {
             setSaving(true);
-            const cleanData = sanitizeMemberPayload(member, { areasRep: selectedRep.name });
-            await memberService.updateMember(cleanData);
-            await refreshAll();
-            succeed(`${formalName(member) || 'That member'} was added to ${selectedRep?.name ?? 'this recruiter'}.`);
+            await recruitmentChannelService.addMember(selectedRep.id, member.id);
+            await afterMemberChange();
+            succeed(`${name} was added to ${channel}.`);
         } catch (err) {
-            fail(`That member could not be assigned to ${selectedRep?.name ?? 'this recruiter'}. ${err?.message || ''}`.trim());
+            // A71: a timeout or a 5xx may have saved; only a refusal says it did not.
+            reportError('Recruiters.addMember', err);
+            fail(writeFailure(err, `Adding ${name} to ${channel}`, 'the list'));
         } finally {
             setSaving(false);
         }
-    }, [selectedRep, refreshAll, fail, succeed]);
+    }, [selectedRep, afterMemberChange, fail, succeed]);
 
-    // 🔴 `03.4`: both of this file's `window.confirm()` calls become ConfirmDialogs. The
-    // second one is the reason it matters: it sets EVERY member of a recruiter to Inactive,
-    // and `window.confirm` can only offer "OK".
+    // 🔴 `03.4`: both of this file's `window.confirm()` calls are ConfirmDialogs.
     const [pendingRemoveMember, setPendingRemoveMember] = useState(null);
     const [pendingRemoveRep, setPendingRemoveRep] = useState(null);
 
@@ -531,14 +382,15 @@ export function Recruiters() {
         const member = pendingRemoveMember;
         if (!member) return;
         setPendingRemoveMember(null);
+        const name = formalName(member) || 'That member';
         try {
             setSaving(true);
-            const cleanData = sanitizeMemberPayload(member, { areasRep: '' });
-            await memberService.updateMember(cleanData);
-            await refreshAll();
-            succeed(`${formalName(member) || 'That member'} was removed from ${selectedRep?.name ?? 'the recruiter'}.`);
+            await recruitmentChannelService.removeMember(selectedRep.id, member.id);
+            await afterMemberChange();
+            succeed(`${name} was removed from ${selectedRep?.name ?? 'the recruitment channel'}.`);
         } catch (err) {
-            fail(writeFailure(err, `${formalName(member) || 'That member'}'s removal from the recruiter`, 'the recruiter'));
+            reportError('Recruiters.removeMember', err);
+            fail(writeFailure(err, `${name}'s removal from the recruitment channel`, 'the list'));
         } finally {
             setSaving(false);
         }
@@ -566,12 +418,13 @@ export function Recruiters() {
                 electionDate: newRepDetails.isElectedRep ? newRepDetails.electionDate || null : null,
                 structureIds: newRepDetails.structureIds,
             };
-            const createdRep = await recruiterService.create(payload);
+            await recruiterService.create(payload);
             await refreshAll();
             setShowAddRep(false);
             setNewRepMember(null);
             setNewRepDetails(EMPTY_REP_DETAILS);
-            setSelectedRep({ id: createdRep?.id, name: repName });
+            // Not opened as a row: the rows are the recruitment channels (RC15), and a recruiter's id is not a channel's --
+            // opening it would ask for the members of whichever channel shares the number.
             succeed(`${repName} is a recruiter now.`);
         } catch (err) {
             fail(writeFailure(err, 'That recruiter', 'the list'));
@@ -580,15 +433,17 @@ export function Recruiters() {
         }
     };
 
-    /**
-     * The members a channel's removal touches: those recruited through it. The wire carries the channel by NAME
-     * (`recruitedHow`, `MemberMapper`), and the server clears exactly these.
-     */
-    const channelMembers = useCallback((rep) => members.filter(m => m.recruitedHow === rep.name), [members]);
+    /** How many members a channel's removal touches -- those recruited through it, as the server counts them. */
+    const membersOf = useCallback((rep) => repList.find((row) => row.id === rep.id)?.count ?? 0, [repList]);
 
     /**
-     * 🔒 A49, corrected on the owner's decision of 2026-10-01 (MO21): *Remove recruiter* removes the recruitment channel
-     * this screen listed, and its members KEEP THEIR STATUS, with only their channel cleared.
+     * 🔒 A49, corrected on the owner's decision of 2026-10-01 (MO21): removing removes the recruitment channel this
+     * screen listed, and its members KEEP THEIR STATUS, with only their channel cleared.
+     *
+     * 🔴 AND IT SAYS SO NOW (the manual's reading of every screen, 6 Oct). The action was labelled *Remove recruiter* --
+     * a person -- while it deletes a whole recruitment channel: one of SASBO's list, gone from Capture Member's
+     * Recruiter Type, and cleared from every member recruited through it. The label, the question and the answer name
+     * the channel and every consequence; what removal does is MO21's, unchanged.
      *
      * One request: the server clears the channel from its members and deletes it in one transaction, so a removal is
      * whole or nothing and no member is written from here. It used to PUT every member it guessed at -- by a
@@ -693,7 +548,8 @@ export function Recruiters() {
         { key: 'bankName', header: 'Bank', priority: 'secondary', truncate: true, className: 'max-w-[10rem]', cell: (m) => m.bankName || '—' },
         { key: 'branch', header: 'Branch', priority: 'secondary', truncate: true, className: 'max-w-[10rem]', cell: (m) => m.branch || '—' },
         { key: 'status', header: 'Status', priority: 'essential', cell: (m) => <StatusChip status={m.status} /> },
-        {
+        // 🔒 Taking a member off a channel edits their record: MEMBERS_EDIT. Without it the list is read-only.
+        ...(canEditMembers ? [{
             key: 'remove',
             header: 'Remove',
             priority: 'essential',
@@ -704,7 +560,7 @@ export function Recruiters() {
                     variant="ghost"
                     onClick={() => setPendingRemoveMember(m)}
                     disabled={saving}
-                    aria-label={`Remove ${fullName(m)} from this recruiter`}
+                    aria-label={`Remove ${fullName(m)} from this recruitment channel`}
                     // Quiet until meant: the red is a status colour in this world, so it
                     // appears only under the pointer that is about to act.
                     className="text-ink-muted hover-hover:hover:text-status-suspended"
@@ -712,8 +568,8 @@ export function Recruiters() {
                     <Trash2 size={14} aria-hidden="true" />
                 </Button>
             ),
-        },
-    ], [memberColumn, saving]);
+        }] : []),
+    ], [memberColumn, saving, canEditMembers]);
 
     const candidateColumns = useMemo(() => [
         { key: 'membershipNumber', header: 'Membership No.', priority: 'essential', cell: (m) => <span className="font-medium text-brand-ink">{m.membershipNumber}</span> },
@@ -896,12 +752,15 @@ export function Recruiters() {
                                 disabled={saving}
                                 className="mr-auto"
                             >
-                                <UserMinus size={16} strokeWidth={1.75} aria-hidden="true" /> Remove recruiter
+                                <UserMinus size={16} strokeWidth={1.75} aria-hidden="true" /> Remove recruitment channel
                             </Button>
                             <Button onClick={handleCloseRepModal}>Close</Button>
-                            <Button variant="primary" onClick={handleOpenAddMember}>
-                                <UserPlus size={16} strokeWidth={1.75} aria-hidden="true" /> Add Member
-                            </Button>
+                            {/* 🔒 Adding a member to a channel edits their record: MEMBERS_EDIT. */}
+                            {canEditMembers && (
+                                <Button variant="primary" onClick={handleOpenAddMember}>
+                                    <UserPlus size={16} strokeWidth={1.75} aria-hidden="true" /> Add Member
+                                </Button>
+                            )}
                         </>
                     }
                 >
@@ -940,8 +799,14 @@ export function Recruiters() {
                                 centred and set in the brand's ink, which is the one weight
                                 nothing but a page title and a primary action carries. */}
                             <h3 className="border-b border-line pb-2.5 pt-4 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">
-                                Members ({repMembers.length})
+                                Members ({membersOf(selectedRep)})
                             </h3>
+                            {/* 🔒 The list names members: MEMBERS_VIEW, within the user's region or area. The count above
+                                names nobody, so it stays for everyone. */}
+                            {!canViewMembers ? (
+                                <div className="py-3"><RequirePermission permission={PERMISSIONS.MEMBERS_VIEW} /></div>
+                            ) : (
+                            <>
                             {/* 🔴 FIVE RAW `<input>` TAGS WITH `aria-label` AND NO VISIBLE
                                 LABEL. They read as a header row of search boxes, which is
                                 the intent -- but a placeholder is not a label: it vanishes
@@ -964,22 +829,30 @@ export function Recruiters() {
                                 <TextInput className={CRITERION} label="Status" kind="search" value={repSearch.status || ''} onChange={handleRepSearchChange('status')} placeholder="Any" />
                             </Criteria>
                             <div className="overflow-hidden rounded-lg border border-line">
+                            {/* The server pages the list; past the first CHANNEL_MEMBERS_SHOWN the table says how many
+                                there are and to narrow them (R-SCALE-E). */}
                             <Table
-                                caption={`Members recruited by ${selectedRep.name}`}
+                                caption={`Members recruited through ${selectedRep.name}`}
                                 columns={repMemberColumns}
-                                rows={filteredRepMembers}
+                                rows={repMembers}
+                                total={repMembersTotal}
                                 rowKey="id"
+                                loading={channelMembers.loading}
+                                error={channelMembers.error ? 'We could not load the members of this channel.' : null}
+                                onRetry={channelMembers.refetch}
                                 emptyTitle="No members found."
-                                emptyMessage="No member on this recruiter's list matches those filters."
+                                emptyMessage="No member recruited through this channel matches those filters."
                                 dense
                             />
                             </div>
+                            </>
+                            )}
                         </div>
                 </Modal>
             )}
 
             {/* Add Member Picker */}
-            {showAddMember && selectedRep && (
+            {showAddMember && selectedRep && canEditMembers && (
                 <Modal
                     open
                     onOpenChange={closeOn(handleCloseAddMember)}
@@ -1000,22 +873,27 @@ export function Recruiters() {
                                 placeholder="Search by name, membership no. or bank…"
                             />
                         </div>
-                        {/* 🔴 R-SCALE-E: `slice(0, 50)` USED TO LIE BY OMISSION. It rendered
-                            the first fifty matches and said nothing, so a search returning
-                            four hundred members looked like a search returning fifty --
-                            and the member somebody was looking for was simply not there,
-                            with no way to tell. `total` is what turns that into the
-                            table's own "showing the first N of M -- refine your search". */}
-                        <Table
-                            caption="Members who can be added to this recruiter"
-                            columns={candidateColumns}
-                            rows={visibleCandidates}
-                            total={candidateMembers.length}
-                            rowKey="id"
-                            emptyTitle="No members found."
-                            emptyMessage="Every member matching that search is already on this recruiter's list."
-                            dense
-                        />
+                        {/* 🔴 R-SCALE-E: a capped list must not lie by omission. The server offers fifty and says
+                            whether more matched; the note below says so, and to narrow the search. */}
+                        {canViewMembers ? (
+                            <>
+                                <Table
+                                    caption="Members who can be added to this recruitment channel"
+                                    columns={candidateColumns}
+                                    rows={candidates.data?.rows ?? []}
+                                    rowKey="id"
+                                    loading={candidates.loading}
+                                    error={candidates.error ? 'We could not load the members.' : null}
+                                    onRetry={candidates.refetch}
+                                    emptyTitle="No members found."
+                                    emptyMessage="Every member matching that search is already recruited through this channel."
+                                    dense
+                                />
+                                {candidates.data?.more && <MoreMatch />}
+                            </>
+                        ) : (
+                            <div className="py-3"><RequirePermission permission={PERMISSIONS.MEMBERS_VIEW} /></div>
+                        )}
                 </Modal>
             )}
 
@@ -1219,16 +1097,25 @@ export function Recruiters() {
                                 placeholder="Search by name, membership no. or bank…"
                             />
                         </div>
-                        <Table
-                            caption="Members who could become a recruiter"
-                            columns={newRepColumns}
-                            rows={visibleNewRepCandidates}
-                            total={newRepCandidates.length}
-                            rowKey="id"
-                            emptyTitle="No members found."
-                            emptyMessage="Every member matching that search is already a recruiter."
-                            dense
-                        />
+                        {canViewMembers ? (
+                            <>
+                                <Table
+                                    caption="Members who could become a recruiter"
+                                    columns={newRepColumns}
+                                    rows={newRepCandidates.data?.rows ?? []}
+                                    rowKey="id"
+                                    loading={newRepCandidates.loading}
+                                    error={newRepCandidates.error ? 'We could not load the members.' : null}
+                                    onRetry={newRepCandidates.refetch}
+                                    emptyTitle="No members found."
+                                    emptyMessage="No member matches that search."
+                                    dense
+                                />
+                                {newRepCandidates.data?.more && <MoreMatch />}
+                            </>
+                        ) : (
+                            <div className="py-3"><RequirePermission permission={PERMISSIONS.MEMBERS_VIEW} /></div>
+                        )}
                         {newRepMember && (
                             <div className="shrink-0 space-y-4 border-t border-line py-4">
                                 <p className="text-xs font-bold uppercase tracking-wider text-ink-muted">Recruiter Details</p>
@@ -1288,59 +1175,72 @@ export function Recruiters() {
                         <div className="flex items-start justify-between pb-4">
                             <div>
                                 <div className="mt-1 flex flex-wrap items-center gap-2 text-base font-semibold text-ink">
-                                    <span>{selectedMember.title ? `${selectedMember.title} ` : ''}{selectedMember.initials} {selectedMember.surname}</span>
+                                    <span>{shownMember.title ? `${shownMember.title} ` : ''}{shownMember.initials} {shownMember.surname}</span>
                                     <span aria-hidden="true" className="text-ink-faint">•</span>
-                                    <span className="text-sm font-normal text-ink-muted">{selectedMember.membershipNumber}</span>
+                                    <span className="text-sm font-normal text-ink-muted">{shownMember.membershipNumber}</span>
                                     <span aria-hidden="true" className="text-ink-faint">•</span>
-                                    <StatusChip status={selectedMember.status} />
+                                    <StatusChip status={shownMember.status} />
                                 </div>
                             </div>
                         </div>
                         <div className="py-2 text-xs text-ink-muted border-b border-line flex items-center gap-1">
                             <Button size="sm" variant="ghost" onClick={() => setSelectedMember(null)}>{selectedRep?.name}</Button>
                             <ChevronRight size={12} />
-                            <span className="font-medium text-ink">{selectedMember.membershipNumber}</span>
+                            <span className="font-medium text-ink">{shownMember.membershipNumber}</span>
                         </div>
+                        {/* The list's row carries who the member is; the rest is the record's, asked for here. */}
+                        {(memberDetail.loading || memberDetail.error) && (
+                            <div className="pt-3">
+                                <DataState
+                                    state={memberDetail.error ? 'error' : 'loading'}
+                                    layout="row"
+                                    compact
+                                    error={memberDetail.error}
+                                    onRetry={memberDetail.refetch}
+                                    title={memberDetail.error ? 'This member’s record could not be loaded.' : 'Loading the member’s record…'}
+                                />
+                            </div>
+                        )}
                         <div className="overflow-y-auto flex-1 py-5">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <Section title="Personal">
-                                    <DRow label="First Names" value={selectedMember.firstNames || selectedMember.firstName} />
-                                    <DRow label="Surname" value={selectedMember.surname} />
-                                    <DRow label="ID Number" value={selectedMember.identityNumber} />
-                                    <DRow label="Race" value={selectedMember.race} />
-                                    <DRow label="Email" value={selectedMember.preferredEmail === "both" ? [selectedMember.personalEmail, selectedMember.workEmail].filter(Boolean).join(', ') || '—' : ((selectedMember.preferredEmail === "work" ? selectedMember.workEmail : selectedMember.personalEmail) || '—')} className="break-all text-brand-ink" />
-                                    <DRow label="Cell" value={selectedMember.phone || selectedMember.cellTel} />
-                                    <DRow label="Work Tel" value={selectedMember.workTel} />
-                                    <DRow label="Home Tel" value={selectedMember.homeTel} />
-                                    <DRow label="Address" value={selectedMember.address} />
+                                    <DRow label="First Names" value={shownMember.firstNames || shownMember.firstName} />
+                                    <DRow label="Surname" value={shownMember.surname} />
+                                    <DRow label="ID Number" value={shownMember.identityNumber} />
+                                    <DRow label="Race" value={shownMember.race} />
+                                    <DRow label="Email" value={shownMember.preferredEmail === "both" ? [shownMember.personalEmail, shownMember.workEmail].filter(Boolean).join(', ') || '—' : ((shownMember.preferredEmail === "work" ? shownMember.workEmail : shownMember.personalEmail) || '—')} className="break-all text-brand-ink" />
+                                    <DRow label="Cell" value={shownMember.phone || shownMember.cellTel} />
+                                    <DRow label="Work Tel" value={shownMember.workTel} />
+                                    <DRow label="Home Tel" value={shownMember.homeTel} />
+                                    <DRow label="Address" value={shownMember.address} />
                                 </Section>
                                 <Section title="Employment & Bank">
-                                    <DRow label="Employee Number" value={selectedMember.employeeNumber} />
-                                    <DRow label="Job Grade" value={selectedMember.jobGrade} />
-                                    <DRow label="Bank" value={selectedMember.bankName} />
-                                    <DRow label="Branch" value={selectedMember.branch} />
-                                    <DRow label="Account Number" value={selectedMember.bankAccountNumber} />
-                                    <DRow label="IBT No." value={selectedMember.ibtNo} />
-                                    <DRow label="Payment Type" value={selectedMember.paymentType} />
-                                    <DRow label="Work Address" value={selectedMember.workBankAddress} />
+                                    <DRow label="Employee Number" value={shownMember.employeeNumber} />
+                                    <DRow label="Job Grade" value={shownMember.jobGrade} />
+                                    <DRow label="Bank" value={shownMember.bankName} />
+                                    <DRow label="Branch" value={shownMember.branch} />
+                                    <DRow label="Account Number" value={shownMember.bankAccountNumber} />
+                                    <DRow label="IBT No." value={shownMember.ibtNo} />
+                                    <DRow label="Payment Type" value={shownMember.paymentType} />
+                                    <DRow label="Work Address" value={shownMember.workBankAddress} />
                                 </Section>
                                 <Section title="Membership">
-                                    <DRow label="Membership No." value={selectedMember.membershipNumber} />
-                                    <DRow label="Date Joined" value={recordDate(selectedMember.joinDate)} />
-                                    <DRow label="Status" value={selectedMember.status} />
-                                    <DRow label="Monthly Subs" value={formatZar(selectedMember.monthlySubscription)} />
-                                    <DRow label="Current Balance" value={selectedMember.currentBalance} />
-                                    <DRow label="Arrears Balance" value={selectedMember.arrearsBalance} />
+                                    <DRow label="Membership No." value={shownMember.membershipNumber} />
+                                    <DRow label="Date Joined" value={recordDate(shownMember.joinDate)} />
+                                    <DRow label="Status" value={shownMember.status} />
+                                    <DRow label="Monthly Subs" value={formatZar(shownMember.monthlySubscription)} />
+                                    <DRow label="Current Balance" value={shownMember.currentBalance} />
+                                    <DRow label="Arrears Balance" value={shownMember.arrearsBalance} />
                                 </Section>
                                 <Section title="Recruiters">
-                                    <DRow label="Area's Rep" value={selectedMember.areasRep} />
+                                    <DRow label="Area's Rep" value={shownMember.areasRep} />
                                     {/* 🔴 IT READ `recruitmentRep`, WHICH THE API DOES NOT SEND (`06.4`): `MemberDto` carries
                                         `recruitmentRepresentativeId` and `recruitmentRepresentativeName`, so this row was a dash for
                                         every member -- on the screen whose subject is who recruited whom. */}
-                                    <DRow label="Recruitment Rep" value={selectedMember.recruitmentRepresentativeName} />
-                                    <DRow label="Elected Rep" value={selectedMember.electedRep} />
-                                    <DRow label="Election Date" value={[selectedMember.repElectionDay, selectedMember.repElectionMonth, selectedMember.repElectionYear].filter(Boolean).join('/') || '—'} />
-                                    <DRow label="Remarks" value={selectedMember.remarks} />
+                                    <DRow label="Recruitment Rep" value={shownMember.recruitmentRepresentativeName} />
+                                    <DRow label="Elected Rep" value={shownMember.electedRep} />
+                                    <DRow label="Election Date" value={[shownMember.repElectionDay, shownMember.repElectionMonth, shownMember.repElectionYear].filter(Boolean).join('/') || '—'} />
+                                    <DRow label="Remarks" value={shownMember.remarks} />
                                 </Section>
                             </div>
                         </div>
@@ -1361,16 +1261,17 @@ export function Recruiters() {
             <ConfirmDialog
                 open={Boolean(pendingRemoveRep)}
                 onOpenChange={closeOn(() => setPendingRemoveRep(null))}
-                title="Remove this recruiter?"
-                confirmLabel="Remove recruiter"
+                title="Remove this recruitment channel?"
+                confirmLabel="Remove recruitment channel"
                 onConfirm={handleRemoveRep}
             >
-                {/* 🔑 The consequence is SPELLED OUT, as it always was here -- now the true one (A49, MO21): the
-                    channel goes, and the members recruited through it keep their status. */}
+                {/* 🔑 Every consequence SPELLED OUT (A49, MO21; the manual, 6 Oct): the channel leaves SASBO's list --
+                    and Capture Member's -- and the members recruited through it keep their status. */}
                 {pendingRemoveRep && (
                     <p className="text-sm text-ink">
-                        <strong className="font-medium">{pendingRemoveRep.name}</strong> will be removed.{' '}
-                        <strong className="font-medium">{channelMembers(pendingRemoveRep).length}</strong>{' '}
+                        <strong className="font-medium">{pendingRemoveRep.name}</strong> will be removed from the
+                        recruitment channels, and Capture Member will no longer offer it.{' '}
+                        <strong className="font-medium">{membersOf(pendingRemoveRep)}</strong>{' '}
                         member(s) recruited through it keep their status; only their recruitment channel is cleared.
                     </p>
                 )}
@@ -1407,6 +1308,15 @@ function YesNo({ legend, value, onChange }) {
                 ))}
             </div>
         </fieldset>
+    );
+}
+
+/** Under a picker the server capped: more members matched than it offers. */
+function MoreMatch() {
+    return (
+        <p role="status" className="px-1 pt-2 text-xs text-ink-muted">
+            More members match than are shown here — refine your search to narrow the list.
+        </p>
     );
 }
 

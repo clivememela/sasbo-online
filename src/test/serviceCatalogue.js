@@ -125,6 +125,12 @@ const ARGS = {
   'adminService.updatePosition': ['ORGANISER', { code: 'ORGANISER', name: 'Organiser', defaultRoleCode: 'ORGANISER', active: true, ordinal: 6 }],
   'adminService.updateRole': ['ORGANISER', { code: 'ORGANISER', name: 'Organiser', permissions: ['MEMBERS_VIEW'] }],
   'auditService.getAudit': [{ username: 'synthetic.user', from: '2026-10-01', to: '2026-10-06', page: 0, size: 50 }],
+  'subscriptionsService.create': [{ bankName: 'Synthetic Bank Limited', acbDebitDay: 25, subscriptionAmount: 174 }],
+  'recruitmentChannelService.summary': [],
+  'recruitmentChannelService.members': ['7', { page: 0, size: 20, name: 'Synthetic' }],
+  'recruitmentChannelService.candidates': [{ q: 'Synthetic', excludeChannel: 7 }],
+  'recruitmentChannelService.addMember': ['7', '41'],
+  'recruitmentChannelService.removeMember': ['7', '41'],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS

@@ -136,6 +136,89 @@ describe('Capture Member', () => {
   })
 })
 
+/**
+ * 🔴 A67: THE BANK'S DEBIT DAY IS THE DEFAULT, AND ONLY THE DEFAULT.
+ *
+ * The server replaced the day chosen here with the bank's whenever the bank's was in range, so this form showed one
+ * day and the member was saved with another. It now keeps the day it is sent and gives the bank's only to a member
+ * with none -- so the default is the form's to show: the chosen bank's usable day until somebody picks one.
+ */
+describe("A67: the bank's debit day is the default, and only the default", () => {
+  const field = (text) => screen.getByLabelText(new RegExp(`^${text}`))
+  const TYME = { id: 2, bankName: 'TymeBank Limited', branchName: 'Rosebank', branchCode: '678910', universalBranchCode: '678910' }
+
+  /** A value given in one input event, as a paste is: one render of this large form instead of one per keystroke. */
+  async function paste(user, labelText, value) {
+    await user.click(field(labelText))
+    await user.paste(value)
+  }
+
+  /** The Employment tab, a debit order (the form's default) at the bank and branch named. */
+  async function debitOrderAt(user, bank, branch) {
+    await user.click(screen.getByRole('button', { name: /^Employment & Bank/ }))
+    await chooseFrom(user, 'Bank Where Employed', bank.slice(0, 4), bank)
+    await chooseFrom(user, 'Bank Branch', branch.slice(0, 4), branch)
+  }
+
+  beforeEach(() => {
+    server.use(
+      http.get('*/api/banks', () => HttpResponse.json([ABSA, TYME])),
+      http.get('*/api/banks/branches', () => HttpResponse.json([ABSA, TYME])),
+      // Absa's seeded 5th is outside the range and is never given; TymeBank's 28th is inside it.
+      http.get('*/api/subscriptions', () => HttpResponse.json([
+        { id: 1, bankName: 'Absa Bank Limited', acbDebitDay: 5, subscriptionAmount: 174 },
+        { id: 2, bankName: 'TymeBank Limited', acbDebitDay: 28, subscriptionAmount: 174 },
+      ])),
+    )
+    // After the answers above exist: the reference lists are read once, on mount.
+    renderWithProviders(<CaptureMember />)
+  })
+
+  it('🔴 a bank whose day is usable: the field shows it until a day is chosen, and the save sends it', async () => {
+    const user = setupUser()
+    await screen.findByLabelText(/^First Name\(s\)/)
+    await paste(user, 'First Name\\(s\\)', 'Synthetic')
+    await paste(user, 'Surname', 'Testperson')
+    await paste(user, 'Personal Email', 'synthetic@example.test')
+    await user.selectOptions(field('Identity Type'), 'I.D. Number')
+    await paste(user, 'I.D. Number', '9001010000080')
+    await debitOrderAt(user, 'TymeBank Limited', 'Rosebank')
+    await paste(user, 'Bank Account Number', '62000987654')
+    await user.selectOptions(field('Account Type'), 'Savings')
+
+    expect(field('Debit Day'), "the bank's 28th, not the form's own 20th").toHaveValue('28')
+    expect(screen.getByText(/TymeBank Limited’s debit day/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /save member/i }))
+    await user.click(await screen.findByRole('button', { name: /send welcome letter/i }))
+    await waitFor(() => expect(posted, 'the capture was posted').toBeDefined())
+    expect(String(posted.debitDay), 'the day on screen is the day saved').toBe('28')
+  })
+
+  it('a day the administrator chose stands when the bank changes to one whose day is usable', async () => {
+    const user = setupUser()
+    await screen.findByLabelText(/^First Name\(s\)/)
+    await debitOrderAt(user, 'Absa Bank Limited', 'Sandton City')
+    await user.selectOptions(field('Debit Day'), '22')
+
+    // A closed select shows its choice; the click that opens it starts an empty search, so the new name types clean.
+    await chooseFrom(user, 'Bank Where Employed', 'Tyme', 'TymeBank Limited')
+    await chooseFrom(user, 'Bank Branch', 'Rose', 'Rosebank')
+
+    expect(field('Debit Day'), "TymeBank's 28th must not replace the 22nd chosen").toHaveValue('22')
+    expect(screen.queryByText(/TymeBank Limited’s debit day/), 'and no claim it is the bank\'s').toBeNull()
+  })
+
+  it('a bank whose day is outside the range leaves the 20th, and says nothing of the bank', async () => {
+    const user = setupUser()
+    await screen.findByLabelText(/^First Name\(s\)/)
+    await debitOrderAt(user, 'Absa Bank Limited', 'Sandton City')
+
+    expect(field('Debit Day')).toHaveValue('20')
+    expect(screen.queryByText(/Absa Bank Limited’s debit day/), 'no claim the 20th is the bank\'s').toBeNull()
+  })
+})
+
 describe('Edit Member', () => {
   const LEGACY = {
     id: 7, membershipNumber: 'M0007', firstNames: 'Synthetic', surname: 'Alpha', initials: 'S',

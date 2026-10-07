@@ -7,11 +7,9 @@ import { requestJson, requestJsonWrite } from './parseApiError';
  * (conventions §16) and rejects with an `Error` carrying `kind`, `status`, `validationErrors` and
  * `retryable`, under A14's request ceiling.
  *
- * ⚠️ `create` STILL POSTS TO `/api/recruitment-channels`, AND THAT IS DELIBERATE HERE. It is
- * A23 — a subscription created against the wrong resource — and it is PINNED in
- * `services.errorContract.test.js`, which asserts the wrong endpoint on purpose so the day it is
- * fixed the pin reddens and names the row. Correcting it inside an error-handling change would
- * flip a pinned defect silently, which is exactly what contract ④ forbids. The path is untouched.
+ * 🔴 A23, FIXED (the October build): `create` POSTed `{ name }` to `/api/recruitment-channels`, so
+ * creating a subscription silently created a RECRUITMENT CHANNEL and answered 2xx. It addresses its
+ * own resource now, with the row the server's `SubscriptionsDto` reads.
  */
 export const subscriptionsService = {
     getAll: () =>
@@ -20,12 +18,13 @@ export const subscriptionsService = {
             signal,
         })),
 
-    create: (name) =>
-        requestJsonWrite((signal) => fetch(apiUrl('/api/recruitment-channels'), {
+    /** @param {{ bankName: string, acbDebitDay: number, subscriptionAmount: number, isCoreBanking?: boolean, status?: string }} subscription */
+    create: (subscription) =>
+        requestJsonWrite((signal) => fetch(apiUrl('/api/subscriptions'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ name }),
+            body: JSON.stringify(subscription),
             signal,
         })),
 

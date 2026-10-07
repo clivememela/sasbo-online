@@ -1,4 +1,4 @@
-// @vitest-environment jsdom -- Recruiters: its reference lists failing, and a count of zero
+// @vitest-environment jsdom -- Recruiters: its reference lists failing, a count of zero, and what each action says
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
@@ -8,6 +8,8 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { TestAuthProvider } from '../../test/authTestUtils'
+import { PERMISSIONS } from '../../auth/permissions'
 
 /**
  * WHAT RECRUITERS SAID WITHOUT CHECKING. `06.4`.
@@ -18,11 +20,20 @@ import { setupUser } from '../../test/user'
  *     done -- including when it had failed too -- and began in lowercase;
  *   ③ a channel that has recruited nobody showed "—" for Members Recruited, which reads as "unknown".
  *
- * Each has its must-pass, because each has a wrong fix that satisfies the guard alone.
+ * Each has its must-pass, because each has a wrong fix that satisfies the guard alone. Since RC15 the table's figures
+ * are the server's (`GET /api/recruitment-channels/summary`), and the lists that name members are asked for when their
+ * dialog opens, by a user who may see them.
  */
 
 const boom = () => HttpResponse.json({ status: 500, error: 'boom' }, { status: 500 })
-const CHANNEL = { id: 5, name: 'Synthetic Channel', enabled: true }
+const CHANNEL = { channelId: 5, name: 'Synthetic Channel', enabled: true, members: 0, banks: [], branches: [] }
+const summaryOf = (...channels) => http.get('*/api/recruitment-channels/summary', () => HttpResponse.json(channels))
+const pageOf = (...members) => ({ content: members, page: 0, size: 100, totalElements: members.length, totalPages: 1 })
+
+/** Staff who may see members and change their channel -- what the dialogs below need. */
+const asStaff = (ui) => (
+  <TestAuthProvider permissions={[PERMISSIONS.MEMBERS_VIEW, PERMISSIONS.MEMBERS_EDIT]}>{ui}</TestAuthProvider>
+)
 
 describe('Recruiters', () => {
   beforeEach(() => {
@@ -49,7 +60,7 @@ describe('Recruiters', () => {
 
   describe('② the notice', () => {
     it('does not call the page up to date when the recruiter list failed too', async () => {
-      server.use(http.get('*/api/banks/branches', boom), http.get('*/api/members', boom))
+      server.use(http.get('*/api/banks/branches', boom), http.get('*/api/recruitment-channels/summary', boom))
       renderWithProviders(<Recruiters />)
 
       expect(await screen.findByText('Banks did not load.')).toBeInTheDocument()
@@ -66,7 +77,7 @@ describe('Recruiters', () => {
 
   describe('③ a count of zero', () => {
     it('reads 0 -- and a field with nothing in it still reads as a dash', async () => {
-      server.use(http.get('*/api/recruitment-channels', () => HttpResponse.json([CHANNEL])))
+      server.use(summaryOf(CHANNEL))
       const user = setupUser()
       renderWithProviders(<Recruiters />)
 
@@ -86,11 +97,12 @@ describe('Recruiters', () => {
     const REFUSAL = 'Choose a recruiter type before making this member a recruiter.'
 
     async function refuseInAddRecruiter(user) {
-      server.use(http.get('*/api/members', () => HttpResponse.json([CANDIDATE])))
-      renderWithProviders(<Recruiters />)
+      server.use(http.get('*/api/recruitment-channels/member-candidates', () => HttpResponse.json({ rows: [CANDIDATE], more: false })))
+      renderWithProviders(asStaff(<Recruiters />))
       await user.click(await screen.findByRole('button', { name: /Add Recruiter/ }))
       const dialog = await screen.findByRole('dialog', { name: 'Add Recruiter' })
-      await user.type(within(dialog).getByLabelText('Search members'), 'Candidate')
+      // Chosen from the list the dialog opens with: searching is not this test's subject, and a typed search's answer
+      // re-renders the rows after a button was found (the server's list since RC15).
       const [choose] = await within(dialog).findAllByRole('button', { name: /^Choose .* as the recruiter$/ })
       await user.click(choose)
       await user.click(within(dialog).getByRole('button', { name: /Make Recruiter/ }))
@@ -117,33 +129,28 @@ describe('Recruiters', () => {
   })
 
   describe('⑤ who recruited a member', () => {
-    it('reads the recruiter the API names -- not a dash for every member', async () => {
+    it('reads the recruiter the record names -- not a dash for every member', async () => {
       // 🔴 The row read `recruitmentRep`, which `MemberDto` does not carry; the API sends
-      // `recruitmentRepresentativeName`. The Remarks row is the must-pass: an absent value is still a dash.
-      const RECRUITED = {
-        id: 31,
-        membershipNumber: 'M0031',
-        initials: 'S',
-        surname: 'Recruited',
-        status: 'Active',
-        recruitmentRepresentativeId: 5,
-        recruitmentRepresentativeName: 'Synthetic Channel',
-      }
+      // `recruitmentRepresentativeName`. The Remarks row is the must-pass: an absent value is still a dash. Since RC15 the
+      // list gives who the member is, and the record is asked for when their details open.
+      const ROW = { id: 31, membershipNumber: 'M0031', initials: 'S', surname: 'Recruited', status: 'Active' }
       server.use(
-        http.get('*/api/recruitment-channels', () => HttpResponse.json([CHANNEL])),
-        http.get('*/api/members', () => HttpResponse.json([RECRUITED])),
+        summaryOf({ ...CHANNEL, members: 1 }),
+        http.get('*/api/recruitment-channels/5/members', () => HttpResponse.json(pageOf(ROW))),
+        http.get('*/api/members/31', () => HttpResponse.json({ ...ROW, recruitmentRepresentativeName: 'Synthetic Recruiter' })),
       )
       const user = setupUser()
-      renderWithProviders(<Recruiters />)
+      renderWithProviders(asStaff(<Recruiters />))
 
       const [channel] = await screen.findAllByRole('button', { name: /Synthetic Channel — show the members recruited/ })
       await user.click(channel)
       const [member] = await screen.findAllByRole('button', { name: /M0031 — open the record for/ })
       await user.click(member)
 
-      const rep = await screen.findByText('Recruitment Rep')
-      expect(rep.nextElementSibling).toHaveTextContent('Synthetic Channel')
-      expect(within(rep.parentElement.parentElement).getByText('Remarks').nextElementSibling).toHaveTextContent('—')
+      const dialog = within(await screen.findByRole('dialog', { name: 'Member details' }))
+      await waitFor(() => expect(dialog.getByText('Recruitment Rep').nextElementSibling).toHaveTextContent('Synthetic Recruiter'))
+      expect(within(dialog.getByText('Recruitment Rep').parentElement.parentElement).getByText('Remarks').nextElementSibling)
+        .toHaveTextContent('—')
     })
   })
 
@@ -154,10 +161,11 @@ describe('Recruiters', () => {
 
     async function addTheCandidate(user) {
       server.use(
-        http.get('*/api/recruitment-channels', () => HttpResponse.json([CHANNEL])),
-        http.get('*/api/members', () => HttpResponse.json([CANDIDATE])),
+        summaryOf(CHANNEL),
+        http.get('*/api/recruitment-channels/5/members', () => HttpResponse.json(pageOf())),
+        http.get('*/api/recruitment-channels/member-candidates', () => HttpResponse.json({ rows: [CANDIDATE], more: false })),
       )
-      renderWithProviders(<Recruiters />)
+      renderWithProviders(asStaff(<Recruiters />))
       const [channel] = await screen.findAllByRole('button', { name: /Synthetic Channel — show the members recruited/ })
       await user.click(channel)
       await user.click(await screen.findByRole('button', { name: /Add Member/ }))
@@ -166,37 +174,20 @@ describe('Recruiters', () => {
       return screen.findByRole('dialog', { name: 'Synthetic Channel' })
     }
 
-    it('adding a member to a recruiter says who was added', async () => {
-      server.use(http.put('*/api/members/:id', async ({ request }) => HttpResponse.json(await request.json())))
+    it('adding a member to a channel says who was added', async () => {
+      server.use(http.put('*/api/recruitment-channels/5/members/41', () => HttpResponse.json(CANDIDATE)))
       const dialog = await addTheCandidate(setupUser())
 
       const said = await within(dialog).findByText('S Candidate was added to Synthetic Channel.')
       expect(said.closest('[role="status"]')).not.toBeNull()
     })
 
-    it('🔒 00.2: the PUT carries no money it would write back as R 0,00 -- an omitted key keeps what is on file', async () => {
-      // `|| 0` wrote a member with no subscription or balance on file back as a real zero. Server 0cf00e1's
-      // IGNORE strategy keeps an omitted key, so the three amounts are not sent at all.
-      let sent
-      server.use(http.put('*/api/members/:id', async ({ request }) => {
-        sent = await request.json()
-        return HttpResponse.json(sent)
-      }))
-      await addTheCandidate(setupUser())
-
-      await waitFor(() => expect(sent).toBeDefined())
-      for (const money of ['monthlySubscription', 'currentBalance', 'arrearsBalance']) {
-        expect(sent, money).not.toHaveProperty(money)
-      }
-      // The must-pass: the builder still sends the record it was given.
-      expect(sent).toMatchObject({ id: 41, membershipNumber: 'M0041', surname: 'Candidate' })
-    })
-
-    it('the must-pass: an add that failed still says so, as a failure', async () => {
-      server.use(http.put('*/api/members/:id', boom))
+    it('the must-pass: an add that may have saved says so, and to check -- never "added"', async () => {
+      server.use(http.put('*/api/recruitment-channels/5/members/41', boom))
       const dialog = await addTheCandidate(setupUser())
 
-      expect(await within(dialog).findByRole('alert')).toHaveTextContent(/could not be assigned/)
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        'Adding S Candidate to Synthetic Channel could not be confirmed. Reload the list and check before trying again.')
       expect(within(dialog).queryByText(/was added to/)).not.toBeInTheDocument()
     })
   })
