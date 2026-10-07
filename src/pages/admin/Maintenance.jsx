@@ -9,12 +9,12 @@ import PageTitle from '../../components/common/PageTitle.jsx';
 import {useOutletContext} from "react-router-dom";
 import { SIGN_IN_ENTRIES } from '../../config/navigation.js';
 
-/** Sign-in's cards' icons, by the screen each opens. */
-const SIGN_IN_ICONS = {
-    '/admin/maintenance/users': UserCog,
-    '/admin/maintenance/positions': Briefcase,
-    '/admin/maintenance/roles': ShieldCheck,
-    '/admin/maintenance/audit': ScrollText,
+/** Sign-in's cards' icons and descriptions, by the screen each opens -- here, where the page is lazy. */
+const SIGN_IN_CARDS = {
+    '/admin/maintenance/users': { icon: UserCog, desc: 'Who signs in, their position and the part of SASBO they see' },
+    '/admin/maintenance/positions': { icon: Briefcase, desc: 'SASBO’s positions, and the role each one gives' },
+    '/admin/maintenance/roles': { icon: ShieldCheck, desc: 'What each role may see and do' },
+    '/admin/maintenance/audit': { icon: ScrollText, desc: 'The record of every sign-in and every change to users, positions and roles' },
 };
 
 const maintenance_cards = [
@@ -80,7 +80,7 @@ const maintenance_cards = [
     },
     // Sign-in's users, positions, roles and record of who did what -- the same entries as the rail's, by construction,
     // with their icons here: the rail never draws them, and this page is lazy where navigation.js is not.
-    ...SIGN_IN_ENTRIES.map((entry) => ({ ...entry, icon: SIGN_IN_ICONS[entry.href] })),
+    ...SIGN_IN_ENTRIES.map((entry) => ({ ...entry, ...SIGN_IN_CARDS[entry.href] })),
     /*{
         title: 'Recruiters',
         icon: LucideUserKey,

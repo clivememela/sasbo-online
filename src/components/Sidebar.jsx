@@ -1,6 +1,6 @@
-import { LogIn, LogOut, X } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { memo, useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { lazy, memo, Suspense, useEffect, useRef, useState } from "react";
 import Logo from "./common/Logo";
 import SidebarItem from "./common/SidebarItem";
 import ThemeToggle from "./common/ThemeToggle";
@@ -9,50 +9,10 @@ import { navItems } from "../config/navigation";
 import { MENU_BUTTON_ID, SIDEBAR_ID } from "./shellIds";
 import { cn } from "../lib/utils";
 import useMediaQuery from "../hooks/useMediaQuery";
-import { useAuth } from "../auth/useAuth";
-import { loginPath } from "../auth/next";
 
-// `touch-size`: the rail's foot takes the same 44px rows on a coarse pointer as the list (`07.2`).
-const FOOT_ROW = cn(
-  "touch-size flex h-9 w-full items-center gap-3 rounded-lg px-2.5 text-sm font-medium text-nav-ink",
-  "transition-[background-color,color] duration-(--duration-instant)",
-  "hover-hover:hover:bg-nav-hover hover-hover:hover:text-ink",
-  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
-);
-
-/**
- * The foot's way in or out. It was "Log out", a link to /login that signed nobody out because nobody was signed in;
- * with sign-in it is Sign out -- the session revoked, then the sign-in page -- or, for nobody, Sign in and back here.
- */
-function AuthFootItem({ onClick }) {
-  const { status, signOut } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const icon = (Icon) => <Icon size={18} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-nav-icon" />;
-
-  if (status !== "signed-in") {
-    return (
-      <Link to={loginPath(location)} className={FOOT_ROW} onClick={onClick}>
-        {icon(LogIn)}
-        <span className="truncate">Sign in</span>
-      </Link>
-    );
-  }
-  return (
-    <button
-      type="button"
-      className={FOOT_ROW}
-      onClick={async () => {
-        onClick();
-        await signOut();
-        navigate("/login", { replace: true });
-      }}
-    >
-      {icon(LogOut)}
-      <span className="truncate">Sign out</span>
-    </button>
-  );
-}
+// LAZY (OB17a): the foot's Sign in or Sign out, from the same lazy module as the header's account (`AccountControls`).
+const RailAccount = lazy(() =>
+  import("./account/AccountControls").then((m) => ({ default: m.RailAccount })));
 
 /*
  * The chain of hrefs from the rail's root to `target`, and the SHORTEST one when a route
@@ -323,7 +283,9 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
         {/* card.html's `.side__foot`: the appearance switch, then the way out. */}
         <div className="grid gap-0.5 border-t border-line pt-3">
           <ThemeToggle variant="nav" />
-          <AuthFootItem onClick={() => setSideBarOpen(false)} />
+          <Suspense fallback={null}>
+            <RailAccount onClick={() => setSideBarOpen(false)} />
+          </Suspense>
         </div>
       </nav>
     </>

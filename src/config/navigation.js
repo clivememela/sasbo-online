@@ -23,37 +23,17 @@ import {
  * menu rule (`navAccess.js`, OB18) reads to mark an entry for a person who may not use it; the screen itself says what
  * is needed either way.
  *
- * 🔑 NO ICONS AND NO IMPORT OF `permissions.js`, BECAUSE THIS FILE IS IN THE FIRST LOAD (OB17a). The rail draws an icon
- * only on its top level, so these third-level entries never show one; `Maintenance.jsx` gives its cards theirs. The
+ * 🔑 NO ICONS, NO DESCRIPTIONS AND NO IMPORT OF `permissions.js`, BECAUSE THIS FILE IS IN THE FIRST LOAD (OB17a). The
+ * rail shows neither an icon nor a description at its third level; `Maintenance.jsx` (lazy) gives its cards both. The
  * names are `PERMISSIONS`' own, held to it by `Maintenance.test.jsx` -- importing the catalogue here put all of it,
  * labels and all, into every first paint.
  */
 export const SIGN_IN_ENTRIES = [
-  {
-    title: 'Users',
-    href: '/admin/maintenance/users',
-    desc: 'Who signs in, their position and the part of SASBO they see',
-    permission: 'USERS_ADMIN',
-  },
-  {
-    title: 'Positions',
-    href: '/admin/maintenance/positions',
-    desc: 'SASBO’s positions, and the role each one gives',
-    permission: 'USERS_ADMIN',
-  },
-  {
-    title: 'Roles',
-    href: '/admin/maintenance/roles',
-    desc: 'What each role may see and do',
-    permission: 'USERS_ADMIN',
-  },
-  {
-    // Short enough for the rail's third level, which truncates; SASBO's own words ("a record of who did what", 5 Oct).
-    title: 'Who did what',
-    href: '/admin/maintenance/audit',
-    desc: 'The record of every sign-in and every change to users, positions and roles',
-    permission: 'AUDIT_VIEW',
-  },
+  { title: 'Users', href: '/admin/maintenance/users', permission: 'USERS_ADMIN' },
+  { title: 'Positions', href: '/admin/maintenance/positions', permission: 'USERS_ADMIN' },
+  { title: 'Roles', href: '/admin/maintenance/roles', permission: 'USERS_ADMIN' },
+  // Short enough for the rail's third level, which truncates; SASBO's own words ("a record of who did what", 5 Oct).
+  { title: 'Who did what', href: '/admin/maintenance/audit', permission: 'AUDIT_VIEW' },
 ];
 
 export const navItems = [

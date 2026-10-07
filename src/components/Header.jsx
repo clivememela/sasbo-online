@@ -1,75 +1,15 @@
-import { useEffect, useRef } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bell, KeyRound, LogIn, LogOut, Menu, Search } from "lucide-react";
+import { lazy, Suspense, useEffect, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Bell, Menu, Search } from "lucide-react";
 import Breadcrumbs from "./common/Breadcrumbs";
 import Button from "./form/Button";
 import { MENU_BUTTON_ID, SIDEBAR_ID } from "./shellIds";
 import { cn } from "../lib/utils";
 import useMediaQuery from "../hooks/useMediaQuery";
-import { useAuth } from "../auth/useAuth";
-import { loginPath } from "../auth/next";
 
-/** Up to two letters from the name a person is shown by -- "Thandi Synthetic" is TS. */
-export const initialsOf = (name) =>
-  String(name ?? "").trim().split(/\s+/).slice(0, 2).map((word) => word[0] ?? "").join("").toUpperCase();
-
-/** A link that looks like the topbar's ghost buttons: the same 38px row, ring and hover. */
-const TOOL_LINK = cn(
-  "touch-target inline-flex min-h-(--size-control) items-center gap-2 rounded-lg border border-transparent px-3 text-sm font-medium text-ink-muted",
-  "hover-hover:hover:bg-surface hover-hover:hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring",
-);
-
-/**
- * WHO IS SIGNED IN -- the mock's account chip, made real by sign-in (signin.md, "The client"): the person's name and
- * position, a way to change the password, and Sign out. Nobody signed in sees Sign in, which brings them back here.
- *
- * Sign out revokes the session on the server and then opens the sign-in page, in either mode: staying on a screen as
- * somebody who has just left it is how a shared office computer hands the next person a session.
- */
-function Account() {
-  const { status, user, signOut } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  if (status !== "signed-in") {
-    return (
-      <Link to={loginPath(location)} className={TOOL_LINK}>
-        <LogIn size={18} strokeWidth={1.75} aria-hidden="true" />
-        Sign in
-      </Link>
-    );
-  }
-
-  const position = user.position?.name;
-  return (
-    <>
-      <p className="flex h-9 min-w-0 items-center gap-2.5 rounded-full py-0 pl-1 pr-2.5">
-        <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-ink">
-          {initialsOf(user.displayName || user.username)}
-        </span>
-        {/* The name and position across the whole desk, from `xl` as the placeholder's name was; below that, read but
-            not shown -- ONE copy of the words, so a screen reader never hears them twice. */}
-        <span className="sr-only min-w-0 leading-tight xl:not-sr-only xl:grid">
-          <span className="truncate text-[13.5px] font-medium text-ink">{user.displayName || user.username}</span>
-          {position && <span className="truncate text-xs text-ink-muted"><span className="sr-only">, </span>{position}</span>}
-        </span>
-      </p>
-      <Link to="/change-password" className={TOOL_LINK} aria-label="Change your password" title="Change your password">
-        <KeyRound size={18} strokeWidth={1.75} aria-hidden="true" />
-      </Link>
-      <Button
-        variant="ghost"
-        onClick={async () => {
-          await signOut();
-          navigate("/login", { replace: true });
-        }}
-      >
-        <LogOut size={18} strokeWidth={1.75} aria-hidden="true" />
-        <span className="max-sm:sr-only">Sign out</span>
-      </Button>
-    </>
-  );
-}
+// LAZY (OB17a): who is signed in, and the way in or out, arrive with the page's own chunk -- see `AccountControls`.
+const HeaderAccount = lazy(() =>
+  import("./account/AccountControls").then((m) => ({ default: m.HeaderAccount })));
 
 /**
  * THE TOPBAR. card.html's `.topbar`, and it is 60px.
@@ -282,7 +222,9 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
 
         {/* The placeholder chip ("SA", "Administrator") that stood here while authentication was deferred (R-SEC-C)
             is the real account now: the session's name and position, and the way out. */}
-        <Account />
+        <Suspense fallback={null}>
+          <HeaderAccount />
+        </Suspense>
       </div>
     </header>
   );

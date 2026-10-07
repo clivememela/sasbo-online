@@ -5,8 +5,10 @@ import { Route, Routes, useLocation } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 
 import AppLayout from '../layouts/AppLayout'
-// The ended-session notice is a lazy chunk; in the registry before any test, so a wait times the page, not the box.
+// The ended-session notice and the account controls are lazy chunks; in the registry before any test, so a wait times
+// the page, not the box. The controls still arrive a tick after the page, so they are found with `findBy`.
 import '../components/common/SessionNotice'
+import '../components/account/AccountControls'
 import { AuthProvider } from './AuthContext'
 import { SESSION_KEY } from './session'
 import { expectNoA11yViolations } from '../test/assertions'
@@ -51,8 +53,8 @@ describe('the shell, signed out', () => {
   it('open mode: the page is there, and the header and the rail offer Sign in with a way back', async () => {
     renderShell()
     expect(await screen.findByText('The home page')).toBeInTheDocument()
-    expect(within(banner()).getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login?next=%2Fhome')
-    expect(within(rail()).getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login?next=%2Fhome')
+    expect(await within(banner()).findByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login?next=%2Fhome')
+    expect(await within(rail()).findByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login?next=%2Fhome')
     expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument()
   })
 
@@ -67,11 +69,11 @@ describe('the shell, signed in', () => {
     storeSession()
     renderShell()
     expect(await screen.findByText('The home page')).toBeInTheDocument()
-    expect(within(banner()).getByText('Sam Synthetic')).toBeInTheDocument()
+    expect(await within(banner()).findByText('Sam Synthetic')).toBeInTheDocument()
     expect(within(banner()).getByText('System Administrator')).toBeInTheDocument()
     expect(within(banner()).getByRole('link', { name: 'Change your password' })).toHaveAttribute('href', '/change-password')
     expect(within(banner()).getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
-    expect(within(rail()).getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+    expect(await within(rail()).findByRole('button', { name: 'Sign out' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument()
   })
 
@@ -142,14 +144,22 @@ describe('a session the server ends', () => {
 
 describe('the shell with sign-in -- accessibility', () => {
   it('has no violations signed out, signed in, and with the ended-session notice', async () => {
+    // Each scan waits for the account controls too: they are lazy, and a scan before they land would not see them.
     const signedOut = renderShell()
-    await screen.findByText('The home page')
+    await within(banner()).findByRole('link', { name: 'Sign in' })
     await expectNoA11yViolations(signedOut.container)
     signedOut.unmount()
 
     storeSession()
+    const signedIn = renderShell()
+    await within(banner()).findByRole('button', { name: 'Sign out' })
+    await expectNoA11yViolations(signedIn.container)
+    signedIn.unmount()
+
+    storeSession()
     const ended = renderShell({ me: () => refusal(401, 'SESSION_EXPIRED') })
     await screen.findByText(/Your session has ended\./)
+    await within(banner()).findByRole('link', { name: 'Sign in' })
     await expectNoA11yViolations(ended.container)
   })
 })
