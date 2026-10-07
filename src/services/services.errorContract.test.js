@@ -81,6 +81,7 @@ const nonJsonBody = () =>
 const BODYLESS = new Set([
   'recruiterService.remove',
   'recruitmentChannelService.remove',
+  'recruitmentChannelService.removeMember',
   'subscriptionsService.remove',
 ])
 

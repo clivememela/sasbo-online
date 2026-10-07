@@ -1,32 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
 import fixture from '../../test/fixtures/recruitment-channel-fixture.json'
-import { bankPlacesOf, channelRowsFromMembers, channelRowsFromSummary } from './channelFigures'
+import { bankPlacesOf, channelRowsFromSummary } from './channelFigures'
 
 /**
- * RC15: THE RECRUITERS SCREEN'S FIGURES, TWO WAYS, ONE FIXTURE.
+ * RC15: THE RECRUITERS SCREEN'S ROWS, FROM THE SERVER'S FIGURES.
  *
- * `recruitment-channel-fixture.json` is the same file the server's `RecruitmentChannelMembersTest` reads, and both
- * sides are held to its `expected.all`: the server's grouped SQL there, the screen's own count here -- before the
- * screen's count is removed for the server's.
+ * `recruitment-channel-fixture.json` is the same file the server's `RecruitmentChannelMembersServiceImplTest` reads, where the
+ * grouped SQL is held to `expected.all`. Step 1 (client 3c647cd) held the screen's own count to it too, beside these
+ * rows, and they agreed string for string; step 2 removed that count with the member register it was loaded from.
  */
 
-const channels = fixture.channels.map((name, i) => ({ id: i + 1, name, enabled: true }))
-
-/** The fixture's members as `GET /api/members` sends them: the channel by name, the recruiter by id. */
-const members = fixture.members.map((m, i) => ({
-  id: i + 1,
-  membershipNumber: m.membershipNumber,
-  title: m.title,
-  initials: m.initials,
-  firstNames: m.firstNames,
-  surname: m.surname,
-  bankName: m.bankName,
-  branch: m.branch,
-  status: m.status,
-  recruitedHow: m.channel,
-  recruitmentRepresentativeId: m.recruiterId,
-}))
+const channels = fixture.channels.map((name, i) => ({ id: i + 1, name }))
 
 /** The server's answer for the fixture, as `GET /api/recruitment-channels/summary` sends it. */
 const summary = fixture.expected.all.map((c) => ({
@@ -39,26 +24,26 @@ const summary = fixture.expected.all.map((c) => ({
 }))
 
 const places = bankPlacesOf(fixture.banks)
-
-/** A row as the fixture states it: its count, and its banks and branches as lists. */
-const figuresOf = (row) => ({
-  name: row.name,
-  members: row.count,
-  banks: row.banks ? row.banks.split(', ') : [],
-  branches: row.branches ? row.branches.split(', ') : [],
-})
-
 const byName = (rows) => Object.fromEntries(rows.map((row) => [row.name, row]))
 
-describe('RC15: the figures, from each member\'s own recruitment channel', () => {
-  it('🔴 the screen\'s own count gives the fixture\'s figures', () => {
-    const rows = channelRowsFromMembers(members, channels, places)
+describe('RC15: the rows, from the server\'s figures', () => {
+  it('every channel\'s count, banks and branches are the fixture\'s', () => {
+    const rows = byName(channelRowsFromSummary(summary, places))
 
-    expect(byName(rows.map(figuresOf))).toEqual(byName(fixture.expected.all))
+    for (const expected of fixture.expected.all) {
+      expect(rows[expected.name], expected.name).toMatchObject({
+        count: expected.members,
+        banks: expected.banks.join(', '),
+        branches: expected.branches.join(', '),
+      })
+    }
   })
 
-  it('the server\'s figures make the same rows, string for string -- provinces and areas included', () => {
-    expect(channelRowsFromSummary(summary, places)).toEqual(channelRowsFromMembers(members, channels, places))
+  it('each channel\'s provinces and areas follow from its banks, by the branch listing', () => {
+    expect(byName(channelRowsFromSummary(summary, places)).BEC).toMatchObject({
+      provinces: 'Invented North, Invented South',
+      areas: 'Invented Area A, Invented Area B',
+    })
   })
 
   it('the rows keep the screen\'s order: by name, every channel listed, a channel nobody joined reading 0', () => {
@@ -66,21 +51,19 @@ describe('RC15: the figures, from each member\'s own recruitment channel', () =>
 
     expect(rows.map((row) => row.name)).toEqual(['BEC', 'EORO', 'MSO', 'RO', 'Website', 'Youth'])
     expect(byName(rows).EORO).toMatchObject({ count: 0, banks: '', branches: '', provinces: '', areas: '' })
-    expect(byName(rows).BEC).toMatchObject({
-      banks: 'Invented Bank, Synthetic Bank',
-      provinces: 'Invented North, Invented South',
-      areas: 'Invented Area A, Invented Area B',
-    })
   })
 
   it('what RC15 was: matched on the RECRUITER\'s id, RO counted the member of recruiter 4 and not its own two', () => {
-    // The old join, written out once so the difference is on record: each channel took the members whose
+    // The old join, written out once so the difference stays on record: each channel took the members whose
     // recruitmentRepresentativeId was the channel's id.
-    const old = Object.fromEntries(channels.map((channel) => [
-      channel.name, members.filter((m) => m.recruitmentRepresentativeId === channel.id).length,
-    ]))
+    const old = fixture.members.filter((m) => m.recruiterId === channels.find((c) => c.name === 'RO').id).length
 
-    expect(old.RO).toBe(1)
-    expect(byName(fixture.expected.all).RO.members).toBe(2)
+    expect(old).toBe(1)
+    expect(byName(channelRowsFromSummary(summary, places)).RO.count).toBe(2)
+  })
+
+  it('the must-pass: no answer, or none yet, is no rows -- never a throw', () => {
+    expect(channelRowsFromSummary(undefined, places)).toEqual([])
+    expect(channelRowsFromSummary([], {})).toEqual([])
   })
 })
