@@ -58,7 +58,7 @@ import ChangeStatus from "../../components/members/ChangeStatus.jsx";
 /*
  * 📜 THE HISTORY TAB IS A CHUNK OF ITS OWN (month end 03.6): it is fetched when the tab is opened -- never at the
  * register's first paint -- and a chunk that will not load, or a tab that throws, is held by a boundary of its own and
- * says so in one line, the record around it untouched (Home's figures do the same).
+ * says so in one line, the record around it untouched (Month end's figures do the same, under a boundary of their own).
  */
 const MemberHistory = lazy(() => import("./MemberHistory.jsx"));
 
