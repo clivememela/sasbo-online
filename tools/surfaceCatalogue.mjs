@@ -4,6 +4,15 @@
  * Its own module so the suite can hold the catalogue against `src/` on every run
  * (`src/test/stateGatedSurfaces.structural.test.js`) without launching a browser; the browser run is `surfaces.mjs`.
  * A dialog added tomorrow is a red suite tomorrow, not a surface nobody opened.
+ *
+ * 🔑 A SURFACE BEHIND A PERMISSION IS REACHED SIGNED IN: `session: ['USERS_ADMIN', …]` (the names of
+ * `src/auth/permissions.js`). `surfaces.mjs` plants `sessionStorage['sasbo.session']` before the page's scripts run --
+ * the contract's `{token, expiresAt, user}`, the user holding exactly those permissions -- and `serve-dist.mjs` answers
+ * `GET /api/auth/me` with that same user and `GET /api/auth/mode` with `open` (`surfaceSession.mjs` is the one
+ * definition both read). `session: []` is a signed-in user with no permission, for a refusal worth measuring; a surface
+ * with no `session` is measured signed out, and any session a previous surface planted is removed first.
+ * The stub answers sign-in's other routes too, but nothing else of an October stream: a screen's own reads still need
+ * their stubs in `serve-dist.mjs`, or its surface measures an empty page.
  */
 import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -168,6 +177,7 @@ const IN_DIALOG = '[role="dialog"] button';
 /**
  * `covers` names the source sites a surface drives, as `<path under src>#<kind>@<which>`. The guard counts distinct
  * `@which` per `path#kind` against the sites in the source. `widths` narrows a surface that only exists at one.
+ * `session` signs the surface in with those permissions (this file's head).
  */
 export const SURFACES = [
   // ── the register (A27's class) ────────────────────────────────────────────────────────────────

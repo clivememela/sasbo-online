@@ -27,6 +27,8 @@ import { createReadStream, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 
+import { surfaceUser, userForToken } from './surfaceSession.mjs';
+
 /** Is this a readable file? One stat, and a missing path is simply `false`. */
 const isFile = (path) => {
   try {
@@ -593,6 +595,27 @@ const monthEndShape = (req, path, query) => {
   return path.startsWith('/api/month-end') ? { status: 404, body: { status: 404, error: 'Not Found', path } } : false;
 };
 
+/**
+ * SIGN-IN (contracts/signin.md), for the browser run: the mode is `open`, and `GET /api/auth/me` answers the user a
+ * surface's planted token stands for (`surfaceSession.mjs`) -- anyone else is `SIGN_IN_REQUIRED`, as the server says.
+ * Signing in is always refused (`SIGN_IN_FAILED`): a surface is signed in by planting a session, never by typing one,
+ * so the refusal is the one sign-in state worth measuring. Signing out and a password change succeed and store nothing.
+ * `false` when the path is not one of these.
+ */
+const refused = (status, code, message) => ({ status, body: { code, message, status } });
+const authAnswer = (req, path) => {
+  if (req.method === 'GET' && path === '/api/auth/mode') return { status: 200, body: { mode: 'open' } };
+  if (req.method === 'GET' && path === '/api/auth/me') {
+    const user = userForToken(req.headers.authorization);
+    return user ? { status: 200, body: { user } } : refused(401, 'SIGN_IN_REQUIRED', 'Sign in to use this.');
+  }
+  if (req.method === 'POST' && path === '/api/auth/login') {
+    return refused(401, 'SIGN_IN_FAILED', 'The username or the password is not right.');
+  }
+  if (req.method === 'POST' && (path === '/api/auth/logout' || path === '/api/auth/password')) return { status: 204, raw: '' };
+  return false;
+};
+
 /** Month end's shapes a prefix match cannot answer; `false` when the path is not one of them. */
 const monthEndAnswer = (req, path, query) => {
   if (path.startsWith('/api/month-end')) return monthEndOwnAnswer(req, path, query);
@@ -618,6 +641,13 @@ const monthEndAnswer = (req, path, query) => {
 };
 
 const API = {
+  // Sign-in's five routes, each answered by `authAnswer` before this table is read; keyed here so the drift check
+  // below sees every one of them answered by its own stub.
+  '/api/auth/mode': { mode: 'open' },
+  '/api/auth/me': { user: surfaceUser([]) },
+  '/api/auth/login': {},
+  '/api/auth/logout': {},
+  '/api/auth/password': {},
   '/api/members': members,
   '/api/members/summary': memberSummary,
   // Month end's reads, from the server's golden answers (`golden`, above). The workplaces' key answers their first
@@ -838,8 +868,8 @@ const server = createServer((req, res) => {
       res.end();
       return;
     }
-    // The shapes a prefix match cannot answer: A.C.B.'s runs, and month end's pages and change of status.
-    const shaped = acbRunAnswer(req, path) || monthEndAnswer(req, path, url.searchParams);
+    // The shapes a prefix match cannot answer: sign-in, A.C.B.'s runs, and month end's pages and change of status.
+    const shaped = authAnswer(req, path) || acbRunAnswer(req, path) || monthEndAnswer(req, path, url.searchParams);
     if (shaped) {
       // A JSON body, unless the shape carries bytes of its own type (the pack's workbook, an attachment).
       res.writeHead(shaped.status, { 'content-type': shaped.type ?? 'application/json; charset=utf-8', ...shaped.headers });
