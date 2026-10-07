@@ -92,6 +92,12 @@ const CEILINGS = {
   // 03.1, which cut it from 506 KiB to 287 by splitting every route. The ceiling is
   // deliberately BELOW the pre-split figure -- its job is to notice a route quietly
   // becoming a static import again, which would show up here and nowhere else.
+  //
+  // 2026-10-07, MEASURED, the ceiling unmoved: register paging (A10) leaves the entry at 330.49 KiB, +0.02 over main's
+  // 330.47 at cbd11dc (run 37672789318 at 1d6e43b against 37017335321; vite's index 338.40 -> 338.42 kB, +20 B). The
+  // only entry module the stream changes is Header.jsx, -127 B esbuild-minified alone (the search chip names what the
+  // server's search finds); the rest, by elimination, is the dependency map the entry keeps for its lazy routes: Members
+  // now shares `useDebounce` with Workplaces, so Rollup split it into a chunk of its own, and both routes' lists name it.
   entryJs: 350 * KB,
   // 600 -> 640 on 2026-09-09: see the re-measured table above. 6% over the 602.24
   // actual, for the reason the header gives -- a limit equal to the measurement
@@ -310,7 +316,19 @@ const CEILINGS = {
   // runner: clivememela/sasbo-online run 36988020502 at b0f9a4d, javascript 790.75 KiB, 0.10 over 790.65 at 0eb0d56
   // (run 36903903677). +100 B by vite's sizes, in one chunk there already: HomeFigures 5.90 -> 6.00 kB (the sentence,
   // and the choice between it and "today"). Nothing from src/test/ is imported.
-  js: 790.76 * KB,
+  //
+  // 790.76 -> 798.62 on 2026-10-07, MEASURED, under OB17 (javascript, css and all assets rise to the stream's staging
+  // run, and no further): the member register a page at a time (A10) and the record's save saying why it was refused
+  // (V68). Measured on a team runner: clivememela/sasbo-online run 37672789318 at 1d6e43b, javascript 798.61 KiB, 8.73
+  // over 789.88 at cbd11dc (run 37017335321). +8,930 B by vite's sizes, chunk by chunk:
+  //   Members 54.96 -> 62.50 kB (+7.54: the view in the address bar, the server's page and count, sorting, Per page,
+  //   the record read when its row is opened, the refused save's reason and MEMBER_CHANGED_SINCE -- less the browser's
+  //   own filtering and counting, gone) · Table +1.01 (headings that sort, with aria-sort) · memberService +0.27 (the
+  //   page and the overview) · useDebounce 0 -> 0.20 and Workplaces -0.10 (shared now, so split out) · monthEnd +0.03
+  //   (MEMBER_CHANGED_SINCE) · format -0.06 (the dates the register counted, no longer read) · index +0.02 (above)
+  //   · Admin +0.01 · Locations +0.01.
+  // Nothing from src/test/ is imported by the product.
+  js: 798.62 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
@@ -320,7 +338,10 @@ const CEILINGS = {
   // 80 -> 80.64 on 2026-10-01, MEASURED (MO25): 80.63 KiB on the same run, +720 B over 79.92 -- MO24's card rows' `end`
   // rule, the first screen's phone block and five utilities the build had not shipped (+590 B), and A.1's opened row's
   // rule (+130 B). The hundredth over the printed figure covers its rounding, as the javascript's does.
-  css: 80.64 * KB,
+  //
+  // 80.64 -> 80.79 on 2026-10-07, MEASURED (OB17): 80.78 KiB on run 37672789318 at 1d6e43b, +0.15 over 80.63 at cbd11dc
+  // (vite's index.css 82.56 -> 82.72 kB, +160 B) -- the sortable headings' and Per page's utilities.
+  css: 80.79 * KB,
   // 900 -> 925.12 on 2026-09-30, MEASURED, on the owner's word (MO14), the first time `all assets` was over: the same
   // pair as the javascript's, 866.48 KiB (run 36773278932) -> 925.11 KiB (run 36773289808). The javascript's +59,631 B
   // and the stylesheet's +409 B (296 of them the History tab's: its column widths, gutter bleed, alignment and one line
@@ -337,7 +358,10 @@ const CEILINGS = {
   //
   // 934.77 -> 934.87 on 2026-10-02, MEASURED (MO33): 934.86 KiB on run 36988020502 -- the javascript's +0.10 above,
   // the stylesheet unmoved at 80.63.
-  total: 934.87 * KB,
+  //
+  // 934.87 -> 942.88 on 2026-10-07, MEASURED (OB17): 942.87 KiB on run 37672789318 at 1d6e43b, 8.88 over 933.99 at
+  // cbd11dc -- the javascript's +8.73 and the stylesheet's +0.15 above, index.html unmoved.
+  total: 942.88 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to
