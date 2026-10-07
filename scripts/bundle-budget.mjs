@@ -321,7 +321,8 @@ const CEILINGS = {
   //   less the figures' lazy loader) · NavigationCard +360 (the card, drawn from the row's own parts) · MonthlyMenu
   //   +6,080 and HomeFigures -6,000 (the figures moved, their own month control gone) · Admin +80 · monthEnd -210 (the
   //   months the figures no longer offer) · index -70 (the entry: the rail's short name, Subscriptions off its top
-  //   level) · MemberHistory +30 (the reasons' new name) · eight chunks within 10 B each (two labels, renamed stubs).
+  //   level) · MemberHistory +30 (the reasons' new name) · AcbDebits +20 (two longer labels) · eight chunks within 10 B
+  //   each (a column's new name, renamed import stubs).
   //   Nothing from src/test/ is imported. The css is unmoved at 80.63; the entry is 330.40 against main's 330.47.
   js: 791.39 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme

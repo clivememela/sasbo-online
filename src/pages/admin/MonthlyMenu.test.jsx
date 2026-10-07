@@ -243,8 +243,11 @@ describe('the month -- chosen once, at the top, from the server\'s months (MD55)
     openPage('/admin/monthly-menu?month=2026-07')
     await monthsRead()
 
-    expect(screen.getByText('July 2026 was not taken, and a past month is read only from what was taken.'))
-      .toHaveAttribute('data-month-state', 'NOT_TAKEN')
+    // What refuses such a month is named -- its statistics and its pack -- and what the figures beneath it are: the
+    // page never says a month is read only from what was taken above figures that work it out now (review-home).
+    expect(screen.getByText('July 2026 was not taken: its statistics and its pack are made only from a taken month, '
+      + 'and its figures below are worked out now.')).toHaveAttribute('data-month-state', 'NOT_TAKEN')
+    expect(screen.queryByText(/a past month is read only from what was taken/)).not.toBeInTheDocument()
   })
 
   it('the months could not be read: said, with Try again -- and the statistics still open, for no month named', async () => {

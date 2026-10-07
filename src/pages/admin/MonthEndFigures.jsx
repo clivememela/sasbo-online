@@ -233,9 +233,11 @@ export default function MonthEndFigures({ month, openMonth = null }) {
   return (
     <section aria-labelledby="month-end-figures-heading" data-figures={empty ? 'empty' : view} className="mt-8">
       <h2 id="month-end-figures-heading" className="text-lg font-semibold text-ink">The month’s figures</h2>
+      {/* A name of its own: under the section's, the strip is the month's six totals, and the sheet beneath breaks
+          them down. One name for the region, the heading and the list was read three times over (review-home). */}
       <FigureStrip
         className="mt-3"
-        label="The month's figures"
+        label="The month’s totals"
         figures={stripOf(answer)}
         state={view === 'loading' ? 'loading' : view === 'error' ? 'error' : 'ready'}
       />

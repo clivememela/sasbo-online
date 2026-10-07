@@ -1,12 +1,13 @@
 // @vitest-environment jsdom -- Home: its modules in three views, the switch between them, and what it remembers
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
-import { screen, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import { Outlet, Route, Routes } from 'react-router-dom'
 
 import Home from './Home'
 import { navItems } from '../config/navigation'
 import { HOME_MODULES, HOME_VIEW_KEY } from './home/homeModules'
+import { summaryService } from '../services/summaryService'
 import { server } from '../test/msw/server'
 import { renderWithProviders } from '../test/renderWithProviders'
 import { setupUser } from '../test/user'
@@ -41,7 +42,11 @@ const pressed = () => ['Cards', 'List', 'Table'].filter((name) => choice(name).g
 const moduleHrefs = () => screen.getAllByRole('link').map((link) => link.getAttribute('href'))
 
 describe('Home keeps only the modules (the 5 Oct Show & Tell)', () => {
-  it('🔴 no figures, and nothing asked of the server: the month\'s figures are Month end\'s now', async () => {
+  it('🔴 no figures, and nothing asked of the server -- not on the first paint, in no view, and not once every import has settled', async () => {
+    // Two instruments: the service the figures read through, called in the very effect that reads, and every request
+    // any module sends.
+    const summaryRead = vi.spyOn(summaryService, 'getSummary')
+    const user = setupUser()
     renderWithProviders(<Home />)
 
     expect(screen.getByRole('heading', { level: 1, name: 'Welcome to SASBO Online' })).toBeInTheDocument()
@@ -50,8 +55,16 @@ describe('Home keeps only the modules (the 5 Oct Show & Tell)', () => {
     for (const word of ['Paying members', 'Penetration', 'Members on record']) {
       expect(screen.queryByText(word), `${word} is a figure, and the figures moved to Month end`).not.toBeInTheDocument()
     }
-    // A summary read would reach MSW as a request; a tick lets one that was going to start, start.
-    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // 🔑 NOT ONE TICK AFTER THE FIRST PAINT, WHICH A READ BEHIND A LAZY IMPORT WOULD OUTLAST (review-home): every view
+    // opened and back, every dynamic import settled, and one more turn of the event loop for the effects they bring.
+    for (const name of ['List', 'Table', 'Cards']) {
+      await user.click(choice(name))
+      expect(view()).toBe(name.toLowerCase())
+    }
+    await vi.dynamicImportSettled()
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+    expect(summaryRead).not.toHaveBeenCalled()
     expect(requests).toEqual([])
   })
 

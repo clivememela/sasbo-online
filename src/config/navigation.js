@@ -110,6 +110,8 @@ export const navItems = [
       // print "Debit Orders": a 256px rail row cuts the whole name off mid-word, and this file ships on every page's
       // first load. The whole name is Home's (`homeModules.js`) and Admin Membership's. The address stays `/admin/acb`
       // -- deep links and the decks use it. Written twice, here and on the rail's top level below.
+      // ⏳ "Debit Orders" IS PROVISIONAL: the wording of the shorter labels is asked of SASBO at Friday's meeting (DOD
+      // item 16, `answers/DOD.md`), so both entries change on her answer.
       {
         title: "Debit Orders",
         href:'/admin/acb',
