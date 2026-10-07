@@ -1,13 +1,13 @@
 // @vitest-environment jsdom -- every date on the member record, in one place, in one format
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen, within } from '@testing-library/react'
-import { http, HttpResponse } from 'msw'
 
 import MembersPage from './Members'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * 🔴 R3-F1 (P9's independent review): THE RECORD PRINTED DATES FOUR WAYS, AND A PASSPORT HOLDER'S RAN TOGETHER.
@@ -59,7 +59,7 @@ const panel = () => within(screen.getByTestId('member-panel'))
 
 async function openRecord(member, tab) {
   const user = setupUser()
-  server.use(http.get('*/api/members', () => HttpResponse.json([member])))
+  server.use(...registerHandlers([member]))
   renderWithProviders(<MembersPage />)
   await user.click(await screen.findByRole('button', { name: /open the record for/i }))
   if (tab) await user.click(await screen.findByRole('button', { name: tab }))

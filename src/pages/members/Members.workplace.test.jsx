@@ -9,6 +9,7 @@ import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { monthEndAnswer, monthEndBody, monthEndRefusal } from '../../test/msw/monthEndExamples'
 import { setupUser } from '../../test/user'
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * MONTH END `01.3` ON THE RECORD.
@@ -44,16 +45,23 @@ const NOWHERE = {
 
 let asked
 let saved
+/**
+ * The record is open. Since A10 a row OPENS by reading the member (`GET /api/members/{id}`), the register's own kit
+ * answering it; `asked` counts the reads after that -- the Employment tab's read of the workplace's lineage.
+ */
+let opened
 
 beforeEach(() => {
   asked = []
   saved = undefined
+  opened = false
   // The screen reports a failure through the one sink as well as showing it.
   vi.spyOn(console, 'error').mockImplementation(() => {})
   server.use(...pageFixtures)
   server.use(
-    http.get('*/api/members', () => HttpResponse.json([AT_HARBOUR, NOWHERE])),
     http.get('*/api/members/:id', ({ params }) => {
+      // The read that opens the record is the kit's, beneath.
+      if (!opened) return undefined
       asked.push(params.id)
       return HttpResponse.json({ ...AT_HARBOUR, workplace: HARBOUR })
     }),
@@ -68,6 +76,8 @@ beforeEach(() => {
       saved = await request.json()
       return HttpResponse.json({ ...saved, workplace: HEAD_OFFICE })
     }),
+    // Last, so the handlers above answer first.
+    ...registerHandlers([AT_HARBOUR, NOWHERE]),
   )
 })
 
@@ -76,7 +86,10 @@ const panel = () => within(screen.getByTestId('member-panel'))
 async function openEmployment(user, surname) {
   renderWithProviders(<MembersPage />)
   await user.click(await screen.findByRole('button', { name: new RegExp(`open the record for.*${surname}`, 'i') }))
-  await user.click(await panel().findByRole('button', { name: /Employment & Bank/i }))
+  // The tabs are there once the record has been read: from here a read is the record's own.
+  const employment = await panel().findByRole('button', { name: /Employment & Bank/i })
+  opened = true
+  await user.click(employment)
 }
 
 const workplaceGroup = () => panel().getByText('Workplace', { selector: 'legend' }).closest('fieldset')
@@ -102,7 +115,7 @@ describe('the record -- the member\'s workplace, read', () => {
   })
 
   it('a read the server does not have yet -- a 404 -- is not available (MD58, MV-53)', async () => {
-    server.use(http.get('*/api/members/:id', () => HttpResponse.json({ status: 404 }, { status: 404 })))
+    server.use(http.get('*/api/members/:id', () => (opened ? HttpResponse.json({ status: 404 }, { status: 404 }) : undefined)))
     const user = setupUser()
     await openEmployment(user, 'Harbour')
 
@@ -116,6 +129,7 @@ describe('the record -- the member\'s workplace, read', () => {
   it('a read that failed says so, with Try again -- and Try again reads it', async () => {
     let calls = 0
     server.use(http.get('*/api/members/:id', () => {
+      if (!opened) return undefined
       calls += 1
       return calls === 1
         ? HttpResponse.json({ status: 503 }, { status: 503 })
@@ -170,11 +184,11 @@ describe('the record -- the member\'s workplace, changed', () => {
   it('🔴 a workplace that shares its name with the one on record is still a change -- the id decides, not the name', async () => {
     // An invented twin: another workplace called INVENTED HEAD OFFICE, at another R/A number.
     const twin = { ...HEAD_OFFICE, id: 99, raNumber: 900099 }
+    // The record is read from the answer for one member since A10, so it carries the twin's scalars as the row does.
+    const atTwin = { ...AT_HARBOUR, workplaceId: twin.id, workplaceName: twin.name, workplaceRaNumber: twin.raNumber }
     server.use(
-      http.get('*/api/members', () => HttpResponse.json([
-        { ...AT_HARBOUR, workplaceId: twin.id, workplaceName: twin.name, workplaceRaNumber: twin.raNumber },
-      ])),
-      http.get('*/api/members/:id', () => HttpResponse.json({ ...AT_HARBOUR, workplaceId: twin.id, workplace: twin })),
+      http.get('*/api/members/:id', () => HttpResponse.json({ ...atTwin, workplace: twin })),
+      ...registerHandlers([atTwin]),
     )
     const user = setupUser()
     await editAndChooseHeadOffice(user)

@@ -9,6 +9,7 @@ import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
 import { BRANCH_OPTIONS } from '../../config/memberConstants'
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * EDIT MEMBER'S BANK BRANCH FOLLOWS THE SAME RULE AS CAPTURE MEMBER'S.
@@ -33,7 +34,7 @@ beforeEach(() => {
   saved = undefined
   vi.spyOn(console, 'error').mockImplementation(() => {})
   server.use(
-    http.get('*/api/members', () => HttpResponse.json([MEMBER])),
+    ...registerHandlers([MEMBER]),
     http.get('*/api/banks', () => HttpResponse.json([ABSA, CAPITEC])),
     http.get('*/api/banks/branches', () => HttpResponse.json([ABSA, CAPITEC])),
     http.put('*/api/members/:id', async ({ request }) => {
@@ -82,7 +83,7 @@ describe('Edit Member · Bank Branch', () => {
 
   it('the must-pass: a branch the new bank DOES offer is kept', async () => {
     const user = setupUser()
-    server.use(http.get('*/api/members', () => HttpResponse.json([{ ...MEMBER, branch: 'Rosebank' }])))
+    server.use(...registerHandlers([{ ...MEMBER, branch: 'Rosebank' }]))
     await editEmployment(user)
     await waitFor(() => expect(optionTexts(panel().getByLabelText(/^Bank Branch/))).toContain('Sandton City'))
 

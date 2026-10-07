@@ -1,6 +1,6 @@
-import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { flushSync } from "react-dom";
-import { useNavigate, useLocation, useOutletContext } from "react-router-dom";
+import { useNavigate, useLocation, useOutletContext, useSearchParams } from "react-router-dom";
 import {
     LucideUserRoundPlus, AlertCircle, CircleCheck, Printer, SlidersHorizontal,
     Pencil, Check,
@@ -21,7 +21,7 @@ import {
     TITLE_OPTIONS, RACE_OPTIONS, PAYMENT_TYPE_OPTIONS,
     STATUS_OPTIONS, IDENTITY_TYPE_OPTIONS, GENDER_OPTIONS,
     BRANCH_OPTIONS, MEMBER_FIELD_LABEL_MAP, EMPLOYMENT_TYPE_OPTIONS, IDENTITY_TYPE_PASSPORT,
-    DEBIT_DAY_OPTIONS, PAYMENT_TYPE_DEBIT_ORDER, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
+    DEBIT_DAY_OPTIONS, PAYMENT_TYPE_PAYROLL, PAYMENT_TYPE_PAYROLL_LEGACY,
     ACCOUNT_TYPE_OPTIONS, BEC_STRUCTURES_REPRESENTED, BEC_EXECUTIVE_POSITIONS, COSATU_POSITIONS, COSATU_POSITION_LABELS,
     MEMBER_FIELD_TABS as FIELD_TO_TAB_MAP,
 } from "@/config/memberConstants.js";
@@ -42,7 +42,7 @@ import useReferenceData from "../../hooks/useReferenceData.js";
 import reportError from "../../lib/reportError.js";
 import { ERROR_KINDS, writeMayHaveLanded } from "@/services/parseApiError.js";
 import useFocusOn from "../../hooks/useFocusOn.js";
-import { EMPTY, formatDate, formatZar, parseDate, sameDate, sameMonth, today, toWireDate } from "@/lib/format.js";
+import { EMPTY, formatDate, formatZar, toWireDate } from "@/lib/format.js";
 import { finishField, sanitiseField, validateField } from "@/utils/inputRules.js";
 import { branchNamesForBank, settleBankChange } from "@/utils/bankBranches.js";
 import { cn } from "@/lib/utils.js";
@@ -54,6 +54,15 @@ import useWorkplaceChoice from "../../hooks/useWorkplaceChoice.js";
 import useMemberWorkplace from "../../hooks/useMemberWorkplace.js";
 import { WORKPLACE_UNKNOWN } from "@/config/monthEnd.js";
 import ChangeStatus from "../../components/members/ChangeStatus.jsx";
+import { useDebounce } from "../../hooks/useDebounce.js";
+import useRegisterSearch from "./useRegisterSearch.js";
+import { useAuth } from "../../auth/useAuth";
+import RequirePermission from "../../auth/RequirePermission";
+import { PERMISSIONS } from "../../auth/permissions";
+import {
+    REGISTER_PAGE_SIZES, SEARCH_PAUSE_MS, TERM_MAX, historyState, isRegisterPage, isWholeIdentityNumber, nextSort,
+    overviewFigures, readView, registerQuery, writeView,
+} from "./memberRegister.js";
 
 /*
  * 📜 THE HISTORY TAB IS A CHUNK OF ITS OWN (month end 03.6): it is fetched when the tab is opened -- never at the
@@ -67,13 +76,11 @@ const historyFailed = () => (
 );
 
 
-const PAGE_SIZE = memberService.getPageSize();
-
 /** The job-grade list when there is no current answer: stable, so the select is not handed a new array each render. */
 const NO_JOB_GRADES = [];
 
-/** The members out of `getMembers`' answer, whichever of its shapes arrived -- the load and the refresh after a save. */
-const memberRows = (res) => (Array.isArray(res) ? res : (res.data || res.members || []));
+/** A page with nothing on it, while none has answered: stable, so the table is not handed a new array each render. */
+const NO_ROWS = [];
 
 /*
  * 🔴 HOW LONG THE RECORD OUTLIVES THE CLICK THAT CLOSED IT. This is `--duration-panel` in
@@ -83,13 +90,16 @@ const memberRows = (res) => (Array.isArray(res) ? res : (res.data || res.members
  */
 const PANEL_MS = 380;
 
-/** The fields in the topbar's search reads -- card.js `visible()`, plus the wire's own names. */
-const SEARCH_FIELDS = [
-    "membershipNumber", "employeeNumber", "surname", "firstNames", "initials", "bankName",
-    "branch", "status", "identityNumber", "workEmail", "personalEmail", "email", "phone",
-];
-
-const EMPTY_FILTERS = {
+/*
+ * 🔍 THE TWELVE CRITERIA BEHIND "MORE CRITERIA" -- matched by the server since A10, a page at a time, and kept out of
+ * the address bar: an identity, account or cellphone number, an e-mail address, are a member's details. What a box
+ * matches changed with the move, and each box's placeholder says how: a name or a number by its START, an identity,
+ * account or cellphone number WHOLE OR BY ITS LAST FOUR (the four every masked display prints), a pick exactly. The
+ * browser used to match any part of any of them, over every member it held.
+ *
+ * Bank, Branch and Status are the criteria row's three, and live in the address bar with the search and the page.
+ */
+const NO_CRITERIA = Object.freeze({
     title: "",
     employeeNumber: "",
     membershipNumber: "",
@@ -97,23 +107,21 @@ const EMPTY_FILTERS = {
     surname: "",
     identityType: "",
     identityNumber: "",
-    bankName: "",
-    branch: "",
     bankAccountNumber: "",
     phone: "",
     personalEmail: "",
     workEmail: "",
-    status: "",
     race: "",
-    recruitmentRepId: "",
-    isRepresentative: "",
-};
+});
 
-const FILTER_FIELDS = [
-    "title", "employeeNumber", "membershipNumber", "initials", "surname",
-    "identityType", "identityNumber", "bankName", "branch", "bankAccountNumber",
-    "phone", "personalEmail", "workEmail", "status", "race",
-];
+/** The criteria chosen from a list: asked at once. The typed ones wait for typing to pause. */
+const CHOSEN_CRITERIA = ["title", "identityType", "race"];
+
+/** The register's figures where none has been read: nothing, never a zero (A47, K1). */
+const NO_FIGURES = Object.freeze({
+    total: null, active: null, pending: null, suspended: null, newThisMonth: null, newDebitOrders: null,
+    updatedToday: null,
+});
 
 /*
  * THE FIVE SECTIONS OF A MEMBER'S RECORD -- this panel's own list, not the capture form's.
@@ -234,12 +242,6 @@ const TAB_PLACE = tabPlace(TABS.length);
  */
 const normalizePaymentType = (paymentType) =>
     paymentType === PAYMENT_TYPE_PAYROLL_LEGACY ? PAYMENT_TYPE_PAYROLL : paymentType;
-
-const getInitialFilters = (locationState) => ({
-    ...EMPTY_FILTERS,
-    bankName: locationState?.filters?.bankName || "",
-    branch: locationState?.filters?.branch || "",
-});
 
 /*
  * 🔴 THE SAVE CONFIRMATION SPOKE IN FIELD KEYS, AND PRINTED "No" AS "-" (`06.5`, the `06.3` critique, F-P55). It
@@ -391,9 +393,54 @@ const SAVE_NOTICE_TITLES = {
 export default function Members() {
     const navigate = useNavigate();
     const location = useLocation();
-    const [filters, setFilters] = useState(() => getInitialFilters(location.state));
-    const [requestedPage, setPage] = useState(1);
+    const [params, setParams] = useSearchParams();
+
+    /*
+     * 📄 THE REGISTER'S VIEW IS THE ADDRESS BAR'S (A10) -- the search, the page, its size and order, and the criteria
+     * row's three -- read whole on every render, so a refresh, a link or Back opens the register where it was.
+     * `memberRegister.js` holds what each may be; anything unreadable is the register's default, never a refusal.
+     */
+    const view = readView(params, location.state, STATUS_OPTIONS);
+    // The view as the handlers that change it read it: they run after the render that showed it.
+    const viewRef = useRef(view);
+    useEffect(() => {
+        viewRef.current = view;
+    });
+
+    /** A new view, in the address bar: pushed, so Back returns to the one before -- or replaced, for what typing asks. */
+    const showView = useCallback((changes, { replace = false } = {}) => {
+        const next = { ...viewRef.current, ...changes };
+        viewRef.current = next;
+        setParams(writeView(next), { replace, state: historyState(next) });
+    }, [setParams]);
+
+    /*
+     * 🔍 "MORE CRITERIA" -- a member's details, never the address bar's (`NO_CRITERIA`). The typed ones are asked once
+     * typing pauses -- each would otherwise be a request a keystroke -- and the picked ones at once.
+     */
+    const [criteria, setCriteria] = useState(NO_CRITERIA);
+    const typedCriteria = useDebounce(criteria, SEARCH_PAUSE_MS);
+    const askedCriteria = useMemo(() => {
+        const asked = {};
+        for (const field of Object.keys(NO_CRITERIA)) {
+            const value = CHOSEN_CRITERIA.includes(field) ? criteria[field] : typedCriteria[field];
+            const trimmed = String(value ?? "").trim().slice(0, TERM_MAX);
+            if (trimmed) asked[field] = trimmed;
+        }
+        return asked;
+    }, [criteria, typedCriteria]);
+
     const [selectedMember, setSelectedMember] = useState(null);
+
+    /*
+     * 📂 A RECORD IS READ WHEN IT IS OPENED (A10). A row of the register is its six columns and the id; the record --
+     * every field, and the workplace's lineage -- is `GET /api/members/{id}`, read for the one member chosen. `opening`
+     * holds the row while that read is out, and why it failed if it did: the panel shows the row's card, says it is
+     * opening, and offers no edit until the record itself is in -- an edit of a row would save a member with every
+     * other field blank.
+     */
+    const [opening, setOpening] = useState(null);
+    const openTicket = useRef(0);
 
     /*
      * 🔴 CLOSING IS TWO THINGS, AND THEY DO NOT HAPPEN AT THE SAME MOMENT: the column starts
@@ -410,22 +457,47 @@ export default function Members() {
     // The guarded close, for the window-level Escape listener, which is registered once. Kept current by an effect.
     const leaveRef = useRef(null);
 
-    const openRecord = useCallback((member) => {
+    /** The column stays: a close that was under way is called off. */
+    const keepOpen = useCallback(() => {
         if (closeTimer.current) {
             clearTimeout(closeTimer.current);
             closeTimer.current = null;
         }
         setPanelClosing(false);
-        setSelectedMember(member);
     }, []);
+
+    /**
+     * Reads the record of the row chosen, and opens it. The newest choice wins: the answer for a member chosen before
+     * another -- or before the panel closed -- is dropped (the ticket).
+     */
+    const loadRecord = useCallback((row) => {
+        keepOpen();
+        const ticket = ++openTicket.current;
+        setOpening({ row, error: null });
+        memberService.getMemberById(row.id).then((one) => {
+            if (ticket !== openTicket.current) return;
+            if (one?.id !== row.id) throw new Error("The server answered with another member's record.");
+            setOpening(null);
+            // The workplace's lineage the answer for one member carries is the Employment tab's own read and never an
+            // input, so it is kept off the record: a later edit's save does not send it back (as `rereadMember` does).
+            setSelectedMember({ ...one, workplace: undefined });
+        }).catch((error) => {
+            if (ticket !== openTicket.current) return;
+            reportError("Members.openRecord", error);
+            setOpening({ row, error });
+        });
+    }, [keepOpen]);
 
     const closeRecord = useCallback(() => {
         if (closeTimer.current) return;
+        // A record still being read is not opened into a column that has closed.
+        openTicket.current += 1;
         setPanelClosing(true);
         closeTimer.current = setTimeout(() => {
             closeTimer.current = null;
             setPanelClosing(false);
             setSelectedMember(null);
+            setOpening(null);
         }, PANEL_MS);
     }, []);
 
@@ -439,12 +511,11 @@ export default function Members() {
     const [editBaseline, setEditBaseline] = useState(null);
     const [activeTab, setActiveTab] = useState("personal");
     const [fieldErrors, setFieldErrors] = useState({});
-    const [membersList, setMembersList] = useState([]);
 
     /*
      * ✅ THE TWO SILENT `.catch(console.error)` LOADS, REPLACED BY ONE SET (EH-D9).
      *
-     * Note what is NOT here: `membersList`. The register's own fetch keeps its own
+     * Note what is NOT here: the register's page. The register's own fetch keeps its own
      * `listState`, because a register that failed IS this screen failing -- there is nothing
      * left to look at. A missing bank list is not; the register still renders and the edit
      * panel says which list is missing. That is the line between `error` and `partial`.
@@ -491,33 +562,133 @@ export default function Members() {
         { enabled: isEditing && activeTab === "structures" && editForm.isBec === true },
     );
 
-    /**
-     * A27 — THE THREE STATES, AT LAST, AND THE DEFECT WAS THAT THERE WAS ONLY ONE.
-     *
-     * The mount effect's entire failure handling was `console.error`, and `membersList`
-     * simply stayed `[]`. So a backend that is DOWN rendered "No Sasbo members match the
-     * specified query definitions" — which an administrator reads as a fact about the
-     * union rather than a fact about the server, with no retry, because nothing in the
-     * page knew a request had failed. There was no loading state either: the empty table
-     * rendered synchronously on mount, so the first thing every user saw, every time, was
-     * "no members", flickering into data.
-     *
-     * 🔑 `listState` IS ONE VALUE, NOT TWO BOOLEANS. `loading` and `error` as separate
-     * flags is four combinations for three legal states, and the illegal fourth
-     * (`loading && error`) is what renders an error and a spinner at once.
+    /*
+     * 🔒 WHO MAY READ THE REGISTER (A10, contracts/permissions.md) -- the server's own rule, said here so the screen asks
+     * nothing it would be refused: anyone while sign-in is open and nobody is signed in, and a signed-in user who holds
+     * MEMBERS_VIEW. Anyone else is told what is needed (`RequirePermission`), and no request is sent.
      */
-    const [listState, setListState] = useState("loading");
+    const auth = useAuth();
+    const mayRead = auth.can(PERMISSIONS.MEMBERS_VIEW) || (auth.mode === "open" && auth.status !== "signed-in");
+
     /* The twelve criteria the mock keeps behind "More criteria". Closed at rest. */
     const [moreCriteria, setMoreCriteria] = useState(false);
 
     /*
-     * The topbar's search is the SHELL's (card.html's `.search`); this page reads it
-     * through the outlet context and applies it across every field the register shows.
-     * Mounted without the shell -- every test does -- there is no context and no query.
+     * 🔎 THE TOPBAR'S SEARCH IS THE SHELL'S (card.html's `.search`), and since A10 the register's question is the address
+     * bar's `q`: `useRegisterSearch` keeps the two in step. Mounted without the shell -- every test but a few -- there is
+     * no box, and the address bar alone asks.
      */
     const { search = "", setSearch } = useOutletContext() || {};
-    const deferredSearch = useDeferredValue(search);
-    const query = deferredSearch.trim().toLowerCase();
+    useRegisterSearch(search, setSearch, view.q, showView);
+    const query = view.q;
+
+    /*
+     * 📊 THE FIGURE STRIP AND THE BRANCHES, READ FROM THE SERVER SINCE A10 (`GET /api/members/register/overview`).
+     *
+     * They were counted here from every member the register held, and the decision recorded was not to fetch them: a
+     * summary of its own would be one more thing to fail, and a number that could disagree with the rows. A register read
+     * a page at a time holds one page, so the server counts them -- over the same members the pages are drawn from (the
+     * caller's own region or area), as of SASBO's day -- and they are read when the page opens and again after every save
+     * and change of status, so they move with the rows. A figure that was never read is "not available", never a zero.
+     */
+    const [overview, setOverview] = useState({ state: "loading", figures: NO_FIGURES, branches: [] });
+    const loadOverview = useCallback(() => memberService.getRegisterOverview().then(
+        (read) => {
+            const figures = overviewFigures(read);
+            setOverview(figures
+                ? { state: "ready", figures, branches: Array.isArray(read.branches) ? read.branches : [] }
+                : { state: "error", figures: NO_FIGURES, branches: [] });
+        },
+        (error) => {
+            reportError("Members.overview", error);
+            // A refresh that fails keeps the figures it had: they were true when they were read.
+            setOverview((shown) => (shown.state === "ready" ? shown : { state: "error", figures: NO_FIGURES, branches: [] }));
+        },
+    ), []);
+
+    useEffect(() => {
+        if (mayRead) loadOverview();
+    }, [mayRead, loadOverview]);
+
+    /**
+     * A27 — THE THREE STATES, AND A10 KEEPS THEM: a page that has not answered is LOADING, a page that failed is a
+     * FAILURE with a retry, and only a page that answered with no rows is EMPTY. A backend that is down never renders as
+     * "no members match", which an administrator reads as a fact about the union.
+     *
+     * 🔑 ONE ANSWER, KEYED BY THE QUESTION IT ANSWERS, as the workplaces' and the job grades' are: a page for another
+     * question -- another search, criterion, page, size or order -- is simply not current, so it is not shown and nothing
+     * has to be cleared for it to disappear. `attempt` is a retry's: the same question, asked again.
+     */
+    const question = JSON.stringify(registerQuery(view, askedCriteria));
+    const [attempt, setAttempt] = useState(0);
+    const [answer, setAnswer] = useState({});
+    // The answer and the question as the promises and the save read them, after the render that showed them.
+    const answerRef = useRef(answer);
+    const questionRef = useRef(question);
+    const showViewRef = useRef(showView);
+    useEffect(() => {
+        questionRef.current = question;
+        showViewRef.current = showView;
+    });
+
+    /** An answer, kept: a page past the last is answered as the last, and the address bar follows it there. */
+    const keepAnswer = useCallback((asking, data, attemptNo) => {
+        const answered = JSON.stringify({ ...asking, page: data.page });
+        answerRef.current = { question: answered, attempt: attemptNo, data };
+        setAnswer(answerRef.current);
+        if (data.page !== asking.page) showViewRef.current({ page: data.page }, { replace: true });
+    }, []);
+
+    useEffect(() => {
+        if (!mayRead) return undefined;
+        // Answered already: the page a page past the last landed on is the answer this question now asks.
+        if (answerRef.current.question === question && answerRef.current.attempt === attempt) return undefined;
+        // THE TICKET: a newer question -- or leaving the page -- retires this one, and its answer is dropped.
+        let current = true;
+        const asking = JSON.parse(question);
+        memberService.searchRegister(asking).then((data) => {
+            if (!current) return;
+            if (!isRegisterPage(data)) throw new Error("The register answered with something that is not a page of it.");
+            keepAnswer(asking, data, attempt);
+        }).catch((error) => {
+            if (!current) return;
+            // Still logged -- the log is what a developer reads. What changed is that the SCREEN knows too.
+            reportError("Members.loadRegister", error);
+            answerRef.current = { question, attempt, error };
+            setAnswer(answerRef.current);
+        });
+        return () => {
+            current = false;
+        };
+    }, [question, attempt, mayRead, keepAnswer]);
+
+    // A request that has not answered is not an answer (SCREEN-CONTRACT §2): nothing is counted until it has.
+    const shownAnswer = answer.question === question ? answer : null;
+    const listState = !mayRead ? "refused" : shownAnswer === null ? "loading" : shownAnswer.error ? "error" : "ready";
+    const registerPage = shownAnswer?.data ?? null;
+    const visibleMembers = registerPage?.content ?? NO_ROWS;
+
+    const retryMembers = useCallback(() => {
+        answerRef.current = {};
+        setAnswer({});
+        setAttempt((n) => n + 1);
+        // The figures most likely failed with the page: asked again too. A strip that had its figures keeps them.
+        loadOverview();
+    }, [loadOverview]);
+
+    /**
+     * 🔁 THE PAGE ON SCREEN, ASKED AGAIN -- after a save and after a change of status, ONLY THAT PAGE (A10): its rows
+     * stay up while it is asked, the open record and the page are kept, and a member who has left a filter leaves the
+     * page. Resolves when the page is in; rejects where it could not be read, for the save to say so (R3-F2).
+     */
+    const refreshPage = useCallback(() => {
+        const asking = JSON.parse(questionRef.current);
+        return memberService.searchRegister(asking).then((data) => {
+            if (!isRegisterPage(data)) throw new Error("The register answered with something that is not a page of it.");
+            keepAnswer(asking, data, answerRef.current.attempt ?? 0);
+        });
+    }, [keepAnswer]);
+
 
     /* Tab changes move in the direction of travel (card.js `enterTab`). */
     const [tabDirection, setTabDirection] = useState("fwd");
@@ -564,30 +735,6 @@ export default function Members() {
         setPrintScope(null);
     }, []);
 
-    /*
-     * 🔴 THE LOADING RESET IS ON THE RETRY PATH NOW (`10.4`), not inside the fetch the effect
-     * calls. `react-hooks/set-state-in-effect` is an error as of this phase and it was right.
-     *
-     * 🔑 A NO-OP ON MOUNT: `listState` already initialises to "loading". The line only ever did
-     * work when a human pressed Try again after a failure, and that is `retryMembers`.
-     */
-    const loadMembers = useCallback(() => {
-        return memberService.getMembers().then(res => {
-            setMembersList(memberRows(res));
-            setListState("ready");
-        }).catch(err => {
-            // Still logged — the log is what a developer reads. What changed is that the
-            // SCREEN now knows too.
-            reportError("Members.loadMembers", err);
-            setListState("error");
-        });
-    }, []);
-
-    const retryMembers = useCallback(() => {
-        setListState("loading");
-        loadMembers();
-    }, [loadMembers]);
-
     /**
      * 🔁 THE RECORD'S OWN RELOAD (month end 03.3): the answer for this one member replaces the record and its row in the
      * register -- after a change of status, and before the *Change status* dialog says anything of a change whose answer
@@ -608,15 +755,12 @@ export default function Members() {
         const now = fresh ?? (status ? { status } : null);
         if (now) {
             setSelectedMember((member) => (member?.id === id ? { ...member, ...now } : member));
-            setMembersList((rows) => rows.map((row) => (row.id === id ? { ...row, ...now } : row)));
+            // A10: the page on screen and the figures, asked again -- a member who changed status may have left a filter.
+            refreshPage().catch((error) => reportError("Members.refreshAfterStatus", error));
+            loadOverview();
         }
         return fresh;
-    }), []);
-
-    // The two reference lists are `useReferenceData`'s now; this owns the register alone.
-    useEffect(() => {
-        loadMembers();
-    }, [loadMembers]);
+    }), [refreshPage, loadOverview]);
 
     const tabsWithErrors = useMemo(() => {
         const errorTabs = new Set();
@@ -1055,9 +1199,10 @@ export default function Members() {
             setIsEditing(false);
             const savedName = personName(editForm);
             say(savedName ? `${savedName}’s record saved` : "Changes saved");
+            // A10: the page on screen alone is asked again, and the figures with it -- the record stays open on it.
+            loadOverview();
             try {
-                const refreshed = await memberService.getMembers();
-                setMembersList(memberRows(refreshed));
+                await refreshPage();
             } catch (error) {
                 reportError("Members.refreshAfterSave", error);
                 setSaveNotice({
@@ -1094,20 +1239,25 @@ export default function Members() {
         setFieldErrors({});
     }, []);
 
-    const requestOpenRecord = useCallback((member) => {
+    const requestOpenRecord = useCallback((row) => {
         const { isEditing: editing, selectedId } = guard.current;
-        // The member already open, chosen again: there is nothing to switch to, and nothing to throw away.
-        if (member?.id != null && member.id === selectedId) {
-            if (!editing) openRecord(member);
+        // The member already open, chosen again: nothing to read and nothing to throw away -- and a record another
+        // click was still reading is not opened over the one chosen last.
+        if (row?.id != null && row.id === selectedId) {
+            if (!editing) {
+                openTicket.current += 1;
+                setOpening(null);
+                keepOpen();
+            }
             return;
         }
         if (recordIsDirty(guard.current)) {
-            setPendingLeave({ member });
+            setPendingLeave({ member: row });
             return;
         }
         endEdit();
-        openRecord(member);
-    }, [openRecord, endEdit, setPendingLeave]);
+        loadRecord(row);
+    }, [keepOpen, loadRecord, endEdit, setPendingLeave]);
 
     const requestCloseRecord = useCallback(() => {
         if (recordIsDirty(guard.current)) {
@@ -1127,92 +1277,57 @@ export default function Members() {
         const leave = pendingLeave;
         setPendingLeave(null);
         endEdit();
-        if (leave?.member) openRecord(leave.member);
+        if (leave?.member) loadRecord(leave.member);
         else closeRecord();
     };
 
     // The save summary takes focus once it exists, and again on every fresh notice -- `useFocusOn` says why.
     const errorSummaryRef = useFocusOn(saveNotice);
 
-    const handleInputChange = useCallback((field) => (event) => {
-        setFilters((prev) => ({ ...prev, [field]: fieldValue(event) }));
-        setPage(1);
-    }, []);
+    /** A criterion of the criteria row -- the bank, the branch, the status -- in the address bar, from the first page. */
+    const handleViewCriterion = useCallback((field) => (event) => {
+        showView({ [field]: fieldValue(event), page: 0 });
+    }, [showView]);
 
     /**
-     * R-PERF-J. The filter runs against the WHOLE member list on every keystroke, and the
-     * result re-renders a table of up to a hundred rows. `useDeferredValue` lets React
-     * paint the keystroke first and the filtered list a beat later, so typing stays
-     * responsive on a list that is large enough to matter.
-     *
-     * ⚠️ DEFERRED, NOT DEBOUNCED, AND THE DIFFERENCE IS WHICH ONE IS CORRECT HERE. A
-     * debounce delays by a fixed time whether or not the machine needed it; deferring
-     * costs nothing on a fast machine and degrades gracefully on a slow one. `useDebounce`
-     * is the right tool where a keystroke triggers a REQUEST — this filter is local, so
-     * there is no request to spare.
+     * A criterion behind "More criteria": asked once typing pauses, or at once where it is picked from a list -- and from
+     * the first page, as every change of question is.
      */
-    const deferredFilters = useDeferredValue(filters);
+    const handleInputChange = useCallback((field) => (event) => {
+        setCriteria((prev) => ({ ...prev, [field]: fieldValue(event) }));
+        if (viewRef.current.page !== 0) showView({ page: 0 }, { replace: true });
+    }, [showView]);
 
-    const filteredMembers = useMemo(() => {
-        const activeFilters = FILTER_FIELDS
-            .map((field) => [field, deferredFilters[field] ? String(deferredFilters[field]).trim().toLowerCase() : ""])
-            .filter(([, value]) => value);
-        return membersList.filter((member) =>
-            activeFilters.every(([field, value]) =>
-                String(member[field] ?? "").trim().toLowerCase().includes(value)
-            ) &&
-            (!query || SEARCH_FIELDS.some((field) => String(member[field] ?? "").toLowerCase().includes(query)))
-        );
-    }, [deferredFilters, membersList, query]);
+    /** A heading pressed: its column, A to Z first and Z to A on a second press -- from the first page. */
+    const handleSort = useCallback((key) => {
+        showView({ sort: nextSort(viewRef.current.sort, key), page: 0 });
+    }, [showView]);
 
-    /*
-     * 🔴 THE PAGE IS DERIVED, NOT CLAMPED AFTER THE FACT (`10.4`) -- AND THE CLAMP WAS A LIE FOR ONE FRAME.
-     *
-     * It used to be an effect: `setPage(p => Math.min(p, totalPages))`. `react-hooks/set-state-in-effect`
-     * flagged it, and the warning was describing a real frame. Search from page 3 for a surname five members
-     * share, and React rendered once with `page` still 3 and one page in total -- an EMPTY slice -- COMMITTED
-     * it, and drew **No member matches "..."** over members it was about to show. Only then did the effect
-     * bring the page down. A false statement about the union's own register, for one frame, on every search
-     * made from a later page.
-     *
-     * Criteria never showed it (they reset to page 1 themselves); only the TOPBAR search shrinks the list
-     * without doing so, which is why that is the one path that needed a clamp at all. And no test could see
-     * it, because every test mounts this page without the shell that supplies the search.
-     * `Members.pageClamp.test.jsx` mounts it under one, and watches the empty title for the whole transition.
-     *
-     * Derived during render, there is no frame in which the page can be out of range.
-     *
-     * ⚠️ AND DERIVING ALONE WOULD HAVE BROKEN SOMETHING ELSE, WHICH IS WHY THE SECOND LINE EXISTS. The effect
-     * clamped PERMANENTLY: search from page 3, land on page 1, clear the search, and you stay on page 1. A bare
-     * `Math.min` leaves what was asked for at 3, so clearing the search would have thrown the user back to
-     * page 3 of the full register -- a page they never chose for that list. So what was asked for follows
-     * what can be shown, during render. That is React's documented adjustment ("storing information from
-     * previous renders"): the re-render happens before anything commits, so the stale frame is never drawn,
-     * and the guard is what makes it terminate. The test file's third case holds this half.
+    /**
+     * 🔴 THE PAGE IS THE SERVER'S ANSWER, NEVER A GUESS (A10). The client clamped a page it had computed from every
+     * member it held -- once with an effect that drew "No member matches" over members for a frame (`10.4`), then
+     * during render. The server answers the page asked for, or its last page where the list has shrunk past it, and
+     * says which: `keepAnswer` moves the address bar there. So no frame shows a page out of range, and a page asked
+     * past the end lands where the list ends.
      */
-    const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE)), [filteredMembers]);
-    const page = Math.min(requestedPage, totalPages);
-    if (requestedPage !== page) setPage(page);
+    const pageSize = registerPage?.size ?? view.size;
+    const page = (registerPage?.page ?? view.page) + 1;
+    const totalPages = Math.max(registerPage?.totalPages ?? 1, 1);
+    const totalMembers = registerPage?.totalElements ?? 0;
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + visibleMembers.length;
 
-    /* The rows re-enter when the question changes: a new query, a new criterion, a new page. */
-    const enterKey = useMemo(
-        () => JSON.stringify([deferredFilters, query, page]),
-        [deferredFilters, query, page],
-    );
+    const handlePageChange = useCallback((next) => {
+        showView({ page: next - 1 });
+    }, [showView]);
 
-    /*
-     * 📊 THE FIGURE STRIP'S NUMBERS, COUNTED FROM THE REGISTER THIS PAGE ALREADY HOLDS.
-     *
-     * 🔑 NOT FETCHED, AND THAT IS THE DECISION. A `/api/members/summary` endpoint would be
-     * one more thing to fail, one more empty state, and -- worse -- a number that can
-     * DISAGREE with the rows underneath it. A strip reading "1 902 active" over a register
-     * showing something else is a screen nobody can trust twice, and it is the failure mode
-     * the register would take longest to notice.
-     *
-     * ⚠️ COUNTED OVER `membersList`, NOT `filteredMembers`. The strip is a statement about
-     * the REGISTER, not about the current search: totals that move as you type are a
-     * different instrument, and the contract calls this the "register summary".
-     */
+    const handlePageSize = useCallback((size) => {
+        showView({ size: Number(size), page: 0 });
+    }, [showView]);
+
+    /* The rows re-enter when the question changes: a new search, a new criterion, a new page, size or order. */
+    const enterKey = question;
+
     /*
      * How many of the COLLAPSED criteria are actually filtering.
      *
@@ -1222,50 +1337,32 @@ export default function Members() {
      * a consequence as a fact. The count on the control is what makes a hidden criterion
      * visible.
      */
-    const activeExtraCriteria = useMemo(() => {
-        const shown = new Set(["bankName", "branch", "status"]);
-        return Object.entries(filters).filter(
-            ([key, value]) => !shown.has(key) && String(value ?? "").trim() !== "",
-        ).length;
-    }, [filters]);
-
-    /* The Branch criterion's choices: every branch the register holds, once, in order. */
-    const registerBranches = useMemo(
-        () => [...new Set(membersList.map((m) => m?.branch).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
-        [membersList],
+    const activeExtraCriteria = useMemo(
+        () => Object.values(criteria).filter((value) => String(value ?? "").trim() !== "").length,
+        [criteria],
     );
 
-    const registerFigures = useMemo(() => {
-        const by = (status) => membersList.filter((m) => m?.status === status).length;
-        const now = today();
-        // 🗣️ SASBO, 18 Sep 2026: the month's new members, and how many of them pay by debit order. "New" is the
-        // member's own Date Joined -- the day they were captured, which capture fills in and does not let anyone
-        // change -- in this calendar month; the payment type is read through the same fold the record uses, so a
-        // legacy spelling counts as what it is.
-        const joinedThisMonth = membersList.filter((m) => sameMonth(parseDate(m?.joinDate), now));
-        return {
-            total: membersList.length,
-            active: by("Active"),
-            pending: by("Pending"),
-            suspended: by("Suspended"),
-            newThisMonth: joinedThisMonth.length,
-            newDebitOrders: joinedThisMonth.filter((m) => normalizePaymentType(m?.paymentType) === PAYMENT_TYPE_DEBIT_ORDER).length,
-            // card.html's fifth, quiet figure. `dateLastChanged` is the wire's name for the
-            // record's last edit; a register that carries none simply reads 0.
-            updatedToday: membersList.filter((m) =>
-                sameDate(parseDate(m?.dateLastChanged ?? m?.updatedAt), now),
-            ).length,
-        };
-    }, [membersList]);
+    /*
+     * The Branch criterion's choices: every branch the register's members are at, once, in order -- the server's list
+     * (`overview.branches`), so it never offers a branch with no members; and the one in the address bar, should a link
+     * name one the list does not hold.
+     */
+    const registerBranches = useMemo(
+        () => [...new Set([...overview.branches, view.branch].filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+        [overview.branches, view.branch],
+    );
 
-    const startIndex = (page - 1) * PAGE_SIZE;
-    const endIndex = Math.min(startIndex + PAGE_SIZE, filteredMembers.length);
-    const visibleMembers = useMemo(() => filteredMembers.slice(startIndex, endIndex), [filteredMembers, startIndex, endIndex]);
+    // 🗣️ SASBO, 18 Sep 2026: the month's new members, and how many of them pay by debit order -- counted by the server
+    // now, over the register (`overview`), by the member's own Date Joined in SASBO's calendar month.
+    const registerFigures = overview.figures;
+
+    /** Is anything narrowing the register -- the search, a criterion of the row, or one behind "More criteria"? */
+    const narrowed = Boolean(query || view.status || view.bank || view.branch || activeExtraCriteria > 0);
 
     const handleClear = () => {
-        setFilters({ ...EMPTY_FILTERS });
+        setCriteria(NO_CRITERIA);
         setSearch?.("");
-        setPage(1);
+        showView({ q: "", status: "", bank: "", branch: "", page: 0 });
     };
 
     /**
@@ -1286,6 +1383,7 @@ export default function Members() {
         {
             key: "membershipNumber",
             header: "Membership no.",
+            sortKey: "membershipNumber",
             priority: "essential",
             cell: (member) => {
                 const number = member.membershipNumber || "—";
@@ -1336,6 +1434,8 @@ export default function Members() {
         {
             key: "member",
             header: "Member",
+            // Sorted by surname, then first names: the register's own order (A10).
+            sortKey: "surname",
             priority: "essential",
             // The two-line member cell -- `Ms NT Mokoena` over `Nomvula Thandeka`. Both lines
             // truncate at the same width, and the full names are one click away on the card.
@@ -1353,6 +1453,7 @@ export default function Members() {
         {
             key: "bankName",
             header: "Bank",
+            sortKey: "bank",
             priority: "secondary",
             fit: "narrow",
             // Real bank names run to "The Standard Bank of South Africa Limited"; the mock's
@@ -1373,6 +1474,7 @@ export default function Members() {
         {
             key: "branch",
             header: "Branch",
+            sortKey: "branch",
             priority: "secondary",
             fit: "medium",
             // Capped like Bank, and for Bank's reason: an uncapped branch sets the width the column
@@ -1386,6 +1488,7 @@ export default function Members() {
         {
             key: "status",
             header: "Status",
+            sortKey: "status",
             priority: "essential",
             cell: (member) => <StatusChip status={member.status} />,
         },
@@ -1393,6 +1496,23 @@ export default function Members() {
     // stable and the columns are still built once -- it is named because the rule is right: a closure that is not
     // declared is a closure nobody will remember to check when it stops being stable.
     ], [requestOpenRecord]);
+
+    /*
+     * 🔒 A SIGNED-IN USER WITHOUT MEMBERS_VIEW, or nobody while sign-in is required (A10): the page says what is needed
+     * and asks the server nothing -- `RequirePermission`'s notice, with the way to sign in where nobody is.
+     */
+    if (!mayRead) {
+        return (
+            <div className="flex min-h-0 flex-1 flex-col text-ink">
+                <div className={cn(PAGE_GUTTER, "pt-[26px]")}>
+                    <PageTitle title="Members" subtitle="The membership register across every bank." />
+                    <div className="mt-5">
+                        <RequirePermission permission={PERMISSIONS.MEMBERS_VIEW} />
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         /* 📐 card.html's `.main`, section by section: the page head, the ruled figure strip,
@@ -1424,9 +1544,9 @@ export default function Members() {
 
             {/* 📊 THE RULED FIGURE STRIP -- "ledger line, not tiles", and the contract
                 refuses the alternative by name ("hero-metric tiles, dashboards of same-size
-                cards"). Counted from the register the page already holds, so it can never
-                disagree with the rows below it. */}
-            <FigureStrip className="mx-7 mt-5 max-lg:mx-4" {...registerFigures} state={listState} />
+                cards"). Counted by the server over the caller's register since A10, read with
+                the page and again after every save; "not available" until it has answered. */}
+            <FigureStrip className="mx-7 mt-5 max-lg:mx-4" {...registerFigures} state={overview.state} />
 
             {/* 🔍 THE CRITERIA ROW -- card.css `.criteria`. Three labelled fields printed on
                 the page, "More criteria" beside them, Clear at the end. This page had FIFTEEN
@@ -1437,27 +1557,28 @@ export default function Members() {
                     <SearchableSelect
                         className={CRITERION}
                         label="Bank"
-                        value={filters.bankName}
-                        onChange={handleInputChange("bankName")}
+                        value={view.bank}
+                        onChange={handleViewCriterion("bank")}
                         placeholder="All banks"
                         {...refs.field('banks')}
                         options={[{ value: '', label: 'All banks' }, ...bankOptions.map(b => ({ value: b, label: b }))]}
                     />
-                    {/* A picker, as the mock's `.crit` is -- fed by the branches the register
-                        actually holds, so the list can never offer a branch with no members. */}
+                    {/* A picker, as the mock's `.crit` is -- fed by the branches the register's
+                        members are at (the server's list since A10), so it never offers a branch
+                        with no members. */}
                     <SearchableSelect
                         className={CRITERION}
                         label="Branch"
-                        value={filters.branch}
-                        onChange={handleInputChange("branch")}
+                        value={view.branch}
+                        onChange={handleViewCriterion("branch")}
                         placeholder="Any"
                         options={[{ value: "", label: "Any" }, ...registerBranches.map(b => ({ value: b, label: b }))]}
                     />
                     <SearchableSelect
                         className={CRITERION}
                         label="Status"
-                        value={filters.status}
-                        onChange={handleInputChange("status")}
+                        value={view.status}
+                        onChange={handleViewCriterion("status")}
                         placeholder="Any"
                         options={[{ value: "", label: "Any" }, ...statusOptions.map(o => ({ value: o, label: o }))]}
                     />
@@ -1493,11 +1614,11 @@ export default function Members() {
                     hidden={!moreCriteria}
                     className="mt-3 grid grid-cols-1 items-end gap-x-3 gap-y-3 rounded-lg bg-surface p-4 shadow-(--shadow-1) sm:grid-cols-2 lg:grid-cols-4"
                 >
-                    <SearchableSelect label="Title" value={filters.title} onChange={handleInputChange("title")} placeholder="All Titles" options={[{ value: "", label: "All Titles" }, ...titleOptions.map(o => ({ value: o, label: o }))]} />
-                    <TextInput label="Employee Number" kind="identifier" value={filters.employeeNumber} onChange={handleInputChange("employeeNumber")} placeholder="Search by employee number" />
-                    <TextInput label="Membership Number" kind="identifier" value={filters.membershipNumber} onChange={handleInputChange("membershipNumber")} placeholder="Search by membership number" />
-                    <TextInput label="Initials" value={filters.initials} onChange={handleInputChange("initials")} placeholder="Search by initials" />
-                    <TextInput label="Surname" kind="name" value={filters.surname} onChange={handleInputChange("surname")} placeholder="Search by surname" />
+                    <SearchableSelect label="Title" value={criteria.title} onChange={handleInputChange("title")} placeholder="All Titles" options={[{ value: "", label: "All Titles" }, ...titleOptions.map(o => ({ value: o, label: o }))]} />
+                    <TextInput label="Employee Number" kind="identifier" value={criteria.employeeNumber} onChange={handleInputChange("employeeNumber")} placeholder="The start of the number" maxLength={TERM_MAX} />
+                    <TextInput label="Membership Number" kind="identifier" value={criteria.membershipNumber} onChange={handleInputChange("membershipNumber")} placeholder="The start of the number" maxLength={TERM_MAX} />
+                    <TextInput label="Initials" value={criteria.initials} onChange={handleInputChange("initials")} placeholder="The start of the initials" maxLength={TERM_MAX} />
+                    <TextInput label="Surname" kind="name" value={criteria.surname} onChange={handleInputChange("surname")} placeholder="The start of the surname" maxLength={TERM_MAX} />
                     {/* 🔴 A28, CLOSED. This was a bare <select> under a <span>Identity Type</span>
                         — a span is not a label, so nothing associated the two and a
                         screen-reader user reached a dropdown announced only as "combo box",
@@ -1508,17 +1629,19 @@ export default function Members() {
                         commit — never repaired. */}
                     <SelectInput
                         label="Identity Type"
-                        value={filters.identityType}
+                        value={criteria.identityType}
                         onChange={handleInputChange("identityType")}
                         placeholder="All Types"
                         options={[{ value: "", label: "All Types" }, ...idTypeOptions.map(o => ({ value: o, label: o }))]}
                     />
-                    <TextInput label="Identity Number" kind="identifier" value={filters.identityNumber} onChange={handleInputChange("identityNumber")} placeholder="Search by identity number" />
-                    <TextInput label="Bank Account Number" kind="identifier" value={filters.bankAccountNumber} onChange={handleInputChange("bankAccountNumber")} placeholder="Search by bank account number" />
-                    <TextInput label="Cellphone Number" kind="tel" value={filters.phone} onChange={handleInputChange("phone")} placeholder="Search by cellphone number" />
-                    <TextInput label="Personal Email" kind="email" value={filters.personalEmail} onChange={handleInputChange("personalEmail")} placeholder="Search by personal email" />
-                    <TextInput label="Work Email" kind="email" value={filters.workEmail} onChange={handleInputChange("workEmail")} placeholder="Search by work email" />
-                    <SearchableSelect label="Race" value={filters.race || ""} onChange={handleInputChange("race")} placeholder="All Races" options={[{ value: "", label: "All Races" }, ...raceOptions.map(o => ({ value: o, label: o }))]} />
+                    {/* 🔒 Whole, or by the last four the masked displays print -- never by a part: a number's
+                        middle is no way to find a member, and every part of every member's was once matched here. */}
+                    <TextInput label="Identity Number" kind="identifier" value={criteria.identityNumber} onChange={handleInputChange("identityNumber")} placeholder="Whole, or its last four digits" maxLength={TERM_MAX} />
+                    <TextInput label="Bank Account Number" kind="identifier" value={criteria.bankAccountNumber} onChange={handleInputChange("bankAccountNumber")} placeholder="Whole, or its last four digits" maxLength={TERM_MAX} />
+                    <TextInput label="Cellphone Number" kind="tel" value={criteria.phone} onChange={handleInputChange("phone")} placeholder="Whole, or its last four digits" maxLength={TERM_MAX} />
+                    <TextInput label="Personal Email" kind="email" value={criteria.personalEmail} onChange={handleInputChange("personalEmail")} placeholder="The start of the address" maxLength={TERM_MAX} />
+                    <TextInput label="Work Email" kind="email" value={criteria.workEmail} onChange={handleInputChange("workEmail")} placeholder="The start of the address" maxLength={TERM_MAX} />
+                    <SearchableSelect label="Race" value={criteria.race || ""} onChange={handleInputChange("race")} placeholder="All Races" options={[{ value: "", label: "All Races" }, ...raceOptions.map(o => ({ value: o, label: o }))]} />
                 </div>
             </div>
 
@@ -1564,34 +1687,40 @@ export default function Members() {
                         columns={columns}
                         rows={visibleMembers}
                         rowKey="id"
-                        selectedKey={selectedMember?.id}
+                        selectedKey={selectedMember?.id ?? opening?.row?.id}
                         onRowSelect={requestOpenRecord}
                         enterKey={enterKey}
+                        // ↕️ A10: the headings sort, on the server -- `aria-sort` on the heading the rows are in.
+                        sort={view.sort}
+                        onSortChange={handleSort}
                         loading={listState === "loading"}
                         error={listState === "error" ? "The register could not be reached" : null}
                         errorMessage="The server did not answer, so this is not an empty result. Nothing you typed has been lost."
                         onRetry={retryMembers}
-                        emptyTitle={query ? `No member matches “${deferredSearch.trim()}”` : "No members match these criteria"}
+                        emptyTitle={query ? `No member matches “${query}”` : "No members match these criteria"}
                         emptyMessage={
-                            query
-                                ? "Try the membership number, which is unique, or clear the search to see the whole register."
-                                : "Clear the criteria to see the whole register, or capture a new member."
+                            isWholeIdentityNumber(query)
+                                ? "No member on record has that identity number. Check it, or search by the member's surname or membership number."
+                                : query
+                                    ? "A search finds the start of a surname, a first name, a membership or employee number, or an identity number whole or by its last four digits."
+                                    : "Clear the criteria to see the whole register, or capture a new member."
                         }
                         // 🔴 "Clear" WAS OFFERED WHEN NOTHING WAS SET, AND DID NOTHING (`06.4`). A register that is empty with no
                         // search and no criteria has nothing to clear; what there is to do is capture a member.
                         emptyAction={
-                            query || Object.values(filters).some((value) => String(value ?? "").trim() !== "")
+                            narrowed
                                 ? <Button onClick={handleClear}>Clear</Button>
                                 : <Button variant="primary" onClick={() => navigate("/members/capture")}>Capture member</Button>
                         }
                     />
 
-                    {/* card.css `.pager`: "Showing 1–14 of 2 418 · Page 1 of 173", Previous and Next. */}
+                    {/* card.css `.pager`: "Showing 1–14 of 2 418 · Page 1 of 173", Previous and Next -- the server's
+                        page and count since A10, with the page size beside them (REG-25 is SASBO's to answer). */}
                     <Pager
                         page={page}
                         totalPages={totalPages}
-                        onPageChange={setPage}
-                        count={filteredMembers.length}
+                        onPageChange={handlePageChange}
+                        count={totalMembers}
                         start={startIndex + 1}
                         end={endIndex}
                         noun="members"
@@ -1603,7 +1732,7 @@ export default function Members() {
                            while the panel had nothing in it, so when the owner asked for that
                            empty column to close it would have taken the one place the
                            application teaches its own keyboard model with it. */
-                        hint={filteredMembers.length > 0 ? (
+                        hint={visibleMembers.length > 0 ? (
                             <KeyHints
                                 hints={[
                                     [['↑', '↓'], 'move'],
@@ -1612,7 +1741,18 @@ export default function Members() {
                                 ]}
                             />
                         ) : null}
-                    />
+                    >
+                        <label className="mr-2 inline-flex items-center gap-2 text-sm text-ink-muted">
+                            <span>Per page</span>
+                            <select
+                                value={view.size}
+                                onChange={(event) => handlePageSize(event.target.value)}
+                                className="touch-target h-8 rounded-md border border-line-strong bg-surface px-2 text-sm text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring"
+                            >
+                                {REGISTER_PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+                            </select>
+                        </label>
+                    </Pager>
                 </Sheet>
             </section>
 
@@ -1644,11 +1784,13 @@ export default function Members() {
                 `open={Boolean(selectedMember)}` threw `Cannot read properties of null` the
                 moment the page mounted -- caught by the route smoke, not by reading. */}
             <MemberPanel
-                member={selectedMember}
-                open={Boolean(selectedMember) && !panelClosing}
+                // 📂 A10: while a record is read, the panel shows the row's card -- name, number, status, bank -- and
+                // says it is opening; the record replaces it when it arrives.
+                member={opening ? opening.row : selectedMember}
+                open={Boolean(selectedMember || opening) && !panelClosing}
                 onClose={requestCloseRecord}
                 footer={
-                    isEditing ? (
+                    opening ? null : isEditing ? (
                         <>
                             <Button onClick={handleEditToggle}>Cancel</Button>
                             <Button variant="primary" onClick={handleSaveChanges}>
@@ -1674,7 +1816,18 @@ export default function Members() {
                     went to the error boundary with `Cannot read properties of null (reading
                     'address')` the moment it mounted -- the same failure the Modal's own
                     comment recorded, reintroduced by the commit that removed the Modal. */}
-                {selectedMember && (
+                {opening && (
+                    <div className="mt-6">
+                        <DataState
+                            state={opening.error ? "error" : "loading"}
+                            title={opening.error ? "This member's record could not be opened." : "Opening the record…"}
+                            message={opening.error ? "The register is as it was; nothing has changed." : null}
+                            error={opening.error}
+                            onRetry={() => loadRecord(opening.row)}
+                        />
+                    </div>
+                )}
+                {!opening && selectedMember && (
                     <div className={cn("member-record", printScope === "record" && "print-area")}>
                         {/* THE ERROR SUMMARY that replaced three `alert()` calls. Focused
                             rather than `role="alert"`: `Field` already gives every inline

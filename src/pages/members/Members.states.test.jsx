@@ -10,6 +10,7 @@ import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
 import { deferred } from '../../test/deferred'
+import { registerFails, registerHandlers, registerOverview, registerPage } from '../../test/msw/memberRegister'
 
 /**
  * THE THREE-STATE RULE, TESTED WHERE IT IS CLAIMED.
@@ -53,8 +54,12 @@ const MEMBERS = [
   },
 ]
 
-const membersRespond = (body, status = 200) =>
-  http.get('*/api/members', () => HttpResponse.json(body, { status }))
+/**
+ * The register answering with `members` -- its page, its figures and each record (A10) -- or, given a status, its page
+ * refused with it. An array of handlers either way, to spread into `server.use`.
+ */
+const membersRespond = (members, status = 200) =>
+  (status === 200 ? registerHandlers(members) : [registerFails(status)])
 
 /**
  * An answer that does not arrive until the test says so, so the loading state is observable
@@ -91,10 +96,19 @@ const membersRespond = (body, status = 200) =>
 const membersRespondWhenReleased = () => {
   const answer = deferred()
   return {
-    handler: http.get('*/api/members', async () => {
-      await answer.promise
-      return HttpResponse.json(MEMBERS)
-    }),
+    // A10: the page and the figure strip are two reads now, and both wait -- a strip that answered first would print
+    // its counts beside a register that has not.
+    handlers: [
+      http.post('*/api/members/register/search', async ({ request }) => {
+        const query = await request.json()
+        await answer.promise
+        return HttpResponse.json(registerPage(MEMBERS, query))
+      }),
+      http.get('*/api/members/register/overview', async () => {
+        await answer.promise
+        return HttpResponse.json(registerOverview(MEMBERS))
+      }),
+    ],
     release: () => answer.resolve(),
   }
 }
@@ -111,7 +125,7 @@ describe('the Members list', () => {
 
   describe('the EMPTY state', () => {
     it('says so plainly when the server genuinely has no members', async () => {
-      server.use(membersRespond([]))
+      server.use(...membersRespond([]))
       renderWithProviders(<MembersPage />)
 
       expect(await screen.findByText(EMPTY_TEXT)).toBeInTheDocument()
@@ -120,7 +134,7 @@ describe('the Members list', () => {
     it('and its foot and figures say the same thing', async () => {
       // The PRESENCE half of K1's case below: the same two locators, seen to match when "no
       // members" is the truth. Their absence under a failure proves nothing without this (T37).
-      server.use(membersRespond([]))
+      server.use(...membersRespond([]))
       renderWithProviders(<MembersPage />)
 
       await screen.findByText(EMPTY_TEXT)
@@ -131,7 +145,7 @@ describe('the Members list', () => {
 
   describe('the LOADED state', () => {
     it('renders the members the server returned', async () => {
-      server.use(membersRespond(MEMBERS))
+      server.use(...membersRespond(MEMBERS))
       renderWithProviders(<MembersPage />)
 
       expect(await screen.findByText(/Testperson/)).toBeInTheDocument()
@@ -147,7 +161,7 @@ describe('the Members list', () => {
       // its empty table synchronously on mount, so the FIRST thing every user saw,
       // every time, was "no members" -- which then flickered into data.
       const members = membersRespondWhenReleased()
-      server.use(members.handler)
+      server.use(...members.handlers)
       renderWithProviders(<MembersPage />)
 
       try {
@@ -173,7 +187,7 @@ describe('the Members list', () => {
 
   describe('the FAILED state', () => {
     it('shows an error with a retry, not "no members"', async () => {
-      server.use(membersRespond({ status: 500, error: 'Internal Server Error' }, 500))
+      server.use(...membersRespond({ status: 500, error: 'Internal Server Error' }, 500))
       renderWithProviders(<MembersPage />)
 
       // 🔑 WAIT FIRST. `expectErrorState` queries SYNCHRONOUSLY -- it checks both halves
@@ -195,7 +209,7 @@ describe('the Members list', () => {
       // and the figure strip printed a row of zeros, so the page still told an administrator the
       // union was empty -- two lines under the sentence saying the server had not answered.
       // `expectErrorState` looks for the EMPTY STATE's words, which neither of them prints.
-      server.use(membersRespond({ status: 500 }, 500))
+      server.use(...membersRespond({ status: 500 }, 500))
       renderWithProviders(<MembersPage />)
       await screen.findByRole('alert')
 
@@ -210,13 +224,13 @@ describe('the Members list', () => {
       // from the outside: the affordance is there, it has the right name, and pressing
       // it does nothing. The assertion above cannot tell those apart -- this can.
       const user = setupUser()
-      server.use(membersRespond({ status: 500 }, 500))
+      server.use(...membersRespond({ status: 500 }, 500))
       renderWithProviders(<MembersPage />)
 
       await screen.findByRole('alert')
       const { retry } = await expectErrorState({ emptyText: EMPTY_TEXT })
 
-      server.use(membersRespond(MEMBERS))
+      server.use(...membersRespond(MEMBERS))
       await user.click(retry)
 
       expect(await screen.findByText(/Testperson/)).toBeInTheDocument()
@@ -242,14 +256,14 @@ describe('the Members list', () => {
        * loading assertion is guaranteed rather than winning a race against a real delay.
        */
       const user = setupUser()
-      server.use(membersRespond({ status: 500 }, 500))
+      server.use(...membersRespond({ status: 500 }, 500))
       renderWithProviders(<MembersPage />)
 
       await screen.findByRole('alert')
       const { retry } = await expectErrorState({ emptyText: EMPTY_TEXT })
 
       const second = membersRespondWhenReleased()
-      server.use(second.handler)
+      server.use(...second.handlers)
       try {
         await user.click(retry)
 
@@ -271,7 +285,7 @@ describe('the Members list', () => {
       // right way round, because it is the one assertion that compares the two screens
       // against each other rather than each against a fixture -- so it is what would
       // notice the day a well-meaning change made a failed fetch fall back to `[]` again.
-      server.use(membersRespond({ status: 500 }, 500))
+      server.use(...membersRespond({ status: 500 }, 500))
       const failed = renderWithProviders(<MembersPage />)
       await screen.findByRole('alert')
       await expectErrorState({ emptyText: EMPTY_TEXT })
@@ -279,7 +293,7 @@ describe('the Members list', () => {
       failed.unmount()
 
       server.resetHandlers()
-      server.use(...pageFixtures, membersRespond([]))
+      server.use(...pageFixtures, ...membersRespond([]))
       const empty = renderWithProviders(<MembersPage />)
       await screen.findByText(EMPTY_TEXT)
       const whenEmpty = empty.container.textContent
@@ -297,7 +311,7 @@ describe('the Members list', () => {
     it('is reported as a failure too, not as "no members"', async () => {
       // A rejected fetch and a 500 arrive at the page by different paths -- one throws
       // before there is a response to read -- and only one of them was ever exercised.
-      server.use(http.get('*/api/members', () => HttpResponse.error()))
+      server.use(registerFails('network'))
       renderWithProviders(<MembersPage />)
 
       await screen.findByRole('alert')
@@ -320,7 +334,8 @@ describe('the Members list', () => {
 
       const [tag, line] = consoleError.mock.calls.at(-1)
       expect(tag).toBe('[sasbo]')
-      expect(line).toMatchObject({ context: 'Members.loadMembers', kind: 'network' })
+      // A10: the register's read is `Members.loadRegister` since it reads a page.
+      expect(line).toMatchObject({ context: 'Members.loadRegister', kind: 'network' })
       // The whole emitted line, not field by field: a sink that copied `body` wholesale
       // under a key this test did not think to check would pass a narrower assertion.
       expect(JSON.stringify(line)).not.toMatch(/membershipNumber|identityNumber|surname/i)

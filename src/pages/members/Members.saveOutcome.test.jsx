@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { registerHandlers, registerPage } from '../../test/msw/memberRegister'
 
 /**
  * 🔴 R3-F2 (P9's independent review), THE RECORD'S HALF: "NOTHING WAS WRITTEN" WAS SAID OF WRITES THAT MAY HAVE LANDED.
@@ -57,12 +58,15 @@ describe('the member record, after Save', () => {
 
   it('① a save that landed, then a refresh that failed, says the changes were SAVED', async () => {
     server.use(
-      http.get('*/api/members', () => {
+      // A10: the page on screen is what a save refreshes -- its first read answers, the one after the save fails.
+      http.post('*/api/members/register/search', async ({ request }) => {
         registerCalls += 1
+        const query = await request.json()
         return registerCalls === 1
-          ? HttpResponse.json([ALPHA])
+          ? HttpResponse.json(registerPage([ALPHA], query))
           : HttpResponse.json({ status: 500, error: 'boom' }, { status: 500 })
       }),
+      ...registerHandlers([ALPHA]),
       http.put('*/api/members/:id', async ({ request }) => HttpResponse.json(await request.json())),
     )
     await saveAChange()
@@ -74,7 +78,7 @@ describe('the member record, after Save', () => {
 
   it('② a save whose answer never arrived says it could not be confirmed -- never that nothing was written', async () => {
     server.use(
-      http.get('*/api/members', () => HttpResponse.json([ALPHA])),
+      ...registerHandlers([ALPHA]),
       http.put('*/api/members/:id', () => HttpResponse.error()),
     )
     await saveAChange()
@@ -85,7 +89,7 @@ describe('the member record, after Save', () => {
 
   it('② a server error (5xx) could have landed too, and says so', async () => {
     server.use(
-      http.get('*/api/members', () => HttpResponse.json([ALPHA])),
+      ...registerHandlers([ALPHA]),
       http.put('*/api/members/:id', () => HttpResponse.json({ status: 500, error: 'boom' }, { status: 500 })),
     )
     await saveAChange()
@@ -95,7 +99,7 @@ describe('the member record, after Save', () => {
 
   it('the must-pass: a refusal (4xx) says the changes were not saved', async () => {
     server.use(
-      http.get('*/api/members', () => HttpResponse.json([ALPHA])),
+      ...registerHandlers([ALPHA]),
       http.put('*/api/members/:id', () =>
         HttpResponse.json({ status: 400, message: 'Identity number is invalid.' }, { status: 400 }),
       ),

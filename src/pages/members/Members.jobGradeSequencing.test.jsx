@@ -10,6 +10,7 @@ import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
 import { deferred } from '../../test/deferred'
 import { jobGradeService } from '../../services/jobGradeService.js'
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * 🔴 R3-F4 (P9's independent review): THE RECORD FETCHED JOB GRADES ON EVERY OPEN, UNSEQUENCED.
@@ -53,7 +54,7 @@ describe('the record’s job grades', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     server.use(...pageFixtures)
     server.use(
-      http.get('*/api/members', () => HttpResponse.json([MEMBER])),
+      ...registerHandlers([MEMBER]),
       http.get('*/api/banks', () => HttpResponse.json([{ name: 'ABSA' }, { name: 'Capitec' }])),
     )
   })

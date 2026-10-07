@@ -1,12 +1,12 @@
 // @vitest-environment jsdom -- renders the member register with its list request failing
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen } from '@testing-library/react'
-import { http, HttpResponse } from 'msw'
 
 import MembersPage from './Members'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
+import { registerFails } from '../../test/msw/memberRegister'
 
 /**
  * A47: THE FAILED REGISTER STILL COUNTS ZERO AROUND ITS OWN ERROR.
@@ -30,7 +30,7 @@ import { pageFixtures } from '../../test/msw/pageFixtures'
  * the standard-facing test un-skipped -- flipped, not repaired (BR-5).
  */
 const failed = () =>
-  http.get('*/api/members', () => HttpResponse.json({ status: 500 }, { status: 500 }))
+  registerFails(500)
 
 /** The number the figure strip shows under a label, read from the definition list. */
 const figure = (label) => screen.getByText(label, { selector: 'dt, dt *' }).closest('dt').nextElementSibling
