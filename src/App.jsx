@@ -56,6 +56,7 @@ const MonthEndStatistic = lazy(() => import('./pages/admin/MonthEndStatistic.jsx
 const MonthEndRegionPacks = lazy(() => import('./pages/admin/MonthEndRegionPacks.jsx'));
 const MonthEndFiles = lazy(() => import('./pages/admin/MonthEndFiles.jsx'));
 const MonthEndSent = lazy(() => import('./pages/admin/MonthEndSent.jsx'));
+const MonthEndSuspended = lazy(() => import('./pages/admin/MonthEndSuspended.jsx'));
 const CaptureMember = lazy(() => import('./pages/members/CaptureMember.jsx'));
 const Maintenance = lazy(() => import('./pages/admin/Maintenance.jsx'));
 const BankListing = lazy(() => import('./pages/bank_branch/BankListing.jsx'));
@@ -96,6 +97,7 @@ function App() {
         <Route path="admin/monthly-menu/region-packs" element={<MonthEndRegionPacks />} />
         <Route path="admin/monthly-menu/files" element={<MonthEndFiles />} />
         <Route path="admin/monthly-menu/sent" element={<MonthEndSent />} />
+        <Route path="admin/monthly-menu/suspended-members" element={<MonthEndSuspended />} />
         <Route path="admin/monthly-menu/:statistic" element={<MonthEndStatistic />} />
         <Route path="recruiters" element={<Recruiters />} />
         <Route path="banks" element={<MapsScope><BanksPage /></MapsScope>} />
