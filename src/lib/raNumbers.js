@@ -41,7 +41,8 @@ export function parseRaNumbers(text) {
  * The listings grouped by bank, for "separate them by bank ... if it's a new bank, start it on a new page" (5 Oct):
  * each bank once, in the order its first branch was typed, its branches in the order typed. A workplace's bank is the
  * employer its table code proves, or -- where the files prove none -- the employer as the branch list prints it, so a
- * branch is never left without a bank to be printed under.
+ * branch is never left without a bank to be printed under. PROVISIONAL: "bank" is read as the EMPLOYER, not its group
+ * (one "bank" a sheet) -- which one SASBO meant is their question, asked in the stream's report.
  *
  * @param {Array<{ workplace: object }>} listings in the order the numbers were typed
  * @returns {Array<{ key: string, bank: string, listings: Array<object> }>}

@@ -336,6 +336,8 @@ if (visitRecorded?.status !== 201) throw new Error(`${MONTH_END_EXAMPLES} has no
  */
 const listingsBatch = golden('GET /api/workplaces/listings');
 const branchMembers = golden('GET /api/workplaces/{id}/members');
+// The batch's members in one read (October build review): each id asked, a branch with the golden branch's members.
+const batchMembers = golden('GET /api/workplaces/members');
 const myDrafts = golden('GET /api/workplaces/visit-drafts');
 const oneDraft = golden('GET /api/workplaces/visit-drafts/{id}');
 const draftSavedAgain = golden('PUT /api/workplaces/visit-drafts/{id}');
@@ -615,6 +617,11 @@ const monthEndAnswer = (req, path, query) => {
   // October build: a branch's members and the visit drafts -- a prefix match would answer them with the workplaces' page.
   const branch = /^\/api\/workplaces\/(\d+)\/members$/.exec(path);
   if (branch && req.method === 'GET') return { status: 200, body: { ...branchMembers, workplaceId: Number(branch[1]) } };
+  if (path === '/api/workplaces/members' && req.method === 'GET') {
+    const ids = (query.get('ids') ?? '').split(',').filter((id) => /^\d+$/.test(id)).map(Number);
+    const [one] = batchMembers.branches;
+    return { status: 200, body: { ...batchMembers, unknown: [], branches: ids.map((workplaceId) => ({ ...one, workplaceId })) } };
+  }
   if (path === '/api/workplaces/visit-drafts') {
     return req.method === 'POST' ? { status: 201, body: draftCreated.body } : { status: 200, body: myDrafts };
   }
@@ -622,6 +629,7 @@ const monthEndAnswer = (req, path, query) => {
   if (draft && draft[2] && req.method === 'POST') return { status: 200, body: draftSubmitted };
   if (draft && !draft[2] && req.method === 'PUT') return { status: 200, body: draftSavedAgain };
   if (draft && !draft[2] && req.method === 'GET') return { status: 200, body: oneDraft };
+  if (draft && !draft[2] && req.method === 'DELETE') return { status: 204, raw: '' };
   if (req.method === 'GET' && path === '/api/workplaces') {
     const page = Number(query.get('page') ?? 0);
     const size = Number(query.get('size') ?? WORKPLACE_PAGE);
