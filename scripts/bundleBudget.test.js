@@ -67,6 +67,14 @@ function realisticBuild(dir, { entryKiB = 280, lazyKiB = 220, cssKiB = 50, asset
   return dist
 }
 
+/** The javascript ceiling the script holds today, read from its own report on a build within every limit. */
+function javascriptCeilingKiB() {
+  const { out } = budgetAgainst((dir) => realisticBuild(dir))
+  const row = out.match(/ javascript +[\d.]+ KiB +floor +[\d.]+ KiB +ceiling +([\d.]+) KiB/)
+  expect(row, `the report names no javascript ceiling:\n${out}`).not.toBeNull()
+  return Number(row[1])
+}
+
 describe('the bundle budget can fail', () => {
   it('passes a build that is within every limit — so a failure below means something', () => {
     const { status, out } = budgetAgainst((dir) => realisticBuild(dir))
@@ -79,12 +87,15 @@ describe('the bundle budget can fail', () => {
    * The direction the ceiling exists for: something got bigger and nobody looked.
    */
   it('FAILS when the javascript is over its ceiling', () => {
-    // 850 KiB of js against the javascript ceiling (bundle-budget.mjs's `js`, under 790 KiB since MO25) -- and deliberately
-    // arranged as a 300 KiB entry plus 550 KiB of lazy chunks, so the ENTRY row stays green and
-    // this case can only be caught by the total. Each row is proved on its own. The fixture
-    // was 700, then 750, until the ceiling passed it: a fixture under the ceiling proves nothing.
+    // 50 KiB of js over the javascript ceiling the script holds TODAY (bundle-budget.mjs's `js`, read from its own report)
+    // -- and deliberately arranged as a 300 KiB entry plus the rest in lazy chunks, so the ENTRY row stays green and this
+    // case can only be caught by the total. Each row is proved on its own. The fixture was a number -- 700, 750, 850,
+    // then 900 -- each until the ceiling passed it, and a fixture under the ceiling proves nothing (October build
+    // integration, run 37675550980: 850 against 883.88, so the case went red for the wrong reason). Read off the ceiling,
+    // it is always over it.
+    const lazyKiB = Math.ceil(javascriptCeilingKiB()) - 300 + 50
     const { status, out } = budgetAgainst((dir) =>
-      realisticBuild(dir, { entryKiB: 300, lazyKiB: 550 }))
+      realisticBuild(dir, { entryKiB: 300, lazyKiB }))
 
     expect(out).toMatch(/OVER +javascript/)
     expect(out, 'it should say what to look for, not just that a number moved')
