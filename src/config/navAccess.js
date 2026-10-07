@@ -1,8 +1,9 @@
 /**
  * What a menu entry that needs a permission shows a caller (`contracts/permissions.md`, "Menus").
  *
- * Two data keys on any entry of `navigation.js` -- the rail and a menu page read them the same way:
- *   `permission`   what the entry's screen needs, a name from `auth/permissions.js`;
+ * Two data keys on any entry of `navigation.js` -- the rail, Home's three views and every menu page read them the same
+ * way (OB18):
+ *   `permission`   what the entry's screen needs: a name from `auth/permissions.js`, or a list, any of which will do;
  *   `hideWithout`  hide it from a SIGNED-IN user who lacks that permission. Unpaids and payroll discrepancies are
  *                  never shown to organisers (Stephne, DOD-14; PAY), so their entries are hidden from them outright.
  *
@@ -13,7 +14,7 @@
  * @returns {'open' | 'locked' | 'hidden'}
  */
 export const entryAccess = (entry, { status, can }) => {
-  if (!entry?.permission || can(entry.permission)) return 'open';
+  if (!entry?.permission || [].concat(entry.permission).some((permission) => can(permission))) return 'open';
   return entry.hideWithout && status === 'signed-in' ? 'hidden' : 'locked';
 };
 

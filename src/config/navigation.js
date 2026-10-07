@@ -17,6 +17,9 @@ import {
   LucideConstruction, LucideCopyCheck, UserRoundPen
 } from "lucide-react";
 
+/** Any of the three Debit Order permissions -- what reading a run or its unpaids takes (`contracts/dod-api.md` §1). */
+const DOD_READ = ['DOD_PREPARE', 'DOD_FILE', 'DOD_SETTINGS'];
+
 export const navItems = [
   {
     title: "Home",
@@ -114,18 +117,24 @@ export const navItems = [
         title: "Debit Orders",
         href:'/admin/acb',
         icon: LucideFile,
+        // 🔒 `permission` / `hideWithout` (navAccess.js): the runs and the unpaids need a Debit Order permission, and are
+        // never shown to an organiser (Stephne, DOD-14). Strings, not `PERMISSIONS`: this file is on every first load.
         subItems: [
           {
             title: "Debits",
             desc: "Manage Re-Debits",
             href: "/admin/acb/debits",
             icon: LucidePiggyBank,
+            permission: DOD_READ,
+            hideWithout: true,
           },
           {
             title: "Runs",
             desc: "Debit Order Runs",
             href: "/admin/acb/runs",
             icon: LucideCalendarRange,
+            permission: DOD_READ,
+            hideWithout: true,
           },
         ]
       },
@@ -196,12 +205,16 @@ export const navItems = [
         desc: "Manage Re-Debits",
         href: "/admin/acb/debits",
         icon: LucidePiggyBank,
+        permission: DOD_READ,
+        hideWithout: true,
       },
       {
         title: "Runs",
         desc: "Debit Order Runs",
         href: "/admin/acb/runs",
         icon: LucideCalendarRange,
+        permission: DOD_READ,
+        hideWithout: true,
       },
       /*{
         title: "Credits",

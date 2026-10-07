@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 
 import { cn } from "../../lib/utils";
+import { useAuth } from "../../auth/useAuth";
+import { entryAccess, lockedNote } from "../../config/navAccess";
 import Sheet from "./Sheet.jsx";
 
 /**
@@ -54,7 +56,7 @@ const LIVE =
   "group text-ink transition-colors duration-(--duration-instant) hover-hover:hover:bg-surface-2 " +
   "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-ring";
 
-export default function NavigationCard({ title, icon: Icon, href, desc, onSelect, note = 'Not yet available', layout = 'row' }) {
+export default function NavigationCard({ title, icon: Icon, href, desc, onSelect, note = 'Not yet available', layout = 'row', lockNote }) {
   const tile = layout === 'tile';
   const icon = Icon && (
     <Icon size={tile ? 24 : 18} strokeWidth={1.75} aria-hidden="true" className={cn("shrink-0", href ? "text-brand" : "text-ink-faint")} />
@@ -65,12 +67,17 @@ export default function NavigationCard({ title, icon: Icon, href, desc, onSelect
       {desc && <span className="mt-0.5 block text-sm text-ink-muted">{desc}</span>}
     </span>
   );
+  // 🔒 OB18: an entry its screen will refuse says how to get in, as the rail's does (`navAccess.js`) -- after the words in
+  // both layouts, so the link's name reads "Settings … Sign in" in every view. The space is that name's.
+  const lock = lockNote && (
+    <>{' '}<span className={cn("shrink-0 whitespace-nowrap text-sm text-ink-muted", !tile && "ml-auto")}>{lockNote}</span></>
+  );
   const end = href ? (
     <ChevronRight
       size={16}
       strokeWidth={1.75}
       aria-hidden="true"
-      className="ml-auto shrink-0 text-ink-faint transition-transform duration-(--duration-fast) hover-hover:group-hover:translate-x-0.5"
+      className={cn("shrink-0 text-ink-faint transition-transform duration-(--duration-fast) hover-hover:group-hover:translate-x-0.5", (tile || !lockNote) && "ml-auto")}
     />
   ) : (
     /* A NOTE, NOT A STATUS CHIP. Set as small capitals it read as a label of the same
@@ -80,7 +87,7 @@ export default function NavigationCard({ title, icon: Icon, href, desc, onSelect
     <span className="ml-auto shrink-0 whitespace-nowrap text-sm text-ink-muted">{note}</span>
   );
   // A row reads across; a card puts the icon and the way in on one line, above its words.
-  const parts = tile ? <><span className="flex items-start gap-3">{icon}{end}</span>{body}</> : <>{icon}{body}{end}</>;
+  const parts = tile ? <><span className="flex items-start gap-3">{icon}{end}</span>{body}{lock}</> : <>{icon}{body}{lock}{end}</>;
 
   return href ? (
     <Link to={href} onClick={onSelect} className={cn(tile ? TILE : ROW, LIVE)}>{parts}</Link>
@@ -99,11 +106,13 @@ export default function NavigationCard({ title, icon: Icon, href, desc, onSelect
  * `tiles` lays the same cards out as cards (Home's card view): one a row on a phone, two from `md`, three from `lg`.
  */
 export function NavigationList({ cards, onSelect, wide = false, tiles = false, className }) {
-  const items = cards.map((card) => (
+  const auth = useAuth();
+  const items = visibleEntries(cards, auth).map((card) => (
     <NavigationCard
       key={`${card.href}-${card.title}`}
       {...card}
       layout={tiles ? 'tile' : 'row'}
+      lockNote={card.access === 'locked' ? lockedNote(auth.status) : undefined}
       onSelect={onSelect && (() => onSelect(card))}
     />
   ));
@@ -113,3 +122,12 @@ export function NavigationList({ cards, onSelect, wide = false, tiles = false, c
     <Sheet className={cn("mt-6 divide-y divide-line", !wide && "max-w-4xl", className)}>{items}</Sheet>
   );
 }
+
+/**
+ * The entries a caller is shown, each with the access the rail gives it -- `open`, or `locked` (marked with the way in);
+ * one hidden from them is left out (OB18, `navAccess.js`). Home's three views and every menu page read their entries
+ * through this, so none can disagree with the rail.
+ */
+export const visibleEntries = (entries, auth) => entries
+  .map((entry) => ({ ...entry, access: entryAccess(entry, auth) }))
+  .filter((entry) => entry.access !== 'hidden');

@@ -91,5 +91,8 @@ export const HOME_MODULES = /* @__PURE__ */ Object.freeze(navItems
     href: item.href,
     desc: DESCRIPTIONS[item.href],
     places: menuPaths(item.href).map((path) => path.join(' › ')),
-    under: (item.subItems ?? []).map((sub) => sub.title),
+    // The access keys travel with every entry, a module's and what is under it, so Home shows what the rail shows (OB18).
+    permission: item.permission,
+    hideWithout: item.hideWithout,
+    under: (item.subItems ?? []).map(({ title, permission, hideWithout }) => ({ title, permission, hideWithout })),
   })));
