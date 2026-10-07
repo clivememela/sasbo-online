@@ -1,6 +1,6 @@
 // @vitest-environment jsdom -- the statistics pack on the Month end page: asked for, polled, and saved
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 
 /**
@@ -52,7 +52,9 @@ beforeEach(() => {
   posts = 0
   reads = 0
   polls.length = 0
-  server.use(monthEndAnswer('GET /api/month-end/months'))
+  // The page's months, and its figures' read (the 5 Oct Show & Tell moved them here) answered as the shared fixture's
+  // empty array: *not available*, which asks for nothing more.
+  server.use(monthEndAnswer('GET /api/month-end/months'), http.get('*/api/members/summary', () => HttpResponse.json([])))
 })
 
 /** The pack asked for: answered PREPARING (202), and each read of it answered by `answer(reads)`. */
@@ -80,6 +82,8 @@ const prepare = async (user, month = 'August 2026') => {
 }
 
 const links = () => screen.queryAllByRole('link', { name: /^Download / })
+/** The pack's own alert -- the page holds other sections, and the figures above it say their own failures. */
+const packAlert = () => within(screen.getByRole('region', { name: 'The statistics pack' })).findByRole('alert')
 
 describe('asking for the pack', () => {
   it('🔑 one POST, then the pack re-read until it is ready -- and a link to save each workbook', async () => {
@@ -207,7 +211,7 @@ describe('what the server refuses, in its own words (ME-13)', () => {
     openPage()
     const button = await prepare(user)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(`${refusal.body.message} The pack in hand is July 2026’s.`)
+    expect(await packAlert()).toHaveTextContent(`${refusal.body.message} The pack in hand is July 2026’s.`)
     await waitFor(() => expect(button).toBeEnabled())
     await user.click(button)
     await waitFor(() => expect(posts).toBe(2))
@@ -219,7 +223,7 @@ describe('what the server refuses, in its own words (ME-13)', () => {
     openPage()
     const button = await prepare(user)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
+    expect(await packAlert()).toHaveTextContent(
       `The pack for August 2026 could not be prepared: ${FAILED.failure}. Ask for it again.`)
     expect(links()).toEqual([])
     await waitFor(() => expect(button).toBeEnabled())
@@ -234,7 +238,7 @@ describe('what the server refuses, in its own words (ME-13)', () => {
     openPage()
     await prepare(user)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(monthEndExamples.refusals.PACK_NOT_FOUND.body.message)
+    expect(await packAlert()).toHaveTextContent(monthEndExamples.refusals.PACK_NOT_FOUND.body.message)
     expect(links()).toEqual([])
     expect(screen.queryByText(/is ready/)).not.toBeInTheDocument()
   })
@@ -263,7 +267,7 @@ describe('what the server refuses, in its own words (ME-13)', () => {
     openPage()
     const button = await prepare(user)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
+    expect(await packAlert()).toHaveTextContent(
       'The pack for August 2026 could not be confirmed. Asking again is safe — a pack in hand for the month is answered, never started twice.')
     expect(screen.queryByText(/was not prepared/)).not.toBeInTheDocument()
     await waitFor(() => expect(button).toBeEnabled())

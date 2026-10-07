@@ -1,5 +1,11 @@
 import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 
+/*
+ * 🗣️ LIGHT BY DEFAULT -- the 5 Oct Show & Tell (handover §A, "light mode by default"). A browser with no stored choice
+ * starts light, whatever its operating system prefers: nothing here reads `prefers-color-scheme`, and index.html's
+ * pre-paint script and its `color-scheme` meta give the same answer before React runs. The key stays `darkMode` --
+ * the presentation decks set it before the page's scripts run.
+ */
 const STORAGE_KEY = 'darkMode';
 
 /**
