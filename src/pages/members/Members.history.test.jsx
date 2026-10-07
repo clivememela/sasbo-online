@@ -7,7 +7,7 @@ import MembersPage, { RECORD_TABS, tabPlace } from './Members'
 /*
  * 🔑 THE HISTORY TAB'S CHUNK IS IMPORTED HERE, AND THAT IS AN ANTI-FLAKE FIX RATHER THAN AN UNUSED IMPORT. `Members`
  * asks for it with `lazy(() => import(...))` when the tab is opened; a module already in the registry resolves on the
- * next microtask instead of on however busy the machine is (Home.figures.test.jsx, shell.drawer.test.jsx).
+ * next microtask instead of on however busy the machine is (the old Home.figures.test.jsx, shell.drawer.test.jsx).
  */
 import './MemberHistory.jsx'
 import membersSource from './Members.jsx?raw'

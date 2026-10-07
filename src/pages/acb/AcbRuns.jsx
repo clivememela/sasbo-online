@@ -22,7 +22,8 @@ import {
 const PAGE_SIZE = 12;
 
 /**
- * A.C.B. -> Runs (`01.5`): every month's debit-order run, preparing a new one, and the run itself.
+ * Debit Order Deductions -> Runs (`01.5`): every month's debit-order run, preparing a new one, and the run itself.
+ * Headed *Debit Order Runs*: the screen keeps its name and "ACB" becomes "Debit Order" (Stephne, DOD).
  *
  * 🔑 PREPARING IS THE DRY RUN. Nothing leaves the building until a run is approved, and approving
  * waits until administrators sign in (register B1) -- so this screen prepares, shows who would be
@@ -210,7 +211,7 @@ export default function AcbRuns({ pollDelaysMs = POLL_DELAYS_MS }) {
 
   return (
     <Page>
-      <PageTitle title="A.C.B. Runs" subtitle="Every month's debit order run, and what became of it" />
+      <PageTitle title="Debit Order Runs" subtitle="Every month's debit order run, and what became of it" />
 
       <div className="mt-4 empty:hidden">
         <DialogNotice notice={notice} onDismiss={() => setNotice(null)} />

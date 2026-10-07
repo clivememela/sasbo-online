@@ -9,8 +9,6 @@ import '../pages/members/MemberHistory.jsx'
 import CaptureMember from '../pages/members/CaptureMember'
 import BankListing from '../pages/bank_branch/BankListing'
 import Home from '../pages/Home'
-// The first screen's figures are a lazy chunk; in the registry before the scan, so it waits on the page, not on the box.
-import '../pages/home/HomeFigures.jsx'
 import MonthlyMenu from '../pages/admin/MonthlyMenu'
 import MonthEndStatistic from '../pages/admin/MonthEndStatistic'
 import { renderWithProviders } from './renderWithProviders'
@@ -22,8 +20,8 @@ import { pageFixtures } from './msw/pageFixtures'
 import { setupUser } from './user'
 
 /**
- * THE ACCESSIBILITY GATE, on the surfaces named below -- the three this phase named, and the first screen since
- * month end's `02.3` (MR-ROB-37).
+ * THE ACCESSIBILITY GATE, on the surfaces named below -- the three this phase named, the first screen since month
+ * end's `02.3` (MR-ROB-37), and since the 5 Oct Show & Tell Home's three views and the figures on Month end.
  *
  * WHAT IS DELIBERATELY OFF, AND WHY SAYING SO IS BETTER THAN PRETENDING
  * `color-contrast` is disabled, in `expectNoA11yViolations` rather than here,
@@ -174,11 +172,30 @@ describe('accessibility', () => {
     await expectNoA11yViolations(container)
   })
 
-  it('the first screen has no violations, with its figures, their sheet and the menu rows (02.3, MR-ROB-37)', async () => {
-    // The server's own golden answer (MD48): a sheet with rows, a total and the marks the screen draws on them.
-    // And the lists' status, for the line beneath the sheet (MO24), so it is scanned with the rest.
-    server.use(monthEndAnswer('GET /api/members/summary'), monthEndAnswer('GET /api/reference/status'))
+  it.each([
+    ['Cards', 'cards'],
+    ['List', 'list'],
+    ['Table', 'table'],
+  ])('Home has no violations in its %s view -- the modules and the switch that lays them out (the 5 Oct Show & Tell)', async (name, view) => {
+    // Each view is different DOM -- cards, a ruled list, a table with its caption and heads -- so each is opened and
+    // scanned, the cards (the view a browser opens on) included.
+    const user = setupUser()
     const { container } = renderWithProviders(<Home />)
+    await user.click(screen.getByRole('button', { name }))
+    await waitFor(() => expect(container.querySelector('[data-home-view]')).toHaveAttribute('data-home-view', view))
+    expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true')
+    await expectNoA11yViolations(container)
+  })
+
+  it('the Month end page\'s figures have no violations -- the strip, their sheet and the lines beneath it (02.3 on Month end, MR-ROB-37)', async () => {
+    // The server's own golden answer (MD48): a sheet with rows, a total and the marks the figures draw on them, for the
+    // open month the address names. And the lists' status, for the line beneath the sheet (MO24), scanned with the rest.
+    server.use(
+      monthEndAnswer('GET /api/month-end/months'),
+      monthEndAnswer('GET /api/members/summary'),
+      monthEndAnswer('GET /api/reference/status'),
+    )
+    const { container } = renderWithProviders(<MonthlyMenu />, { initialEntries: ['/admin/monthly-menu?month=2026-09'] })
     await screen.findByText('INVENTED GROUP CORE')
     await screen.findByText(/^Grouped by SASBO's lists as printed on/)
     await expectNoA11yViolations(container)
@@ -219,9 +236,10 @@ describe('accessibility', () => {
     await expectNoA11yViolations(container)
   })
 
-  it('the first screen has no violations while its figures are not available -- the shared fixture\'s empty array', async () => {
-    // The state every other test of this screen sees: the strip's "not available" and the sheet's sentence.
-    const { container } = renderWithProviders(<Home />)
+  it('the Month end page has no violations while its figures are not available -- the shared fixture\'s empty array', async () => {
+    // The state every other test of the page sees: the strip's "not available" and the sheet's sentence.
+    server.use(monthEndAnswer('GET /api/month-end/months'))
+    const { container } = renderWithProviders(<MonthlyMenu />, { initialEntries: ['/admin/monthly-menu?month=2026-09'] })
     await screen.findByText('The figures are not available from this server yet.')
     await expectNoA11yViolations(container)
   })

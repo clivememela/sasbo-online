@@ -1,76 +1,54 @@
-import { lazy, Suspense, useDeferredValue } from 'react';
+import { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import ErrorBoundary from '../components/common/ErrorBoundary';
+
 import { NavigationList } from '../components/common/NavigationCard';
 import { Page } from '../components/common/Sheet.jsx';
 import PageTitle from '../components/common/PageTitle';
-import { navItems } from '../config/navigation';
+import ViewSwitch from '../components/common/ViewSwitch.jsx';
+import ModuleTable from './home/ModuleTable.jsx';
+import { HOME_MODULES, readHomeView, storeHomeView } from './home/homeModules.js';
 
 /*
  * 🔴 THE LANDING PAGE STATED A DIFFERENT INVENTORY OF THE APPLICATION FROM THE RAIL BESIDE
- * IT. This list was hand-typed: five of the nine top-level areas, in an order of their own,
- * silently missing A.C.B, Recruiters and Subscriptions -- each of which the rail two inches
- * to the left lists. "Select an area to begin" under a list that is a subset of the
- * navigation, with nothing saying so, reads as an oversight rather than as a choice.
+ * IT. Its list was hand-typed: five of the nine top-level areas, in an order of their own,
+ * silently missing three that the rail two inches to the left listed. So it is not a list
+ * any more -- it is the rail, read across instead of down (`homeModules.js`).
  *
- * 🔑 SO IT IS NOT A LIST ANY MORE -- it is the rail, read across instead of down. `navItems`
- * is the one place the application's areas are declared, Home drops only its own entry, and
- * the two can no longer disagree: an area added to the menu appears here on the same commit,
- * and one removed disappears from both.
- *
- * The descriptions stay hand-written because the rail has none and a menu row with nothing
- * under its title is a poorer row; they are keyed by href so a renamed title cannot silently
- * detach one from its area.
+ * 🗣️ AND SINCE THE 5 OCT SHOW & TELL IT IS ONLY THAT (handover §A). The month's figures --
+ * paying, suspended, on record, joined, left, penetration -- moved to Month end, where SASBO
+ * looked for them, and Home keeps the modules, shown as cards, a list or a table. Natalie
+ * liked the cards, so they are what a browser that has chosen nothing opens on; the choice
+ * is remembered per browser, and a browser that cannot remember it still shows it.
  */
-const DESCRIPTIONS = {
-  '/admin': 'Daily, monthly and maintenance operations',
-  '/admin/acb': 'Automated clearing bureau debits and returns',
-  '/banks': 'Every bank and branch Sasbo members work from',
-  '/archives': 'Agreements, policies and research, by institution',
-  '/members': 'The membership register across every bank',
-  '/recruiters': 'Who signs members up, and how many they bring',
-  '/admin/maintenance/subscriptions': 'What each bank collects, and when it debits',
-  '/reports': 'Organiser reports, locations, forms and listings',
-};
-
-const cards = navItems
-  .filter((item) => item.href && item.href !== '/home')
-  .map((item) => ({
-    title: item.title.trim(),
-    icon: item.icon,
-    href: item.href,
-    desc: DESCRIPTIONS[item.href],
-  }));
-
-/*
- * 🗣️ *"THE EYE OF SASBO"* (SASBO's 22 Sep agenda): the figures sit above the menu rows -- month end `02.3`.
- *
- * 🔑 AND THE MENU NEVER WAITS FOR THEM (MD69). The figures are a chunk of their own, and it is not even asked for until
- * the menu has painted: `useDeferredValue(true, false)` renders this page first with `false` -- the title and the menu
- * rows, and no figures -- and then again, after that paint, with `true`, which is when the chunk is fetched and the
- * summary requested. A figures chunk that cannot load, or that throws, is held by a boundary of its own and says so in
- * one line: the menu rows beneath it are untouched.
- */
-const HomeFigures = lazy(() => import('./home/HomeFigures.jsx'));
-
-const figuresFailed = () => (
-  <p className="mt-6 text-sm text-ink-muted">The figures could not be shown. Reload the page to try again.</p>
-);
+// Named in words, with no icons: the three words are the whole choice, and three icons were half a kilobyte the bundle
+// did not have (bundle-budget.mjs).
+const VIEWS = [
+  { value: 'cards', label: 'Cards' },
+  { value: 'list', label: 'List' },
+  { value: 'table', label: 'Table' },
+];
 
 export default function Home() {
   const { setSelectedCardHref } = useOutletContext() || {};
-  const menuPainted = useDeferredValue(true, false);
+  const [view, setView] = useState(readHomeView);
+  const choose = (next) => {
+    setView(next);
+    storeHomeView(next);
+  };
+  const onSelect = (card) => setSelectedCardHref?.(card.href);
+
   return (
     <Page>
-      <PageTitle title="Welcome to SASBO Online" subtitle="Where SASBO stands, and every area of the system." />
-      {menuPainted && (
-        <ErrorBoundary fallback={figuresFailed}>
-          <Suspense fallback={null}>
-            <HomeFigures />
-          </Suspense>
-        </ErrorBoundary>
-      )}
-      <NavigationList wide cards={cards} onSelect={(card) => setSelectedCardHref?.(card.href)} />
+      <PageTitle
+        title="Welcome to SASBO Online"
+        subtitle="Every module of the system. Choose one to begin."
+        actions={<ViewSwitch label="Show the modules as" options={VIEWS} value={view} onChange={choose} />}
+      />
+      <div data-home-view={view}>
+        {view === 'table' && <ModuleTable modules={HOME_MODULES} onSelect={onSelect} />}
+        {view === 'list' && <NavigationList wide cards={HOME_MODULES} onSelect={onSelect} />}
+        {view === 'cards' && <NavigationList tiles cards={HOME_MODULES} onSelect={onSelect} />}
+      </div>
     </Page>
   );
 }
