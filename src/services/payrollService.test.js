@@ -19,6 +19,9 @@ import {
  */
 
 /** The last request to a route, as the server would read it. */
+/** An invented password: the answer carries one, shown once, and the service hands it on untouched. */
+const SHOWN_ONCE = 'shown-once-here'
+
 const capture = (method, path, respond = () => HttpResponse.json({ id: 12 }, { status: 201 })) => {
   const seen = []
   server.use(http[method](path, async ({ request }) => {
@@ -182,7 +185,7 @@ describe('the downloads, fetched with the name the server gave', () => {
 
   it('🔒 an employer\'s query list: made with only its format sent -- the system makes the password -- then fetched', async () => {
     const made = capture('post', '*/api/payroll/queries/:id/files', () => HttpResponse.json({
-      file: { id: 31, fileName: 'Payroll queries - Absa - September 2026.xlsx' }, password: 'shown-once-here', passwordNote: 'Shown once.',
+      file: { id: 31, fileName: 'Payroll queries - Absa - September 2026.xlsx' }, password: SHOWN_ONCE, passwordNote: 'Shown once.',
     }, { status: 201 }))
     const bytes = capture('get', '*/api/payroll/query-files/:id', attachment('Payroll queries - Absa - September 2026.xlsx'))
 
@@ -190,7 +193,7 @@ describe('the downloads, fetched with the name the server gave', () => {
     const fetched = await downloadQueryFile(answer.file.id)
 
     expect(made[0]).toMatchObject({ path: '/api/payroll/queries/2/files', query: {}, body: { format: 'pdf' } })
-    expect(answer.password).toBe('shown-once-here')
+    expect(answer.password).toBe(SHOWN_ONCE)
     expect(bytes[0]).toMatchObject({ path: '/api/payroll/query-files/31', query: {} })
     expect(fetched.filename).toBe('Payroll queries - Absa - September 2026.xlsx')
   })

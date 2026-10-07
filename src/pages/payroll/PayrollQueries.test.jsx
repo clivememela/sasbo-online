@@ -25,6 +25,9 @@ import { setupUser } from '../../test/user'
 const VIEW = [PERMISSIONS.PAYROLL_VIEW]
 const PROCESS = [PERMISSIONS.PAYROLL_VIEW, PERMISSIONS.PAYROLL_PROCESS]
 
+/** An invented password in the shape the system makes (four groups of four), never a real one. */
+const SHOWN_ONCE = 'K7MW-Q3ZR-T8XH-N4CP'
+
 const openQueries = (permissions = PROCESS, entry = '/admin/payroll/files/12/queries') => renderWithProviders(
   <TestAuthProvider permissions={permissions}>
     <Routes>
@@ -182,7 +185,7 @@ describe('downloading a list for the employer -- protected by a password the sys
   /** The produce answers, recorded; the bytes of the file it made, under the server's name. */
   const produces = (answer = () => HttpResponse.json({
     file: { id: 31, queryId: 2, fileName: 'Payroll queries - Absa - September 2026.pdf', format: 'PDF' },
-    password: 'K7MW-Q3ZR-T8XH-N4CP',
+    password: SHOWN_ONCE,
     passwordNote: 'This password is shown once and is not kept.',
   }, { status: 201 })) => {
     const seen = []
@@ -213,14 +216,14 @@ describe('downloading a list for the employer -- protected by a password the sys
     await user.selectOptions(within(dialog).getByLabelText('Format'), 'PDF')
     await user.click(within(dialog).getByRole('button', { name: 'Make the protected file' }))
 
-    expect(await within(dialog).findByText('K7MW-Q3ZR-T8XH-N4CP')).toBeInTheDocument()
+    expect(await within(dialog).findByText(SHOWN_ONCE)).toBeInTheDocument()
     expect(seen).toEqual([{ format: 'pdf' }])
     expect(dialog).toHaveAccessibleDescription('The password below is shown once, and is not kept.')
     expect(within(dialog).getByRole('alert')).toHaveTextContent('Give this to the employer by phone; it will not be shown again.')
     expect(within(dialog).getByText('This password is shown once and is not kept.')).toBeInTheDocument()
 
     await user.click(within(dialog).getByRole('button', { name: 'Copy the password' }))
-    expect(await navigator.clipboard.readText()).toBe('K7MW-Q3ZR-T8XH-N4CP')
+    expect(await navigator.clipboard.readText()).toBe(SHOWN_ONCE)
     expect(within(dialog).getByText('Copied.')).toBeInTheDocument()
 
     await user.click(within(dialog).getByRole('button', { name: 'Download the file' }))
@@ -266,7 +269,7 @@ describe('downloading a list for the employer -- protected by a password the sys
     await user.click(screen.getByRole('button', { name: 'Make the protected file' }))
     await user.click(await screen.findByRole('button', { name: 'Copy the password' }))
     expect(screen.getByText('This browser would not copy it: select it and copy it by hand.')).toBeInTheDocument()
-    expect(screen.getByText('K7MW-Q3ZR-T8XH-N4CP')).toBeInTheDocument()
+    expect(screen.getByText(SHOWN_ONCE)).toBeInTheDocument()
   })
 
   it('a file not made says so inside the dialog, in the server\'s words; one whose answer never arrived is unconfirmed', async () => {
@@ -296,7 +299,7 @@ describe('accessibility', () => {
 
   it('the download dialog, with the password shown once, has no violations', async () => {
     server.use(http.post('*/api/payroll/queries/:id/files', () => HttpResponse.json({
-      file: { id: 31, fileName: 'Payroll queries - Absa - September 2026.xlsx' }, password: 'K7MW-Q3ZR-T8XH-N4CP',
+      file: { id: 31, fileName: 'Payroll queries - Absa - September 2026.xlsx' }, password: SHOWN_ONCE,
     }, { status: 201 })))
     const user = setupUser()
     openQueries()
@@ -304,7 +307,7 @@ describe('accessibility', () => {
     await user.click(screen.getByRole('button', { name: 'Download for the employer' }))
     await user.click(screen.getByRole('button', { name: 'Make the protected file' }))
     const dialog = screen.getByRole('dialog', { name: 'Download the query list for the employer' })
-    await within(dialog).findByText('K7MW-Q3ZR-T8XH-N4CP')
+    await within(dialog).findByText(SHOWN_ONCE)
     await expectNoA11yViolations(dialog, { rules: { region: { enabled: false } } })
   })
 })
