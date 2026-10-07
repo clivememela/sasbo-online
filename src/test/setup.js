@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, expect, vi } from 'vitest'
 import * as axeMatchers from 'vitest-axe/matchers'
 
 import { server } from './msw/server'
+import { installSessionFetch } from '../services/api'
 
 // ---------------------------------------------------------------------------
 // Is there a DOM in this file's environment?
@@ -138,9 +139,15 @@ if (hasDom && !Element.prototype.scrollIntoView) {
 // ---------------------------------------------------------------------------
 // The network
 // ---------------------------------------------------------------------------
+// The session's `fetch` wrapper, as `main.jsx` installs it -- AFTER MSW, so it is the outer layer here exactly as in
+// the browser: a handler sees the `Authorization` header a signed-in screen sends. MSW answers handled requests itself
+// and never calls the `fetch` it wrapped, so a wrapper installed first would never run in a test at all.
+let uninstallSessionFetch = () => {}
+
 beforeAll(() => {
   // 'error', not 'warn'. See src/test/msw/server.js.
   server.listen({ onUnhandledRequest: 'error' })
+  uninstallSessionFetch = installSessionFetch()
 })
 
 afterEach(() => {
@@ -161,5 +168,7 @@ afterEach(() => {
 })
 
 afterAll(() => {
+  // In this order: MSW restores the `fetch` it found, which must be the original rather than this wrapper.
+  uninstallSessionFetch()
   server.close()
 })

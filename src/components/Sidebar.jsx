@@ -1,14 +1,16 @@
 import { X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, Suspense, useEffect, useRef, useState } from "react";
 import Logo from "./common/Logo";
 import SidebarItem from "./common/SidebarItem";
 import ThemeToggle from "./common/ThemeToggle";
 import Button from "./form/Button";
-import { navItems, authItems } from "../config/navigation";
+import { navItems } from "../config/navigation";
 import { MENU_BUTTON_ID, SIDEBAR_ID } from "./shellIds";
 import { cn } from "../lib/utils";
 import useMediaQuery from "../hooks/useMediaQuery";
+// LAZY (OB17a): the foot's Sign in or Sign out, from the same lazy module as the header's account (`AccountControls`).
+import { RailAccount } from "./account/lazyAccount";
 
 /*
  * The chain of hrefs from the rail's root to `target`, and the SHORTEST one when a route
@@ -45,7 +47,7 @@ const BELOW_DESK = "(max-width: 1023px)";
 /**
  * THE RAIL. card.html's `.side`: the quiet second layer -- a full step below the page
  * ground, 256px, the wordmark at the top, the navigation as 36px rows, and the foot
- * carrying Appearance and Log out.
+ * carrying Appearance and Sign out (or Sign in).
  *
  * Below `lg` it is the same column as a drawer, which is this application's measured
  * phone treatment (R-RESP) rather than the mock's 68px icon rail; the mock only ever
@@ -279,26 +281,9 @@ function Sidebar({ sideBarOpen, setSideBarOpen, selectedCardHref }) {
         {/* card.html's `.side__foot`: the appearance switch, then the way out. */}
         <div className="grid gap-0.5 border-t border-line pt-3">
           <ThemeToggle variant="nav" />
-          {authItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                to={item.href}
-                className={cn(
-                  // `touch-size`: the rail's foot takes the same 44px rows on a coarse pointer as the list (`07.2`).
-                  "touch-size flex h-9 items-center gap-3 rounded-lg px-2.5 text-sm font-medium text-nav-ink",
-                  "transition-[background-color,color] duration-(--duration-instant)",
-                  "hover-hover:hover:bg-nav-hover hover-hover:hover:text-ink",
-                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
-                )}
-                onClick={() => setSideBarOpen(false)}
-              >
-                <Icon size={18} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-nav-icon" />
-                <span className="truncate">{item.title}</span>
-              </Link>
-            );
-          })}
+          <Suspense fallback={null}>
+            <RailAccount onClick={() => setSideBarOpen(false)} />
+          </Suspense>
         </div>
       </nav>
     </>

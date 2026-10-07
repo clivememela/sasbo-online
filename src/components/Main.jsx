@@ -5,6 +5,9 @@ import ErrorBoundary from "./common/ErrorBoundary";
 import RoutePending from "./common/RoutePending";
 import { MAIN_CONTENT_ID } from "./shellIds";
 import OfflineBanner from "./common/OfflineBanner";
+import { useAuth } from "../auth/useAuth";
+// LAZY: it says something only after a session has ended, so the first load does not carry it (OB17a).
+import { SessionNotice } from "./account/lazyAccount";
 import { PAGE_GUTTER } from "./common/Sheet.jsx";
 import { cn } from "../lib/utils";
 import { getLastNetworkFailureAt, onNetworkFailure } from "../lib/reportError";
@@ -26,6 +29,7 @@ export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref,
   // effect left a gap between the first render and the subscription.
   const lastNetworkFailureAt = useSyncExternalStore(onNetworkFailure, getLastNetworkFailureAt);
   const { pathname } = useLocation();
+  const { sessionEnded } = useAuth();
 
   return (
     /* 🔴 THE LANDMARKS WERE NESTED WRONG, AND THE COST WAS THAT THERE WERE NONE.
@@ -60,6 +64,12 @@ export default function Main({ sideBarOpen, setSideBarOpen, setSelectedCardHref,
             // which is a large amount of machinery for a button pressed once a month.
             onRetry={() => window.location.reload()}
           />
+          {/* Beside the offline banner and for its reason: a fact about the application, not about one screen. */}
+          {sessionEnded && (
+            <Suspense fallback={null}>
+              <SessionNotice />
+            </Suspense>
+          )}
         </div>
         {/* 🔴 THE BOUNDARY IS HERE, INSIDE THE SHELL, and the position is the whole point.
             A11's standard-facing test says it in one line: "the shell must survive, and

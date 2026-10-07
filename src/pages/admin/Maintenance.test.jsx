@@ -4,6 +4,7 @@ import { screen } from '@testing-library/react'
 
 import Maintenance from './Maintenance'
 import { navItems } from '../../config/navigation'
+import { PERMISSIONS } from '../../auth/permissions'
 import { renderWithProviders } from '../../test/renderWithProviders'
 
 /**
@@ -50,6 +51,21 @@ describe('the Maintenance menu', () => {
     // Written twice -- a card here, a leaf in the rail -- so both halves are asserted by name, not only by count.
     expect(screen.getByRole('link', { name: /^Workplaces/ })).toHaveAttribute('href', '/admin/maintenance/workplaces')
     expect(sidebarMaintenance().find((entry) => entry.title === 'Workplaces')?.href).toBe('/admin/maintenance/workplaces')
+  })
+
+  it('offers sign-in\'s users, positions, roles and record (5 Oct), each naming the permission its screen needs', () => {
+    const SIGN_IN = [
+      ['Users', '/admin/maintenance/users', PERMISSIONS.USERS_ADMIN],
+      ['Positions', '/admin/maintenance/positions', PERMISSIONS.USERS_ADMIN],
+      ['Roles', '/admin/maintenance/roles', PERMISSIONS.USERS_ADMIN],
+      ['Who did what', '/admin/maintenance/audit', PERMISSIONS.AUDIT_VIEW],
+    ]
+    renderWithProviders(<Maintenance />)
+    for (const [title, href, permission] of SIGN_IN) {
+      expect(screen.getByRole('link', { name: new RegExp(`^${title}`) })).toHaveAttribute('href', href)
+      // The rail's entry is the same object, carrying the key the menu rule (navAccess.js, OB18) marks it by.
+      expect(sidebarMaintenance().find((entry) => entry.title === title)).toMatchObject({ href, permission })
+    }
   })
 
   it('says the same in the sidebar as on the page -- every entry a link, to the same place', () => {

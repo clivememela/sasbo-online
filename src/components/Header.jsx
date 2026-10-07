@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, Menu, Search } from "lucide-react";
 import Breadcrumbs from "./common/Breadcrumbs";
@@ -6,6 +6,8 @@ import Button from "./form/Button";
 import { MENU_BUTTON_ID, SIDEBAR_ID } from "./shellIds";
 import { cn } from "../lib/utils";
 import useMediaQuery from "../hooks/useMediaQuery";
+// LAZY (OB17a): who is signed in, and the way in or out, arrive with the page's own chunk -- see `AccountControls`.
+import { HeaderAccount } from "./account/lazyAccount";
 
 /**
  * THE TOPBAR. card.html's `.topbar`, and it is 60px.
@@ -216,25 +218,11 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
           <Bell size={18} strokeWidth={1.75} aria-hidden="true" />
         </Button>
 
-        {/* ⚠️ A PLACEHOLDER, AND AN HONEST ONE. There is no signed-in person for the pill to
-            belong to: authentication is DEFERRED (R-SEC-C). It stays as the shell's anchor,
-            as a non-interactive chip assistive technology is not told to believe in. When
-            authentication lands it becomes the mock's account menu, whose name comes from
-            the session. */}
-        <p
-          aria-hidden="true"
-          className="flex h-9 select-none items-center gap-2.5 rounded-full py-0 pl-1 pr-2.5"
-        >
-          <span className="grid size-7 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-ink">
-            SA
-          </span>
-          {/* 🔑 THE NAME IS PRESENT ACROSS THE WHOLE DESK, which is what the mock's topbar
-              shows and what the contract calls desktop -- from `xl` (1280), the same edge
-              the record panel docks at. It was briefly hidden below 1440 because it had been
-              pushing the breadcrumb off; the trail carries `min-w-0` now, so the row's
-              give comes out of the crumbs and the name stays where the mock puts it. */}
-          <span className="hidden whitespace-nowrap text-[13.5px] font-medium text-ink xl:inline">Administrator</span>
-        </p>
+        {/* The placeholder chip ("SA", "Administrator") that stood here while authentication was deferred (R-SEC-C)
+            is the real account now: the session's name and position, and the way out. */}
+        <Suspense fallback={null}>
+          <HeaderAccount />
+        </Suspense>
       </div>
     </header>
   );

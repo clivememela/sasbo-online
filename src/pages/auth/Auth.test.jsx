@@ -1,314 +1,300 @@
-// @vitest-environment jsdom -- drives the sign-in form and reads what it announces
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+// @vitest-environment jsdom -- signs in through the real AuthProvider and reads what the screen says and where it goes
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { screen, waitFor, within } from '@testing-library/react'
+import { Route, Routes } from 'react-router-dom'
+import { http, HttpResponse } from 'msw'
 
 import Auth from './Auth'
+import { AuthProvider } from '../../auth/AuthContext'
+// The provider's server conversations are a lazy chunk; in the registry before any test, so a wait times the screen.
+import '../../auth/authServer'
+import { SESSION_KEY } from '../../auth/session'
 import { expectNoA11yViolations } from '../../test/assertions'
+import { authHandlers, refusal, storeSession, userWith } from '../../test/authFixtures'
+import { deferred } from '../../test/deferred'
+import { server } from '../../test/msw/server'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { setupUser } from '../../test/user'
 
 /**
- * The sign-in screen. `04.1`.
+ * The sign-in screen, made real (contracts/signin.md). Every case mounts the real `AuthProvider` over MSW, so what is
+ * asserted is what a person meets: the request sent, the sentence shown, the page reached.
  *
- * 🔴 THE FIRST DESCRIBE IS R-SEC-C AND IT IS THE REASON THIS FILE EXISTS. The screen
- * used to `console.log` the typed email and password on every submit. A source scan
- * would have caught that one spelling of it; this catches the BEHAVIOUR, wherever it
- * comes from -- a `console.info` added later, a debug line inside a helper, a logging
- * library. What must never happen is a credential reaching any console sink.
+ * 🔴 THE FIRST TWO DESCRIBES ARE R-SEC-C AND THEY ARE WHY THIS FILE EXISTS. The screen once did
+ * `console.log('Login attempt:', { email, password })`. Now it sends the password to the server -- so the guard is
+ * sharper than before: across a real sign-in, a refused one and a failed request, nothing typed may reach any console
+ * sink, in any shape.
  */
 
 /**
- * The string this suite types into a password field.
- *
- * ⚠️ ITS SHAPE IS LOAD-BEARING AND IT IS NOT A STYLE CHOICE. `committedSecrets.js`
- * watches for an assignment to a credential-shaped NAME with a long literal on the right,
- * which is exactly what `const PASSWORD = <realistic password>` is -- and it caught this
- * file the run after `04.1` was committed, because that guard reads `git ls-files` and is
- * blind to untracked files.
- *
- * 🔑 THE GUARD WAS NOT WEAKENED TO FIX IT. No allowlist entry, no path exclusion for
- * test files, no rename until the regex stops matching -- all three would leave a real
- * credential pasted here undetected, which is how secrets get committed. Instead the value
- * uses the guard's OWN affordance: `OBVIOUS_PLACEHOLDERS` clears `your_password_here`
- * because nothing that shape is ever a real secret.
- *
- * 🔴 SO DO NOT MAKE IT LOOK LIKE A REAL PASSWORD. It reads as a downgrade and it will
- * redden the secret guard.
+ * The strings typed into the form. ⚠️ THEIR SHAPE IS LOAD-BEARING: `committedSecrets.js` convicts a credential-shaped
+ * name assigned a long literal, and clears `your_password_here` only because nothing that shape is ever a real secret.
+ * Do not make it look like a real password -- it reads as a downgrade and reddens the secret guard.
  */
 const PASSWORD = 'your_password_here'
-const EMAIL = 'synthetic.member@example.invalid'
-const SUMMARY_HEADING = /There is a problem with this form/i
+const USERNAME = 'sam.synthetic'
+const SUMMARY = /There is a problem with this form|You are not signed in/
 
-/**
- * The error summary, found by its ACCESSIBLE NAME rather than by `role="alert"`.
- *
- * 🔴 THE FIRST DRAFT ASKED FOR `role="alert"` AND FOUND FIVE. `Field` gives every error
- * message that role, so an empty submit produces one live region per bad field plus the
- * summary -- five simultaneous announcements for one mistake. The summary is focused
- * instead, which is what announces it, and this looks it up the way a user meets it.
- */
-const errorSummary = () =>
-  screen.getByText(SUMMARY_HEADING).closest('[aria-labelledby]')
+/** The summary, found by its accessible name rather than by a role (`Field` gives each field's message `alert`). */
+const summary = () => screen.getByText(SUMMARY).closest('[aria-labelledby]')
 
-/**
- * One console argument, flattened to text a search can actually find a secret in.
- *
- * 🔴 THIS FUNCTION IS THE WHOLE GUARD, AND THE FIRST VERSION OF IT WAS BLIND. It was
- * `String(arg)`, which turns `{ email, password }` into the literal text
- * `[object Object]` — so the defect this file exists to catch,
- * `console.log('Login attempt:', { email, password })`, produced console output with no
- * password in it and the test reported GREEN.
- *
- * 🔑 IT WAS NOT FOUND BY READING. It was found by putting the original defect back and
- * running the guard, which is the only thing that distinguishes a guard from a guard
- * that cannot see. Credentials are almost always logged as a FIELD of an object, so a
- * stringifier that stops at the top level is exactly the wrong one here.
- */
+/** One console argument, flattened to text a search can find a secret in -- object fields included (see the canary). */
 const flatten = (value, depth = 0) => {
   if (depth > 6) return ''
   if (value === null || value === undefined) return String(value)
   if (typeof value === 'string') return value
   if (typeof value !== 'object') return String(value)
   if (value instanceof Error) return `${value.message} ${value.stack ?? ''}`
-  // Own keys AND values: a password can arrive as either, and `JSON.stringify` would
-  // drop functions, symbols and anything that throws in a getter.
-  return Object.entries(value)
-    .map(([key, nested]) => `${key} ${flatten(nested, depth + 1)}`)
-    .join(' ')
+  return Object.entries(value).map(([key, nested]) => `${key} ${flatten(nested, depth + 1)}`).join(' ')
 }
 
 /** Every console sink, spied together. A guard that watches only `log` is half a guard. */
 const spyOnConsole = () => {
-  const sinks = ['log', 'info', 'debug', 'warn', 'error', 'trace']
-  const spies = sinks.map((sink) => vi.spyOn(console, sink).mockImplementation(() => {}))
+  const spies = ['log', 'info', 'debug', 'warn', 'error', 'trace'].map((sink) => vi.spyOn(console, sink).mockImplementation(() => {}))
   return {
-    everythingWritten: () =>
-      spies.flatMap((spy) => spy.mock.calls).map((call) => call.map((arg) => flatten(arg)).join(' ')),
+    everythingWritten: () => spies.flatMap((spy) => spy.mock.calls).map((call) => call.map((arg) => flatten(arg)).join(' ')).join('\n'),
   }
 }
 
-describe('the credential guard can actually see a credential', () => {
-  afterEach(() => vi.restoreAllMocks())
+/** /login under the real provider, with the two places a sign-in can lead. */
+const renderLogin = ({ path = '/login', mode = 'open', user = userWith() } = {}) => {
+  server.use(...authHandlers({ mode, user }))
+  return renderWithProviders(
+    <AuthProvider>
+      <Routes>
+        <Route path="/login" element={<Auth />} />
+        <Route path="/home" element={<p>The home page</p>} />
+        <Route path="/members" element={<p>The member register</p>} />
+        <Route path="/change-password" element={<p>The change-password screen</p>} />
+      </Routes>
+    </AuthProvider>,
+    { initialEntries: [path] },
+  )
+}
 
-  // 🔴 THE CANARY, and it is here because the guard failed it once. Everything in the
-  // next describe is satisfied by a flattener that returns '' — no password found, in an
-  // empty string. This drives the exact shape the defect had.
+const fillAndSubmit = async (user) => {
+  await user.type(screen.getByLabelText(/^Username/), USERNAME)
+  await user.type(screen.getByLabelText(/^Password/), PASSWORD)
+  await user.click(screen.getByRole('button', { name: /^Sign in$/ }))
+}
+
+/** `POST /api/auth/login`, remembering the body it was sent. */
+const answersSignIn = (answer) => {
+  const bodies = []
+  server.use(http.post('*/api/auth/login', async ({ request }) => {
+    bodies.push(await request.json())
+    return answer()
+  }))
+  return bodies
+}
+
+const signedIn = (user = userWith()) => () => HttpResponse.json({ token: 'synthetic-session-token', expiresAt: '2026-10-07T19:30:00Z', user })
+
+afterEach(() => vi.restoreAllMocks())
+
+describe('the credential guard can actually see a credential', () => {
   it('finds a secret logged as a field of an object, not just as a bare string', () => {
     const console_ = spyOnConsole()
-
-    console.log('Login attempt:', { email: EMAIL, password: PASSWORD })
+    console.log('Login attempt:', { username: USERNAME, password: PASSWORD })
     console.warn({ nested: { deeper: { credential: PASSWORD } } })
     console.error(`bare ${PASSWORD}`)
-
-    const written = console_.everythingWritten().join('\n')
-    const occurrences = written.split(PASSWORD).length - 1
-
-    expect(
-      occurrences,
-      'The console flattener cannot see a secret in the shape this application logged ' +
-        'it in. Every assertion below would pass while the defect was present.',
-    ).toBe(3)
-    expect(written).toContain(EMAIL)
+    const written = console_.everythingWritten()
+    expect(written.split(PASSWORD).length - 1, 'the flattener cannot see a secret in the shape it was once logged in').toBe(3)
+    expect(written).toContain(USERNAME)
   })
 })
 
-describe('Auth — R-SEC-C, nothing typed here reaches a console', () => {
-  afterEach(() => vi.restoreAllMocks())
-
-  it('logs neither the password nor the email, on either mode', async () => {
+describe('Auth -- R-SEC-C, nothing typed here reaches a console', () => {
+  it.each([
+    ['a sign-in that succeeds', signedIn()],
+    ['a sign-in the server refuses', () => refusal(401, 'SIGN_IN_FAILED')],
+    ['a sign-in that never reaches the server', () => HttpResponse.error()],
+  ])('logs neither the username nor the password on %s', async (_case, answer) => {
     const user = setupUser()
     const console_ = spyOnConsole()
-    renderWithProviders(<Auth />, { initialEntries: ['/login'] })
+    const sent = answersSignIn(answer)
+    renderLogin()
 
-    await user.type(screen.getByLabelText(/Email Address/i), EMAIL)
-    await user.type(screen.getByLabelText(/^Password/i), PASSWORD)
-    await user.click(screen.getByRole('button', { name: /Log In/i }))
+    await fillAndSubmit(user)
+    // 🔑 THE MUST-PASS HALF: the credentials really were sent. An empty console proves nothing if nothing happened.
+    await waitFor(() => expect(sent).toEqual([{ username: USERNAME, password: PASSWORD }]))
 
-    // 🔑 THE MUST-PASS HALF, and without it this test is worthless. Everything below is
-    // satisfied by a form that was never filled in -- an empty console proves nothing if
-    // nothing happened. This asserts the credentials actually went in.
-    expect(
-      screen.getByLabelText(/Email Address/i),
-      'The form was never actually filled in, so an empty console proves nothing.',
-    ).toHaveValue(EMAIL)
-
-    const written = console_.everythingWritten().join('\n')
-
-    expect(
-      written.includes(PASSWORD),
-      `A password reached the console. It survives in a saved HAR, a screen share and ` +
-        `any extension that reads the console. Console output was:\n${written}`,
-    ).toBe(false)
-
-    expect(written.includes(EMAIL), 'An email address reached the console.').toBe(false)
-  })
-
-  it('logs nothing from the sign-up form either', async () => {
-    const user = setupUser()
-    const console_ = spyOnConsole()
-    renderWithProviders(<Auth />, { initialEntries: ['/login'] })
-
-    await user.click(screen.getByRole('button', { name: 'Sign Up' }))
-    await user.type(screen.getByLabelText(/Full Name/i), 'Synthetic Testperson')
-    await user.type(screen.getByLabelText(/Email Address/i), EMAIL)
-    await user.type(screen.getByLabelText(/^Password/i), PASSWORD)
-    await user.type(screen.getByLabelText(/Confirm Password/i), PASSWORD)
-    await user.click(screen.getByRole('button', { name: 'Create account' }))
-
-    expect(screen.getByLabelText(/Confirm Password/i)).toHaveValue(PASSWORD)
-
-    const written = console_.everythingWritten().join('\n')
+    const written = console_.everythingWritten()
     expect(written.includes(PASSWORD), `A password reached the console:\n${written}`).toBe(false)
+    expect(written.includes(USERNAME), `A username reached the console:\n${written}`).toBe(false)
   })
 })
 
-describe('Auth — validation is inline, and never a native dialog', () => {
-  beforeEach(() => {
-    // 🔴 THE DEFECT THIS REPLACES. `alert()` stole focus, could not be styled, named no
-    // field, and left the member facing an unchanged form. jsdom's `window.alert` throws
-    // "not implemented" rather than being callable, so a spy is what makes a regression
-    // legible instead of an unattributed crash.
+describe('Auth -- signing in', () => {
+  it('sends the username trimmed and the password as typed, keeps the session, and opens Home', async () => {
+    const user = setupUser()
+    const sent = answersSignIn(signedIn())
+    renderLogin()
+
+    await user.type(screen.getByLabelText(/^Username/), `  ${USERNAME} `)
+    await user.type(screen.getByLabelText(/^Password/), ` ${PASSWORD} `)
+    await user.click(screen.getByRole('button', { name: /^Sign in$/ }))
+
+    expect(await screen.findByText('The home page')).toBeInTheDocument()
+    expect(sent).toEqual([{ username: USERNAME, password: ` ${PASSWORD} ` }])
+    // The contract's key and shape -- what `api.js` reads its token from, and what a deck slide sets.
+    expect(JSON.parse(sessionStorage.getItem(SESSION_KEY))).toMatchObject({ token: 'synthetic-session-token', user: { username: USERNAME } })
+  })
+
+  it('honours a `next` on this site -- the screen asked for, with its query', async () => {
+    const user = setupUser()
+    answersSignIn(signedIn())
+    renderLogin({ path: `/login?next=${encodeURIComponent('/members?q=Synthetic')}` })
+    await fillAndSubmit(user)
+    expect(await screen.findByText('The member register')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['a protocol-relative address', '//evil.example/steal'],
+    ['an absolute address', 'https://evil.example/steal'],
+    ['a backslash trick', '/\\evil.example'],
+    ['a script address', 'javascript:alert(1)'],
+  ])('refuses %s in `next`, and opens Home instead', async (_case, next) => {
+    const user = setupUser()
+    answersSignIn(signedIn())
+    renderLogin({ path: `/login?next=${encodeURIComponent(next)}` })
+    await fillAndSubmit(user)
+    expect(await screen.findByText('The home page')).toBeInTheDocument()
+  })
+
+  it('sends a temporary password to the change-password screen first, keeping where it was going', async () => {
+    const user = setupUser()
+    answersSignIn(signedIn(userWith({ mustChangePassword: true })))
+    renderLogin({ path: '/login?next=%2Fmembers' })
+    await fillAndSubmit(user)
+    expect(await screen.findByText('The change-password screen')).toBeInTheDocument()
+  })
+
+  it('says it is signing in, and cannot be sent twice, while the server is asked', async () => {
+    const user = setupUser()
+    const answer = deferred()
+    server.use(http.post('*/api/auth/login', () => answer.promise))
+    renderLogin()
+
+    await fillAndSubmit(user)
+    const button = screen.getByRole('button', { name: /Signing in/ })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('aria-busy', 'true')
+
+    answer.resolve(signedIn()())
+    expect(await screen.findByText('The home page')).toBeInTheDocument()
+  })
+
+  it('a session already in the tab goes straight on to `next`', async () => {
+    storeSession()
+    renderLogin({ path: '/login?next=%2Fmembers' })
+    expect(await screen.findByText('The member register')).toBeInTheDocument()
+  })
+})
+
+describe('Auth -- each refusal is a sentence, and gives nothing away', () => {
+  it.each([
+    ['SIGN_IN_FAILED', 401, /username or the password is not right/],
+    ['ACCOUNT_LOCKED', 423, /locked for 15 minutes, after five sign-ins/],
+    ['ACCOUNT_INACTIVE', 403, /account is closed/],
+  ])('%s says what happened and what to do, with focus on it', async (code, status, sentence) => {
+    const user = setupUser()
+    answersSignIn(() => refusal(status, code))
+    renderLogin()
+    await fillAndSubmit(user)
+
+    await waitFor(() => expect(summary()).toHaveFocus())
+    expect(within(summary()).getByText(sentence)).toBeInTheDocument()
+    // Not the username typed, and never which half was wrong (the server answers both the same: no enumeration).
+    expect(summary()).not.toHaveTextContent(USERNAME)
+    expect(summary()).not.toHaveTextContent(/no such user|unknown user|wrong password/i)
+    // The password is cleared for the next attempt; the username is kept.
+    expect(screen.getByLabelText(/^Password/)).toHaveValue('')
+    expect(screen.getByLabelText(/^Username/)).toHaveValue(USERNAME)
+    expect(sessionStorage.getItem(SESSION_KEY)).toBeNull()
+  })
+
+  it('a failure that is not a refusal says so, in the request layer\'s own words', async () => {
+    const user = setupUser()
+    answersSignIn(() => HttpResponse.error())
+    renderLogin()
+    await fillAndSubmit(user)
+    expect(await screen.findByText(/Could not reach the server/)).toBeInTheDocument()
+  })
+
+  it('an empty form names both fields at once, focuses the summary, and sends nothing', async () => {
+    const user = setupUser()
+    const sent = answersSignIn(signedIn())
     vi.spyOn(window, 'alert').mockImplementation(() => {})
-  })
+    renderLogin()
 
-  afterEach(() => vi.restoreAllMocks())
+    await user.click(screen.getByRole('button', { name: /^Sign in$/ }))
 
-  it('mismatched passwords are reported on the field, in a summary, with no alert', async () => {
-    const user = setupUser()
-    renderWithProviders(<Auth />, { initialEntries: ['/login'] })
-
-    await user.click(screen.getByRole('button', { name: 'Sign Up' }))
-    await user.type(screen.getByLabelText(/Full Name/i), 'Synthetic Testperson')
-    await user.type(screen.getByLabelText(/Email Address/i), EMAIL)
-    await user.type(screen.getByLabelText(/^Password/i), PASSWORD)
-    await user.type(screen.getByLabelText(/Confirm Password/i), 'something-else')
-    await user.click(screen.getByRole('button', { name: 'Create account' }))
-
-    expect(window.alert, 'A native alert() is back. It names no field and steals focus.')
-      .not.toHaveBeenCalled()
-
-    const summary = errorSummary()
-    expect(within(summary).getByText(/do not match/i)).toBeInTheDocument()
-
-    // ⚠️ THE SUMMARY IS NOT ENOUGH ON ITS OWN. A member reading the form rather than the
-    // top of the page needs the error ON the control -- and `aria-invalid` is what tells
-    // a screen reader which one is wrong.
-    const confirm = screen.getByLabelText(/Confirm Password/i)
-    expect(confirm).toHaveAttribute('aria-invalid', 'true')
-    expect(
-      document.getElementById(confirm.getAttribute('aria-describedby')),
-      'aria-describedby names an element that is not in the document, which makes the ' +
-        'whole description silently empty in several screen readers.',
-    ).toHaveTextContent(/do not match/i)
-
-    // The summary takes focus, so the next thing announced says what went wrong.
-    expect(summary).toHaveFocus()
-  })
-
-  it('an empty form reports every missing field at once, not one at a time', async () => {
-    const user = setupUser()
-    renderWithProviders(<Auth />, { initialEntries: ['/login'] })
-
-    await user.click(screen.getByRole('button', { name: 'Sign Up' }))
-    await user.click(screen.getByRole('button', { name: 'Create account' }))
-
-    const problems = within(errorSummary()).getAllByRole('listitem')
-
-    // Name, email, password, confirm -- four empty required fields, four messages. A
-    // form that reports them one submit at a time is four round trips for one mistake.
-    expect(problems).toHaveLength(4)
-  })
-
-  it('switching mode clears errors that describe fields no longer on screen', async () => {
-    const user = setupUser()
-    renderWithProviders(<Auth />, { initialEntries: ['/login'] })
-
-    await user.click(screen.getByRole('button', { name: 'Sign Up' }))
-    await user.click(screen.getByRole('button', { name: 'Create account' }))
-    expect(errorSummary()).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Login' }))
-
-    expect(
-      screen.queryByText(SUMMARY_HEADING),
-      'A summary survived the mode switch, so it now points at inputs that are not on ' +
-        'the screen -- "Enter your full name" over a form with no name field.',
-    ).not.toBeInTheDocument()
-  })
-
-  it('a complete form is accepted, and says nothing is wrong', async () => {
-    // 🔑 THE NON-VACUITY CASE. Every assertion above is satisfied by a form that
-    // ALWAYS refuses. This is the one that catches a validator stuck on "no".
-    const user = setupUser()
-    renderWithProviders(<Auth />, { initialEntries: ['/login'] })
-
-    await user.type(screen.getByLabelText(/Email Address/i), EMAIL)
-    await user.type(screen.getByLabelText(/^Password/i), PASSWORD)
-    await user.click(screen.getByRole('button', { name: /Log In/i }))
-
-    expect(
-      screen.queryByText(SUMMARY_HEADING),
-      'A valid submission was refused. The form cannot be completed at all.',
-    ).not.toBeInTheDocument()
+    expect(within(summary()).getAllByRole('listitem')).toHaveLength(2)
+    expect(summary()).toHaveFocus()
+    expect(screen.getByLabelText(/^Username/)).toHaveAttribute('aria-invalid', 'true')
+    expect(window.alert, 'a native alert() is back').not.toHaveBeenCalled()
+    expect(sent).toEqual([])
   })
 })
 
-describe('Auth — the screen says what it actually does', () => {
-  it('states that sign-in is not active, without hiding it behind a dismissal', async () => {
-    renderWithProviders(<Auth />, { initialEntries: ['/login'] })
-
-    // 🗣️ Authentication is DEFERRED (the owner, 2026-09-09). The screen navigates
-    // because it is the only door into the application, so it has to SAY so -- a login
-    // that silently accepts anything is the thing this wave was told not to paint.
-    expect(screen.getByText(/not active yet/i)).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: /dismiss|close|got it/i }),
-      'The notice can be dismissed, so a member can be looking at a form that behaves ' +
-        'nothing like it appears to with nothing on screen saying so.',
-    ).not.toBeInTheDocument()
-  })
-
-  it('password fields ask a password manager for the right thing', async () => {
+describe('Auth -- the two modes', () => {
+  it('open mode offers to carry on without an account, to where the person was going', async () => {
     const user = setupUser()
-    renderWithProviders(<Auth />, { initialEntries: ['/login'] })
-
-    expect(screen.getByLabelText(/^Password/i)).toHaveAttribute('autocomplete', 'current-password')
-
-    await user.click(screen.getByRole('button', { name: 'Sign Up' }))
-
-    // 🔴 NOT THE SAME ANSWER. `current-password` on a sign-up form asks the manager to
-    // fill in the password being replaced, which is how a new account silently gets the
-    // old credential.
-    expect(screen.getByLabelText(/^Password/i)).toHaveAttribute('autocomplete', 'new-password')
-    expect(screen.getByLabelText(/Confirm Password/i)).toHaveAttribute(
-      'autocomplete',
-      'new-password',
-    )
+    renderLogin({ path: '/login?next=%2Fmembers', mode: 'open' })
+    await user.click(await screen.findByRole('button', { name: 'Continue without signing in' }))
+    expect(await screen.findByText('The member register')).toBeInTheDocument()
   })
 
-  it('renders exactly one <h1>, and it names the screen', async () => {
-    renderWithProviders(<Auth />, { initialEntries: ['/login'] })
+  it('required mode does not -- once the server has said so', async () => {
+    renderLogin({ mode: 'required' })
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Continue without signing in' })).not.toBeInTheDocument())
+    // The must-pass half: the form itself is there, so the absence above is the mode's doing, not an empty page.
+    expect(screen.getByRole('button', { name: /^Sign in$/ })).toBeInTheDocument()
+  })
+})
 
+describe('Auth -- the fields', () => {
+  it('asks a password manager for the right things, and shows the password on request', async () => {
+    const user = setupUser()
+    renderLogin()
+    const password = screen.getByLabelText(/^Password/)
+    expect(screen.getByLabelText(/^Username/)).toHaveAttribute('autocomplete', 'username')
+    expect(password).toHaveAttribute('autocomplete', 'current-password')
+    expect(password).toHaveAttribute('type', 'password')
+
+    const show = screen.getByRole('button', { name: 'Show password' })
+    expect(show).toHaveAttribute('aria-pressed', 'false')
+    await user.click(show)
+    expect(password).toHaveAttribute('type', 'text')
+    expect(show).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('renders exactly one <h1>, and it names the screen', () => {
+    renderLogin()
     const headings = screen.getAllByRole('heading', { level: 1 })
     expect(headings).toHaveLength(1)
-    expect(headings[0]).toHaveTextContent(/Welcome Back/i)
+    expect(headings[0]).toHaveTextContent('Sign in')
+  })
+
+  it('offers no sign-up: an administrator creates every account', () => {
+    renderLogin()
+    expect(screen.queryByRole('button', { name: /sign up|create account/i })).not.toBeInTheDocument()
   })
 })
 
-describe('Auth — accessibility, both themes', () => {
-  it('has no violations in light or dark, including while showing errors', async () => {
+describe('Auth -- accessibility, both themes', () => {
+  it('has no violations at rest, showing a refusal, and in dark', async () => {
     const user = setupUser()
-    const { container } = renderWithProviders(<Auth />, { initialEntries: ['/login'] })
-
+    answersSignIn(() => refusal(401, 'SIGN_IN_FAILED'))
+    const { container } = renderLogin()
     await expectNoA11yViolations(container)
 
-    // The error state is different DOM -- a summary, `aria-invalid`, a described-by.
-    // Scanning only the resting form would never see it.
-    await user.click(screen.getByRole('button', { name: /Log In/i }))
+    await fillAndSubmit(user)
+    await screen.findByText(/username or the password is not right/)
     await expectNoA11yViolations(container)
 
     document.documentElement.classList.add('dark')
     await expectNoA11yViolations(container)
-    document.documentElement.classList.remove('dark')
   })
 })
