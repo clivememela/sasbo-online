@@ -2,11 +2,24 @@
 // nowhere but inside the commented-out card blocks below -- so a grep for each name found two
 // hits and concluded it was live, while eslint (which reads code, not comments) called all ten
 // dead. eslint was right. Anyone restoring one of those cards restores its icon import with it.
-import { Building2, Landmark, LucideCopyCheck, LucideMails, UserRoundPen } from "lucide-react";
+import { Building2, Landmark, Layers, ListChecks, LucideCopyCheck, LucideMails, UserRoundPen } from "lucide-react";
 import { NavigationList } from '../../components/common/NavigationCard.jsx';
 import { Page } from '../../components/common/Sheet.jsx';
 import PageTitle from '../../components/common/PageTitle.jsx';
 import {useOutletContext} from "react-router-dom";
+import { REFERENCE_ENTRIES } from '../../config/navigation.js';
+
+/** Month end's lists' cards' icons and descriptions, by the screen each opens -- here, where the page is lazy. */
+const REFERENCE_CARDS = {
+    '/admin/maintenance/no-deduction-reasons': {
+        icon: ListChecks,
+        desc: 'The reasons for no payroll deduction that Change status offers, each under a suspension code',
+    },
+    '/admin/maintenance/core-tiers': {
+        icon: Layers,
+        desc: 'Which table codes stand in Core A, B and C, and which under all other institutions',
+    },
+};
 
 const maintenance_cards = [
     /*{
@@ -69,6 +82,7 @@ const maintenance_cards = [
         href: '/admin/maintenance/workplaces',
         desc: 'Find a workplace by its name or R/A number'
     },
+    ...REFERENCE_ENTRIES.map((entry) => ({ ...entry, ...REFERENCE_CARDS[entry.href] })),
     /*{
         title: 'Recruiters',
         icon: LucideUserKey,

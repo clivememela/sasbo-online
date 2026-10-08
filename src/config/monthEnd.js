@@ -44,6 +44,37 @@ export const HISTORY_PAGE_INVALID = 'HISTORY_PAGE_INVALID';
 export const VISIT_INVALID = 'VISIT_INVALID';
 export const WORKPLACE_PAGE_INVALID = 'WORKPLACE_PAGE_INVALID';
 
+/**
+ * A suspension under a code the reasons for no payroll deduction stand under (Stephne, MEN-17) names one of them, or
+ * types the reason in its note: `NO_DEDUCTION_REASON_REQUIRED` where it does neither (`details.reasons`, the ids that may
+ * be chosen), `NO_DEDUCTION_REASON_UNKNOWN` for a reason no longer offered, and `STATUS_REASON_MISMATCH` for a reason
+ * that stands under another code (`details.fits`). Change status says each at the reason, and reads the list again.
+ */
+export const NO_DEDUCTION_REASON_REQUIRED = 'NO_DEDUCTION_REASON_REQUIRED';
+export const NO_DEDUCTION_REASON_UNKNOWN = 'NO_DEDUCTION_REASON_UNKNOWN';
+export const STATUS_REASON_MISMATCH = 'STATUS_REASON_MISMATCH';
+
+/**
+ * Maintaining the reasons for no payroll deduction (R1), each said where it happened: a name, code or order the server
+ * would not take is said at that field (`details.field`; `count` is the list's ceiling, said above the form), a name
+ * another reason has at the name, a reason gone above the list, and a reason somebody else changed since the screen read
+ * it in the form, with theirs put in its place -- nothing was written.
+ */
+export const NO_DEDUCTION_REASON_INVALID = 'NO_DEDUCTION_REASON_INVALID';
+export const NO_DEDUCTION_REASON_TAKEN = 'NO_DEDUCTION_REASON_TAKEN';
+export const NO_DEDUCTION_REASON_NOT_FOUND = 'NO_DEDUCTION_REASON_NOT_FOUND';
+export const NO_DEDUCTION_REASON_CHANGED_SINCE = 'NO_DEDUCTION_REASON_CHANGED_SINCE';
+
+/** Setting a table code's tier (R7): a table code not on record here, and a tier that is none of Core A, B and C. */
+export const TABLE_CODE_UNKNOWN = 'TABLE_CODE_UNKNOWN';
+export const CORE_TIER_UNKNOWN = 'CORE_TIER_UNKNOWN';
+
+/**
+ * A capture of somebody already on record (R3; Stephne, MEN-19): `details.membershipNumber` names the record to open
+ * instead -- absent where two captures of the same person collided, when only `details.matched` is said.
+ */
+export const MEMBER_ALREADY_CAPTURED = 'MEMBER_ALREADY_CAPTURED';
+
 /** The refusal codes the screens branch on (ME-13) -- each one the server publishes. */
 export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   REQUEST_MALFORMED: 'REQUEST_MALFORMED',
@@ -55,6 +86,16 @@ export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   SUSPENSION_CODE_UNKNOWN,
   HISTORY_PAGE_INVALID,
   VISIT_INVALID,
+  NO_DEDUCTION_REASON_REQUIRED,
+  NO_DEDUCTION_REASON_UNKNOWN,
+  STATUS_REASON_MISMATCH,
+  NO_DEDUCTION_REASON_INVALID,
+  NO_DEDUCTION_REASON_TAKEN,
+  NO_DEDUCTION_REASON_NOT_FOUND,
+  NO_DEDUCTION_REASON_CHANGED_SINCE,
+  TABLE_CODE_UNKNOWN,
+  CORE_TIER_UNKNOWN,
+  MEMBER_ALREADY_CAPTURED,
 });
 
 /**
@@ -197,6 +238,16 @@ export const listRows = (answer) =>
   answer && typeof answer === 'object' && !Array.isArray(answer) && Array.isArray(answer.rows) ? answer.rows : null;
 
 /**
+ * The reasons for no payroll deduction a suspension under SASBO's `code` may name (Stephne, MEN-17: "Can we have a
+ * dropdown sayin a reason for no payroll deduction"): the ACTIVE reasons standing under that code, in the list's order,
+ * as options by id -- none under a code no reason stands under (a debit order code), and none from an answer that is not
+ * a list's (MV-36).
+ */
+export const noDeductionReasonsUnder = (answer, code) => (listRows(answer) ?? [])
+  .filter((row) => row && row.active === true && Number.isInteger(row.id) && row.suspensionCode === Number(code))
+  .map((row) => ({ value: String(row.id), label: row.name }));
+
+/**
  * A workplace's committee in one line -- its code and its name, each trimmed, either absent: `Q01, INVENTED` -- or the
  * absence mark. Trimmed so a padded value cannot put a space before the comma (MO24's "Q01 ,"). Written once, for the
  * member's Workplace field and a workplace's visits, which had drifted apart.
@@ -208,8 +259,9 @@ export const committeeLine = (workplace) =>
 /* ── The figures (02.2, 02.3) ────────────────────────────────────────────────────────────────────── */
 
 /**
- * What the figures are grouped by: the server's six, in its order (`summaryGroupings`), each as a person reads it --
- * which is also how the sheet's first column is headed. Held to the server's list by `monthEnd.test.js`.
+ * What the figures are grouped by: the server's seven, in its order (`summaryGroupings`), each as a person reads it --
+ * which is also how the sheet's first column is headed. Held to the server's list by `monthEnd.test.js`. The seventh is
+ * Stephne's Core A, B and C (MEN-31): the codes in no tier read as "All other institutions", the server's own row.
  */
 export const SUMMARY_GROUPING = /* @__PURE__ */ Object.freeze({
   group: 'Employer group',
@@ -218,6 +270,7 @@ export const SUMMARY_GROUPING = /* @__PURE__ */ Object.freeze({
   area: 'Area',
   region: 'Region',
   committee: 'Committee',
+  tier: 'Core tier',
 });
 
 /**

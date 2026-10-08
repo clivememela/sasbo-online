@@ -226,7 +226,8 @@ export const MEMBER_FIELD_LABEL_MAP = {
   printLabelForPostage: 'Print Label for Postage (Y/N)',
   suspensionCode: 'Suspension Code',
   useAltAddress: 'Use Alternate Address (Y/N)',
-  deductACB: 'Deduct Subs through ACB (Y/N)',
+  // "Debit Order", not "ACB" (Stephne, DOD). The key is the server's field and keeps its name.
+  deductACB: 'Deduct Subs through Debit Order (Y/N)',
   printMembershipCards: 'Print Membership Cards (Y/N)',
   homeLoanReducedRateOption: 'Home Loan Reduced Interest Rate Option (Y/N)',
   isRepresentative: 'Is Representative',

@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Send, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { MEMBER_ALREADY_CAPTURED } from '../../config/monthEnd.js';
 import Modal, { ModalClose, closeOn } from '../overlay/Modal';
 import Button from '../form/Button';
 import { memberService } from '@/services/memberService.js';
@@ -39,6 +41,13 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess, onFail
     // What the server said happened to the letter, and the member as it saved them -- a retry sends for THAT record.
     const [outcome, setOutcome] = useState(null);
     const [saved, setSaved] = useState(null);
+    /*
+     * R3 (Stephne, MEN-19: "Going forward can we avoid capturing duplicates"): a capture of somebody already on record is
+     * refused `MEMBER_ALREADY_CAPTURED`, and the server's sentence names the record's number. This is that number, so
+     * the refusal can open the record -- the register searched for it, as the suspended list opens a member. A refusal
+     * of two captures colliding names no record, and offers none.
+     */
+    const [onRecordAs, setOnRecordAs] = useState(null);
     const emailing = useWelcomeLetterEmail();
 
     /*
@@ -55,6 +64,7 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess, onFail
         setErrorMessage('');
         setOutcome(null);
         setSaved(null);
+        setOnRecordAs(null);
     }
 
     if (!member) return null;
@@ -102,6 +112,7 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess, onFail
     const handleSend = () => {
         setSendState('sending');
         setErrorMessage('');
+        setOnRecordAs(null);
 
         if (onRecord) {
             memberService.sendWelcomeLetter(onRecord.id)
@@ -125,6 +136,8 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess, onFail
             })
             .catch((err) => {
                 setErrorMessage(err?.message || 'The member was not saved. Please try again.');
+                const existing = err?.body?.code === MEMBER_ALREADY_CAPTURED ? err.body.details?.membershipNumber : null;
+                setOnRecordAs(typeof existing === 'string' && existing.trim() ? existing.trim() : null);
                 setSendState('error');
                 // Said here, in the dialog it happened in -- and handed back, so a refusal of one of the form's own
                 // fields (01.3's WORKPLACE_UNKNOWN) is also said at that field when the dialog closes.
@@ -200,7 +213,17 @@ export default function WelcomeLetter({ open, onClose, member, onSuccess, onFail
             {sendState === 'error' && (
                 <div role="alert" data-send-error className="mb-4 flex items-start gap-2 rounded-lg border border-status-suspended-dot bg-status-suspended-bg p-3 text-sm text-status-suspended">
                     <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                    <span>{errorMessage}</span>
+                    <span>
+                        {errorMessage}
+                        {onRecordAs && (
+                            <Link
+                                to={`/members?q=${encodeURIComponent(onRecordAs)}`}
+                                className="mt-1 block w-fit rounded-sm font-medium underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-ring"
+                            >
+                                Open that record: {onRecordAs}
+                            </Link>
+                        )}
+                    </span>
                 </div>
             )}
 

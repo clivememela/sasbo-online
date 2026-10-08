@@ -86,8 +86,12 @@ const HANDLES_FAILURE = /\.catch\s*\(|\bcatch\s*\(|\.then\s*\([^)]*,\s*(?:\(|fun
  * ➕ `usePagedRead` (ACB 03.5, decided here): the A.C.B. sheets page through it, it catches every read and
  * answers `state === 'error'`, and the sheet says so through the `Table` it renders -- whose `error` is the
  * failure shown. `AcbHeldOver` passed until now only on an unrelated `catch` in its permission save.
+ *
+ * ➕ `useMonthAnswer` (month end, October build, decided here): the sending screens read a taken month's answer
+ * through it (`useTakenMonth.js`); it catches every read and answers `failure`, and each screen says so through the
+ * `Table` it renders -- `What was sent` (`MonthEndSent`) reads through it and nothing else.
  */
-const DELEGATES_FAILURE = /useReferenceData\s*\(|useAsyncOptions\s*\(|usePagedRead\s*\(/
+const DELEGATES_FAILURE = /useReferenceData\s*\(|useAsyncOptions\s*\(|usePagedRead\s*\(|useMonthAnswer\s*\(/
 const SHOWS_FAILURE = /<DataState\b|<LoadFailureFrame\b|<Table\b[^>]*?\berror=/
 const handlesFailure = (code) =>
   HANDLES_FAILURE.test(code) || (DELEGATES_FAILURE.test(code) && SHOWS_FAILURE.test(code))
@@ -118,6 +122,11 @@ describe('every page that fetches can say the fetch failed', () => {
     expect(handlesFailure("const { state } = usePagedRead(read)\n<Table rows={rows}\n  error={state === 'error' ? 'Could not load.' : null} />")).toBe(true)
     // ...and the same sheet whose table is never told is NOT.
     expect(handlesFailure('const { state } = usePagedRead(read)\n<Table rows={rows} loading={false} />')).toBe(false)
+    // ➕ October build: a month's answer read through `useMonthAnswer` whose table is given the failure is handled...
+    expect(handlesFailure('const read = useMonthAnswer(readPage, month)\n<Table rows={items}\n  error={read.failure} />'))
+      .toBe(true)
+    // ...and the same screen whose table is never told is NOT.
+    expect(handlesFailure('const read = useMonthAnswer(readPage, month)\n<Table rows={items} />')).toBe(false)
   })
 
   it('the predicate itself: a read imported by name from a service is a fetch; an import from elsewhere is not', () => {

@@ -17,13 +17,15 @@ import { LISTINGS, LISTING_WAITS, STATISTICS, TAKE_AGAIN_WAITS, TAKE_WAITS, take
 /**
  * MONTH END `04.1` -- THE MONTH END PAGE, WHERE THE MONTHLY MENU WAS (MD38).
  *
- * The page lists what is built and nothing else: the seven statistics as links for the month chosen, the statistics
- * pack, and the four listings -- disabled with their reason, never asked for. The month is the server's, chosen once at
- * the top: a taken month says who took it and when, the open month that it is read live. The Admin page, the rail and
- * the route agree about where it is and what it is called, and no row links to the page it is on.
+ * The page lists what is built and nothing else: the month's figures (since the 5 Oct Show & Tell -- their own cases are
+ * `MonthEndFigures.test.jsx`), the seven statistics as links for the month chosen, the statistics pack, and the four
+ * listings -- disabled with their reason, never asked for. The month is the server's, chosen once at the top: a taken
+ * month says who took it and when, the open month that it is read live. The Admin page, the rail and the route agree
+ * about where it is and what it is called, and no row links to the page it is on.
  *
- * Answered as the server answers (MD48): the months are the golden answer's. Every request the page makes is recorded,
- * so "nothing was asked" is a measurement, not an inference.
+ * Answered as the server answers (MD48): the months are the golden answer's, and the figures' read here is the shared
+ * fixture's empty array -- *not available*, which asks nothing more. Every request the page makes is recorded, so
+ * "nothing was asked" is a measurement, not an inference.
  */
 
 const MONTHS = monthEndBody('GET /api/month-end/months')
@@ -36,14 +38,20 @@ const record = ({ request }) => {
   requests.push(`${request.method} ${new URL(request.url).pathname}`)
 }
 
+const FIGURES = 'The month’s figures'
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   requests = []
   server.events.on('request:start', record)
-  server.use(monthEndAnswer('GET /api/month-end/months'))
+  server.use(monthEndAnswer('GET /api/month-end/months'), http.get('*/api/members/summary', () => HttpResponse.json([])))
 })
 
-afterEach(() => {
+afterEach(async () => {
+  // The figures read once the page knows its month: a test ends only once they have answered, so no read of this
+  // test's reaches the next one's handlers.
+  const figures = screen.queryByRole('region', { name: FIGURES })
+  if (figures) await waitFor(() => expect(figures).not.toHaveAttribute('data-figures', 'loading'))
   server.events.removeListener('request:start', record)
 })
 
@@ -57,8 +65,15 @@ const monthsRead = () => waitFor(() => expect(screen.getByLabelText(/^Month/)).t
 const pageLinks = (scope = document.body) =>
   within(scope).queryAllByRole('link').map((link) => link.getAttribute('href'))
 
+/** The screens the October build's *Sending the month* opens -- each a link of its own, beside the statistics. */
+const SENDING = ['region-packs', 'files', 'sent']
+const screenOf = (href) => /^\/admin\/monthly-menu\/([a-z-]+)/.exec(href)?.[1]
+
+/** The page's links to its statistics, in the page's order. */
+const statisticLinks = () => pageLinks().filter((href) => STATISTICS.some((statistic) => statistic.key === screenOf(href)))
+
 describe('where the page is -- the Admin page, the rail and the route agree (04.1, MD38)', () => {
-  it('Admin Membership offers Month end between Daily and A.C.B., at the Monthly Menu\'s address', () => {
+  it('Admin Membership offers Month end between Daily and Debit Order Deductions, at the Monthly Menu\'s address', () => {
     renderWithProviders(<Admin />)
 
     const hrefs = pageLinks()
@@ -67,7 +82,7 @@ describe('where the page is -- the Admin page, the rail and the route agree (04.
     expect(hrefs.indexOf('/admin/acb')).toBe(hrefs.indexOf('/admin/monthly-menu') + 1)
   })
 
-  it('the rail holds it as a LEAF of Admin Menu, between Daily Menu and A.C.B., with nothing under it (BR8)', () => {
+  it('the rail holds it as a LEAF of Admin Menu, between Daily Menu and Debit Order Deductions, with nothing under it (BR8)', () => {
     const admin = navItems.find((item) => item.title === 'Admin Menu')
     const titles = admin.subItems.map((item) => item.title)
     const leaf = admin.subItems.find((item) => item.href === '/admin/monthly-menu')
@@ -75,7 +90,8 @@ describe('where the page is -- the Admin page, the rail and the route agree (04.
     expect(leaf?.title).toBe('Month end')
     expect(leaf.subItems).toBeUndefined()
     expect(titles.indexOf('Month end')).toBe(titles.indexOf('Daily Menu') + 1)
-    expect(titles.indexOf('A.C.B')).toBe(titles.indexOf('Month end') + 1)
+    // The rail prints the module's short name, "Debit Orders" (`navigation.js`).
+    expect(titles.indexOf('Debit Orders')).toBe(titles.indexOf('Month end') + 1)
   })
 
   it('🔑 the route renders the page the rail and the crumb name: Admin Menu › Month end', async () => {
@@ -103,16 +119,39 @@ describe('what the page lists -- what is built, and nothing else', () => {
     expect(pageLinks().length).toBeGreaterThan(0)
   })
 
-  it('🔴 the statistics are its links, each opening its screen for the month chosen -- and nothing else links', async () => {
+  it('🔴 the statistics are its links, each opening its screen for the month chosen -- beside the sending screens, and nothing else', async () => {
     openPage()
     await monthsRead()
 
-    expect(pageLinks()).toEqual(STATISTICS.map((statistic) => `/admin/monthly-menu/${statistic.key}?month=2026-08`))
+    expect(statisticLinks()).toEqual(STATISTICS.map((statistic) => `/admin/monthly-menu/${statistic.key}?month=2026-08`))
     for (const statistic of STATISTICS) {
       const link = screen.getByRole('link', { name: new RegExp(`^${statistic.name}`) })
       // Its plain name, and the legacy title as its second line.
       expect(link).toHaveTextContent(statistic.legacy)
     }
+    // The only other links: the three sending screens, for the taken month, and the lapsed suspensions' "Sign in".
+    const others = pageLinks().filter((href) => !statisticLinks().includes(href))
+    expect(others).toEqual([
+      ...SENDING.map((screenName) => `/admin/monthly-menu/${screenName}?month=2026-08`),
+      '/login?next=%2Fadmin%2Fmonthly-menu',
+    ])
+  })
+
+  it('the October build: Sending the month -- the regions\' packs, the files and what was sent -- opens each for a taken month only', async () => {
+    const user = setupUser()
+    openPage()
+    await monthsRead()
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Sending the month' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^The regions’ packs/ })).toHaveAttribute('href', '/admin/monthly-menu/region-packs?month=2026-08')
+    expect(screen.getByRole('link', { name: /^Files for the banks and providers/ })).toHaveAttribute('href', '/admin/monthly-menu/files?month=2026-08')
+    expect(screen.getByRole('link', { name: /^What was sent/ })).toHaveAttribute('href', '/admin/monthly-menu/sent?month=2026-08')
+    // A pack is made from a take, never from the open month: for the open month each opens on the newest month taken.
+    await user.selectOptions(screen.getByLabelText(/^Month/), '2026-09')
+    expect(screen.getByRole('link', { name: /^The regions’ packs/ })).toHaveAttribute('href', '/admin/monthly-menu/region-packs')
+    // The lapsed suspensions name members: nobody signed in is asked to, and nothing is asked of the server.
+    expect(screen.getByRole('heading', { level: 2, name: 'Suspensions that have lapsed' })).toBeInTheDocument()
+    expect(requests.some((request) => request.includes('/suspensions/'))).toBe(false)
   })
 
   it('🔴 the nine dead rows are gone, and no row says "Not yet available"', async () => {
@@ -146,11 +185,13 @@ describe('the listings -- built refusing, and never asked (MD4)', () => {
       expect(row).toHaveTextContent(listing.legacy)
       expect(row).toHaveTextContent('Waits for sign-in')
     }
-    expect(requests).toEqual(['GET /api/month-end/months'])
+    // The months, then the figures for the month the page opened on -- and nothing else: no listing is asked for.
+    await waitFor(() => expect(screen.getByRole('region', { name: FIGURES })).toHaveAttribute('data-figures', 'error'))
+    expect(requests).toEqual(['GET /api/month-end/months', 'GET /api/members/summary'])
     expect(requests.some((request) => request.includes('/listings/'))).toBe(false)
   })
 
-  it('Take the month: for the open month, disabled with its reason, as A.C.B.\'s Approve is -- and never asked', async () => {
+  it('Take the month: for the open month, disabled with its reason, as Debit Order Runs\' Approve is -- and never asked', async () => {
     const user = setupUser()
     openPage()
     await monthsRead()
@@ -216,7 +257,7 @@ describe('the month -- chosen once, at the top, from the server\'s months (MD55)
 
     expect(screen.getByText(/^September 2026 is the open month: its figures are read live/))
       .toHaveAttribute('data-month-state', 'OPEN')
-    expect(pageLinks()).toEqual(STATISTICS.map((statistic) => `/admin/monthly-menu/${statistic.key}?month=2026-09`))
+    expect(statisticLinks()).toEqual(STATISTICS.map((statistic) => `/admin/monthly-menu/${statistic.key}?month=2026-09`))
     expect(screen.getByRole('button', { name: 'Prepare the pack for September 2026' })).toBeEnabled()
   })
 
@@ -232,8 +273,11 @@ describe('the month -- chosen once, at the top, from the server\'s months (MD55)
     openPage('/admin/monthly-menu?month=2026-07')
     await monthsRead()
 
-    expect(screen.getByText('July 2026 was not taken, and a past month is read only from what was taken.'))
-      .toHaveAttribute('data-month-state', 'NOT_TAKEN')
+    // What refuses such a month is named -- its statistics and its pack -- and what the figures beneath it are: the
+    // page never says a month is read only from what was taken above figures that work it out now (review-home).
+    expect(screen.getByText('July 2026 was not taken: its statistics and its pack are made only from a taken month, '
+      + 'and its figures below are worked out now.')).toHaveAttribute('data-month-state', 'NOT_TAKEN')
+    expect(screen.queryByText(/a past month is read only from what was taken/)).not.toBeInTheDocument()
   })
 
   it('the months could not be read: said, with Try again -- and the statistics still open, for no month named', async () => {
@@ -248,7 +292,7 @@ describe('the month -- chosen once, at the top, from the server\'s months (MD55)
     openPage()
 
     expect(await screen.findByText('Month could not be loaded.')).toBeInTheDocument()
-    expect(pageLinks()).toEqual(STATISTICS.map((statistic) => `/admin/monthly-menu/${statistic.key}`))
+    expect(statisticLinks()).toEqual(STATISTICS.map((statistic) => `/admin/monthly-menu/${statistic.key}`))
     expect(screen.getByRole('button', { name: 'Prepare the pack' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Try again' }))
 

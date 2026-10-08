@@ -13,8 +13,8 @@ import reportError from '../../lib/reportError.js';
 import { STATISTIC_READS } from '../../services/monthEndService.js';
 import { getAreas, getRegions } from '../../services/referenceService.js';
 import {
-  MONTH_CRITERION, SHEET_PAGE, cellText, defaultMonth, failureOf, instantLabel, monthChoices, rowHeader, ruleCNote,
-  statisticNamed, statisticOf,
+  COMPLEMENT_OUT_OF_DATE, MONTH_CRITERION, SHEET_PAGE, cellText, defaultMonth, failureOf, hiddenRowWords, instantLabel,
+  monthChoices, penetrationOutOfDate, rowHeader, ruleCNote, statisticNamed, statisticOf,
 } from './monthEndRules.js';
 import useMonths from './useMonths.js';
 
@@ -30,8 +30,12 @@ import useMonths from './useMonths.js';
  *   the month   chosen from the server's months, as the Month end page does; with none in the address, the newest
  *               month taken (MD55). A taken month says *as taken on … by …*; the open month that it is read live;
  *   the place   SASBO's areas and regions, asked for when the control is opened and kept -- never at first paint (MD69);
- *   rule C      a row of fewer than five reads *fewer than five* and a row withheld beside it *withheld* -- never a
- *               number -- each pointing at the note that says why;
+ *   rule C      a row of fewer than five reads *fewer than five* and the row beside it *Not shown until you sign in*
+ *               (never "withheld", which SASBO read as "has to be approved") -- never a number -- each pointing at the
+ *               note that says why;
+ *   MEN-26      a penetration over 100 % is shown as it is, with *staff complement out of date* beneath it -- the
+ *               server's `complementOutOfDate`, or the figure itself over 1 -- and a row the server marks in a sheet
+ *               with no penetration carries the words under its complement;
  *   the states  loading · failed · empty · ready, and a failed read is never an empty one. A refusal is said in the
  *               server's own sentence (`MONTH_NOT_TAKEN`, `MONTH_NOT_BEGUN`, `REQUEST_MALFORMED`,
  *               `SUMMARY_AREA_UNKNOWN`), never as its code; a statistic the server has none of is a not-found state.
@@ -52,6 +56,18 @@ const placeOf = (area, region) => (area ? `area:${area}` : region ? `region:${re
 /** A row of a sheet's heading or total level stands apart from the rows it sums. */
 const strong = (row, text) => (row.level === 'ROW' ? text : <strong className="font-semibold">{text}</strong>);
 
+/** MEN-26's flag, in the pending ink beneath the figure it is about, as the month's figures draw it. */
+const outOfDate = <span className="block text-xs font-medium text-status-pending">{COMPLEMENT_OUT_OF_DATE}</span>;
+
+/**
+ * Which column carries a row's out-of-date flag: the penetration where the sheet has one, else the staff complement --
+ * the figure that is out of date -- else `-1`, the row's own name.
+ */
+const flagColumn = (columns) => {
+  const at = (key) => columns.findIndex((column) => column.key === key);
+  return at('penetration') >= 0 ? at('penetration') : at('complement');
+};
+
 /**
  * ONE SHEET, as the server lays it out -- its title with the legacy title beneath, its columns in the server's order,
  * a heading row (`GROUP`) and a total (`TOTAL`) set apart, and the sheet's total as its last row. Counts, money and
@@ -68,22 +84,40 @@ function StatisticSheet({ sheet, month, why }) {
   const current = Math.min(page, pages);
   const first = (current - 1) * SHEET_PAGE;
   const shown = paged ? sheet.rows.slice(first, first + SHEET_PAGE) : sheet.rows;
+  const flagAt = flagColumn(sheet.columns);
+  const flagged = (row) => (flagAt >= 0 && sheet.columns[flagAt].key === 'penetration'
+    ? penetrationOutOfDate(row.cells?.[flagAt], row.complementOutOfDate)
+    : row.complementOutOfDate === true);
   const columns = [
-    { key: 'label', header: rowHeader(sheet.key), nowrap: false, cell: (row) => strong(row, row.label) },
+    {
+      key: 'label',
+      header: rowHeader(sheet.key),
+      nowrap: false,
+      cell: (row) => (
+        <>
+          {strong(row, row.label)}
+          {flagAt < 0 && flagged(row) && outOfDate}
+        </>
+      ),
+    },
     ...sheet.columns.map((column, index) => ({
       key: `c:${column.key}`,
       header: column.label,
       align: 'right',
       className: 'tabular-nums',
-      // The first figure carries the words of a row with no number; a phone wraps them rather than widening the sheet.
-      ...(index === 0 && { nowrap: false }),
+      // The first figure carries the words of a row with no number, and the flag column its flag; a phone wraps them
+      // rather than widening the sheet.
+      ...((index === 0 || index === flagAt) && { nowrap: false }),
       cell: (row) => {
         if (row.fewerThanFive || row.withheld) {
-          return index === 0 && (
-            <span className="text-ink-muted" aria-describedby={why}>{row.withheld ? 'withheld' : 'fewer than five'}</span>
-          );
+          return index === 0 && <span className="text-ink-muted" aria-describedby={why}>{hiddenRowWords(row)}</span>;
         }
-        return strong(row, cellText(column.kind, row.cells?.[index]));
+        return (
+          <>
+            {strong(row, cellText(column.kind, row.cells?.[index]))}
+            {index === flagAt && flagged(row) && outOfDate}
+          </>
+        );
       },
     })),
   ];
