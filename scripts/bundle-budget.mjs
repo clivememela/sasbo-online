@@ -355,7 +355,13 @@ const CEILINGS = {
   //
   // 934.87 -> 940.29 on 2026-10-07, MEASURED (OB17): 940.28 KiB on run 37670914235 -- the javascript's +6.29 above, the
   // stylesheet unmoved at 80.63, against 933.99 at main cbd11dc.
-  total: 940.29 * KB,
+  //
+  // 940.29 -> 940.30 on 2026-10-08, MEASURED (OB17): 940.29 KiB printed on run 37779077999 at e6499ba, over by bytes; the
+  // hundredth over the printed figure covers its rounding. One chunk moved against run 37672009580 at 56c4a67:
+  // BankBranch 13.91 -> 13.92 kB, A29's footer buttons keyed apart so that pressing Edit no longer saves the form it
+  // opens. The javascript row stays within its 796.18; the stylesheet unmoved at 80.63. Nothing from src/test/ is
+  // imported by the product.
+  total: 940.30 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to
