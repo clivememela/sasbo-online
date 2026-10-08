@@ -35,6 +35,9 @@ const UNREADABLE = 'This server’s answer could not be read.';
 /** Said of a change whose answer never came -- a timeout, a lost connection, a 5xx -- once the member is read again. */
 const UNCONFIRMED = 'The change could not be confirmed.';
 const AGAIN = 'Asking again is safe — the same change asked twice is written once.';
+/** A return in the month of the leaving it undoes (MEN-23): the membership is kept, and neither is counted. */
+const UNDONE = 'Their leaving earlier this month is undone: they keep their membership, and neither the leaving nor '
+  + 'this return counts in the month’s figures.';
 
 /**
  * One of SASBO's code lists, asked for the first time the dialog needs it and kept while the record's page lives (MD69).
@@ -144,10 +147,12 @@ export default function ChangeStatus({ member, open, onOpenChange, reread, onDon
     const note = form.note.trim();
     const reasonUnderCode = reasons.includes(form.reason) ? form.reason : '';
     // What was written is the server's to say: the reason is named as its answer names it, and not where it names none.
-    const done = (status, already, reason, noDeductionReason) =>
+    // MEN-23 ("We would like to retain current membership as it happened in the same month"): a return that undid a
+    // leaving not yet in any month taken (`undoes`, the leaving's id) is said, because neither is counted.
+    const done = (status, already, reason, noDeductionReason, undoes) =>
       onDone(already ? `${who} was already ${status}. Nothing more was written.`
         : `${who} is now ${status}.${reason ? ` The reason they gave: ${reason}.` : ''}${noDeductionReason
-          ? ` The reason for no payroll deduction: ${noDeductionReason}.` : ''}`);
+          ? ` The reason for no payroll deduction: ${noDeductionReason}.` : ''}${undoes != null ? ` ${UNDONE}` : ''}`);
     setBusy(true);
     edit({ notice: null, codeError: null, reasonError: null, noDeductionError: null });
     try {
@@ -162,7 +167,8 @@ export default function ChangeStatus({ member, open, onOpenChange, reread, onDon
         ...(note && { note }),
       });
       await reread(member.id, changed.status);
-      done(changed.status, !changed.change, changed.change?.reasonUnderCode, changed.change?.noDeductionReason);
+      done(changed.status, !changed.change, changed.change?.reasonUnderCode, changed.change?.noDeductionReason,
+        changed.change?.undoes);
     } catch (error) {
       reportError('ChangeStatus.change', error);
       const refused = error?.body?.code;

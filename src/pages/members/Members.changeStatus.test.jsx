@@ -334,6 +334,26 @@ describe('what is sent -- the status the screen showed, and SASBO\'s code by its
     expect(asked).toEqual({ deletion: 0, suspension: 0 })
   })
 
+  it('🔑 MEN-23: a return in the month of the leaving undoes it -- and what is said says the membership is kept and neither counts', async () => {
+    listed = { ...ALPHA, status: 'Resigned' }
+    stored = { ...listed }
+    server.use(http.post('*/api/members/:id/status', async ({ request }) => {
+      const change = await request.json()
+      sent.push(change)
+      const answer = made(change)
+      // The server's own key, valued as a same-month return values it: the id of the leaving it undid.
+      return HttpResponse.json({ ...answer, change: { ...answer.change, undoes: 41 } })
+    }))
+    const user = setupUser()
+    const dialog = await openDialog(user)
+    await choose(dialog, user, 'Active')
+    await press(dialog, user)
+
+    expect(await screen.findByText('Synthetic Alpha is now Active. Their leaving earlier this month is undone: they keep '
+      + 'their membership, and neither the leaving nor this return counts in the month’s figures.')).toBeInTheDocument()
+    expect(sent).toEqual([{ toStatus: 'Active', expectedStatus: 'Resigned', reason: 'REINSTATED' }])
+  })
+
   it('the new status offers every status of the vocabulary but the member\'s own; the note stops at the server\'s limit', async () => {
     const user = setupUser()
     const dialog = await openDialog(user)
