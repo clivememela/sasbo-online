@@ -92,6 +92,25 @@ const CEILINGS = {
   // 03.1, which cut it from 506 KiB to 287 by splitting every route. The ceiling is
   // deliberately BELOW the pre-split figure -- its job is to notice a route quietly
   // becoming a static import again, which would show up here and nowhere else.
+  //
+  // 2026-10-07, MEASURED, the ceiling unmoved: sign-in (contracts/signin.md) puts its shell in the entry, as OB17a allows
+  // and no more -- a first load that cannot know who is signed in is not leaner, only broken. Run 37665352812 at 644e967:
+  // entry js 335.45 KiB, 4.98 over main's 330.47 at cbd11dc (run 37017335321); vite's index 338.40 -> 343.50 kB, +5,100 B.
+  // Module by module, each esbuild-minified alone at both SHAs (Rollup's hoisting makes the sum differ by 10 B):
+  //   session.js +1,407 (the tab's session, read by api.js and the provider) · AuthContext +1,259 (who is signed in; its
+  //   server talk is the lazy authServer) · api.js +914, and its 319 on main came out of a lazy chunk of its own (the one
+  //   fetch wrapper that puts the token on every API request) · App +493 (the lazy routes of /change-password and the
+  //   four Maintenance screens) · AppLayout +347 (required mode's way to /login; a temporary password's to
+  //   /change-password) · lazyAccount +281 (ONE import() for the header's account, the rail's foot and the session
+  //   notice) · navigation +262 (the entries' permission names, as literals) · Main +160 · main.jsx +123 (the provider,
+  //   the wrapper) · useAuth +118 · next.js +115 · Header -271 and Sidebar -437 (the inert "Administrator" chip and the
+  //   dead "Log out" link, gone for the lazy account). Every screen stays lazy.
+  //
+  // 2026-10-07, MEASURED, the ceiling unmoved: register paging (A10) leaves the entry at 330.49 KiB, +0.02 over main's
+  // 330.47 at cbd11dc (run 37672789318 at 1d6e43b against 37017335321; vite's index 338.40 -> 338.42 kB, +20 B). The
+  // only entry module the stream changes is Header.jsx, -127 B esbuild-minified alone (the search chip names what the
+  // server's search finds); the rest, by elimination, is the dependency map the entry keeps for its lazy routes: Members
+  // now shares `useDebounce` with Workplaces, so Rollup split it into a chunk of its own, and both routes' lists name it.
   entryJs: 350 * KB,
   // 600 -> 640 on 2026-09-09: see the re-measured table above. 6% over the 602.24
   // actual, for the reason the header gives -- a limit equal to the measurement
@@ -310,7 +329,102 @@ const CEILINGS = {
   // runner: clivememela/sasbo-online run 36988020502 at b0f9a4d, javascript 790.75 KiB, 0.10 over 790.65 at 0eb0d56
   // (run 36903903677). +100 B by vite's sizes, in one chunk there already: HomeFigures 5.90 -> 6.00 kB (the sentence,
   // and the choice between it and "today"). Nothing from src/test/ is imported.
-  js: 790.76 * KB,
+  //
+  // 790.76 -> 843.77 on 2026-10-07, MEASURED, under OB17 (the October build's rule for every client stream: javascript,
+  // css and all assets rise to the figures measured on the stream's staging run, and no further; the entry is OB17a's,
+  // above): sign-in -- the session and its token on every API request, /login and /change-password made real, and
+  // Maintenance's Users, Positions, Roles and Who did what (contracts/signin.md). Measured on a team runner:
+  // clivememela/sasbo-online run 37665352812 at 644e967, javascript 843.76 KiB, 53.88 over 789.88 at cbd11dc (run
+  // 37017335321). +55,190 B by vite's sizes, chunk by chunk:
+  //   the new screens, every one lazy: Users 12.33 kB · usersRules 6.72 (what the four Maintenance screens share)
+  //   · Positions 5.26 · Roles 4.93 · ChangePassword 4.71 · Audit 4.17 · signInRules 3.94 (what /login and
+  //   /change-password share) · AccountControls 3.66 (the header's account, the rail's foot, the session notice)
+  //   · adminLists 1.42 · authServer 0.56 · authVocabulary 0.50 · authService 0.34 · their icons key-round 0.35, eye 0.25,
+  //   log-in 0.23, plus 0.15.
+  //   index +5.10 (the entry -- OB17a's paragraph above) · Maintenance +1.75 (the four entries) · Auth -0.65 (/login
+  //   made real; its fake Sign Up gone).
+  //   Shared chunks Rollup split out once a second screen used them: CheckboxGroup 0 -> 1.23 (Roles' permissions) as
+  //   Members -1.14 · LoadFailureFrame 0 -> 0.35 · useDebounce 0 -> 0.20 · options -0.34 · api 0.29 -> 0 (into the
+  //   entry) · thirty-one chunks within 0.15 kB each (their import stubs, re-hashed).
+  // Nothing from src/test/ is imported by the product.
+  //
+  // 790.76 -> 791.39 on 2026-10-07, MEASURED, under OB17 (the October build's rule for every client stream: `entry js`
+  // must not rise; javascript, css and all assets rise to the figures measured on the stream's staging run, and no
+  // further): Home keeps only the modules, as cards, a list or a table, and the month's figures move to Month end (the
+  // 5 Oct Show & Tell). Measured on a team runner: clivememela/sasbo-online run 37549523705 at 3824ec2, javascript
+  // 791.38 KiB, 1.50 over 789.88 at cbd11dc (run 37017335321) -- after reclaiming first: run 37543710742 had it at
+  // 793.11, the css at 81.37 and the entry up 0.02. +1,536 B by this script's count; by vite's sizes, chunk by chunk:
+  //   Home +1,250 (the view switch, the table view, the modules' whole names and menu paths, the remembered choice --
+  //   less the figures' lazy loader) · NavigationCard +360 (the card, drawn from the row's own parts) · MonthlyMenu
+  //   +6,080 and HomeFigures -6,000 (the figures moved, their own month control gone) · Admin +80 · monthEnd -210 (the
+  //   months the figures no longer offer) · index -70 (the entry: the rail's short name, Subscriptions off its top
+  //   level) · MemberHistory +30 (the reasons' new name) · AcbDebits +20 (two longer labels) · eight chunks within 10 B
+  //   each (a column's new name, renamed import stubs).
+  //   Nothing from src/test/ is imported. The css is unmoved at 80.63; the entry is 330.40 against main's 330.47.
+  //
+  // 791.39 -> 791.44 on 2026-10-07, MEASURED (OB17), for the senior review's fixes to the same stream (review-home):
+  // run 37557813096 at 7db86d9, javascript 791.43 KiB, 0.05 over 791.38 at 3824ec2. +60 B by vite's sizes, in one chunk
+  // there already: MonthlyMenu 12.53 -> 12.59 kB -- a month never taken now names what refuses it (its statistics and its
+  // pack) and says its figures are worked out now, where the page had said "a past month is read only from what was
+  // taken" above figures that work the month out. Nothing from src/test/ is imported; entry and css unmoved.
+  //
+  // 790.76 -> 796.18 on 2026-10-07, MEASURED, under the October build's rule (OB17, "raise to measured"): the bugs
+  // stream -- A67, A29, A23, RC15 and the user manual's defects. Measured on a team runner: clivememela/sasbo-online
+  // run 37670914235 at 32c63ab, javascript 796.17 KiB, +6.29 over 789.88 at main cbd11dc (run 37017335321). +6,460 B by
+  // vite's sizes:
+  //   bankBranches 0 -> 5.35 and AddressAutocomplete 4.25 -> 0 (+1.10: one shared chunk now holds the address search
+  //   and A29's branch form, converted once at each edge) · RequirePermission 0 -> 2.13 (oct/base's notice and the
+  //   permission catalogue, first bundled: Subscriptions offers Edit to SUBSCRIPTIONS_MAINTAIN alone, and a channel's
+  //   members need MEMBERS_VIEW) · Subscriptions +1.94 (A23's create, the permission's gate, an emptied debit day
+  //   refused, what ACTIVE decides) · recruitmentChannelService +0.86 (RC15's five calls) · BankBranch +0.70 (A29: the
+  //   record converted, a refusal's fields read in place) · Recruiters +0.31 (RC15 step 2: the server's figures and
+  //   pages, Add Member and removal by the channel's routes, the browser's own count gone) · CaptureMember +0.30 (A67:
+  //   the bank's day is the default the save sends) · useDebounce 0 -> 0.20 and useWorkplaceChoice -1.04 (a module
+  //   shared by more screens leaves for its own chunk) · the entry +0.08, NO CODE (OB17a): the preload map naming the
+  //   two more lazy chunks · the rest +/-0.10 of shared-chunk names. Nothing from src/test/ is imported by the product.
+  //
+  // 790.76 -> 798.62 on 2026-10-07, MEASURED, under OB17 (javascript, css and all assets rise to the stream's staging
+  // run, and no further): the member register a page at a time (A10) and the record's save saying why it was refused
+  // (V68). Measured on a team runner: clivememela/sasbo-online run 37672789318 at 1d6e43b, javascript 798.61 KiB, 8.73
+  // over 789.88 at cbd11dc (run 37017335321). +8,930 B by vite's sizes, chunk by chunk:
+  //   Members 54.96 -> 62.50 kB (+7.54: the view in the address bar, the server's page and count, sorting, Per page,
+  //   the record read when its row is opened, the refused save's reason and MEMBER_CHANGED_SINCE -- less the browser's
+  //   own filtering and counting, gone) · Table +1.01 (headings that sort, with aria-sort) · memberService +0.27 (the
+  //   page and the overview) · useDebounce 0 -> 0.20 and Workplaces -0.10 (shared now, so split out) · monthEnd +0.03
+  //   (MEMBER_CHANGED_SINCE) · format -0.06 (the dates the register counted, no longer read) · index +0.02 (above)
+  //   · Admin +0.01 · Locations +0.01.
+  // Nothing from src/test/ is imported by the product.
+  //
+  // 790.76 -> 813.88 on 2026-10-07, MEASURED, under the October build's rule (OB17, "raise to measured", the parent's
+  // word for every client stream): the organisers' batch print, the members at a branch, the visit drafts. Measured on
+  // a team runner: clivememela/sasbo-online run 37556370376 at 1595f03, javascript 813.87 KiB, against 789.88 at main
+  // cbd11dc (run 37017335321). +24,550 B by vite's sizes:
+  //   BatchPrint 0 -> 12.17 (the new route -- its four modules only, BatchPrint, WorkplaceListing, raNumbers and
+  //   limiter: the build's sourcemaps show no shared module bundled in, and no module of the app in two chunks)
+  //   · OrganizerReport +8.22 (Save draft, Submit visit, My visits, a submitted visit read-only) · LocationListing +1.25
+  //   (the blank-card fix: a /api/branches row read in its own shape; "Complement") · workplaceVisitService +0.92 (the
+  //   drafts' five calls) · permissions 0 -> 0.84 (oct/base's auth context, first imported by a screen here) · the
+  //   entry +0.59, SHELL ONLY (OB17a): the sidebar's Batch print item, the route's lazy line, and the Printer icon,
+  //   which leaves its own shared chunk (-0.32) for the entry because the sidebar now draws it · locationService +0.37 ·
+  //   Locations +0.32 (the line to the batch print) · ReportOptions +0.16 · monthEnd +0.12 (five refusal codes) · the
+  //   rest +/-0.05 of shared-chunk names. Nothing from src/test/ is imported by the product.
+  //
+  // 813.88 -> 816.91 on 2026-10-07, MEASURED (OB17): the reports-visits review's fixes. Measured on a team runner:
+  // clivememela/sasbo-online run 37667621360 at 8b5ec54, javascript 816.90 KiB, +3.03 over 813.87 at 1595f03 (run
+  // 37613005859 at 0b6b8e0 builds the same). +3,130 B by vite's sizes:
+  //   OrganizerReport +1.43 (Discard draft, asked first; My visits' pager) · permissions +0.71 (RequirePermission, first
+  //   bundled: Batch print tells a signed-in user without REPORTS_PRINT what they need) · BatchPrint +0.55 (the batch's
+  //   members in one read, a stale answer dropped; the limiter's module gone) · printer 0 -> 0.32 and the entry -0.23
+  //   (the rail draws an icon it already had, so Printer leaves the first load for a shared chunk of the three lazy
+  //   screens that draw it -- OB17a: the entry only shrinks) · workplaceVisitService +0.22 (discardDraft) · the rest
+  //   +/-0.05 of shared-chunk names. Nothing from src/test/ is imported by the product.
+  // INTEGRATION, MEASURED (OB17): the batch's javascript is 882.06 KiB on clivememela/sasbo-online run 37676718704
+  // at be7b1ab, every paragraph above merged; the ceiling is that figure. The entry chunk measured 336.29, +5.82 over
+  // main's 330.47: the streams' own figures sum to +5.36 (sign-in's shell +4.98, OB17a); the other +0.46 is, by
+  // elimination, the merged preload map naming every stream's lazy chunks.
+  // INTEGRATION, MEASURED (OB17): 882.07 KiB on clivememela/sasbo-online run 37782197874 at dff342f, with A29's keyed
+  // footer buttons (bugs 030e408, +10 B in BankBranch); the ceiling is that figure.
+  js: 882.08 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
@@ -320,7 +434,23 @@ const CEILINGS = {
   // 80 -> 80.64 on 2026-10-01, MEASURED (MO25): 80.63 KiB on the same run, +720 B over 79.92 -- MO24's card rows' `end`
   // rule, the first screen's phone block and five utilities the build had not shipped (+590 B), and A.1's opened row's
   // rule (+130 B). The hundredth over the printed figure covers its rounding, as the javascript's does.
-  css: 80.64 * KB,
+  //
+  // 80.64 -> 81.14 on 2026-10-07, MEASURED (OB17): 81.13 KiB on run 37665352812 at 644e967, +0.50 over 80.63 at cbd11dc
+  // (vite's index.css 82.56 -> 83.08 kB, +520 B) -- the utilities sign-in's screens use that no screen had before (the
+  // account chip, the password field, the users' dialogs and lists).
+  //
+  // 80.64 -> 80.79 on 2026-10-07, MEASURED (OB17): 80.78 KiB on run 37672789318 at 1d6e43b, +0.15 over 80.63 at cbd11dc
+  // (vite's index.css 82.56 -> 82.72 kB, +160 B) -- the sortable headings' and Per page's utilities.
+  //
+  // 80.64 -> 81.00 on 2026-10-07, MEASURED (OB17): 80.99 KiB on run 37556370376, +380 B over 80.63 at main cbd11dc --
+  // the batch print's page rules (a bank a sheet, its A4 named page, a heading kept with what follows it) and the
+  // utilities its screens are the first to use.
+  //
+  // 81.00 -> 81.19 on 2026-10-07, MEASURED (OB17): 81.18 KiB on run 37667621360, +190 B over 80.99 -- the utilities
+  // the review's fixes are the first to use (My visits' pager set flush to its panel, Discard draft's confirmation).
+  // INTEGRATION, MEASURED (OB17): the batch's css is 81.84 KiB on clivememela/sasbo-online run 37676718704
+  // at be7b1ab, every paragraph above merged; the ceiling is that figure.
+  css: 81.85 * KB,
   // 900 -> 925.12 on 2026-09-30, MEASURED, on the owner's word (MO14), the first time `all assets` was over: the same
   // pair as the javascript's, 866.48 KiB (run 36773278932) -> 925.11 KiB (run 36773289808). The javascript's +59,631 B
   // and the stylesheet's +409 B (296 of them the History tab's: its column widths, gutter bleed, alignment and one line
@@ -337,7 +467,38 @@ const CEILINGS = {
   //
   // 934.77 -> 934.87 on 2026-10-02, MEASURED (MO33): 934.86 KiB on run 36988020502 -- the javascript's +0.10 above,
   // the stylesheet unmoved at 80.63.
-  total: 934.87 * KB,
+  //
+  // 934.87 -> 988.39 on 2026-10-07, MEASURED (OB17): 988.38 KiB on run 37665352812 at 644e967, 54.39 over 933.99 at
+  // cbd11dc -- the javascript's +53.88 and the stylesheet's +0.50 above, index.html unmoved at 3.19 kB.
+  //
+  // 934.87 -> 935.58 on 2026-10-07, MEASURED (OB17): 935.57 KiB on run 37549523705 -- the javascript's +1.50 above and
+  // index.html's +80 B (its pre-paint script sets the color-scheme meta: light unless the browser chose dark), the
+  // stylesheet unmoved at 80.63.
+  //
+  // 935.58 -> 935.64 on 2026-10-07, MEASURED (OB17): 935.63 KiB on run 37557813096 -- the javascript's +60 B above
+  // (review-home's never-taken sentence), the stylesheet unmoved at 80.63.
+  //
+  // 934.87 -> 940.29 on 2026-10-07, MEASURED (OB17): 940.28 KiB on run 37670914235 -- the javascript's +6.29 above, the
+  // stylesheet unmoved at 80.63, against 933.99 at main cbd11dc.
+  //
+  // 934.87 -> 942.88 on 2026-10-07, MEASURED (OB17): 942.87 KiB on run 37672789318 at 1d6e43b, 8.88 over 933.99 at
+  // cbd11dc -- the javascript's +8.73 and the stylesheet's +0.15 above, index.html unmoved.
+  //
+  // 934.87 -> 958.35 on 2026-10-07, MEASURED (OB17): 958.34 KiB on run 37556370376 -- the javascript's +23.97 KiB and the
+  // stylesheet's +0.37 above, and nothing else, against 933.99 at main cbd11dc.
+  //
+  // 958.35 -> 961.57 on 2026-10-07, MEASURED (OB17): 961.56 KiB on run 37667621360 -- the javascript's +3.03 and the
+  // stylesheet's +0.19 above, and nothing else.
+  // INTEGRATION, MEASURED (OB17): the batch's all assets is 1027.46 KiB on clivememela/sasbo-online run 37676718704
+  // at be7b1ab, every paragraph above merged; the ceiling is that figure.
+  //
+  // 940.29 -> 940.30 on 2026-10-08, MEASURED (OB17): 940.29 KiB printed on run 37779077999 at e6499ba, over by bytes; the
+  // hundredth over the printed figure covers its rounding. One chunk moved against run 37672009580 at 56c4a67:
+  // BankBranch 13.91 -> 13.92 kB, A29's footer buttons keyed apart so that pressing Edit no longer saves the form it
+  // opens. The javascript row stays within its 796.18; the stylesheet unmoved at 80.63. Nothing from src/test/ is
+  // imported by the product.
+  // INTEGRATION: the base plus every stream's rise above, until the integration run measures it (OB17).
+  total: 1027.48 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to

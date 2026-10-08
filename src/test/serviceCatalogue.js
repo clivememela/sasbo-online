@@ -1,4 +1,7 @@
 import { acbRunService } from '../services/acbRunService'
+import { adminService } from '../services/adminService'
+import { auditService } from '../services/auditService'
+import { authService } from '../services/authService'
 import { bankService } from '../services/bankService'
 import { debounceService } from '../services/debounceService'
 import { jobGradeService } from '../services/jobGradeService'
@@ -10,6 +13,7 @@ import { monthEndService } from '../services/monthEndService'
 import { recruiterService } from '../services/recruiterService'
 import { recruitmentChannelService } from '../services/recruitmentChannelService'
 import { referenceService } from '../services/referenceService'
+import { signInService } from '../services/signInService'
 import { subscriptionsService } from '../services/subscriptionsService'
 import { summaryService } from '../services/summaryService'
 import { workplaceService } from '../services/workplaceService'
@@ -30,6 +34,9 @@ import * as api from '../services/api'
  */
 export const SERVICE_MODULES = [
   { name: 'acbRunService', module: acbRunService },
+  { name: 'adminService', module: adminService },
+  { name: 'auditService', module: auditService },
+  { name: 'authService', module: authService },
   { name: 'bankService', module: bankService },
   { name: 'debounceService', module: debounceService },
   { name: 'jobGradeService', module: jobGradeService },
@@ -41,13 +48,17 @@ export const SERVICE_MODULES = [
   { name: 'recruiterService', module: recruiterService },
   { name: 'recruitmentChannelService', module: recruitmentChannelService },
   { name: 'referenceService', module: referenceService },
+  { name: 'signInService', module: signInService },
   { name: 'subscriptionsService', module: subscriptionsService },
   { name: 'summaryService', module: summaryService },
   { name: 'workplaceService', module: workplaceService },
   { name: 'workplaceVisitService', module: workplaceVisitService },
 ]
 
-/** The one module that exports no method that performs a request. */
+/**
+ * The one module that exports no method that performs a request. Since sign-in it also installs the `fetch` wrapper
+ * that carries the session's token (`installSessionFetch`) -- which changes requests, and makes none of its own.
+ */
 export const PURE_MODULES = [{ name: 'api', module: api }]
 
 /**
@@ -68,6 +79,8 @@ const ARGS = {
   'memberService.updateMember': [{ id: '7', surname: 'Synthetic' }],
   'memberService.updateBanking': ['7', { bankAccountNumber: '0000000000' }],
   'memberService.createMember': [{ surname: 'Synthetic', identityNumber: '0000000000000' }],
+  'memberService.searchRegister': [{ q: 'Synthetic', page: 0, size: 50, sort: 'surname,asc' }],
+  'memberService.getRegisterOverview': [],
   'debounceService.useDebounce': ['search', 200],
   'jobGradeService.getByBank': ['ABSA'],
   'locationService.search': [{ bankName: 'Synthetic Bank' }],
@@ -105,6 +118,29 @@ const ARGS = {
   'memberHistoryService.getMemberHistory': ['7', 0, 50],
   'workplaceVisitService.getVisits': ['7', 0, 20],
   'workplaceVisitService.recordVisit': ['7', { visitedOn: '2026-09-10', complementFound: 40 }],
+  // Placeholders the secret scan clears by shape (`committedSecrets.js`) -- never a credential-looking literal.
+  'signInService.signIn': [{ username: 'synthetic.user', password: 'your_password_here' }],
+  'signInService.changePassword': [{ currentPassword: 'your_password_here', newPassword: 'your_new_password' }],
+  'adminService.getUsers': [{ page: 0, size: 50, q: 'Synthetic' }],
+  'adminService.createUser': [{ username: 'synthetic.user', displayName: 'Synthetic User', positionCode: 'ORGANISER', scope: { type: 'AREA', codes: ['A'] } }],
+  'adminService.updateUser': ['7', { displayName: 'Synthetic User', positionCode: 'ORGANISER', active: true, version: 3 }],
+  'adminService.updatePosition': ['ORGANISER', { code: 'ORGANISER', name: 'Organiser', defaultRoleCode: 'ORGANISER', active: true, ordinal: 6 }],
+  'adminService.updateRole': ['ORGANISER', { code: 'ORGANISER', name: 'Organiser', permissions: ['MEMBERS_VIEW'] }],
+  'auditService.getAudit': [{ username: 'synthetic.user', from: '2026-10-01', to: '2026-10-06', page: 0, size: 50 }],
+  'subscriptionsService.create': [{ bankName: 'Synthetic Bank Limited', acbDebitDay: 25, subscriptionAmount: 174 }],
+  'recruitmentChannelService.summary': [],
+  'recruitmentChannelService.members': ['7', { page: 0, size: 20, name: 'Synthetic' }],
+  'recruitmentChannelService.candidates': [{ q: 'Synthetic', excludeChannel: 7 }],
+  'recruitmentChannelService.addMember': ['7', '41'],
+  'recruitmentChannelService.removeMember': ['7', '41'],
+  'workplaceVisitService.getMyDrafts': ['DRAFT', 0, 20],
+  'workplaceVisitService.getDraft': ['7'],
+  'workplaceVisitService.createDraft': [{ raNumber: 900001, visitedOn: '2026-09-10' }],
+  'workplaceVisitService.updateDraft': ['7', { raNumber: 900001, visitedOn: '2026-09-10', version: 0 }],
+  'workplaceVisitService.submitDraft': ['7', 0],
+  'locationService.getListings': [['900001', '900002']],
+  'locationService.getMembersOf': [['7', '8']],
+  'workplaceVisitService.discardDraft': ['7', 0],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS
@@ -136,4 +172,4 @@ export function allServiceMethods() {
  * declared so -- otherwise this list becomes a place to hide a method that is
  * failing the contract.
  */
-export const NON_FETCHING = new Set(['bankService.getPageSize', 'memberService.getPageSize'])
+export const NON_FETCHING = new Set(['bankService.getPageSize'])

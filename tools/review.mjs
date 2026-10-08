@@ -250,14 +250,25 @@ const SHELL_STANDING = `!!document.querySelector('nav[aria-label="Main"]') && !!
 const NO_BUILD_ARTEFACT = `!/assets\\/|\\.js\\b|dynamically imported/i.test(document.querySelector('[data-testid="route-error"]')?.innerText || '')`;
 
 /**
- * The stub register with its first member in the server's REAL wire shape for COSATU positions:
+ * The register's first member's RECORD in the server's REAL wire shape for COSATU positions:
  * one comma-separated string, never unfolded on the way out (A37, open and pinned). The stub
- * server sends an array, which is why no capture had ever reached the throw.
+ * server sends an array, which is why no capture had ever reached the throw. Since A10 a record is
+ * read when its row is opened (`GET /api/members/{id}`), so it is that read which is answered --
+ * for the member the register's first page puts first, or the panel refuses a record that is not
+ * the row's.
  */
-const a37Register = async () => {
+const a37Record = async () => {
+  const page = await (await fetch(`${baseUrl}/api/members/register/search`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+  })).json();
   const members = await (await fetch(`${baseUrl}/api/members`)).json();
-  return members.map((member, index) => (index === 0 ? { ...member, isCosatu: 'Y', cosatuPositions: 'PEC,CEC' } : member));
+  const first = members.find((member) => member.id === page.content[0].id);
+  return { ...first, isCosatu: 'Y', cosatuPositions: 'PEC,CEC' };
 };
+/** A record's own read, `GET /api/members/{id}`: one to three characters after the slash, never `summary`. */
+const RECORD_READS = ['*/api/members/?', '*/api/members/??', '*/api/members/???'];
+/** The register answering a page with nobody on it (A10). */
+const EMPTY_REGISTER_PAGE = { content: [], page: 0, size: 50, totalElements: 0, totalPages: 0, sort: 'surname,asc' };
 
 const OPEN_FIRST_MEMBER = {
   what: 'open the first member',
@@ -291,7 +302,7 @@ const SHOTS = [
   // ── A27's class: the register's other states, reached by interception ─────────────────────
   {
     name: 'members-error-desk', vp: 'desk', themes: LIGHT, route: '/members',
-    intercept: { url: '*/api/members', mode: 'fail' },
+    intercept: { url: '*/api/members/register/search', mode: 'fail' },
     ready: TEXT('The register could not be reached'),
     expect: {
       ERROR_SHOWN: TEXT('The register could not be reached'),
@@ -301,12 +312,13 @@ const SHOTS = [
   },
   {
     name: 'members-empty-desk', vp: 'desk', themes: LIGHT, route: '/members',
-    intercept: { url: '*/api/members', mode: 'empty' },
+    // A page with no rows (A10): `[]` is not a page, and the register would say it could not be read.
+    intercept: { url: '*/api/members/register/search', mode: 'fulfill', body: async () => EMPTY_REGISTER_PAGE },
     ready: TEXT('No members match these criteria'),
   },
   {
     name: 'members-loading-desk', vp: 'desk', themes: LIGHT, route: '/members',
-    intercept: { url: '*/api/members', mode: 'hang' },
+    intercept: { url: '*/api/members/register/search', mode: 'hang' },
     ready: `!!document.querySelector('tbody[aria-busy="true"] tr[data-skeleton]')`,
     expect: SKELETON_PILL,
   },
@@ -373,7 +385,7 @@ const SHOTS = [
     // A render throw from data: the record's Structures tab calls `.join` on the string A37 says
     // the server really sends. Not a fixture component written to throw -- the register's own code.
     name: 'boundary-render-desk', vp: 'desk', themes: LIGHT, route: '/members',
-    intercept: { url: '*/api/members', mode: 'fulfill', body: a37Register },
+    intercept: { url: RECORD_READS, mode: 'fulfill', body: a37Record },
     ready: ROWS,
     steps: [
       OPEN_FIRST_MEMBER,

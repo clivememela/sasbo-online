@@ -27,6 +27,8 @@ import { createReadStream, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 
+import { surfaceUser, userForToken } from './surfaceSession.mjs';
+
 /** Is this a readable file? One stat, and a missing path is simply `false`. */
 const isFile = (path) => {
   try {
@@ -330,6 +332,20 @@ const statusChanged = golden('POST /api/members/{id}/status');
 const visitsPage = golden('GET /api/workplaces/{id}/visits');
 const visitRecorded = monthEndExamples.answers?.['POST /api/workplaces/{id}/visits'];
 if (visitRecorded?.status !== 201) throw new Error(`${MONTH_END_EXAMPLES} has no answer for POST /api/workplaces/{id}/visits`);
+/*
+ * October build: the organisers' batch print and the members at a branch, and the visit drafts -- each the server's
+ * golden answer, whatever is asked: they measure the screens, not the rules.
+ */
+const listingsBatch = golden('GET /api/workplaces/listings');
+const branchMembers = golden('GET /api/workplaces/{id}/members');
+// The batch's members in one read (October build review): each id asked, a branch with the golden branch's members.
+const batchMembers = golden('GET /api/workplaces/members');
+const myDrafts = golden('GET /api/workplaces/visit-drafts');
+const oneDraft = golden('GET /api/workplaces/visit-drafts/{id}');
+const draftSavedAgain = golden('PUT /api/workplaces/visit-drafts/{id}');
+const draftSubmitted = golden('POST /api/workplaces/visit-drafts/{id}/submit');
+const draftCreated = monthEndExamples.answers?.['POST /api/workplaces/visit-drafts'];
+if (draftCreated?.status !== 201) throw new Error(`${MONTH_END_EXAMPLES} has no answer for POST /api/workplaces/visit-drafts`);
 
 /*
  * THE WORKPLACES. The golden page holds two rows -- right for the suite, too few to measure a sheet with -- so they
@@ -463,9 +479,27 @@ const envelope = (code, message, details) => {
   return { status: example.status, body: { ...example.body, ...(message && { message }), ...(details && { details }) } };
 };
 // Every refusal a month end route answers here, looked up now: one the golden file lacks stops the start by name.
-['REQUEST_MALFORMED', 'MONTH_NOT_BEGUN', 'MONTH_NOT_TAKEN', 'SUMMARY_AREA_UNKNOWN', 'IDENTITY_REQUIRED', 'PACK_NOT_FOUND',
+// (IDENTITY_REQUIRED left month end with the server's slice 2: the take and the listings are held by a permission.)
+['REQUEST_MALFORMED', 'MONTH_NOT_BEGUN', 'MONTH_NOT_TAKEN', 'SUMMARY_AREA_UNKNOWN', 'PACK_NOT_FOUND',
   'HISTORY_PAGE_INVALID', 'MEMBER_NOT_FOUND']
   .forEach((code) => envelope(code));
+const listingExample = golden('GET /api/month-end/{month}/listings/new-members');
+
+/**
+ * A route held by a permission, as the server's security answers it (signin-server-notes.md §4) -- before anything
+ * else is read: nobody signed in is `401 SIGN_IN_REQUIRED`, a signed-in user without the permission `403
+ * PERMISSION_REQUIRED`. `null` for a caller who may. The caller is the surface's planted session (`surfaceSession.mjs`).
+ */
+const heldBy = (req, path, permission) => {
+  const user = userForToken(req.headers.authorization);
+  if (!user) {
+    return { status: 401, body: { status: 401, error: 'Unauthorized', message: 'Please sign in to use this part of SASBO Online.', path, code: 'SIGN_IN_REQUIRED' } };
+  }
+  if (!user.permissions.includes(permission)) {
+    return { status: 403, body: { status: 403, error: 'Forbidden', message: 'You do not have permission to do this. Ask a user administrator if your work needs it.', path, code: 'PERMISSION_REQUIRED', details: { permission }, permission } };
+  }
+  return null;
+};
 const AREAS = new Set(golden('GET /api/reference/areas').rows.map((row) => row.letter));
 const REGIONS = new Set(golden('GET /api/reference/regions').rows.map((row) => row.code));
 
@@ -556,13 +590,18 @@ const monthEndShape = (req, path, query) => {
     packReads = 0;
     return { status: 202, body: packOf('PREPARING') };
   }
+  // The take (MONTH_END_TAKE) answers the month as it now stands, as the server's MonthEndMonthDto; nothing is stored.
   if (req.method === 'POST' && m && m[2] === 'take') {
-    return monthRefused(m[1]) ?? envelope('IDENTITY_REQUIRED', null, { month: m[1] });
+    const held = heldBy(req, path, 'MONTH_END_TAKE') ?? monthRefused(m[1]);
+    if (held) return held;
+    const taken = MONTHS.taken.find((record) => record.month === m[1]);
+    return { status: 200, body: taken ?? { month: m[1], state: 'TAKEN', takenAt: '2026-10-07T08:00:00Z', takenBy: 'Surface Tester (surface.tester)' } };
   }
+  // A listing (MEMBERS_VIEW) answers the golden listing's shape for the month and listing asked -- no member in it.
   m = /^\/api\/month-end\/([^/]+)\/listings\/([^/]+)$/.exec(path);
   if (req.method === 'GET' && m) {
-    return envelope('IDENTITY_REQUIRED', 'A listing names members, so it waits until administrators sign in to this '
-      + 'system. The statistics beside it are counts, and are open.', { listing: m[2] });
+    return heldBy(req, path, 'MEMBERS_VIEW') ?? monthRefused(m[1])
+      ?? { status: 200, body: { ...listingExample, month: m[1], listing: m[2] } };
   }
   m = /^\/api\/month-end\/packs\/(\d+)(?:\/([^/]+))?$/.exec(path);
   if (req.method === 'GET' && m) {
@@ -593,6 +632,122 @@ const monthEndShape = (req, path, query) => {
   return path.startsWith('/api/month-end') ? { status: 404, body: { status: 404, error: 'Not Found', path } } : false;
 };
 
+/**
+ * SIGN-IN (contracts/signin.md), for the browser run: the mode is `open`, and `GET /api/auth/me` answers the user a
+ * surface's planted token stands for (`surfaceSession.mjs`) -- anyone else is `SIGN_IN_REQUIRED`, as the server says.
+ * Signing in is always refused (`SIGN_IN_FAILED`): a surface is signed in by planting a session, never by typing one,
+ * so the refusal is the one sign-in state worth measuring. Signing out and a password change succeed and store nothing.
+ * `false` when the path is not one of these.
+ */
+const refused = (status, code, message) => ({ status, body: { code, message, status } });
+const authAnswer = (req, path) => {
+  if (req.method === 'GET' && path === '/api/auth/mode') return { status: 200, body: { mode: 'open' } };
+  if (req.method === 'GET' && path === '/api/auth/me') {
+    const user = userForToken(req.headers.authorization);
+    return user ? { status: 200, body: { user } } : refused(401, 'SIGN_IN_REQUIRED', 'Sign in to use this.');
+  }
+  if (req.method === 'POST' && path === '/api/auth/login') {
+    return refused(401, 'SIGN_IN_FAILED', 'The username or the password is not right.');
+  }
+  if (req.method === 'POST' && (path === '/api/auth/logout' || path === '/api/auth/password')) return { status: 204, raw: '' };
+  return false;
+};
+
+/**
+ * MAINTENANCE'S USERS, POSITIONS, ROLES AND THE RECORD OF WHO DID WHAT (contracts/signin.md), for the signed-in
+ * surfaces. The provisional positions and their roles as the server seeds them (`SignInSeeder`: permissions.md's, and
+ * the two named in the room on 5 Oct); invented users across them, each scope a real code of the golden lists (regions
+ * NORTH and SOUTH, areas A, B and Y); several pages of the record. Writes are answered and nothing is stored: a new user
+ * is always id 9201, and every temporary password is the same obviously-invented string, which is what a surface
+ * photographs.
+ */
+const ALL_PERMISSIONS = {
+  USERS_ADMIN: 'Create and edit users, positions and roles; reset a password; deactivate a user',
+  AUDIT_VIEW: 'Read the record of who did what',
+  MEMBERS_VIEW: 'See a listing that names members, within the user\'s region or area',
+  MEMBERS_CAPTURE: 'Capture a new member',
+  MEMBERS_EDIT: 'Edit a member\'s record and change a member\'s status',
+  REFERENCE_MAINTAIN: 'Maintain lists: banks and branches, workplaces, recruitment channels, reasons',
+  SUBSCRIPTIONS_MAINTAIN: 'Change subscription amounts',
+  MONTH_END_VIEW: 'Read month-end figures and statistics',
+  MONTH_END_TAKE: 'Take the month, and take it again with a reason',
+  MONTH_END_SEND: 'Produce, download and e-mail the month\'s packs, bank files and provider files',
+  DOD_PREPARE: 'Prepare a debit order run, record unpaids and suspensions, confirm endings',
+  DOD_FILE: 'Download the debit order file for the bank',
+  DOD_SETTINGS: 'Debit order rates, non-working days and moving a bank\'s members to a new debit day',
+  PAYROLL_PROCESS: 'Load employer payroll files, work discrepancies, raise and close queries',
+  PAYROLL_VIEW: 'Read payroll reconciliation results and reports',
+  VISITS_CAPTURE: 'Capture and submit a workplace visit',
+  REPORTS_PRINT: 'Print organisers\' reports and location listings',
+  MIGRATION_RUN: 'Run legacy data imports and their checks',
+};
+const PROVISIONAL = [
+  ['SYSTEM_ADMINISTRATOR', 'System Administrator', Object.keys(ALL_PERMISSIONS)],
+  ['HEAD_OFFICE_ADMINISTRATOR', 'Head Office Administrator', ['AUDIT_VIEW', 'MEMBERS_VIEW', 'MEMBERS_CAPTURE', 'MEMBERS_EDIT',
+    'REFERENCE_MAINTAIN', 'MONTH_END_VIEW', 'MONTH_END_TAKE', 'MONTH_END_SEND', 'DOD_PREPARE', 'PAYROLL_PROCESS', 'PAYROLL_VIEW',
+    'VISITS_CAPTURE', 'REPORTS_PRINT']],
+  ['CHIEF_FINANCIAL_OFFICER', 'Chief Financial Officer', ['MEMBERS_VIEW', 'MONTH_END_VIEW', 'DOD_FILE', 'DOD_SETTINGS',
+    'SUBSCRIPTIONS_MAINTAIN', 'PAYROLL_VIEW']],
+  ['SENIOR_SECRETARIAT', 'Senior Secretariat', ['MEMBERS_VIEW', 'MONTH_END_VIEW', 'REPORTS_PRINT']],
+  ['REGIONAL_SECRETARY', 'Regional Secretary', ['MEMBERS_VIEW', 'MONTH_END_VIEW', 'VISITS_CAPTURE', 'REPORTS_PRINT']],
+  ['REGIONAL_ORGANISER', 'Regional Organiser', ['MEMBERS_VIEW', 'VISITS_CAPTURE', 'REPORTS_PRINT']],
+  ['ORGANISER', 'Organiser', ['MEMBERS_VIEW', 'MEMBERS_CAPTURE', 'VISITS_CAPTURE', 'REPORTS_PRINT']],
+  ['MSO', 'MSO (to be confirmed)', ['MEMBERS_VIEW', 'MEMBERS_CAPTURE', 'VISITS_CAPTURE', 'REPORTS_PRINT']],
+];
+// As the server seeds them (SignInSeeder): ordinals 10 to 80, the System Administrator's role `fixed`, each with a version.
+const adminPositions = PROVISIONAL.map(([code, name], i) => ({ code, name, defaultRoleCode: code, active: true, ordinal: (i + 1) * 10, version: 1 }));
+const adminRoles = PROVISIONAL.map(([code, name, permissions]) => ({ code, name, permissions, fixed: code === 'SYSTEM_ADMINISTRATOR', version: 1 }));
+const SCOPES = [{ type: 'ALL', codes: [] }, { type: 'REGION', codes: ['NORTH'] }, { type: 'AREA', codes: ['A', 'B'] }, { type: 'AREA', codes: ['Y'] }];
+const adminUsers = ['Ada', 'Ben', 'Cleo', 'Dumi', 'Eve', 'Femi', 'Gugu', 'Hal', 'Ivy', 'Jabu', 'Kea', 'Lulu'].map((first, i) => {
+  const [code, name, permissions] = PROVISIONAL[i % PROVISIONAL.length];
+  const scope = code.startsWith('REGIONAL_') ? SCOPES[1] : code === 'ORGANISER' || code === 'MSO' ? SCOPES[2 + (i % 2)] : SCOPES[0];
+  return {
+    id: 9101 + i, username: `${first.toLowerCase()}.synthetic`, displayName: `${first} Synthetic`,
+    email: `${first.toLowerCase()}.synthetic@example.invalid`, position: { code, name }, role: { code, name }, permissions, scope,
+    mustChangePassword: i === 11, lastSignInAt: i === 11 ? null : `2026-10-0${1 + (i % 6)}T0${6 + (i % 3)}:15:00Z`,
+    active: i !== 10, version: 1 + (i % 3),
+  };
+});
+const AUDIT_ACTIONS = [['SIGN_IN', 'USER', 'Signed in'], ['SIGN_IN_FAILED', 'USER', 'Sign-in refused: the password did not match'],
+  ['USER_UPDATED', 'USER', 'Changed: position, scope'], ['PASSWORD_RESET', 'USER', 'Temporary password issued; 2 sessions ended'],
+  ['ROLE_UPDATED', 'ROLE', 'Permissions: 1 added, 0 removed'], ['MONTH_TAKEN', 'MONTH', 'September 2026 taken: 6 statistics frozen']];
+const auditEntries = Array.from({ length: 120 }, (_, i) => {
+  const [action, entityType, summary] = AUDIT_ACTIONS[i % AUDIT_ACTIONS.length];
+  const who = adminUsers[i % 4];
+  return {
+    id: 50000 - i, at: `2026-10-${String(6 - Math.floor(i / 24)).padStart(2, '0')}T${String(16 - (i % 10)).padStart(2, '0')}:${String((i * 7) % 60).padStart(2, '0')}:00Z`,
+    username: who.username, displayName: who.displayName, action, entityType,
+    entityId: entityType === 'MONTH' ? '2026-09' : entityType === 'ROLE' ? 'ORGANISER' : String(adminUsers[(i + 3) % 12].id), summary,
+  };
+});
+const pageOf = (rows, query) => {
+  const size = Math.min(Math.max(Number(query.get('size') ?? 50) || 50, 1), 200);
+  const page = Math.max(Number(query.get('page') ?? 0) || 0, 0);
+  return { content: rows.slice(page * size, page * size + size), page, size, totalElements: rows.length, totalPages: Math.ceil(rows.length / size) };
+};
+const TEMPORARY = 'surface-temporary-password';
+const adminAnswer = (req, path, query) => {
+  if (req.method === 'GET' && path === '/api/admin/users') {
+    const q = (query.get('q') ?? '').toLowerCase();
+    return { status: 200, body: pageOf(adminUsers.filter((u) => !q || `${u.displayName} ${u.username}`.toLowerCase().includes(q)), query) };
+  }
+  if (req.method === 'POST' && path === '/api/admin/users') {
+    return { status: 201, body: { user: { ...adminUsers[5], id: 9201, version: 0, mustChangePassword: true, lastSignInAt: null }, temporaryPassword: TEMPORARY } };
+  }
+  const user = /^\/api\/admin\/users\/(\d+)(\/reset-password)?$/.exec(path);
+  if (user && req.method === 'POST' && user[2]) return { status: 200, body: { temporaryPassword: TEMPORARY } };
+  if (user && req.method === 'PUT') {
+    const found = adminUsers.find((u) => u.id === Number(user[1])) ?? adminUsers[0];
+    return { status: 200, body: { user: { ...found, version: found.version + 1 } } };
+  }
+  if (req.method === 'POST' && path === '/api/admin/positions') return { status: 201, body: adminPositions[0] };
+  if (req.method === 'PUT' && path.startsWith('/api/admin/positions/')) return { status: 200, body: adminPositions[0] };
+  if (req.method === 'POST' && path === '/api/admin/roles') return { status: 201, body: adminRoles[0] };
+  if (req.method === 'PUT' && path.startsWith('/api/admin/roles/')) return { status: 200, body: adminRoles[0] };
+  if (req.method === 'GET' && path === '/api/audit') return { status: 200, body: pageOf(auditEntries, query) };
+  return false;
+};
+
 /** Month end's shapes a prefix match cannot answer; `false` when the path is not one of them. */
 const monthEndAnswer = (req, path, query) => {
   if (path.startsWith('/api/month-end')) return monthEndOwnAnswer(req, path, query);
@@ -600,6 +755,22 @@ const monthEndAnswer = (req, path, query) => {
   const visits = /^\/api\/workplaces\/(\d+)\/visits$/.exec(path);
   if (visits && req.method === 'GET') return { status: 200, body: { ...visitsPage, workplaceId: Number(visits[1]) } };
   if (visits && req.method === 'POST') return { status: 201, body: visitRecorded.body };
+  // October build: a branch's members and the visit drafts -- a prefix match would answer them with the workplaces' page.
+  const branch = /^\/api\/workplaces\/(\d+)\/members$/.exec(path);
+  if (branch && req.method === 'GET') return { status: 200, body: { ...branchMembers, workplaceId: Number(branch[1]) } };
+  if (path === '/api/workplaces/members' && req.method === 'GET') {
+    const ids = (query.get('ids') ?? '').split(',').filter((id) => /^\d+$/.test(id)).map(Number);
+    const [one] = batchMembers.branches;
+    return { status: 200, body: { ...batchMembers, unknown: [], branches: ids.map((workplaceId) => ({ ...one, workplaceId })) } };
+  }
+  if (path === '/api/workplaces/visit-drafts') {
+    return req.method === 'POST' ? { status: 201, body: draftCreated.body } : { status: 200, body: myDrafts };
+  }
+  const draft = /^\/api\/workplaces\/visit-drafts\/(\d+)(\/submit)?$/.exec(path);
+  if (draft && draft[2] && req.method === 'POST') return { status: 200, body: draftSubmitted };
+  if (draft && !draft[2] && req.method === 'PUT') return { status: 200, body: draftSavedAgain };
+  if (draft && !draft[2] && req.method === 'GET') return { status: 200, body: oneDraft };
+  if (draft && !draft[2] && req.method === 'DELETE') return { status: 204, raw: '' };
   if (req.method === 'GET' && path === '/api/workplaces') {
     const page = Number(query.get('page') ?? 0);
     const size = Number(query.get('size') ?? WORKPLACE_PAGE);
@@ -618,6 +789,19 @@ const monthEndAnswer = (req, path, query) => {
 };
 
 const API = {
+  // Sign-in's five routes, each answered by `authAnswer` before this table is read; keyed here so the drift check
+  // below sees every one of them answered by its own stub.
+  '/api/auth/mode': { mode: 'open' },
+  '/api/auth/me': { user: surfaceUser([]) },
+  '/api/auth/login': {},
+  '/api/auth/logout': {},
+  '/api/auth/password': {},
+  // Maintenance's users, positions, roles and the record (`adminAnswer` pages and writes; these keys cover the reads).
+  '/api/admin/users': { content: adminUsers, page: 0, size: 50, totalElements: adminUsers.length, totalPages: 1 },
+  '/api/admin/positions': adminPositions,
+  '/api/admin/roles': adminRoles,
+  '/api/admin/permissions': Object.entries(ALL_PERMISSIONS).map(([name, description]) => ({ name, description })),
+  '/api/audit': { content: auditEntries.slice(0, 50), page: 0, size: 50, totalElements: auditEntries.length, totalPages: 3 },
   '/api/members': members,
   '/api/members/summary': memberSummary,
   // Month end's reads, from the server's golden answers (`golden`, above). The workplaces' key answers their first
@@ -633,6 +817,10 @@ const API = {
   '/api/reference/suspension-codes': golden('GET /api/reference/suspension-codes'),
   '/api/reference/status': golden('GET /api/reference/status'),
   '/api/workplaces': workplacePage(0, WORKPLACE_PAGE),
+  // October build: the batch print by R/A number, and my visit drafts (one draft, a save and a submission are answered
+  // per shape by `monthEndAnswer`). The keys are what `stubDrift` reads, so each service path is covered by name.
+  '/api/workplaces/listings': listingsBatch,
+  '/api/workplaces/visit-drafts': myDrafts,
   // Month end `04.1`-`04.10`. Every path under these three is answered by `monthEndOwnAnswer` first -- a statistic, a
   // pack and a month each by its shape; the keys are what `stubDrift` reads, so the services' paths are covered by
   // name. The longer two stop the shorter one answering the months or a pack by prefix.
@@ -675,7 +863,7 @@ const API = {
     becMembers: '4', memnetMembers: '9', bankManager: 'Synthetic Manager',
     bankManagerEmail: 'manager.synthetic@example.invalid',
     alternativeContact: 'Synthetic Alternate', alternativeContactEmail: 'alt.synthetic@example.invalid',
-    compliments: '-', membership: '28', lastVisited: '2026-08-01',
+    complement: '-', membership: '28', lastVisited: '2026-08-01',
     members: members.slice(0, 14).map((m) => ({
       memNo: m.membershipNumber, name: `${m.title} ${m.initials} ${m.surname}`,
       bankAt: m.bankName, subscr: m.monthlySubscription, empNum: m.employeeNumber,
@@ -820,6 +1008,33 @@ const API_BODY = new Map(API_KEYS.map((k) => [k, Buffer.from(JSON.stringify(API[
  */
 const unmatched = new Map();
 
+/*
+ * THE REGISTER A PAGE AT A TIME (A10): `POST /api/members/register/search` answers one page of the synthetic members
+ * -- the page and size asked, in the register's own order (surname) -- and `GET /api/members/register/overview` their
+ * figures and branches. A prefix match would answer both with the whole list, which the register reads as "not a page"
+ * and shows as a failure on every /members surface.
+ */
+const registerRow = ({ id, membershipNumber, employeeNumber, title, initials, surname, firstNames, bankName, branch, status }) =>
+  ({ id, membershipNumber, employeeNumber, title, initials, surname, firstNames, bankName, branch, status });
+const registerPage = (query) => {
+  const size = Number.isInteger(query?.size) && query.size > 0 ? Math.min(query.size, 100) : 50;
+  const ordered = [...members].sort((a, b) => a.surname.localeCompare(b.surname) || a.id - b.id);
+  const totalPages = Math.max(1, Math.ceil(ordered.length / size));
+  const page = Math.min(Math.max(0, Number.isInteger(query?.page) ? query.page : 0), totalPages - 1);
+  return {
+    content: ordered.slice(page * size, (page + 1) * size).map(registerRow),
+    page, size, totalElements: ordered.length, totalPages, sort: 'surname,asc',
+  };
+};
+const registerOverview = () => {
+  const by = (status) => members.filter((m) => m.status === status).length;
+  return {
+    total: members.length, active: by('Active'), pending: by('Pending'), suspended: by('Suspended'),
+    newThisMonth: 3, newDebitOrders: 2, updatedToday: 1,
+    branches: [...new Set(members.map((m) => m.branch))].sort(), asOf: '2026-10-07',
+  };
+};
+
 const server = createServer((req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1');
   const path = decodeURIComponent(url.pathname);
@@ -838,8 +1053,25 @@ const server = createServer((req, res) => {
       res.end();
       return;
     }
-    // The shapes a prefix match cannot answer: A.C.B.'s runs, and month end's pages and change of status.
-    const shaped = acbRunAnswer(req, path) || monthEndAnswer(req, path, url.searchParams);
+    if (req.method === 'POST' && path === '/api/members/register/search') {
+      let raw = '';
+      req.on('data', (chunk) => { raw += chunk; });
+      req.on('end', () => {
+        let query = {};
+        try { query = JSON.parse(raw || '{}'); } catch { /* an unreadable body asks for the register's first page */ }
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(registerPage(query)));
+      });
+      return;
+    }
+    if (req.method === 'GET' && path === '/api/members/register/overview') {
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(registerOverview()));
+      return;
+    }
+    // The shapes a prefix match cannot answer: sign-in, A.C.B.'s runs, and month end's pages and change of status.
+    const shaped = authAnswer(req, path) || adminAnswer(req, path, url.searchParams) || acbRunAnswer(req, path)
+      || monthEndAnswer(req, path, url.searchParams);
     if (shaped) {
       // A JSON body, unless the shape carries bytes of its own type (the pack's workbook, an attachment).
       res.writeHead(shaped.status, { 'content-type': shaped.type ?? 'application/json; charset=utf-8', ...shaped.headers });

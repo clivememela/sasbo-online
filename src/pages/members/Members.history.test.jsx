@@ -7,7 +7,7 @@ import MembersPage, { RECORD_TABS, tabPlace } from './Members'
 /*
  * 🔑 THE HISTORY TAB'S CHUNK IS IMPORTED HERE, AND THAT IS AN ANTI-FLAKE FIX RATHER THAN AN UNUSED IMPORT. `Members`
  * asks for it with `lazy(() => import(...))` when the tab is opened; a module already in the registry resolves on the
- * next microtask instead of on however busy the machine is (Home.figures.test.jsx, shell.drawer.test.jsx).
+ * next microtask instead of on however busy the machine is (the old Home.figures.test.jsx, shell.drawer.test.jsx).
  */
 import './MemberHistory.jsx'
 import membersSource from './Members.jsx?raw'
@@ -16,6 +16,7 @@ import { pageFixtures } from '../../test/msw/pageFixtures'
 import { server } from '../../test/msw/server'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { setupUser } from '../../test/user'
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * THE RECORD'S STRIP AT SIX, AND THE HISTORY TAB BEHIND IT -- month end 03.6, the owner's approval of the mock on
@@ -77,7 +78,7 @@ beforeEach(() => {
   historyAsked.length = 0
   // Two `use` calls: the catch-all first, then the specific handlers, which prepend.
   server.use(...pageFixtures)
-  server.use(http.get('*/api/members', () => HttpResponse.json([MEMBER])), historyAnswers())
+  server.use(...registerHandlers([MEMBER]), historyAnswers())
 })
 
 describe('the record\'s strip', () => {

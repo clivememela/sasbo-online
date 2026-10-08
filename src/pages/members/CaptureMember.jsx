@@ -21,7 +21,7 @@ import {
 import { formatZar, toWireDate, today } from "@/lib/format.js";
 import { finishField, sanitiseField, validateField } from "@/utils/inputRules.js";
 import { subscriptionsService } from "@/services/subscriptionsService.js";
-import { findSubscriptionForBank, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
+import { bankDebitDay, findSubscriptionForBank, sasboSubscriptionAmount } from "@/utils/bankSubscription.js";
 import {
     branchCodeOf, branchNamesForBank, findBranchRecord, formatBranchAddress, settleBankChange,
 } from "@/utils/bankBranches.js";
@@ -158,6 +158,17 @@ export default function CaptureMember() {
         const row = form.bankName ? findSubscriptionForBank(subscriptionRows, form.bankName) : null;
         return row?.subscriptionAmount ?? sasboSubscriptionAmount(subscriptionRows);
     }, [form.bankName, subscriptionRows]);
+    /**
+     * 🔴 A67 -- THE BANK'S DEBIT DAY IS THE DEFAULT, AND ONLY THE DEFAULT. The server used to replace the day chosen
+     * here with the bank's whenever the bank's was in range, so the form showed one day and the member was saved with
+     * another. It now keeps the day it is sent and gives the bank's only to a member with none -- so the default lives
+     * HERE, where it can be seen: until somebody picks a day, the field shows the chosen bank's usable day (the 20th
+     * when it has none), and the save sends what the field shows. Derived during render, like the subscription above;
+     * once a day is picked no bank changes it (S4: a derivation never wins an argument with a value somebody chose).
+     */
+    const [debitDayChosen, setDebitDayChosen] = useState(false);
+    const bankDay = form.bankName ? bankDebitDay(subscriptionRows, form.bankName) : null;
+    const debitDay = debitDayChosen || bankDay == null ? form.debitDay : bankDay;
     const reps = refs.data.recruiters;
     const channels = refs.data['recruitment channels'];
     const bankListing = refs.data['bank branches'];
@@ -305,7 +316,10 @@ export default function CaptureMember() {
         return () => { left = true; };
     }, []);
     const debitDateHint = form.paymentType === PAYMENT_TYPE_DEBIT_ORDER
-        ? debitDateSentence(form.debitDay, new Date(), holidays)
+        ? [
+            debitDayChosen || bankDay == null ? null : `${form.bankName}’s debit day — choose another if the member wants one.`,
+            debitDateSentence(debitDay, new Date(), holidays),
+        ].filter(Boolean).join(" ")
         : null;
 
     // An event from a text field, or a bare value from a select: `fieldValue` reads either (RF -- the selects
@@ -315,6 +329,7 @@ export default function CaptureMember() {
         if (field === "initials") initialsTyped.current = true;
         if (field === "bankAddress") setBankAddressTyped(true);
         if (field === "ibtNo") setIbtNoTyped(true);
+        if (field === "debitDay") setDebitDayChosen(true);
 
         const hasNonNumericInput =
             field === "identityNumber" && form.identityType === "I.D. Number" &&
@@ -425,7 +440,7 @@ export default function CaptureMember() {
 
             // A RANGE, not a list of three. The server's DebitDay takes the 20th to the 31st, and
             // most banks' own ACB days live between them (E9a/E9b, A32).
-            if (!isDebitDayInRange(form.debitDay)) {
+            if (!isDebitDayInRange(debitDay)) {
                 errors.debitDay = `Debit day must be between ${DEBIT_DAY_EARLIEST} and ${DEBIT_DAY_LATEST} when payment type is 'Debit Order'`;
             }
         }
@@ -472,7 +487,7 @@ export default function CaptureMember() {
 
         setSaveNotice(null);
         // Open confirmation modal to preview welcome letter PDF and confirm capture + dispatch
-        setWelcomeMember({ ...form, monthlySubscription: subscriptionAmount ?? form.monthlySubscription });
+        setWelcomeMember({ ...form, debitDay, monthlySubscription: subscriptionAmount ?? form.monthlySubscription });
     };
 
     const handleCaptureSuccess = (saved) => {
@@ -482,6 +497,7 @@ export default function CaptureMember() {
 
         // Reset form to pristine after successful confirmation & email dispatch
         initialsTyped.current = false;
+        setDebitDayChosen(false);
         setForm(JSON.parse(pristineForm));
         setFieldErrors({});
         workplace.reset();
@@ -707,7 +723,7 @@ export default function CaptureMember() {
                                     <>
                                         <Field label="Bank Account Number" kind="identifier" value={form.bankAccountNumber} onChange={handleChange("bankAccountNumber")} error={fieldErrors.bankAccountNumber} required />
                                         <Field label="Account Type" value={form.accountType} onChange={handleChange("accountType")} options={ACCOUNT_TYPE_OPTIONS} error={fieldErrors.accountType} required />
-                                        <Field label="Debit Day" value={form.debitDay} onChange={handleChange("debitDay")} options={DEBIT_DAY_OPTIONS} note={debitDateHint} />
+                                        <Field label="Debit Day" value={debitDay} onChange={handleChange("debitDay")} options={DEBIT_DAY_OPTIONS} note={debitDateHint} />
                                     </>
                                 )}
                                 {form.paymentType === PAYMENT_TYPE_PAYROLL && (

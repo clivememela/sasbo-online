@@ -1,8 +1,11 @@
 import '../assets/styles/App.css'
 import { useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar.jsx";
 import Main from "../components/Main";
 import { MAIN_CONTENT_ID, PANEL_SLOT_ID } from "../components/shellIds";
+import { useAuth } from "../auth/useAuth";
+import { loginPath } from "../auth/next";
 
 export default function AppLayout() {
   const [sideBarOpen, setSideBarOpen] = useState(false);
@@ -13,6 +16,19 @@ export default function AppLayout() {
    * topbar can own the control and the register can read it through the outlet context.
    */
   const [search, setSearch] = useState("");
+  const { status, mode, user } = useAuth();
+  const location = useLocation();
+
+  /*
+   * 🔑 THE TWO DOORS THE SHELL KEEPS (signin.md). In REQUIRED mode nobody reaches a screen without a session: they go
+   * to sign in, and `next` brings them back here -- including a session the server has just ended, which leaves this
+   * render anonymous. In OPEN mode everyone comes in, as today, and an ended session is a notice in `Main` instead.
+   * A temporary password is changed before anything else is opened, in either mode.
+   */
+  if (mode === "required" && status !== "signed-in") return <Navigate to={loginPath(location)} replace />;
+  if (user?.mustChangePassword) {
+    return <Navigate to={`/change-password?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  }
 
   // ✅ R-RESP-F, done in P5 as P1 said it would be. `h-screen` is `100vh`, which on a phone
   // is the viewport WITHOUT the browser chrome that is actually on screen -- so the shell was

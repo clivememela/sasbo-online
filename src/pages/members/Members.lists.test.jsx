@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * THE BANK LIST, WHERE IT IS CHOSEN. `06.4`.
@@ -44,7 +45,7 @@ describe('the bank list on Members', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     // Two `use` calls: the catch-all first, then the specific handlers, which prepend.
     server.use(...pageFixtures)
-    server.use(http.get('*/api/members', () => HttpResponse.json([MEMBER])))
+    server.use(...registerHandlers([MEMBER]))
   })
 
   it('that failed says so at the register’s Bank criterion', async () => {

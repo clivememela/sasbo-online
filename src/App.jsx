@@ -58,6 +58,13 @@ const RecruitmentChannel = lazy(() => import('./pages/maintainance/RecruitmentCh
 const Subscriptions = lazy(() => import('./pages/maintainance/Subscriptions.jsx'));
 // Month end `01.5`: SASBO's workplaces -- a leaf of Maintenance, beside the other tables it maintains.
 const Workplaces = lazy(() => import('./pages/maintainance/Workplaces.jsx'));
+// Sign-in (contracts/signin.md): a person's own password, and Maintenance's users, positions, roles and the record of
+// who did what. Lazy like every page, so the first load carries none of the administration screens.
+const ChangePassword = lazy(() => import('./pages/auth/ChangePassword.jsx'));
+const Users = lazy(() => import('./pages/users/Users.jsx'));
+const Positions = lazy(() => import('./pages/users/Positions.jsx'));
+const Roles = lazy(() => import('./pages/users/Roles.jsx'));
+const Audit = lazy(() => import('./pages/users/Audit.jsx'));
 
 // NAMED exports, so the dynamic import has to be adapted to lazy()'s default-export
 // contract. Written out rather than hidden in a helper: the shape of the mistake --
@@ -69,6 +76,8 @@ const Forms = lazy(() =>
   import('./pages/forms/Forms.jsx').then((m) => ({ default: m.Forms })));
 const Locations = lazy(() =>
   import('./pages/reports/Locations.jsx').then((m) => ({ default: m.Locations })));
+const BatchPrint = lazy(() =>
+  import('./pages/reports/BatchPrint.jsx').then((m) => ({ default: m.BatchPrint })));
 const Recruiters = lazy(() =>
   import('./pages/members/Recruiters.jsx').then((m) => ({ default: m.Recruiters })));
 
@@ -77,6 +86,7 @@ function App() {
     <Routes>
       <Route element={<AuthLayout />}>
         <Route path="login" element={<AuthPage />} />
+        <Route path="change-password" element={<ChangePassword />} />
         <Route path="signup" element={<Navigate to="/login" replace />} />
       </Route>
       <Route path="/" element={<AppLayout />}>
@@ -101,6 +111,7 @@ function App() {
         <Route path="reports/organizer-report" element={<OrganizerReport />} />
         <Route path="reports/forms" element={<Forms />} />
         <Route path="reports/locations" element={<Locations />} />
+        <Route path="reports/locations/print" element={<BatchPrint />} />
         <Route path="archives" element={<ArchivesPage />} />
         <Route path="archives/affiliations-other-trade-unions" element={<AffiliationsOtherTradeUnions />} />
         <Route path="archives/finance-houses" element={<FinanceHouses />} />
@@ -108,6 +119,10 @@ function App() {
         <Route path="admin/maintenance" element={<Maintenance/>} />
         <Route path="admin/maintenance/recruitment-channel" element={<RecruitmentChannel />} />
         <Route path="admin/maintenance/workplaces" element={<Workplaces />} />
+        <Route path="admin/maintenance/users" element={<Users />} />
+        <Route path="admin/maintenance/positions" element={<Positions />} />
+        <Route path="admin/maintenance/roles" element={<Roles />} />
+        <Route path="admin/maintenance/audit" element={<Audit />} />
       </Route>
     </Routes>
   )

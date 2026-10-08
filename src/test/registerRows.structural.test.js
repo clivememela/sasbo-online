@@ -90,7 +90,7 @@ describe("the register's card rows", () => {
 /**
  * MONTH END 02.1 -- THE FIRST SCREEN'S SHEET ON A PHONE (MO24, the stand-in review: at 390 it ran 58px past its own
  * edge and Penetration was cut). Its mock's phone measures, read where they are written: jsdom applies no media query,
- * and the widths they buy were measured in a browser. `Home.figures.test.jsx` holds the class that reaches the sheet.
+ * and the widths they buy were measured in a browser. `MonthEndFigures.test.jsx` holds the class that reaches the sheet.
  */
 describe("the first screen's sheet on a phone", () => {
   it('takes month-end-first-screen.html\'s measures at 760px and below: a head 8 and 12, a cell 6 and 10, the grouping 6 and wrapping, the expander 36', () => {

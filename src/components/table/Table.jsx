@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
 import DataState from '../common/DataState';
@@ -134,6 +134,8 @@ export default function Table({
   enterKey,
   footer,
   below,
+  sort,
+  onSortChange,
 }) {
   const [expanded, setExpanded] = useState(() => new Set());
 
@@ -299,18 +301,45 @@ export default function Table({
                   <span className="sr-only">Expand row</span>
                 </th>
               )}
-              {visible.map((column) => (
-                <th
-                  key={column.key}
-                  scope="col"
-                  data-col={column.key}
-                  data-fit={column.fit}
-                  style={column.width ? { width: column.width } : undefined}
-                  className={column.headClass}
-                >
-                  {column.header}
-                </th>
-              ))}
+              {visible.map((column) => {
+                /*
+                 * ↕️ A HEADING THAT SORTS (the member register, A10): `sortKey` on the column and `onSortChange` on
+                 * the table. The order is the SERVER's, so the heading only asks for it; the button is the heading's
+                 * own text, and `aria-sort` on the cell says which column the rows are in -- on that one cell alone,
+                 * as the APG's sortable table does. A column without `sortKey` is a plain heading, as every table was.
+                 */
+                const sortable = Boolean(column.sortKey && onSortChange);
+                const active = sortable && sort?.key === column.sortKey;
+                const Arrow = !active ? ArrowUpDown : sort.direction === 'desc' ? ArrowDown : ArrowUp;
+                return (
+                  <th
+                    key={column.key}
+                    scope="col"
+                    data-col={column.key}
+                    data-fit={column.fit}
+                    style={column.width ? { width: column.width } : undefined}
+                    className={column.headClass}
+                    aria-sort={active ? (sort.direction === 'desc' ? 'descending' : 'ascending') : undefined}
+                  >
+                    {sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => onSortChange(column.sortKey)}
+                        className={cn(
+                          'touch-target -mx-1 inline-flex items-center gap-1 rounded-sm px-1 uppercase tracking-[inherit]',
+                          'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring hover-hover:hover:text-ink',
+                          active && 'text-ink',
+                        )}
+                      >
+                        {column.header}
+                        <Arrow aria-hidden="true" className={cn('size-3.5 shrink-0', !active && 'text-ink-faint')} strokeWidth={2} />
+                      </button>
+                    ) : (
+                      column.header
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
 

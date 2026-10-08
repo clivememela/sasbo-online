@@ -8,6 +8,8 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { TestAuthProvider } from '../../test/authTestUtils'
+import { PERMISSIONS } from '../../auth/permissions'
 
 /**
  * 🔴 WRITTEN BEFORE `autoFocus` WAS REMOVED FROM EITHER DIALOG, AND THAT ORDER IS THE PROOF. `10.4`.
@@ -28,7 +30,7 @@ import { setupUser } from '../../test/user'
  * something -- not that it does the same thing. The primitive's own half is `Modal.initialFocus.test.jsx`.
  */
 
-const REP = { id: 1, name: 'Synthetic Recruiter', isElectedRep: false, recruiterTypeId: 1, roleId: 1 }
+const CHANNEL = { channelId: 1, name: 'Synthetic Channel', enabled: true, members: 1, banks: [], branches: [] }
 
 const MEMBER = {
   id: 7,
@@ -41,19 +43,27 @@ const MEMBER = {
   recruitmentRepresentativeId: 1,
 }
 
+/** Add Member is offered to a user who may change a member's channel (MEMBERS_EDIT). */
+const asStaff = (ui) => (
+  <TestAuthProvider permissions={[PERMISSIONS.MEMBERS_VIEW, PERMISSIONS.MEMBERS_EDIT]}>{ui}</TestAuthProvider>
+)
+
 describe('Recruiters, where the caret lands when a search dialog opens', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     server.use(...pageFixtures)
     server.use(
-      http.get('*/api/recruitment-channels', () => HttpResponse.json([REP])),
-      http.get('*/api/members', () => HttpResponse.json([MEMBER])),
+      http.get('*/api/recruitment-channels/summary', () => HttpResponse.json([CHANNEL])),
+      http.get('*/api/recruitment-channels/1/members', () => HttpResponse.json({
+        content: [MEMBER], page: 0, size: 100, totalElements: 1, totalPages: 1,
+      })),
+      http.get('*/api/recruitment-channels/member-candidates', () => HttpResponse.json({ rows: [MEMBER], more: false })),
     )
   })
 
   it('Add Recruiter opens with the caret in its search field, not on the Close button', async () => {
     const user = setupUser()
-    renderWithProviders(<Recruiters />)
+    renderWithProviders(asStaff(<Recruiters />))
 
     await user.click(await screen.findByRole('button', { name: /Add Recruiter/i }))
 
@@ -63,7 +73,7 @@ describe('Recruiters, where the caret lands when a search dialog opens', () => {
 
   it('Add member to recruiter does the same', async () => {
     const user = setupUser()
-    renderWithProviders(<Recruiters />)
+    renderWithProviders(asStaff(<Recruiters />))
 
     await user.click(
       await screen.findByRole('button', { name: /show the members recruited by this channel/i }),
@@ -75,7 +85,7 @@ describe('Recruiters, where the caret lands when a search dialog opens', () => {
   })
 
   it('the must-pass: nothing takes the caret before a dialog is opened', async () => {
-    renderWithProviders(<Recruiters />)
+    renderWithProviders(asStaff(<Recruiters />))
     await screen.findByRole('button', { name: /Add Recruiter/i })
 
     // 🔑 WITHOUT THIS, A REPLACEMENT THAT FOCUSED THE FIELD UNCONDITIONALLY WOULD PASS BOTH

@@ -1,13 +1,13 @@
 // @vitest-environment jsdom -- where focus goes when the member record opens and closes
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
-import { http, HttpResponse } from 'msw'
 
 import MembersPage from './Members'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * THE RECORD TAKES FOCUS WHEN IT OPENS, AND GIVES IT BACK WHEN IT CLOSES. `06.5`, F-P55.
@@ -35,7 +35,7 @@ describe('focus and the member record', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     // Two `use` calls: the catch-all first, then the specific handlers, which prepend.
     server.use(...pageFixtures)
-    server.use(http.get('*/api/members', () => HttpResponse.json([MEMBER])))
+    server.use(...registerHandlers([MEMBER]))
   })
 
   it('opening a record moves focus into it, and closing it gives focus back to the row that opened it', async () => {

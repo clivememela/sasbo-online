@@ -43,6 +43,13 @@ describe('the Location Visit report', () => {
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Location Visit')
   })
 
+  it('🗣️ 5 Oct: asks for the staff "Complement" -- "Compliment" is nowhere on the form', () => {
+    renderWithProviders(<OrganizerReport />)
+
+    expect(screen.getByLabelText('Complement')).toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/Compliment/i)
+  })
+
   it('says "Organizer Report" nowhere a person can read it', () => {
     renderWithProviders(
       <>

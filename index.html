@@ -14,10 +14,10 @@
          asset, so it is named rather than invented here. -->
     <link rel="icon" type="image/png" href="/src/assets/images/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <!-- R-ROB-E / R-PERF-H. Tells the UA both schemes exist before any CSS arrives, so the
-         browser paints its own canvas, form controls and scrollbars in the right one from
-         the first frame instead of assuming light. index.css narrows it per theme. -->
-    <meta name="color-scheme" content="light dark" />
+    <!-- R-ROB-E / R-PERF-H. The scheme the browser paints its canvas, form controls and
+         scrollbars in before any CSS arrives: light, as the app starts (5 Oct), and dark only
+         for a browser that chose it (the script below). index.css narrows it per theme. -->
+    <meta name="color-scheme" content="light" />
     <!-- The two faces the Card direction sets: Schibsted Grotesk is the interface, Marcellus
          engraves the membership card's name and nothing else. index.css declared both on
          2026-09-09 and nothing ever fetched them, so every screen rendered in Segoe UI -- the
@@ -40,6 +40,7 @@
       try {
         if (localStorage.getItem('darkMode') === 'true') {
           document.documentElement.classList.add('dark');
+          document.querySelector('meta[name="color-scheme"]').content = 'dark';
         }
       } catch (e) { /* no storage: light, which is the same answer a missing key gives */ }
     </script>

@@ -4,6 +4,15 @@
  * Its own module so the suite can hold the catalogue against `src/` on every run
  * (`src/test/stateGatedSurfaces.structural.test.js`) without launching a browser; the browser run is `surfaces.mjs`.
  * A dialog added tomorrow is a red suite tomorrow, not a surface nobody opened.
+ *
+ * 🔑 A SURFACE BEHIND A PERMISSION IS REACHED SIGNED IN: `session: ['USERS_ADMIN', …]` (the names of
+ * `src/auth/permissions.js`). `surfaces.mjs` plants `sessionStorage['sasbo.session']` before the page's scripts run --
+ * the contract's `{token, expiresAt, user}`, the user holding exactly those permissions -- and `serve-dist.mjs` answers
+ * `GET /api/auth/me` with that same user and `GET /api/auth/mode` with `open` (`surfaceSession.mjs` is the one
+ * definition both read). `session: []` is a signed-in user with no permission, for a refusal worth measuring; a surface
+ * with no `session` is measured signed out, and any session a previous surface planted is removed first.
+ * The stub answers sign-in's other routes too, but nothing else of an October stream: a screen's own reads still need
+ * their stubs in `serve-dist.mjs`, or its surface measures an empty page.
  */
 import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -128,6 +137,12 @@ const emptyHistory = () => {
 const VISITS = (state) => `!!document.querySelector('main [data-visits="${state}"]')`;
 /** Open INVENTED HARBOUR's visits by its R/A number, the row's control -- named by what it opens -- until `state`. */
 const OPEN_VISITS = (state) => step("open a workplace's visits", clickByText('main td button', '/^900003 — the visits to /'), VISITS(state));
+/** The batch print's numbers, pasted as a list -- two of the golden batch's banks and one number not on record. */
+const TYPE_RA_NUMBERS = step('paste the R/A numbers', typeIntoLabelled('main', '/^R\\/A numbers/', '900001, 900003\n900099'));
+/** Show listings, until the state the surface is after. */
+const SHOW_LISTINGS = (until) => step('show the listings', clickByText('main button', '/^Show listings$/'), until);
+/** A batch of which not one number is on record, as the server answers it. */
+const noneOnRecord = () => ({ asked: [900099], listings: [], unknown: [900099], workplacesServed: 'ALL', reason: null });
 /** A workplace with no visit on record, as the server answers one: the golden page with none on it. */
 const noVisits = () => {
   const golden = JSON.parse(readFileSync(join(REPO_ROOT, 'src', 'test', 'month-end-examples.json'), 'utf8'))
@@ -168,20 +183,23 @@ const IN_DIALOG = '[role="dialog"] button';
 /**
  * `covers` names the source sites a surface drives, as `<path under src>#<kind>@<which>`. The guard counts distinct
  * `@which` per `path#kind` against the sites in the source. `widths` narrows a surface that only exists at one.
+ * `session` signs the surface in with those permissions (this file's head).
  */
 export const SURFACES = [
   // ── the register (A27's class) ────────────────────────────────────────────────────────────────
   { name: 'members-more-criteria', route: '/members', ready: ROWS,
     steps: [step('open More criteria', clickByText('main button', '/More criteria/'), EXPANDED('main'))],
     present: { EXPANDED: EXPANDED('main') }, covers: ['pages/members/Members.jsx#aria-expanded@more criteria'] },
-  { name: 'members-error', route: '/members', intercept: { url: '*/api/members', mode: 'fail' },
+  { name: 'members-error', route: '/members', intercept: { url: '*/api/members/register/search', mode: 'fail' },
     ready: TEXT('The register could not be reached'),
     present: { ERROR: TEXT('The register could not be reached'), BANNER: BANNER('true', 'could not reach its server') },
     covers: ['components/table/Table.jsx#DataState@error', 'components/common/OfflineBanner.jsx#banner@unreachable'] },
-  { name: 'members-empty', route: '/members', intercept: { url: '*/api/members', mode: 'empty' },
+  { name: 'members-empty', route: '/members', intercept: { url: '*/api/members/register/search', mode: 'fulfill',
+      // A page with no rows (A10): `[]` is not a page, and the register would say it could not be read.
+      body: async () => ({ content: [], page: 0, size: 50, totalElements: 0, totalPages: 0, sort: 'surname,asc' }) },
     ready: TEXT('No members match these criteria'), present: { EMPTY: STATE('empty') },
     covers: ['components/table/Table.jsx#DataState@empty'] },
-  { name: 'members-loading', route: '/members', intercept: { url: '*/api/members', mode: 'hang' },
+  { name: 'members-loading', route: '/members', intercept: { url: '*/api/members/register/search', mode: 'hang' },
     ready: `!!document.querySelector('tbody[aria-busy="true"] tr[data-skeleton]')`,
     present: { SKELETON: `!!document.querySelector('tr[data-skeleton]')` }, covers: ['components/table/Table.jsx#DataState@loading'] },
   { name: 'members-partial', route: '/members', intercept: { url: '*/api/banks', mode: 'fail' },
@@ -190,6 +208,14 @@ export const SURFACES = [
     covers: ['pages/members/Members.jsx#DataState@refs', 'components/form/LoadFailureFrame.jsx#DataState@loadError'] },
 
   // ── the record ────────────────────────────────────────────────────────────────────────────────
+  // A10: a row's record is read when it is opened (`GET /api/members/{id}`); a read that fails says so in the panel,
+  // the register as it was. One to three characters after the slash: an id, never `summary` or a record's history.
+  { name: 'record-opening-failed', route: '/members', ready: ROWS,
+    intercept: { url: ['*/api/members/?', '*/api/members/??', '*/api/members/???'], mode: 'fail' },
+    steps: [step('open the first member', clickByText('[data-row-action]', '/open the record for/i'),
+      TEXT("This member's record could not be opened."))],
+    present: { ERROR: TEXT("This member's record could not be opened.") },
+    covers: ['pages/members/Members.jsx#DataState@opening'] },
   { name: 'record-open', route: '/members', ready: ROWS, steps: [OPEN_FIRST_MEMBER], present: { PANEL_OPEN } },
   { name: 'record-structures', route: '/members', ready: ROWS,
     steps: [OPEN_FIRST_MEMBER, step('open Structures', clickByText(`${PANEL} button`, '/Structures/i'), TEXT('SASBO structures'))],
@@ -307,18 +333,12 @@ export const SURFACES = [
   // ── Recruiters ────────────────────────────────────────────────────────────────────────────────
   { name: 'recruiters-channel', route: '/recruiters', ready: ROWS, steps: [OPEN_CHANNEL], present: { DIALOG: ANY_DIALOG },
     covers: ['pages/members/Recruiters.jsx#Modal@channel'] },
-  { name: 'recruiters-add-member', route: '/recruiters', ready: ROWS,
-    steps: [OPEN_CHANNEL, step('Add Member', clickByText(IN_DIALOG, '/^Add Member$/'), dialogNamed('/^Add member to recruiter$/'))],
-    present: { DIALOG: dialogNamed('/^Add member to recruiter$/') }, covers: ['pages/members/Recruiters.jsx#Modal@add member'] },
-  { name: 'recruiters-member-details', route: '/recruiters', ready: ROWS,
-    steps: [OPEN_CHANNEL, step('open a member', clickByText(IN_DIALOG, '/open the record for/i'), dialogNamed('/^Member details$/'))],
-    present: { DIALOG: dialogNamed('/^Member details$/') }, covers: ['pages/members/Recruiters.jsx#Modal@member details'] },
-  { name: 'recruiters-remove-member', route: '/recruiters', ready: ROWS,
-    steps: [OPEN_CHANNEL, step('remove a member', clickByText(IN_DIALOG, '/from this recruiter$/'), dialogNamed('/^Remove this member from the recruiter\\?$/'))],
-    present: { DIALOG: dialogNamed('/^Remove this member from the recruiter\\?$/') }, covers: ['pages/members/Recruiters.jsx#ConfirmDialog@remove member'] },
+  // RC15, step 2 (bugs): a channel's members, Add Member, a member's record and removing a member need MEMBERS_VIEW or
+  // MEMBERS_EDIT -- UNREACHABLE below until the sign-in client's stub mode can drive a signed-in user. The channel's
+  // removal is named for what it removes (the user manual's reading, 6 Oct): "Remove recruitment channel".
   { name: 'recruiters-remove-recruiter', route: '/recruiters', ready: ROWS,
-    steps: [OPEN_CHANNEL, step('Remove recruiter', clickByText(IN_DIALOG, '/^Remove recruiter$/'), dialogNamed('/^Remove this recruiter\\?$/'))],
-    present: { DIALOG: dialogNamed('/^Remove this recruiter\\?$/') }, covers: ['pages/members/Recruiters.jsx#ConfirmDialog@remove recruiter'] },
+    steps: [OPEN_CHANNEL, step('Remove recruitment channel', clickByText(IN_DIALOG, '/^Remove recruitment channel$/'), dialogNamed('/^Remove this recruitment channel\\?$/'))],
+    present: { DIALOG: dialogNamed('/^Remove this recruitment channel\\?$/') }, covers: ['pages/members/Recruiters.jsx#ConfirmDialog@remove recruiter'] },
   { name: 'recruiters-recruiter-details-date', route: '/recruiters', ready: ROWS,
     steps: [OPEN_CHANNEL,
       step('view recruiter details', clickByText(IN_DIALOG, '/^View recruiter details$/'), dialogNamed('/^Recruiter details$/')),
@@ -328,15 +348,12 @@ export const SURFACES = [
       step('open Election Date', mouseDownOn('[role="dialog"] input[aria-haspopup="dialog"]', '/Election Date/'), DATE_PICKER_OPEN)],
     present: { DETAILS: dialogNamed('/^Recruiter details$/'), DATE_PICKER_OPEN },
     covers: ['pages/members/Recruiters.jsx#Modal@recruiter details', 'pages/members/Recruiters.jsx#DateField@recruiter details'] },
-  { name: 'recruiters-add-recruiter-date', route: '/recruiters', ready: ROWS,
-    // The recruiter's details -- Elected Recruiter among them -- render only once a member has been chosen (Recruiters.jsx).
-    steps: [step('Add Recruiter', clickByText('main button', '/^Add Recruiter$/'), dialogNamed('/^Add Recruiter$/')),
-      step('choose a member', clickByText('[role="dialog"] button', '/^Choose .* as the recruiter$/'), `[...document.querySelectorAll('[role="dialog"] legend')].some((l) => /Elected Recruiter/.test(l.textContent))`),
-      step('answer Elected Recruiter: Yes', answerYes('/Elected Recruiter/'), `!!document.querySelector('[role="dialog"] input[aria-haspopup="dialog"]')`),
-      DIALOG_DATE_IN_VIEW,
-      step('open Election Date', mouseDownOn('[role="dialog"] input[aria-haspopup="dialog"]', '/Election Date/'), DATE_PICKER_OPEN)],
-    present: { DIALOG: dialogNamed('/^Add Recruiter$/'), DATE_PICKER_OPEN },
-    covers: ['pages/members/Recruiters.jsx#Modal@add recruiter', 'pages/members/Recruiters.jsx#DateField@add recruiter'] },
+  // The recruiter's details -- Elected Recruiter and its date among them -- render only once a member is chosen, and the
+  // picker needs MEMBERS_VIEW since RC15 step 2: the dialog is driven, its date is UNREACHABLE below.
+  { name: 'recruiters-add-recruiter', route: '/recruiters', ready: ROWS,
+    steps: [step('Add Recruiter', clickByText('main button', '/^Add Recruiter$/'), dialogNamed('/^Add Recruiter$/'))],
+    present: { DIALOG: dialogNamed('/^Add Recruiter$/') },
+    covers: ['pages/members/Recruiters.jsx#Modal@add recruiter'] },
   { name: 'recruiters-refs-partial', route: '/recruiters', intercept: { url: '*/api/banks*', mode: 'fail' },
     ready: `${ROWS} && (${STATE('partial')} || ${STATE('error')})`, present: { NOTICE: `${STATE('partial')} || ${STATE('error')}` },
     covers: ['pages/members/Recruiters.jsx#DataState@refs'] },
@@ -515,6 +532,27 @@ export const SURFACES = [
     intercept: { url: '*/api/workplaces/*/visits*', mode: 'fulfill', body: noVisits }, steps: [OPEN_VISITS('empty')],
     present: { EMPTY: TEXT('No visits on record') } },
 
+  // ── the organisers' batch print (October build, 5 Oct Show & Tell) ──────────────────────────────
+  // The R/A numbers pasted into the box as an organiser pastes a list, and Show listings; `serve-dist.mjs` answers the
+  // server's golden batch -- two invented banks and a number not on record. Signed out, so each branch says why its
+  // members are not listed. The other states: the batch hung, failed, or not one number on record.
+  { name: 'batch-print-results', route: '/reports/locations/print', ready: HEADING,
+    steps: [TYPE_RA_NUMBERS, SHOW_LISTINGS(`!!document.querySelector('main .print-bank article')`)],
+    present: { BANKS: `!!document.querySelector('main .print-bank h2')`, UNKNOWN: TEXT('Not on record here: 900099'),
+      SIGN_IN: TEXT('Sign in to see the members at this branch') } },
+  { name: 'batch-print-loading', route: '/reports/locations/print', ready: HEADING,
+    intercept: { url: '*/api/workplaces/listings*', mode: 'hang' },
+    steps: [TYPE_RA_NUMBERS, SHOW_LISTINGS(TEXT('Finding the branches…'))], present: { LOADING: STATE('loading') },
+    covers: ['pages/reports/BatchPrint.jsx#DataState@loading'] },
+  { name: 'batch-print-error', route: '/reports/locations/print', ready: HEADING,
+    intercept: { url: '*/api/workplaces/listings*', mode: 'fail' },
+    steps: [TYPE_RA_NUMBERS, SHOW_LISTINGS(TEXT('We could not find those branches.'))], present: { ERROR: STATE('error') },
+    covers: ['pages/reports/BatchPrint.jsx#DataState@error'] },
+  { name: 'batch-print-none-on-record', route: '/reports/locations/print', ready: HEADING,
+    intercept: { url: '*/api/workplaces/listings*', mode: 'fulfill', body: noneOnRecord },
+    steps: [TYPE_RA_NUMBERS, SHOW_LISTINGS(TEXT('None of these R/A numbers is on record here'))],
+    present: { EMPTY: STATE('empty') }, covers: ['pages/reports/BatchPrint.jsx#DataState@empty'] },
+
   // ── month end (`04.1`-`04.10`) ────────────────────────────────────────────────────────────────
   // The Month end page and a statistic's screen, from `serve-dist.mjs`'s golden months and sheets: August 2026 taken,
   // September 2026 open. Each state is reached the way a person meets it -- a month chosen by its address, a sheet
@@ -555,6 +593,40 @@ export const SURFACES = [
   { name: 'month-end-statistic-unknown', route: '/admin/monthly-menu/no-such-statistic', ready: HEADING,
     present: { NOT_FOUND: TEXT('No such statistic') } },
 
+  // ── sign-in's Maintenance screens (contracts/signin.md), signed in through `session` ──────────
+  // `serve-dist.mjs` answers invented users over the server's seeded positions, their roles, the permission catalogue
+  // and several pages of the record (`adminAnswer`). A new user's temporary password is one invented string.
+  { name: 'users', route: '/admin/maintenance/users', session: ['USERS_ADMIN'], ready: ROWS,
+    present: { ROWS, CREATE: TEXT('Create a user'), SCOPE: TEXT('Areas: A, B') } },
+  { name: 'users-refused', route: '/admin/maintenance/users', session: [], ready: HEADING,
+    present: { REFUSED: TEXT('You need permission to manage users') } },
+  { name: 'users-create', route: '/admin/maintenance/users', session: ['USERS_ADMIN'], ready: ROWS,
+    steps: [step('open Create a user', clickByText('main button', '/Create a user/'), dialogNamed('/^Create a user$/')),
+      step('choose an area scope', `(() => { const r = [...document.querySelectorAll('[role="dialog"] input[type="radio"]')].find((n) => n.value === 'AREA'); if (!r) return false; r.click(); return true; })()`,
+        TEXT('Area A'))],
+    present: { DIALOG: dialogNamed('/^Create a user$/'), AREAS: TEXT('Area A') }, covers: ['pages/users/UserDialog.jsx#Modal@user'] },
+  { name: 'users-temporary-password', route: '/admin/maintenance/users', session: ['USERS_ADMIN'], ready: ROWS,
+    steps: [step('open Create a user', clickByText('main button', '/Create a user/'), dialogNamed('/^Create a user$/')),
+      step('type a name', typeIntoLabelled('[role="dialog"]', '/^Name/', 'Mo Synthetic')),
+      step('type a username', typeIntoLabelled('[role="dialog"]', '/^Username/', 'mo.synthetic')),
+      step('choose a position', chooseOption('[role="dialog"]', '/^Position/', 'HEAD_OFFICE_ADMINISTRATOR'), `!!document.querySelector('[role="dialog"] select')`),
+      step('create the user', clickByText('[role="dialog"] button', '/^Create user$/'), TEXT('It is shown only this once'))],
+    present: { ONCE: TEXT('It is shown only this once'), PASSWORD: TEXT('surface-temporary-password') } },
+  { name: 'positions-change', route: '/admin/maintenance/positions', session: ['USERS_ADMIN'], ready: ROWS,
+    steps: [step('open a position', clickNth('main [data-row-action]', 0), ANY_DIALOG)],
+    present: { DIALOG: dialogNamed('/^Change System Administrator$/') }, covers: ['pages/users/Positions.jsx#Modal@position'] },
+  // The SECOND role: the first is the System Administrator's, `fixed`, whose dialog says so instead of a checklist.
+  { name: 'roles-change', route: '/admin/maintenance/roles', session: ['USERS_ADMIN'], ready: ROWS,
+    steps: [step('open a role', clickNth('main [data-row-action]', 1), ANY_DIALOG)],
+    present: { DIALOG: dialogNamed('/^Change Head Office Administrator$/'), CATALOGUE: TEXT('Read the record of who did what') },
+    covers: ['pages/users/Roles.jsx#Modal@role'] },
+  { name: 'audit-from', route: '/admin/maintenance/audit', session: ['AUDIT_VIEW'], ready: ROWS,
+    steps: [step('open From', mouseDownOn('main input[aria-haspopup="dialog"]', '/^From/'), DATE_PICKER_OPEN)],
+    present: { DATE_PICKER_OPEN }, covers: ['pages/users/Audit.jsx#DateField@From'] },
+  { name: 'audit-to', route: '/admin/maintenance/audit', session: ['AUDIT_VIEW'], ready: ROWS,
+    steps: [step('open To', mouseDownOn('main input[aria-haspopup="dialog"]', '/^To/'), DATE_PICKER_OPEN)],
+    present: { DATE_PICKER_OPEN }, covers: ['pages/users/Audit.jsx#DateField@To'] },
+
   // ── the shell ─────────────────────────────────────────────────────────────────────────────────
   { name: 'shell-drawer', route: '/home', widths: [390], ready: HEADING,
     steps: [step('open the navigation', clickByText('header button', '/^Open navigation menu$/'), EXPANDED('header'))],
@@ -583,6 +655,27 @@ export const UNREACHABLE = [
     why: 'rendered `disabled` -- a date nobody can open' },
   { site: 'components/form/AddressAutocomplete.jsx#aria-expanded@suggestions',
     why: 'its suggestions come from Google Places; the stub cannot answer Google and a measurement sends nothing to it (R-SEC-H)' },
+  // October build, bugs (RC15 step 2): the members of a recruitment channel are a server page that needs MEMBERS_VIEW, and
+  // changing who is in a channel needs MEMBERS_EDIT; oct/base's AuthProvider is the anonymous caller until the sign-in
+  // stream's client lands -- then its stub mode (contracts/signin.md) drives these, and they go.
+  { site: 'pages/members/Recruiters.jsx#Modal@add member',
+    why: 'Add Member is offered only to a signed-in user holding MEMBERS_EDIT, and no session can be stubbed until sign-in lands' },
+  { site: 'pages/members/Recruiters.jsx#Modal@member details',
+    why: "a member's record opens from a channel's member list, which needs MEMBERS_VIEW, and no session can be stubbed until sign-in lands" },
+  { site: 'pages/members/Recruiters.jsx#DataState@member record',
+    why: "the member's record loads inside Member details, reached only from a channel's member list (MEMBERS_VIEW) -- no session can be stubbed until sign-in lands" },
+  { site: 'pages/members/Recruiters.jsx#ConfirmDialog@remove member',
+    why: 'taking a member off a channel needs MEMBERS_EDIT, from the member list MEMBERS_VIEW shows -- no session can be stubbed until sign-in lands' },
+  { site: 'pages/members/Recruiters.jsx#DateField@add recruiter',
+    why: "the recruiter's Election Date renders once a member is chosen, and the picker needs MEMBERS_VIEW -- no session can be stubbed until sign-in lands" },
+  // October build: the two screens below need a signed-in user, and oct/base's AuthProvider is the anonymous caller
+  // until the sign-in stream's client lands -- then the stub mode of contracts/signin.md drives them, and these go.
+  { site: 'pages/reports/WorkplaceListing.jsx#DataState@loading',
+    why: 'the members at a branch are read only for a signed-in user holding MEMBERS_VIEW, and no session can be stubbed until sign-in lands' },
+  { site: 'pages/reports/WorkplaceListing.jsx#DataState@error',
+    why: 'the members at a branch are read only for a signed-in user holding MEMBERS_VIEW, and no session can be stubbed until sign-in lands' },
+  { site: 'pages/reports/MyVisitDrafts.jsx#DataState@state',
+    why: 'My visits is shown only to a signed-in user holding VISITS_CAPTURE, and no session can be stubbed until sign-in lands' },
 ];
 
 /* ── the guard: the catalogue against the source ─────────────────────────────────────────────────── */

@@ -20,6 +20,7 @@
  */
 
 import { nameKey } from './nameKey.js'
+import { isDebitDayInRange } from '../config/memberConstants.js'
 
 /** The bank name a subscription row carries, under either spelling. */
 export const subscriptionBankNameOf = (row) =>
@@ -38,6 +39,19 @@ export const findSubscriptionForBank = (subscriptions, bankName) => {
   return (Array.isArray(subscriptions) ? subscriptions : []).find(
     (row) => nameKey(subscriptionBankNameOf(row)) === wanted,
   ) ?? null
+}
+
+/**
+ * The bank's debit day as a member's DEFAULT, as the option string the form holds, or `null` (A67).
+ *
+ * The server gives a member the bank's ACB day only when they have no day of their own, and only when the day is
+ * inside the permitted range -- the same two conditions as here, so the day a form shows before anybody chooses one
+ * is the day the bank would have given. `null` for no bank, no row, or a day outside the range (the seeded rows'
+ * placeholder days, Absa's 5th among them).
+ */
+export const bankDebitDay = (subscriptions, bankName) => {
+  const day = findSubscriptionForBank(subscriptions, bankName)?.acbDebitDay
+  return isDebitDayInRange(day) ? String(Number(day)) : null
 }
 
 /**

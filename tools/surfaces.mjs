@@ -35,6 +35,8 @@ import { AXE_CONTRAST, PAGE_CENSUS, SETTLED, TOUCH_OVERLAYS_DRAWN, UNSEEN, contr
 import { decodePng, pixelContrast } from './png.mjs';
 // The catalogue and the guard that holds it against src/ -- also imported by the suite (stateGatedSurfaces.structural.test.js).
 import { ANY_DIALOG, HEADING, OPEN_CHANNEL, ROWS, SURFACES, UNREACHABLE, coverageComplaints } from './surfaceCatalogue.mjs';
+// A surface's `session: [<permissions>]`, planted before the page's scripts run (surfaceSession.mjs).
+import { storeSession } from './surfaceSession.mjs';
 
 const args = process.argv.slice(2);
 const [baseUrl, outDir] = args;
@@ -146,10 +148,16 @@ try {
    * a ratio read off a frame that is still fading is a ratio of something nobody sees. The reduced-motion
    * treatment is the arc's own (06.2), not an absence of design.
    */
-  const arrive = async (route, theme, width) => {
+  /*
+   * `session` is the surface's `session: [<permissions>]` (surfaceSession.mjs). Planted, like the theme, BEFORE the
+   * navigation -- sessionStorage is the tab's, so the new document reads it on its first script -- and removed for a
+   * surface that declares none, so no surface is measured as the previous surface's user.
+   */
+  const arrive = async (route, theme, width, session) => {
     await metrics(width);
     await send('Emulation.setTouchEmulationEnabled', isPhone(width) ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
     await evaluate(storeTheme(theme === 'dark'));
+    await evaluate(storeSession(session));
     await send('Page.navigate', { url: baseUrl + route });
     return waitFor(pageReady, { tries: 120 });
   };
@@ -287,7 +295,7 @@ try {
         const release = surface.intercept ? await intercept(surface.intercept) : null;
         let networkTouched = false;
         try {
-          if (!await arrive(surface.route, theme, width)) row.missed.push('pageReady never held');
+          if (!await arrive(surface.route, theme, width, surface.session)) row.missed.push('pageReady never held');
           else if (surface.ready && !await waitFor(surface.ready, { tries: 120 })) row.missed.push(`never ready: ${surface.ready.slice(0, 120)}`);
           else {
             for (const s of surface.steps ?? []) {

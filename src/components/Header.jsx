@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, Menu, Search } from "lucide-react";
 import Breadcrumbs from "./common/Breadcrumbs";
@@ -6,6 +6,8 @@ import Button from "./form/Button";
 import { MENU_BUTTON_ID, SIDEBAR_ID } from "./shellIds";
 import { cn } from "../lib/utils";
 import useMediaQuery from "../hooks/useMediaQuery";
+// LAZY (OB17a): who is signed in, and the way in or out, arrive with the page's own chunk -- see `AccountControls`.
+import { HeaderAccount } from "./account/lazyAccount";
 
 /**
  * THE TOPBAR. card.html's `.topbar`, and it is 60px.
@@ -32,17 +34,22 @@ import useMediaQuery from "../hooks/useMediaQuery";
  * and `headingContract.test.jsx` mounts every route and counts.
  */
 
-/** What the search recognised: the register's own identifiers, named as the user types them. */
+/**
+ * What the search recognised: the register's own identifiers, named as the user types them.
+ *
+ * 🔁 THE REGISTER SEARCHES ON THE SERVER SINCE A10, and the chip names only what that search finds -- the start of a
+ * name or a number, an identity number whole or by its last four (`memberRegister.js`). It named a cellphone number, a
+ * telephone number and an e-mail address too, which the register's box matched when it filtered every member in the
+ * browser; those are "More criteria" now, and a chip promising them would promise a match that never comes.
+ */
 function searchKind(query) {
   const q = String(query ?? "").trim();
   if (!q) return "";
   if (/^m-?\d{3,}$/i.test(q)) return "Membership number";
   if (/^\d{13}$/.test(q)) return "I.D. number";
-  if (/^(\+27|0)\s?\d{2}[\s-]?\d{3}[\s-]?\d{4}$/.test(q)) return "Cellphone number";
-  if (/^\+27|^0\d{1,2}\s?\d{0,3}$/.test(q)) return "Phone number";
-  if (/^[a-z]{2,4}-?\d{3,}$/i.test(q)) return "Employee number";
-  if (/@/.test(q)) return "Email address";
-  if (/^\d{6,12}$/.test(q)) return "I.D. or account number";
+  if (/^\d{4}$/.test(q)) return "Last four of an I.D.";
+  if (/^\d{5,12}$/.test(q)) return "Number";
+  if (/^[a-z]{1,4}-?\d{3,}$/i.test(q)) return "Employee number";
   if (/^[a-z][a-z' -]{1,}$/i.test(q)) return "Name or surname";
   return "";
 }
@@ -180,7 +187,7 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
           autoComplete="off"
           value={search}
           onChange={onChange}
-          placeholder={narrow ? "Search members" : "Search members: surname, number, I.D., bank, branch"}
+          placeholder={narrow ? "Search members" : "Search members: surname, first name, number, I.D."}
           className="search-text min-w-0 flex-1 border-0 bg-transparent text-ink placeholder:text-ink-muted focus:outline-none [&::-webkit-search-cancel-button]:appearance-none"
         />
         {kind && (
@@ -216,25 +223,11 @@ export default function Header({ setSideBarOpen, sideBarOpen, search = "", setSe
           <Bell size={18} strokeWidth={1.75} aria-hidden="true" />
         </Button>
 
-        {/* ⚠️ A PLACEHOLDER, AND AN HONEST ONE. There is no signed-in person for the pill to
-            belong to: authentication is DEFERRED (R-SEC-C). It stays as the shell's anchor,
-            as a non-interactive chip assistive technology is not told to believe in. When
-            authentication lands it becomes the mock's account menu, whose name comes from
-            the session. */}
-        <p
-          aria-hidden="true"
-          className="flex h-9 select-none items-center gap-2.5 rounded-full py-0 pl-1 pr-2.5"
-        >
-          <span className="grid size-7 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-ink">
-            SA
-          </span>
-          {/* 🔑 THE NAME IS PRESENT ACROSS THE WHOLE DESK, which is what the mock's topbar
-              shows and what the contract calls desktop -- from `xl` (1280), the same edge
-              the record panel docks at. It was briefly hidden below 1440 because it had been
-              pushing the breadcrumb off; the trail carries `min-w-0` now, so the row's
-              give comes out of the crumbs and the name stays where the mock puts it. */}
-          <span className="hidden whitespace-nowrap text-[13.5px] font-medium text-ink xl:inline">Administrator</span>
-        </p>
+        {/* The placeholder chip ("SA", "Administrator") that stood here while authentication was deferred (R-SEC-C)
+            is the real account now: the session's name and position, and the way out. */}
+        <Suspense fallback={null}>
+          <HeaderAccount />
+        </Suspense>
       </div>
     </header>
   );

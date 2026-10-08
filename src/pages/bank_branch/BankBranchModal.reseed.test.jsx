@@ -16,8 +16,8 @@ import { setupUser } from '../../test/user'
  * bank underneath the dialog is replaced. So the behaviour being moved had no witness, and "the tests pass" would
  * have meant nothing about it.
  *
- * This is that witness. The branch uses STRING addresses on purpose: an object address trips A29's crash in the
- * edit form, which is a separate pinned defect and not what this file measures.
+ * This is that witness. The branch carries a STRING address and `branch` (the DTO's spelling): what this file
+ * measures is the reseed, and `BankBranchModal.a29.test.jsx` holds the API's own shape.
  */
 
 const SANDTON = {

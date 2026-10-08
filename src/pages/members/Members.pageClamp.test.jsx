@@ -2,73 +2,45 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import { Outlet, Route, Routes } from 'react-router-dom'
-import { http, HttpResponse } from 'msw'
 
 import MembersPage from './Members'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
-import { setupUser } from '../../test/user'
-
-/*
- * 📉 THIS FILE PAGES THE REGISTER AT TEN ROWS, NOT A HUNDRED -- the cost is the reason, and nothing it pins needs more.
- *
- * Reaching page 3 at the real size takes 250 members, and every step then renders a hundred rows through `Table`
- * while a MutationObserver records each node: 1.96 to 8.26s a test, measured alone on a lightly loaded box (2026-09-21),, and red in the automation arc's p17 and p19
- * at the suite's 20s `testTimeout` once the box was busy. What this file pins -- the page derived during render, so
- * no frame shows "No member matches" on the way to real rows; the must-pass that the watch can see that title; the
- * clamp kept after the search clears -- is about deriving `page` from the filtered list, and holds at any page size.
- * At ten rows, page 3 takes 25 members, and a test costs 0.48 to 2.72s on the same box -- the worst of them a seventh of the budget, not two fifths.
- *
- * The size is the page's own: `Members.jsx` reads `memberService.getPageSize()` once, at module load, so the mock
- * replaces that one getter and nothing else -- the members still come over the network, through MSW. `vi.hoisted`
- * because `vi.mock` is hoisted above this file's imports and constants, and its factory would otherwise read one
- * uninitialised.
- */
-const { PAGE_SIZE } = vi.hoisted(() => ({ PAGE_SIZE: 10 }))
-vi.mock('@/services/memberService.js', async (importOriginal) => {
-  const actual = await importOriginal()
-  return { ...actual, memberService: { ...actual.memberService, getPageSize: () => PAGE_SIZE } }
-})
+import { registerHandlers } from '../../test/msw/memberRegister'
 
 /**
  * 🔴 SEARCH FROM PAGE 3 AND THE REGISTER SAID "NO MEMBER MATCHES" -- FOR MEMBERS IT WAS ABOUT TO SHOW. `10.4`.
  *
- * The register pages at 100 rows (this file mocks it to 10 -- see above). When the list shrinks, `page` has to come down with it, and it did -- through an
- * effect (`setPage(p => Math.min(p, totalPages))`), which `react-hooks/set-state-in-effect` makes an error this
- * phase. The warning looked like a style complaint. It was describing a real frame:
+ * When the register filtered every member in the browser, its page was clamped by an effect: search from page 3 for a
+ * surname five members share, and React committed one frame with the page still 3 and one page in total -- an EMPTY
+ * slice -- drawing **No member matches "..."** over members it was about to show. `10.4` derived the page during
+ * render, and this file watched that transition.
  *
- *   1. the user is on page 3 and types a surname into the topbar search that 5 members share;
- *   2. React renders with `page` still 3 and `totalPages` now 1, so the slice is rows 200-5 -- EMPTY;
- *   3. that render COMMITS, and the table draws its empty state: **No member matches "needle"**;
- *   4. only then does the effect run, clamp `page` to 1, and the five rows appear.
+ * 🔁 SINCE A10 THE PAGE IS THE SERVER'S ANSWER, and the claims stand as they were, re-aimed:
+ *   - a new search asks for the FIRST page of its answer (`useRegisterSearch`), and while it is asked the register is
+ *     LOADING -- the answer for the old question is no longer current -- so no frame says nobody matches;
+ *   - the must-pass: a search that matches nobody does say so, so the watch can see the title it watches for;
+ *   - clear the search afterwards and the register is on its first page, not thrown back to page 3.
  *
- * One frame, and it is a false statement about the union's own register -- the exact thing this arc exists to stop.
- * Criteria changes never showed it, because they call `setPage(1)` themselves. The TOPBAR search does not, and
- * that is the only path that needs the clamp at all.
- *
- * ⚠️ WHY NOTHING EVER CAUGHT IT: `Members.jsx` reads the topbar search through the OUTLET CONTEXT, and its own comment
- * says it plainly -- *"Mounted without the shell -- every test does -- there is no context and no query."* So the one
- * path that needs the clamp had never been driven by a single test. This file mounts the page under a minimal shell
- * that supplies the search, which is the whole of what it takes.
- *
- * 🔑 THE FIX IS TO DERIVE, NOT TO SYNC: `page` becomes `Math.min(requestedPage, totalPages)`, computed during render,
- * so there is no frame in which it can be out of range. A `findBy` assertion could not tell the two apart -- it
- * waits, and the rows do arrive in both -- so the empty title is watched with a MutationObserver for the whole
- * transition. Written against the code BEFORE the fix, so that it goes red for the real reason first.
+ * The page is mounted under the smallest shell that supplies the topbar's search through the outlet, as the real one
+ * does -- the one path that drives the search. Pages of 25 (the smallest the screen offers), in membership-number order,
+ * so page 3 is members 51 to 55; five members share a surname nobody else has. The register OPENS on page 3 -- the page
+ * is the address bar's since A10, so a link or a refresh lands there -- rather than paging to it: two pages of 25 rows
+ * drawn for nothing cost seconds on a loaded box, and a test's verdict must not depend on load.
  */
-
+const SIZE = 25
 const NEEDLES = 5
 
-// 25 members at ten a page, so page 3 exists; five of them share a surname nobody else has.
-const MEMBERS = Array.from({ length: 2 * PAGE_SIZE + NEEDLES }, (_, i) => ({
+const MEMBERS = Array.from({ length: 2 * SIZE + NEEDLES }, (_, i) => ({
   id: i + 1,
   membershipNumber: `M${String(i + 1).padStart(5, '0')}`,
   firstNames: 'Synthetic',
   surname: i < NEEDLES ? 'Needleworth' : `Haystack${i}`,
-  identityNumber: '9001010000080',
   status: 'Active',
 }))
+
+const number = (n) => `M${String(n).padStart(5, '0')}`
 
 /** The smallest shell that gives the page what the real one does: the topbar's search, through the outlet. */
 function Shell({ search }) {
@@ -87,12 +59,10 @@ const page = (search) => (
  * Records whether `pattern` was EVER written into the document while the observer ran -- including for a frame
  * that was removed again before anybody looked.
  *
- * 🔴 THE FIRST VERSION OF THIS READ `document.body.textContent` IN THE CALLBACK, AND IT COULD NOT SEE THE FRAME
- * IT EXISTS TO CATCH. A MutationObserver callback is a microtask; inside `act()` React flushes the clamping effect
- * synchronously, so by the time the callback ran the empty title had been written AND removed, and the current
- * text was clean. It reported "never seen" against the unfixed code -- and its must-pass passed too, because that
- * one only proved it could see a title that STAYS. So it reads the MUTATION RECORDS instead: every node added is
- * delivered in `addedNodes` even if it is gone by delivery time, which is the one thing a transient frame leaves.
+ * 🔴 IT READS THE MUTATION RECORDS, NOT THE CURRENT TEXT. A MutationObserver callback is a microtask; inside `act()`
+ * React can write a title and remove it before the callback runs, so the current text is clean while the frame
+ * happened. Every node added is delivered in `addedNodes` even if it is gone by delivery time, which is the one
+ * thing a transient frame leaves.
  */
 function watchFor(pattern) {
   let seen = false
@@ -122,19 +92,16 @@ describe('the register, searched from a later page', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     server.use(...pageFixtures)
-    server.use(http.get('*/api/members', () => HttpResponse.json(MEMBERS)))
+    server.use(...registerHandlers(MEMBERS))
   })
 
   afterEach(() => watcher?.stop())
 
   async function onPageThree() {
-    const user = setupUser()
-    const view = renderWithProviders(page(''))
-    await screen.findByText('M00001')
-    await user.click(screen.getByRole('button', { name: /Next/ }))
-    await user.click(screen.getByRole('button', { name: /Next/ }))
+    const view = renderWithProviders(page(''), { initialEntries: [`/?size=${SIZE}&sort=membershipNumber&page=3`] })
     // Page 3 is the last five rows.
-    expect(await screen.findByText(`M${String(2 * PAGE_SIZE + 1).padStart(5, '0')}`)).toBeInTheDocument()
+    expect(await screen.findByText(number(2 * SIZE + 1))).toBeInTheDocument()
+    expect(screen.queryByText(number(1))).not.toBeInTheDocument()
     return view
   }
 
@@ -145,21 +112,20 @@ describe('the register, searched from a later page', () => {
     rerender(page('needleworth'))
 
     // Every one of the five arrives...
-    expect(await screen.findByText('M00001')).toBeInTheDocument()
-    expect(screen.getByText('M00005')).toBeInTheDocument()
+    expect(await screen.findByText(number(1))).toBeInTheDocument()
+    expect(screen.getByText(number(NEEDLES))).toBeInTheDocument()
 
     // ...and at NO point on the way did the page say none of them existed.
     expect(
       watcher.stop(),
-      'The register drew "No member matches" for a search that matches five members -- the frame where ' +
-        '`page` was still 3 and the list had one page. Derive the page; do not clamp it in an effect.',
+      'The register drew "No member matches" for a search that matches five members -- a frame showing the old ' +
+        'page\'s answer as the new question\'s. A question the server has not answered is LOADING.',
     ).toBe(false)
   })
 
   it('the must-pass: a search that genuinely matches nothing DOES say so, so the watch above can see it', async () => {
-    // 🔑 WITHOUT THIS THE TEST ABOVE COULD PASS VACUOUSLY -- an observer that was never able to
-    // see the empty title (wrong text, wrong node, never attached) reports "not seen" whether or
-    // not the frame happened. Here the title is the right answer, and the watch must catch it.
+    // 🔑 WITHOUT THIS THE TEST ABOVE COULD PASS VACUOUSLY -- an observer that was never able to see the empty title
+    // (wrong text, wrong node, never attached) reports "not seen" whether or not the frame happened.
     const { rerender } = await onPageThree()
 
     watcher = watchFor(/No member matches/)
@@ -169,21 +135,16 @@ describe('the register, searched from a later page', () => {
     expect(watcher.stop()).toBe(true)
   })
 
-  it('the clamp is kept: clear the search afterwards and you are on page 1, not thrown back to page 3', async () => {
-    /*
-     * 🔑 THIS GUARDS THE FIX, NOT THE DEFECT -- and it was written after catching the obvious fix
-     * breaking it. The old effect clamped PERMANENTLY. The natural replacement, `Math.min(asked,
-     * total)` alone, clamps only what is SHOWN and leaves what was asked for at 3 -- so the moment
-     * the search is cleared and the list is long again, the register jumps to a page the user
-     * never chose. Green against the old code; red against the naive derivation.
-     */
+  it('clear the search afterwards and you are on page 1, not thrown back to page 3', async () => {
+    // A new search asks for the first page of its answer, and so does clearing it: page 3 of the whole register is a
+    // page nobody chose for it.
     const { rerender } = await onPageThree()
 
     rerender(page('needleworth'))
-    expect(await screen.findByText('M00005')).toBeInTheDocument()
+    expect(await screen.findByText(number(NEEDLES))).toBeInTheDocument()
 
     rerender(page(''))
-    expect(await screen.findByText('M00001')).toBeInTheDocument()
-    expect(screen.queryByText(`M${String(2 * PAGE_SIZE + 1).padStart(5, '0')}`)).not.toBeInTheDocument()
+    expect(await screen.findByText(number(1))).toBeInTheDocument()
+    expect(screen.queryByText(number(2 * SIZE + 1))).not.toBeInTheDocument()
   })
 })

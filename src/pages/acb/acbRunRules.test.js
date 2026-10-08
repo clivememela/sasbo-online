@@ -223,9 +223,9 @@ describe('the debit day (Q42)', () => {
     expect([1, 2, 3, 11, 12, 13, 111].map(ordinal)).toEqual(['1st', '2nd', '3rd', '11th', '12th', '13th', '111th'])
   })
 
-  it('A67: a day the server kept other than the one chosen is said', () => {
-    expect(debitDayReplaced('28', 25)).toBe('The debit day was saved as the 25th, not the 28th chosen: '
-      + 'this system still sets the bank’s day over the member’s own. It is a known fault.')
+  it('a day the server kept other than the one chosen is said (the net A67 left behind)', () => {
+    expect(debitDayReplaced('28', 25)).toBe('The debit day was saved as the 25th, not the 28th chosen. '
+      + 'Check the member’s banking details before the next debit order run.')
   })
 
   it('the must-pass twins: the day kept as chosen, or no day chosen, says nothing', () => {

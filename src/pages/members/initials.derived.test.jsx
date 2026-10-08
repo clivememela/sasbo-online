@@ -1,13 +1,13 @@
 // @vitest-environment jsdom -- types into Capture Member and Edit Member
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen, within } from '@testing-library/react'
-import { http, HttpResponse } from 'msw'
 
 import CaptureMember from './CaptureMember'
 import MembersPage from './Members'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { pageFixtures } from '../../test/msw/pageFixtures'
+import { registerHandlers } from '../../test/msw/memberRegister'
 import { setupUser } from '../../test/user'
 
 /**
@@ -69,7 +69,7 @@ describe('Edit Member', () => {
   }
 
   beforeEach(() => {
-    server.use(http.get('*/api/members', () => HttpResponse.json([ALPHA, BRAVO])))
+    server.use(...registerHandlers([ALPHA, BRAVO]))
   })
 
   it('derives Initials from First Name(s) while nobody has typed them', async () => {
