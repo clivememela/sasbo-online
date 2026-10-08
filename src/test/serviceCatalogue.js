@@ -120,6 +120,9 @@ const ARGS = {
   'monthEndSendService.sendFileBySftp': [8],
   'monthEndSendService.getDeliveries': ['2026-09', 0, 50],
   'memberHistoryService.getMemberHistory': ['7', 0, 50],
+  'referenceService.addNoDeductionReason': [{ name: 'Synthetic leave', suspensionCode: 11 }],
+  'referenceService.changeNoDeductionReason': ['7', { name: 'Synthetic leave', suspensionCode: 11, version: 0 }],
+  'referenceService.setCoreTier': ['901', 'B'],
   'workplaceVisitService.getVisits': ['7', 0, 20],
   'workplaceVisitService.recordVisit': ['7', { visitedOn: '2026-09-10', complementFound: 40 }],
 }

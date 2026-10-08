@@ -17,6 +17,20 @@ import {
   LucideConstruction, LucideCopyCheck, UserRoundPen
 } from "lucide-react";
 
+/**
+ * Month end's two lists that Maintenance keeps: the reasons for no payroll deduction (Stephne, MEN-17) and the core tiers
+ * (MEN-31). Written once, for the rail here and for `Maintenance.jsx`'s cards, and `Maintenance.test.jsx` holds the two
+ * together. Each names the `permission` its changes need, the key the menu rule (OB18) marks an entry by; the lists are
+ * read by anyone, and each screen says what is needed to change it.
+ *
+ * 🔑 NO ICONS, NO DESCRIPTIONS AND NO IMPORT OF `permissions.js`: this file is in the first load (OB17a). The titles are
+ * short because the rail's third level truncates; each screen's heading says it in full.
+ */
+export const REFERENCE_ENTRIES = [
+  { title: 'No-deduction reasons', href: '/admin/maintenance/no-deduction-reasons', permission: 'REFERENCE_MAINTAIN' },
+  { title: 'Core tiers', href: '/admin/maintenance/core-tiers', permission: 'REFERENCE_MAINTAIN' },
+];
+
 export const navItems = [
   {
     title: "Home",
@@ -173,6 +187,7 @@ export const navItems = [
             href: '/admin/maintenance/workplaces',
             desc: 'Find a workplace by its name or R/A number',
           },
+          ...REFERENCE_ENTRIES,
         ],
       },
       // { title: "BankBranch", icon: Landmark, color: 'text-red-600 dark:text-red-400'},

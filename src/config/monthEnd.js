@@ -54,6 +54,27 @@ export const NO_DEDUCTION_REASON_REQUIRED = 'NO_DEDUCTION_REASON_REQUIRED';
 export const NO_DEDUCTION_REASON_UNKNOWN = 'NO_DEDUCTION_REASON_UNKNOWN';
 export const STATUS_REASON_MISMATCH = 'STATUS_REASON_MISMATCH';
 
+/**
+ * Maintaining the reasons for no payroll deduction (R1), each said where it happened: a name, code or order the server
+ * would not take is said at that field (`details.field`; `count` is the list's ceiling, said above the form), a name
+ * another reason has at the name, a reason gone above the list, and a reason somebody else changed since the screen read
+ * it in the form, with theirs put in its place -- nothing was written.
+ */
+export const NO_DEDUCTION_REASON_INVALID = 'NO_DEDUCTION_REASON_INVALID';
+export const NO_DEDUCTION_REASON_TAKEN = 'NO_DEDUCTION_REASON_TAKEN';
+export const NO_DEDUCTION_REASON_NOT_FOUND = 'NO_DEDUCTION_REASON_NOT_FOUND';
+export const NO_DEDUCTION_REASON_CHANGED_SINCE = 'NO_DEDUCTION_REASON_CHANGED_SINCE';
+
+/** Setting a table code's tier (R7): a table code not on record here, and a tier that is none of Core A, B and C. */
+export const TABLE_CODE_UNKNOWN = 'TABLE_CODE_UNKNOWN';
+export const CORE_TIER_UNKNOWN = 'CORE_TIER_UNKNOWN';
+
+/**
+ * A capture of somebody already on record (R3; Stephne, MEN-19): `details.membershipNumber` names the record to open
+ * instead -- absent where two captures of the same person collided, when only `details.matched` is said.
+ */
+export const MEMBER_ALREADY_CAPTURED = 'MEMBER_ALREADY_CAPTURED';
+
 /** The refusal codes the screens branch on (ME-13) -- each one the server publishes. */
 export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   REQUEST_MALFORMED: 'REQUEST_MALFORMED',
@@ -68,6 +89,13 @@ export const MONTH_END_REFUSAL = /* @__PURE__ */ Object.freeze({
   NO_DEDUCTION_REASON_REQUIRED,
   NO_DEDUCTION_REASON_UNKNOWN,
   STATUS_REASON_MISMATCH,
+  NO_DEDUCTION_REASON_INVALID,
+  NO_DEDUCTION_REASON_TAKEN,
+  NO_DEDUCTION_REASON_NOT_FOUND,
+  NO_DEDUCTION_REASON_CHANGED_SINCE,
+  TABLE_CODE_UNKNOWN,
+  CORE_TIER_UNKNOWN,
+  MEMBER_ALREADY_CAPTURED,
 });
 
 /**

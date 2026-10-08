@@ -12,6 +12,7 @@ import { menuPaths } from '../home/homeModules'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { smokeHandlers } from '../../test/msw/smokeLayer'
+import { PERMISSIONS } from '../../auth/permissions'
 
 /**
  * 🗣️ SASBO, 18 Sep 2026: "in maintenance there was an option where we could edit the member" -- gone since the menus
@@ -57,6 +58,20 @@ describe('the Maintenance menu', () => {
     // Written twice -- a card here, a leaf in the rail -- so both halves are asserted by name, not only by count.
     expect(screen.getByRole('link', { name: /^Workplaces/ })).toHaveAttribute('href', '/admin/maintenance/workplaces')
     expect(sidebarMaintenance().find((entry) => entry.title === 'Workplaces')?.href).toBe('/admin/maintenance/workplaces')
+  })
+
+  it('offers month end\'s two lists -- the reasons for no payroll deduction and the core tiers -- each naming the permission its changes need', () => {
+    const LISTS = [
+      ['No-deduction reasons', '/admin/maintenance/no-deduction-reasons'],
+      ['Core tiers', '/admin/maintenance/core-tiers'],
+    ]
+    renderWithProviders(<Maintenance />)
+    for (const [title, href] of LISTS) {
+      expect(screen.getByRole('link', { name: new RegExp(`^${title}`) })).toHaveAttribute('href', href)
+      // The rail's entry is the same object, carrying the key the menu rule (OB18) marks it by.
+      expect(sidebarMaintenance().find((entry) => entry.title === title))
+        .toMatchObject({ href, permission: PERMISSIONS.REFERENCE_MAINTAIN })
+    }
   })
 
   it('🗣️ Subscriptions is reached through Maintenance alone -- off the rail\'s top level, and so off Home (the 5 Oct Show & Tell)', () => {

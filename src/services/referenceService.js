@@ -1,5 +1,5 @@
 import { apiUrl } from './api';
-import { requestJson } from './parseApiError';
+import { requestJson, requestJsonWrite } from './parseApiError';
 
 /**
  * SASBO's lists -- month end 01.1. One typed route a list (MD41): no name of a list travels in an address, so each
@@ -61,6 +61,51 @@ export const getSuspensionCodes = () =>
 export const getNoDeductionReasons = () =>
   requestJson((signal) => fetch(apiUrl('/api/reference/no-deduction-reasons'), { credentials: 'include', signal }));
 
+/**
+ * A JSON body sent with `method` to `url`, at the write ceiling: the two lists' writes below. Each caller writes its
+ * path in its own `apiUrl(...)`, where the API contract scan reads it.
+ */
+const sendJson = (method, url, body) =>
+  requestJsonWrite((signal) => fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(body),
+    signal,
+  }));
+
+/**
+ * A reason for no payroll deduction added (R1, held by REFERENCE_MAINTAIN): `{ name, suspensionCode, ordinal?, active? }`
+ * answers `201` with the row as the list reads it -- last on the list unless an order is given, offered unless said
+ * otherwise, never provisional. A refusal rejects with the server's code and sentence: `NO_DEDUCTION_REASON_INVALID`
+ * (`details.field`: `name`, `suspensionCode`, `ordinal` or `count`) and `NO_DEDUCTION_REASON_TAKEN` (`details.id`).
+ */
+export const addNoDeductionReason = (reason) =>
+  sendJson('POST', apiUrl('/api/reference/no-deduction-reasons'), reason);
+
+/**
+ * A reason changed: `{ name, suspensionCode, ordinal, active, version }`, with the version the screen read. A change
+ * made on a view somebody else has changed since is refused `NO_DEDUCTION_REASON_CHANGED_SINCE` (409), and nothing is
+ * written. There is no delete: a reason a change has named is kept, and stops being offered (`active: false`).
+ */
+export const changeNoDeductionReason = (id, reason) =>
+  sendJson('PUT', apiUrl(`/api/reference/no-deduction-reasons/${encodeURIComponent(id)}`), reason);
+
+/**
+ * Core A, B and C (R7; Stephne, MEN-31): `{ tiers: [{ code, name, ordinal, provisional, tableCodes }], allOther }` --
+ * each tier's table codes by number, and the words for every table code in none of them.
+ */
+export const getCoreTiers = () =>
+  requestJson((signal) => fetch(apiUrl('/api/reference/core-tiers'), { credentials: 'include', signal }));
+
+/**
+ * A table code set in a tier (R7, held by REFERENCE_MAINTAIN): `'A'`, `'B'` or `'C'`, or `null` for all other
+ * institutions. Answers `{ code, name, coreTier, setBy, setAt }`; `TABLE_CODE_UNKNOWN` (404) for a table code not on
+ * record, `CORE_TIER_UNKNOWN` (400) for a tier that is none of the three.
+ */
+export const setCoreTier = (code, tier) =>
+  sendJson('PUT', apiUrl(`/api/reference/table-codes/${encodeURIComponent(code)}/core-tier`), { tier: tier || null });
+
 /** How many rows each list holds here, and why none where none is (ME-18, ME-19) -- the workplaces' among them. */
 export const getStatus = () =>
   requestJson((signal) => fetch(apiUrl('/api/reference/status'), { credentials: 'include', signal }));
@@ -76,5 +121,9 @@ export const referenceService = {
   getDeletionCodes,
   getSuspensionCodes,
   getNoDeductionReasons,
+  addNoDeductionReason,
+  changeNoDeductionReason,
+  getCoreTiers,
+  setCoreTier,
   getStatus,
 };

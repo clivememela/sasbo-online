@@ -64,6 +64,9 @@ const RecruitmentChannel = lazy(() => import('./pages/maintainance/RecruitmentCh
 const Subscriptions = lazy(() => import('./pages/maintainance/Subscriptions.jsx'));
 // Month end `01.5`: SASBO's workplaces -- a leaf of Maintenance, beside the other tables it maintains.
 const Workplaces = lazy(() => import('./pages/maintainance/Workplaces.jsx'));
+// Month end's rules (October): the two lists Maintenance keeps -- the reasons for no payroll deduction, the core tiers.
+const NoDeductionReasons = lazy(() => import('./pages/maintainance/NoDeductionReasons.jsx'));
+const CoreTiers = lazy(() => import('./pages/maintainance/CoreTiers.jsx'));
 
 // NAMED exports, so the dynamic import has to be adapted to lazy()'s default-export
 // contract. Written out rather than hidden in a helper: the shape of the mistake --
@@ -118,6 +121,8 @@ function App() {
         <Route path="admin/maintenance" element={<Maintenance/>} />
         <Route path="admin/maintenance/recruitment-channel" element={<RecruitmentChannel />} />
         <Route path="admin/maintenance/workplaces" element={<Workplaces />} />
+        <Route path="admin/maintenance/no-deduction-reasons" element={<NoDeductionReasons />} />
+        <Route path="admin/maintenance/core-tiers" element={<CoreTiers />} />
       </Route>
     </Routes>
   )
