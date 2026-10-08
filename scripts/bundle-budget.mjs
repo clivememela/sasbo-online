@@ -422,8 +422,8 @@ const CEILINGS = {
   // at be7b1ab, every paragraph above merged; the ceiling is that figure. The entry chunk measured 336.29, +5.82 over
   // main's 330.47: the streams' own figures sum to +5.36 (sign-in's shell +4.98, OB17a); the other +0.46 is, by
   // elimination, the merged preload map naming every stream's lazy chunks.
-  // INTEGRATION: the base plus every stream's rise above, until the integration run measures it (OB17) -- here A29's
-  // keyed footer buttons, +10 B in BankBranch (bugs 030e408).
+  // INTEGRATION, MEASURED (OB17): 882.07 KiB on clivememela/sasbo-online run 37782197874 at dff342f, with A29's keyed
+  // footer buttons (bugs 030e408, +10 B in BankBranch); the ceiling is that figure.
   js: 882.08 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
