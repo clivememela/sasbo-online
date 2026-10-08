@@ -140,10 +140,14 @@ export default function BankBranchModal({ onClose, onCreated, onUpdated, selecte
               is the exact silent degrade `pick()` now refuses, and this call site is what it
               found. Naming the variant it was ALREADY rendering: no pixel changes. */}
           <Button type="button" onClick={isReadOnlyView ? onClose : handleCancel} variant="default" disabled={loading}>{isReadOnlyView ? "Close" : "Cancel"}</Button>
+          {/* 🔴 A29: TWO BUTTONS, NEVER ONE THAT CHANGES ITS TYPE -- hence the keys. Unkeyed, React kept the pressed
+              Edit `<button>` and made it Save Changes; a browser applies that update before the click's default
+              action, so pressing Edit submitted the form it had just opened, unchanged, and the answer shut the form
+              again (the merged gate's run 37680224612). */}
           {isReadOnlyView ? (
-            <Button type="button" variant="primary" onClick={() => setIsEditing(true)}>Edit</Button>
+            <Button key="edit" type="button" variant="primary" onClick={() => setIsEditing(true)}>Edit</Button>
           ) : (
-            <Button type="submit" form="add-bank-form" variant="primary" loading={loading}>
+            <Button key="save" type="submit" form="add-bank-form" variant="primary" loading={loading}>
               {isEditMode ? "Save Changes" : "Save"}
             </Button>
           )}

@@ -422,7 +422,9 @@ const CEILINGS = {
   // at be7b1ab, every paragraph above merged; the ceiling is that figure. The entry chunk measured 336.29, +5.82 over
   // main's 330.47: the streams' own figures sum to +5.36 (sign-in's shell +4.98, OB17a); the other +0.46 is, by
   // elimination, the merged preload map naming every stream's lazy chunks.
-  js: 882.07 * KB,
+  // INTEGRATION: the base plus every stream's rise above, until the integration run measures it (OB17) -- here A29's
+  // keyed footer buttons, +10 B in BankBranch (bugs 030e408).
+  js: 882.08 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
@@ -489,7 +491,14 @@ const CEILINGS = {
   // stylesheet's +0.19 above, and nothing else.
   // INTEGRATION, MEASURED (OB17): the batch's all assets is 1027.46 KiB on clivememela/sasbo-online run 37676718704
   // at be7b1ab, every paragraph above merged; the ceiling is that figure.
-  total: 1027.47 * KB,
+  //
+  // 940.29 -> 940.30 on 2026-10-08, MEASURED (OB17): 940.29 KiB printed on run 37779077999 at e6499ba, over by bytes; the
+  // hundredth over the printed figure covers its rounding. One chunk moved against run 37672009580 at 56c4a67:
+  // BankBranch 13.91 -> 13.92 kB, A29's footer buttons keyed apart so that pressing Edit no longer saves the form it
+  // opens. The javascript row stays within its 796.18; the stylesheet unmoved at 80.63. Nothing from src/test/ is
+  // imported by the product.
+  // INTEGRATION: the base plus every stream's rise above, until the integration run measures it (OB17).
+  total: 1027.48 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to
