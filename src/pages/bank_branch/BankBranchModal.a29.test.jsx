@@ -1,9 +1,11 @@
 // @vitest-environment jsdom -- renders the branch dialog inside the route's error boundary
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen, within } from '@testing-library/react'
+import { flushSync } from 'react-dom'
 import { http, HttpResponse } from 'msw'
 
 import BankBranchModal from './BankBranchModal'
+import { bankService } from '../../services/bankService.js'
 import ErrorBoundary from '../../components/common/ErrorBoundary'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
@@ -82,6 +84,45 @@ describe('editing a branch whose record arrives in the API\'s shape (A29)', () =
     expect(within(dialog).getByLabelText(/^Table Code/)).toHaveValue(12)
     expect(screen.queryByText('This page could not be displayed.')).toBeNull()
     expect(errors).toEqual([])
+  })
+
+  /*
+   * 🔴 EDIT SAVED THE BRANCH AS IT WAS, AND SHUT THE FORM AGAIN -- found by the merged gate's journey (run 37680224612:
+   * two PUTs of the old manager, the first sent by Edit, neither by Save). Edit (`type="button"`) and Save Changes
+   * (`type="submit"`, the form's by `form=`) stood in one place in the footer, so React kept ONE `<button>` and changed
+   * its type. A browser settles React's update between a click's listeners and the button's own default action (a
+   * microtask checkpoint after each listener), so by then the button pressed as Edit was the submit button of a form
+   * now on screen: Edit sent the record unchanged, and the answer put the dialog back to Bank Details, dropping what
+   * had been typed meanwhile. jsdom runs the listeners and the default action in one go, so the test settles React
+   * where the browser does -- in a listener after React's own.
+   */
+  it('🔴 Edit opens the form and saves nothing; the manager then typed is the one saved and shown', async () => {
+    const sent = []
+    server.use(http.put('*/api/banks/branches/1', async ({ request }) => {
+      sent.push(await request.json())
+      return HttpResponse.json({ ...BRANCH, managerName: sent.at(-1).managerName })
+    }))
+    const update = vi.spyOn(bankService, 'updateBank')
+    const settleAsABrowserDoes = () => flushSync(() => {})
+    document.addEventListener('click', settleAsABrowserDoes)
+    try {
+      const user = setupUser()
+      renderBranch()
+      await user.click(await screen.findByRole('button', { name: 'Edit' }))
+
+      expect(update, 'a save sent by pressing Edit').not.toHaveBeenCalled()
+      const dialog = await screen.findByRole('dialog', { name: 'Edit Bank/Branch Details' })
+      expect(within(dialog).getByRole('button', { name: 'Save Changes' })).toBeEnabled()
+
+      await user.type(within(dialog).getByLabelText(/^Manager Name/), 'Synthetic Manager')
+      await user.click(within(dialog).getByRole('button', { name: 'Save Changes' }))
+
+      const details = await screen.findByRole('dialog', { name: 'Bank Details' })
+      expect(within(details).getByText('Synthetic Manager')).toBeInTheDocument()
+      expect(sent.map((body) => body.managerName)).toEqual(['Synthetic Manager'])
+    } finally {
+      document.removeEventListener('click', settleAsABrowserDoes)
+    }
   })
 
   it('Save Changes sends the shape the server reads: the branch by name, numbers as numbers, the address left out when unchanged', async () => {
