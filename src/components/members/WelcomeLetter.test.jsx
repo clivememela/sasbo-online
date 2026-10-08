@@ -9,6 +9,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { server } from '../../test/msw/server'
 import { setupUser } from '../../test/user'
 import { deferred } from '../../test/deferred'
+import { monthEndExamples, monthEndRefusal } from '../../test/msw/monthEndExamples'
 
 /**
  * THE WELCOME LETTER, AFTER A MEMBER IS CAPTURED. Three register rows, each written red first:
@@ -277,6 +278,52 @@ describe('the welcome letter dialog', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent(/already on record/i)
       expect(screen.queryByText('Member Saved')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: /send welcome letter/i })).toBeEnabled()
+    })
+  })
+
+  describe('R3 (Stephne, MEN-19) — a person already on record is opened, not captured again', () => {
+    const DUPLICATE = monthEndExamples.refusals.MEMBER_ALREADY_CAPTURED
+    const newcomer = { title: 'Ms', firstNames: 'Invented', surname: 'Again', personalEmail: 'again@example.test',
+      preferredEmail: 'personal', status: 'Active' }
+
+    it('🔑 MEMBER_ALREADY_CAPTURED: the server\'s sentence, and a way to open that record -- the register, searched for its number', async () => {
+      server.use(monthEndRefusal('MEMBER_ALREADY_CAPTURED', 'POST /api/members'))
+      const user = setupUser()
+      renderWithProviders(<WelcomeLetter open onClose={() => {}} member={newcomer} />)
+
+      await user.click(screen.getByRole('button', { name: /send welcome letter/i }))
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent(DUPLICATE.body.message)
+      expect(within(alert).getByRole('link', { name: 'Open that record: M-900001' }))
+        .toHaveAttribute('href', '/members?q=M-900001')
+      expect(screen.getByRole('button', { name: /send welcome letter/i })).toBeEnabled()
+    })
+
+    it('two captures of one person colliding name no record (only `matched`), so none is offered', async () => {
+      server.use(http.post('*/api/members', () => HttpResponse.json({
+        ...DUPLICATE.body,
+        message: 'This person was captured by someone else a moment ago. Search for them before capturing again. Nothing was saved.',
+        details: { matched: DUPLICATE.body.details.matched },
+      }, { status: 409 })))
+      const user = setupUser()
+      renderWithProviders(<WelcomeLetter open onClose={() => {}} member={newcomer} />)
+
+      await user.click(screen.getByRole('button', { name: /send welcome letter/i }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/^This person was captured by someone else a moment ago\./)
+      expect(screen.queryByRole('link', { name: /Open that record/ })).not.toBeInTheDocument()
+    })
+
+    it('must-pass: another refusal offers no record to open', async () => {
+      server.use(http.post('*/api/members', () => HttpResponse.json({ message: 'Identity number already on record' }, { status: 409 })))
+      const user = setupUser()
+      renderWithProviders(<WelcomeLetter open onClose={() => {}} member={newcomer} />)
+
+      await user.click(screen.getByRole('button', { name: /send welcome letter/i }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/already on record/i)
+      expect(screen.queryByRole('link', { name: /Open that record/ })).not.toBeInTheDocument()
     })
   })
 
