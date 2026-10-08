@@ -105,6 +105,12 @@ const ARGS = {
   'memberHistoryService.getMemberHistory': ['7', 0, 50],
   'workplaceVisitService.getVisits': ['7', 0, 20],
   'workplaceVisitService.recordVisit': ['7', { visitedOn: '2026-09-10', complementFound: 40 }],
+  'subscriptionsService.create': [{ bankName: 'Synthetic Bank Limited', acbDebitDay: 25, subscriptionAmount: 174 }],
+  'recruitmentChannelService.summary': [],
+  'recruitmentChannelService.members': ['7', { page: 0, size: 20, name: 'Synthetic' }],
+  'recruitmentChannelService.candidates': [{ q: 'Synthetic', excludeChannel: 7 }],
+  'recruitmentChannelService.addMember': ['7', '41'],
+  'recruitmentChannelService.removeMember': ['7', '41'],
 }
 
 export const argsFor = (qualifiedName) => ARGS[qualifiedName] ?? DEFAULT_ARGS

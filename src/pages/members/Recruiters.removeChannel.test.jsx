@@ -1,4 +1,4 @@
-// @vitest-environment jsdom -- Recruiters: Remove recruiter removes the channel it listed (A49, MO21)
+// @vitest-environment jsdom -- Recruiters: removing removes the recruitment channel it listed, and says so (A49, MO21)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
@@ -10,32 +10,25 @@ import { pageFixtures } from '../../test/msw/pageFixtures'
 import { setupUser } from '../../test/user'
 
 /**
- * REGISTER A49, CORRECTED ON THE OWNER'S DECISION OF 2026-10-01 (MO21).
+ * REGISTER A49, CORRECTED ON THE OWNER'S DECISION OF 2026-10-01 (MO21) -- AND NAMED FOR WHAT IT DOES (6 Oct).
  *
- * The screen lists recruitment channels and calls each a recruiter. *Remove recruiter* used to PUT every member it
- * matched -- by a REPRESENTATIVE's id compared with the CHANNEL's -- as `Inactive`, a status no list knows, and then
- * DELETE the representative that happened to share the channel's number. Now it removes the channel it listed, by one
- * request the server does whole, and the members recruited through it keep their status; only their channel is
- * cleared. Nothing about it was tested, which is how it lasted.
+ * The removal used to PUT every member it matched -- by a REPRESENTATIVE's id compared with the CHANNEL's -- as
+ * `Inactive`, a status no list knows, and then DELETE the representative that happened to share the channel's number.
+ * Since MO21 it removes the channel it listed, by one request the server does whole, and the members recruited through
+ * it keep their status; only their channel is cleared.
+ *
+ * 🔴 THE MANUAL'S READING OF EVERY SCREEN (6 Oct): the action was labelled *Remove recruiter* -- a person -- while it
+ * deletes a whole recruitment channel, which Capture Member then no longer offers. What removal does is MO21's; the
+ * label, the question and its answer now name the channel and every consequence. The count is the server's (RC15).
  */
 
-const CHANNEL = { id: 5, name: 'Synthetic Channel', enabled: true }
-const member = (id, status, recruitedHow, recruitmentRepresentativeId = null) => ({
-  id, membershipNumber: `M-90000${id}`, initials: 'S', surname: `Synthetic ${id}`, status, recruitedHow,
-  recruitmentRepresentativeId,
-})
+const CHANNEL = { channelId: 5, name: 'Synthetic Channel', enabled: true, members: 2, banks: [], branches: [] }
 
 /** The writes the screen makes, in order, as `VERB what id`. */
 function recordWrites(deleteAnswer = () => new HttpResponse(null, { status: 204 })) {
   const writes = []
   server.use(
-    http.get('*/api/recruitment-channels', () => HttpResponse.json([CHANNEL])),
-    http.get('*/api/members', () => HttpResponse.json([
-      member(1, 'Active', 'Synthetic Channel'),
-      member(2, 'Suspended', 'Synthetic Channel'),
-      // A49's own trap: a member whose REPRESENTATIVE id is the channel's number, recruited through another channel.
-      member(3, 'Active', 'Another Channel', CHANNEL.id),
-    ])),
+    http.get('*/api/recruitment-channels/summary', () => HttpResponse.json([CHANNEL])),
     http.delete('*/api/recruitment-channels/:id', ({ params }) => {
       writes.push(`DELETE channel ${params.id}`)
       return deleteAnswer()
@@ -55,25 +48,27 @@ function recordWrites(deleteAnswer = () => new HttpResponse(null, { status: 204 
 async function askToRemove(user) {
   const [open] = await screen.findAllByRole('button', { name: /Synthetic Channel — show the members recruited/ })
   await user.click(open)
-  await user.click(await screen.findByRole('button', { name: /Remove recruiter/ }))
-  return screen.findByRole('dialog', { name: 'Remove this recruiter?' })
+  await user.click(await screen.findByRole('button', { name: /Remove recruitment channel/ }))
+  return screen.findByRole('dialog', { name: 'Remove this recruitment channel?' })
 }
 
-describe('Recruiters — Remove recruiter (A49, MO21)', () => {
+describe('Recruiters — removing a recruitment channel (A49, MO21)', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     server.use(...pageFixtures)
   })
 
-  it('🔒 says what will happen: the channel goes, and the members recruited through it keep their status', async () => {
+  it('🔴 is named for what it removes, and says every consequence: off the list, off Capture Member, members kept', async () => {
     recordWrites()
     const user = setupUser()
     renderWithProviders(<Recruiters />)
 
+    expect(screen.queryByRole('button', { name: /Remove recruiter$/ }), 'no action named for a person').toBeNull()
     const dialog = await askToRemove(user)
 
     expect(dialog).toHaveTextContent(
-      'Synthetic Channel will be removed. 2 member(s) recruited through it keep their status; only their recruitment channel is cleared.')
+      'Synthetic Channel will be removed from the recruitment channels, and Capture Member will no longer offer it. '
+      + '2 member(s) recruited through it keep their status; only their recruitment channel is cleared.')
     expect(dialog, 'no status is written, least of all one no list knows').not.toHaveTextContent(/Inactive/)
   })
 
@@ -83,7 +78,7 @@ describe('Recruiters — Remove recruiter (A49, MO21)', () => {
     renderWithProviders(<Recruiters />)
 
     const dialog = await askToRemove(user)
-    await user.click(within(dialog).getByRole('button', { name: 'Remove recruiter' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Remove recruitment channel' }))
 
     await waitFor(() => expect(writes).toEqual(['DELETE channel 5']))
     expect(await screen.findByText(
@@ -96,7 +91,7 @@ describe('Recruiters — Remove recruiter (A49, MO21)', () => {
     renderWithProviders(<Recruiters />)
 
     const dialog = await askToRemove(user)
-    await user.click(within(dialog).getByRole('button', { name: 'Remove recruiter' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Remove recruitment channel' }))
 
     expect(await screen.findByText(/Synthetic Channel's removal was not saved\./)).toBeInTheDocument()
     expect(writes).toEqual(['DELETE channel 5'])

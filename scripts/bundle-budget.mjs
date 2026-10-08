@@ -310,7 +310,22 @@ const CEILINGS = {
   // runner: clivememela/sasbo-online run 36988020502 at b0f9a4d, javascript 790.75 KiB, 0.10 over 790.65 at 0eb0d56
   // (run 36903903677). +100 B by vite's sizes, in one chunk there already: HomeFigures 5.90 -> 6.00 kB (the sentence,
   // and the choice between it and "today"). Nothing from src/test/ is imported.
-  js: 790.76 * KB,
+  //
+  // 790.76 -> 796.18 on 2026-10-07, MEASURED, under the October build's rule (OB17, "raise to measured"): the bugs
+  // stream -- A67, A29, A23, RC15 and the user manual's defects. Measured on a team runner: clivememela/sasbo-online
+  // run 37670914235 at 32c63ab, javascript 796.17 KiB, +6.29 over 789.88 at main cbd11dc (run 37017335321). +6,460 B by
+  // vite's sizes:
+  //   bankBranches 0 -> 5.35 and AddressAutocomplete 4.25 -> 0 (+1.10: one shared chunk now holds the address search
+  //   and A29's branch form, converted once at each edge) · RequirePermission 0 -> 2.13 (oct/base's notice and the
+  //   permission catalogue, first bundled: Subscriptions offers Edit to SUBSCRIPTIONS_MAINTAIN alone, and a channel's
+  //   members need MEMBERS_VIEW) · Subscriptions +1.94 (A23's create, the permission's gate, an emptied debit day
+  //   refused, what ACTIVE decides) · recruitmentChannelService +0.86 (RC15's five calls) · BankBranch +0.70 (A29: the
+  //   record converted, a refusal's fields read in place) · Recruiters +0.31 (RC15 step 2: the server's figures and
+  //   pages, Add Member and removal by the channel's routes, the browser's own count gone) · CaptureMember +0.30 (A67:
+  //   the bank's day is the default the save sends) · useDebounce 0 -> 0.20 and useWorkplaceChoice -1.04 (a module
+  //   shared by more screens leaves for its own chunk) · the entry +0.08, NO CODE (OB17a): the preload map naming the
+  //   two more lazy chunks · the rest +/-0.10 of shared-chunk names. Nothing from src/test/ is imported by the product.
+  js: 796.18 * KB,
   // 2026-09-10: 60.63 → 72.02 KiB when the client became card.html whole -- the theme
   // switch's pour, the register's container ladder and phone rows, the card's landing and
   // sweep, the skeleton, and the utilities every rebuilt screen now shares. Checked before
@@ -337,7 +352,16 @@ const CEILINGS = {
   //
   // 934.77 -> 934.87 on 2026-10-02, MEASURED (MO33): 934.86 KiB on run 36988020502 -- the javascript's +0.10 above,
   // the stylesheet unmoved at 80.63.
-  total: 934.87 * KB,
+  //
+  // 934.87 -> 940.29 on 2026-10-07, MEASURED (OB17): 940.28 KiB on run 37670914235 -- the javascript's +6.29 above, the
+  // stylesheet unmoved at 80.63, against 933.99 at main cbd11dc.
+  //
+  // 940.29 -> 940.30 on 2026-10-08, MEASURED (OB17): 940.29 KiB printed on run 37779077999 at e6499ba, over by bytes; the
+  // hundredth over the printed figure covers its rounding. One chunk moved against run 37672009580 at 56c4a67:
+  // BankBranch 13.91 -> 13.92 kB, A29's footer buttons keyed apart so that pressing Edit no longer saves the form it
+  // opens. The javascript row stays within its 796.18; the stylesheet unmoved at 80.63. Nothing from src/test/ is
+  // imported by the product.
+  total: 940.30 * KB,
   // 2026-09-14: DOCUMENTS ARE THEIR OWN ROW, not part of `total`. The membership application
   // PDF became a real Vite import (it had been a dev-only `/src/...` path that a production
   // build served as an empty frame), and at 487.6 KiB it alone took `all assets` from ~764 to

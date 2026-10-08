@@ -307,18 +307,12 @@ export const SURFACES = [
   // ── Recruiters ────────────────────────────────────────────────────────────────────────────────
   { name: 'recruiters-channel', route: '/recruiters', ready: ROWS, steps: [OPEN_CHANNEL], present: { DIALOG: ANY_DIALOG },
     covers: ['pages/members/Recruiters.jsx#Modal@channel'] },
-  { name: 'recruiters-add-member', route: '/recruiters', ready: ROWS,
-    steps: [OPEN_CHANNEL, step('Add Member', clickByText(IN_DIALOG, '/^Add Member$/'), dialogNamed('/^Add member to recruiter$/'))],
-    present: { DIALOG: dialogNamed('/^Add member to recruiter$/') }, covers: ['pages/members/Recruiters.jsx#Modal@add member'] },
-  { name: 'recruiters-member-details', route: '/recruiters', ready: ROWS,
-    steps: [OPEN_CHANNEL, step('open a member', clickByText(IN_DIALOG, '/open the record for/i'), dialogNamed('/^Member details$/'))],
-    present: { DIALOG: dialogNamed('/^Member details$/') }, covers: ['pages/members/Recruiters.jsx#Modal@member details'] },
-  { name: 'recruiters-remove-member', route: '/recruiters', ready: ROWS,
-    steps: [OPEN_CHANNEL, step('remove a member', clickByText(IN_DIALOG, '/from this recruiter$/'), dialogNamed('/^Remove this member from the recruiter\\?$/'))],
-    present: { DIALOG: dialogNamed('/^Remove this member from the recruiter\\?$/') }, covers: ['pages/members/Recruiters.jsx#ConfirmDialog@remove member'] },
+  // RC15, step 2 (bugs): a channel's members, Add Member, a member's record and removing a member need MEMBERS_VIEW or
+  // MEMBERS_EDIT -- UNREACHABLE below until the sign-in client's stub mode can drive a signed-in user. The channel's
+  // removal is named for what it removes (the user manual's reading, 6 Oct): "Remove recruitment channel".
   { name: 'recruiters-remove-recruiter', route: '/recruiters', ready: ROWS,
-    steps: [OPEN_CHANNEL, step('Remove recruiter', clickByText(IN_DIALOG, '/^Remove recruiter$/'), dialogNamed('/^Remove this recruiter\\?$/'))],
-    present: { DIALOG: dialogNamed('/^Remove this recruiter\\?$/') }, covers: ['pages/members/Recruiters.jsx#ConfirmDialog@remove recruiter'] },
+    steps: [OPEN_CHANNEL, step('Remove recruitment channel', clickByText(IN_DIALOG, '/^Remove recruitment channel$/'), dialogNamed('/^Remove this recruitment channel\\?$/'))],
+    present: { DIALOG: dialogNamed('/^Remove this recruitment channel\\?$/') }, covers: ['pages/members/Recruiters.jsx#ConfirmDialog@remove recruiter'] },
   { name: 'recruiters-recruiter-details-date', route: '/recruiters', ready: ROWS,
     steps: [OPEN_CHANNEL,
       step('view recruiter details', clickByText(IN_DIALOG, '/^View recruiter details$/'), dialogNamed('/^Recruiter details$/')),
@@ -328,15 +322,12 @@ export const SURFACES = [
       step('open Election Date', mouseDownOn('[role="dialog"] input[aria-haspopup="dialog"]', '/Election Date/'), DATE_PICKER_OPEN)],
     present: { DETAILS: dialogNamed('/^Recruiter details$/'), DATE_PICKER_OPEN },
     covers: ['pages/members/Recruiters.jsx#Modal@recruiter details', 'pages/members/Recruiters.jsx#DateField@recruiter details'] },
-  { name: 'recruiters-add-recruiter-date', route: '/recruiters', ready: ROWS,
-    // The recruiter's details -- Elected Recruiter among them -- render only once a member has been chosen (Recruiters.jsx).
-    steps: [step('Add Recruiter', clickByText('main button', '/^Add Recruiter$/'), dialogNamed('/^Add Recruiter$/')),
-      step('choose a member', clickByText('[role="dialog"] button', '/^Choose .* as the recruiter$/'), `[...document.querySelectorAll('[role="dialog"] legend')].some((l) => /Elected Recruiter/.test(l.textContent))`),
-      step('answer Elected Recruiter: Yes', answerYes('/Elected Recruiter/'), `!!document.querySelector('[role="dialog"] input[aria-haspopup="dialog"]')`),
-      DIALOG_DATE_IN_VIEW,
-      step('open Election Date', mouseDownOn('[role="dialog"] input[aria-haspopup="dialog"]', '/Election Date/'), DATE_PICKER_OPEN)],
-    present: { DIALOG: dialogNamed('/^Add Recruiter$/'), DATE_PICKER_OPEN },
-    covers: ['pages/members/Recruiters.jsx#Modal@add recruiter', 'pages/members/Recruiters.jsx#DateField@add recruiter'] },
+  // The recruiter's details -- Elected Recruiter and its date among them -- render only once a member is chosen, and the
+  // picker needs MEMBERS_VIEW since RC15 step 2: the dialog is driven, its date is UNREACHABLE below.
+  { name: 'recruiters-add-recruiter', route: '/recruiters', ready: ROWS,
+    steps: [step('Add Recruiter', clickByText('main button', '/^Add Recruiter$/'), dialogNamed('/^Add Recruiter$/'))],
+    present: { DIALOG: dialogNamed('/^Add Recruiter$/') },
+    covers: ['pages/members/Recruiters.jsx#Modal@add recruiter'] },
   { name: 'recruiters-refs-partial', route: '/recruiters', intercept: { url: '*/api/banks*', mode: 'fail' },
     ready: `${ROWS} && (${STATE('partial')} || ${STATE('error')})`, present: { NOTICE: `${STATE('partial')} || ${STATE('error')}` },
     covers: ['pages/members/Recruiters.jsx#DataState@refs'] },
@@ -583,6 +574,19 @@ export const UNREACHABLE = [
     why: 'rendered `disabled` -- a date nobody can open' },
   { site: 'components/form/AddressAutocomplete.jsx#aria-expanded@suggestions',
     why: 'its suggestions come from Google Places; the stub cannot answer Google and a measurement sends nothing to it (R-SEC-H)' },
+  // October build, bugs (RC15 step 2): the members of a recruitment channel are a server page that needs MEMBERS_VIEW, and
+  // changing who is in a channel needs MEMBERS_EDIT; oct/base's AuthProvider is the anonymous caller until the sign-in
+  // stream's client lands -- then its stub mode (contracts/signin.md) drives these, and they go.
+  { site: 'pages/members/Recruiters.jsx#Modal@add member',
+    why: 'Add Member is offered only to a signed-in user holding MEMBERS_EDIT, and no session can be stubbed until sign-in lands' },
+  { site: 'pages/members/Recruiters.jsx#Modal@member details',
+    why: "a member's record opens from a channel's member list, which needs MEMBERS_VIEW, and no session can be stubbed until sign-in lands" },
+  { site: 'pages/members/Recruiters.jsx#DataState@member record',
+    why: "the member's record loads inside Member details, reached only from a channel's member list (MEMBERS_VIEW) -- no session can be stubbed until sign-in lands" },
+  { site: 'pages/members/Recruiters.jsx#ConfirmDialog@remove member',
+    why: 'taking a member off a channel needs MEMBERS_EDIT, from the member list MEMBERS_VIEW shows -- no session can be stubbed until sign-in lands' },
+  { site: 'pages/members/Recruiters.jsx#DateField@add recruiter',
+    why: "the recruiter's Election Date renders once a member is chosen, and the picker needs MEMBERS_VIEW -- no session can be stubbed until sign-in lands" },
 ];
 
 /* ── the guard: the catalogue against the source ─────────────────────────────────────────────────── */

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 
 import { server } from '../test/msw/server'
@@ -81,6 +81,7 @@ const nonJsonBody = () =>
 const BODYLESS = new Set([
   'recruiterService.remove',
   'recruitmentChannelService.remove',
+  'recruitmentChannelService.removeMember',
   'subscriptionsService.remove',
 ])
 
@@ -413,48 +414,25 @@ describe('the endpoint each method actually calls', () => {
     },
   )
 
-  it(
-    pin(
-      DEFECTS.A23,
-      'subscriptionsService.create still POSTs to /api/recruitment-channels',
-    ),
-    async () => {
-      const seen = []
-      const listener = ({ request }) =>
-        seen.push(`${request.method} ${new URL(request.url).pathname}`)
-      server.events.on('request:start', listener)
-      try {
-        server.use(okJson())
-        await settle(
-          allServiceMethods().find((m) => m.qualified === 'subscriptionsService.create'),
-        )
-      } finally {
-        server.events.removeListener('request:start', listener)
-      }
-      expect(
-        seen,
-        'A23 has been fixed: subscriptionsService.create now addresses its own resource. ' +
-          'Delete this pin, un-skip the test below, and close the row.',
-      ).toEqual(['POST /api/recruitment-channels'])
-    },
-  )
-
-  it.skip(
-    disabled(DEFECTS.A23, 'subscriptionsService.create must POST to /api/subscriptions'),
-    async () => {
-      const seen = []
-      const listener = ({ request }) =>
-        seen.push(`${request.method} ${new URL(request.url).pathname}`)
-      server.events.on('request:start', listener)
-      try {
-        server.use(okJson())
-        await settle(
-          allServiceMethods().find((m) => m.qualified === 'subscriptionsService.create'),
-        )
-      } finally {
-        server.events.removeListener('request:start', listener)
-      }
-      expect(seen).toEqual(['POST /api/subscriptions'])
-    },
-  )
+  // A23, fixed by the October build: the pin that asserted `POST /api/recruitment-channels` is deleted, and the
+  // standard-facing test below runs live. It also holds the body: a subscription's row, never `{ name }`.
+  it('A23: subscriptionsService.create POSTs a subscription row to /api/subscriptions', async () => {
+    const seen = []
+    let body
+    const listener = async ({ request }) => {
+      seen.push(`${request.method} ${new URL(request.url).pathname}`)
+      body = await request.clone().json().catch(() => undefined)
+    }
+    server.events.on('request:start', listener)
+    try {
+      server.use(okJson())
+      await settle(
+        allServiceMethods().find((m) => m.qualified === 'subscriptionsService.create'),
+      )
+    } finally {
+      server.events.removeListener('request:start', listener)
+    }
+    expect(seen).toEqual(['POST /api/subscriptions'])
+    await vi.waitFor(() => expect(body).toMatchObject({ bankName: 'Synthetic Bank Limited', subscriptionAmount: 174 }))
+  })
 })
